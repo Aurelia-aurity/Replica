@@ -1,0 +1,58 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+
+# Secrets: commit only explicit sample files
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/flutter_export_environment.sh
+
+# Runtime / local datasets / model artifacts
+*.log
+.coverage
+htmlcov/
+.cache/
+data/
+backend/uploads/
+ai/models/
+ai/checkpoints/
+ai/indexes/
+experiments/artifacts/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.gguf
+
+# Local agent / browser records
+.insane-review/
+bridge/
