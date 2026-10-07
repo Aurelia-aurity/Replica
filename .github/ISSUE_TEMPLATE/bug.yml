@@ -1,0 +1,76 @@
+name: 버그
+description: 재현 방법과 기대 결과를 포함해 동작 오류를 등록합니다.
+title: "[버그] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        재현에 필요한 정보와 확인한 결과를 적어주세요. 원인은 확인된 경우에만 적습니다.
+        로그·스크린샷에는 토큰, 비밀번호, 개인 대화·음성 등 비공개 자료를 포함하지 마세요.
+  - type: dropdown
+    id: area
+    attributes:
+      label: 관련 파트
+      multiple: true
+      options:
+        - 앱 (mobile)
+        - 백엔드 (backend)
+        - AI (ai)
+        - 음성 (STT·TTS)
+        - API 계약 (contracts)
+        - 인프라·DB (infra)
+        - 실험·평가 (experiments)
+        - 문서·협업
+        - 공통·연동
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+      description: 발생한 오류와 영향을 받은 동작을 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과
+      description: 정상적으로 동작했을 때의 결과를 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 재현 방법
+      description: 입력·실행 순서·발생 빈도를 적어주세요. 재현이 불규칙하면 확인한 조건을 적습니다.
+      placeholder: |
+        1. 실행 환경과 준비 조건
+        2. 입력 또는 수행한 동작
+        3. 오류가 발생하는 시점과 빈도
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 실행 환경
+      description: 관련된 OS·기기, 도구 버전, 브랜치·커밋을 적어주세요.
+      placeholder: |
+        - OS·기기:
+        - 관련 도구·라이브러리 버전:
+        - 브랜치·커밋:
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 오류 로그·스크린샷
+      description: 비공개 정보를 제거한 로그나 화면을 첨부해주세요. 없으면 생략합니다.
+    validations:
+      required: false
+  - type: textarea
+    id: related
+    attributes:
+      label: 관련 이슈·추가 확인 사항
+      description: 관련 이슈, 확인한 우회 방법, 필요한 추가 조사를 적어주세요.
+    validations:
+      required: false

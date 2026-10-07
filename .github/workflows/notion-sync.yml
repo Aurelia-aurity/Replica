@@ -1,0 +1,41 @@
+name: GitHub → Notion
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  issues:
+    types: [opened, edited, closed, reopened, assigned, unassigned, labeled, unlabeled, deleted, transferred]
+  pull_request_target:
+    types: [opened, edited, closed, reopened, synchronize, ready_for_review, converted_to_draft, assigned, unassigned, labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: replica-notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'Aurelia-aurity/Replica' && vars.NOTION_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # pull_request_target: use ONLY trusted main code, never a PR/fork ref or event-provided command.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify sync implementation
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_notion_sync.py'
+      - name: Sync current GitHub state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
+          NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
+          NOTION_SYNC_ENABLED: ${{ vars.NOTION_SYNC_ENABLED }}
+        run: python3 -B scripts/notion_sync.py

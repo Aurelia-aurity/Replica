@@ -1,0 +1,70 @@
+name: 작업
+description: 기능 개발, 문서, 조사, 실험, 환경 설정 작업을 등록합니다.
+title: "[작업] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        작업 목적과 확인 가능한 완료 조건을 적어주세요.
+        담당자는 이슈의 Assignees에서 지정하고, 관련 PR과 결과는 이 이슈에 연결합니다.
+  - type: dropdown
+    id: area
+    attributes:
+      label: 관련 파트
+      description: 여러 파트에 걸친 작업은 모두 선택해주세요.
+      multiple: true
+      options:
+        - 앱 (mobile)
+        - 백엔드 (backend)
+        - AI (ai)
+        - 음성 (STT·TTS)
+        - API 계약 (contracts)
+        - 인프라·DB (infra)
+        - 실험·평가 (experiments)
+        - 문서·협업
+        - 공통·연동
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목적
+      description: 필요한 이유와 이 작업으로 얻을 결과를 적어주세요.
+      placeholder: 어떤 문제를 해결하거나 무엇을 확인하려는 작업인가요?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 변경할 기능·문서·설정 또는 수행할 조사·실험을 적어주세요.
+      placeholder: |
+        - 수행할 작업
+        - 이번 작업에 포함하지 않는 내용 (필요한 경우)
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+      description: 실행 결과, 검증 방법 또는 남길 산출물을 구체적으로 적어주세요.
+      placeholder: |
+        - [ ] 확인 가능한 결과 또는 산출물
+        - [ ] 결과를 확인하는 방법
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 관련 이슈·선행 작업
+      description: 먼저 필요한 작업이나 다른 파트와 합의할 내용을 적어주세요. 없으면 생략합니다.
+      placeholder: "관련 이슈 #번호, 필요한 API 형식·접근 권한·결정 사항"
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: 참고 자료
+      description: 설계 문서, 공식 문서, 예제 등 작업에 필요한 자료를 연결해주세요.
+    validations:
+      required: false
