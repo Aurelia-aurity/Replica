@@ -2,6 +2,17 @@ name: GitHub → Notion
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '읽기 전용 사전검사 (비활성 상태에서도 실행 가능)'
+        type: boolean
+        required: true
+        default: true
+      resolve_issue_numbers:
+        description: 'PM이 현재 Project 값을 승인한 보류 이슈 번호 (쉼표 구분)'
+        type: string
+        required: false
+        default: ''
   schedule:
     - cron: '7,22,37,52 * * * *'
   issues:
@@ -20,9 +31,12 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'Aurelia-aurity/Replica' && vars.NOTION_SYNC_ENABLED == 'true'
+    if: >-
+      github.repository == 'Aurelia-aurity/Replica' &&
+      (vars.NOTION_SYNC_ENABLED == 'true' ||
+       (github.event_name == 'workflow_dispatch' && inputs.dry_run))
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       # pull_request_target: use ONLY trusted main code, never a PR/fork ref or event-provided command.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -30,12 +44,32 @@ jobs:
           ref: main
           persist-credentials: false
       - name: Verify sync implementation
-        run: python3 -B -m unittest discover -s scripts/tests -p 'test_notion_sync.py'
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Sync current GitHub state
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          PROJECT_OWNER_ID: ${{ vars.PROJECT_OWNER_ID }}
+          PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
+          PROJECT_STATUS_OPTIONS: ${{ vars.PROJECT_STATUS_OPTIONS }}
+          PM_GITHUB_USER_ID: ${{ vars.PM_GITHUB_USER_ID }}
           NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
           NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
           NOTION_SYNC_ENABLED: ${{ vars.NOTION_SYNC_ENABLED }}
-        run: python3 -B scripts/notion_sync.py
+          SYNC_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          SYNC_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
+        run: |
+          python3 -B - <<'PY'
+          import os
+          import subprocess
+          import sys
+
+          args = []
+          if os.environ.get("SYNC_DRY_RUN") == "true":
+              args.append("--dry-run")
+          if os.environ.get("SYNC_RESOLVE_ISSUES"):
+              args.extend(["--resolve-issue-numbers", os.environ["SYNC_RESOLVE_ISSUES"]])
+          subprocess.run([sys.executable, "-B", "scripts/notion_sync.py", *args], check=True)
+          PY

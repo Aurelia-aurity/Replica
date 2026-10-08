@@ -322,4 +322,5 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    from sync_engine import main as core_main
+    sys.exit(core_main())
