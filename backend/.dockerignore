@@ -1,0 +1,9 @@
+.venv
+.env
+.git
+.vscode
+tests
+__pycache__
+*.pyc
+*.pem
+requirements-dev.txt
