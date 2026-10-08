@@ -1,0 +1,3 @@
+# DB 접근 (Supabase Postgres)
+psycopg[binary]==3.2.9
+psycopg-pool==3.2.6
