@@ -1,4 +1,6 @@
 import copy
+import contextlib
+import io
 import json
 import sys
 import unittest
@@ -39,6 +41,11 @@ def conn(nodes=(), *, more=False, cursor=None, total=None):
 def rich_text_value(value):
     return "".join(part.get("plain_text", part.get("text", {}).get("content", ""))
                    for part in value.get("rich_text", []))
+
+
+def title_text(page, name="제목"):
+    return "".join(part.get("plain_text", part.get("text", {}).get("content", ""))
+                   for part in page["properties"][name]["title"])
 
 
 def status_value(name):
@@ -270,6 +277,7 @@ class FakeNotion:
         self.after_patch = None
         self.request_status = {"type": "complete"}
         self.omit_request_status = False
+        self.query_response_transform = None
 
     @staticmethod
     def schema():
@@ -286,10 +294,17 @@ class FakeNotion:
             archived = payload["is_archived"]
             rows = [page for page in self.pages.values() if se.is_archived(page) == archived]
             offset = int(payload.get("start_cursor", "0"))
-            response = {"results": copy.deepcopy(rows[offset:offset + self.page_size]),
-                        "has_more": False, "next_cursor": None}
+            end = offset + self.page_size
+            batch = copy.deepcopy(rows[offset:end])
+            has_more = end < len(rows)
+            response = {"object": "list", "type": "page_or_data_source",
+                        "page_or_data_source": {}, "results": batch,
+                        "has_more": has_more,
+                        "next_cursor": str(end) if has_more else None}
             if not self.omit_request_status:
                 response["request_status"] = copy.deepcopy(self.request_status)
+            if self.query_response_transform:
+                response = self.query_response_transform(response, payload)
             return response
         if method == "GET":
             page_id = path.rsplit("/", 1)[1]
@@ -533,7 +548,10 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(self.notion.writes, [])
 
     def test_unknown_or_null_notion_request_status_fails_before_any_write(self):
-        for request_status in ({"type": "queued"}, None, {"type": "incomplete"}):
+        statuses = ({"type": "queued"}, None, {"type": "incomplete"}, {},
+                    {"type": []}, {"type": "complete", "incomplete_reason": None},
+                    {"type": "complete", "incomplete_reason": "unknown-reason"})
+        for request_status in statuses:
             with self.subTest(request_status=request_status):
                 self.notion = FakeNotion([control_page(control_internal())])
                 self.notion.request_status = request_status
@@ -542,14 +560,197 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertEqual(self.notion.writes, [])
                 self.assertEqual(self.project.writes, [])
 
-    def test_missing_notion_request_status_fails_before_any_write(self):
-        self.notion = FakeNotion([control_page(control_internal())])
+    def test_missing_notion_request_status_is_accepted_after_all_sdk_shaped_pages(self):
+        self.repo_graph = RepoGraph(issues=[make_issue()])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI([make_project_item(option="백로그")])
+        self.notion = FakeNotion([control_page(control_internal()), active_issue_page(task="백로그")])
+        self.notion.page_size = 1
         self.notion.omit_request_status = True
 
-        with self.assertRaises(se.SyncError):
-            self.run_sync()
+        diagnostics = io.StringIO()
+        with contextlib.redirect_stderr(diagnostics):
+            result = self.run_sync(dry_run=True)
+
+        self.assertEqual(result["source_items"], 1)
+        self.assertEqual(len(result["issue_plans"]), 1)
+        self.assertIn("request_status=missing", diagnostics.getvalue())
+        self.assertIn("type=page_or_data_source page_or_data_source=object", diagnostics.getvalue())
+        self.assertIn("next_cursor_valid=true", diagnostics.getvalue())
         self.assertEqual(self.notion.writes, [])
         self.assertEqual(self.project.writes, [])
+
+    def test_malformed_notion_query_envelopes_fail_before_any_write(self):
+        def remove(name):
+            def transform(response, _payload):
+                response.pop(name, None)
+                return response
+            return transform
+
+        def change(**values):
+            def transform(response, _payload):
+                response.update(values)
+                return response
+            return transform
+
+        transforms = (
+            lambda _response, _payload: None,
+            remove("object"), change(object="page"),
+            remove("type"), change(type="page"),
+            remove("page_or_data_source"), change(page_or_data_source=[]),
+            remove("results"), change(results={}),
+            remove("has_more"), change(has_more=1),
+            remove("next_cursor"), change(next_cursor="terminal-cursor"),
+        )
+        for transform in transforms:
+            with self.subTest(transform=transform):
+                self.notion = FakeNotion([control_page(control_internal())])
+                self.notion.query_response_transform = transform
+                with self.assertRaises(se.SyncError):
+                    self.run_sync()
+                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.project.writes, [])
+
+    def test_control_row_accepts_only_legacy_empty_or_fixed_workflow_url(self):
+        for value in (None, se.ACTIONS_WORKFLOW_URL):
+            with self.subTest(url=value):
+                self.notion = FakeNotion([control_page(control_internal())])
+                self.notion.pages[CONTROL_ID]["properties"]["GitHub URL"] = {"url": value}
+                self.run_sync(dry_run=True)
+                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.project.writes, [])
+
+        for value in ("https://github.com/Aurelia-aurity/Replica/actions/runs/12345",
+                      "https://github.com/another/repo/actions/workflows/notion-sync.yml",
+                      "https://example.invalid/workflow"):
+            with self.subTest(rejected_url=value):
+                self.notion = FakeNotion([control_page(control_internal())])
+                self.notion.pages[CONTROL_ID]["properties"]["GitHub URL"] = {"url": value}
+                with self.assertRaisesRegex(se.SyncError, "Actions URL"):
+                    self.run_sync()
+                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.project.writes, [])
+
+    def test_control_summary_readback_mismatch_fails_closed(self):
+        self.notion = FakeNotion([control_page(control_internal())])
+
+        def corrupt_control_title(path, properties, notion):
+            if path == f"/pages/{CONTROL_ID}" and "제목" in properties:
+                notion.after_patch = None
+                notion.pages[CONTROL_ID]["properties"]["제목"] = se.text_property(
+                    "unexpected summary", "title")
+
+        self.notion.after_patch = corrupt_control_title
+        with self.assertRaisesRegex(se.SyncError, "readback"):
+            self.run_sync()
+        control_patches = [entry for entry in self.notion.writes
+                           if entry[1] == f"/pages/{CONTROL_ID}"]
+        self.assertEqual(len(control_patches), 1)
+        self.assertEqual(self.project.writes, [])
+
+    def test_late_notion_page_validation_failure_prevents_every_write(self):
+        self.repo_graph = RepoGraph(issues=[make_issue()])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI([make_project_item(option="백로그")])
+        self.notion = FakeNotion([control_page(control_internal()), active_issue_page(task="백로그")])
+        self.notion.page_size = 1
+
+        def break_second_page(response, payload):
+            if "start_cursor" in payload:
+                response["type"] = "unexpected-page-type"
+            return response
+
+        self.notion.query_response_transform = break_second_page
+        with self.assertRaisesRegex(se.SyncError, "envelope"):
+            self.run_sync()
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.notion.creates, 0)
+        self.assertEqual(self.project.writes, [])
+
+    def test_notion_query_cursors_must_be_fresh_and_terminal_cursor_null(self):
+        def response(*, has_more=False, next_cursor=None):
+            return {"object": "list", "type": "page_or_data_source",
+                    "page_or_data_source": {}, "results": [None],
+                    "has_more": has_more, "next_cursor": next_cursor}
+
+        class ResponseSequence:
+            def __init__(self, responses):
+                self.responses = list(responses)
+                self.calls = 0
+
+            def request(self, *_args, **_kwargs):
+                value = self.responses[self.calls]
+                self.calls += 1
+                return copy.deepcopy(value)
+
+        malformed = (
+            {"object": "list", "type": "page_or_data_source", "page_or_data_source": {},
+             "results": [], "has_more": True},
+            response(has_more=True, next_cursor=""),
+            response(has_more=True, next_cursor=7),
+            response(next_cursor="terminal-cursor"),
+        )
+        for value in malformed:
+            with self.subTest(value=value):
+                with self.assertRaises(se.SyncError):
+                    se.query_all(ResponseSequence([value]), SOURCE_ID, False)
+
+        repeated = ResponseSequence([response(has_more=True, next_cursor="cursor-a"),
+                                      response(has_more=True, next_cursor="cursor-a")])
+        with self.assertRaisesRegex(se.SyncError, "반복"):
+            se.query_all(repeated, SOURCE_ID, False)
+
+    def test_notion_query_cap_refuses_10000_and_accepts_9999_per_query(self):
+        class SizedNotion:
+            def __init__(self, total):
+                self.total = total
+                self.archived_queries = []
+
+            def request(self, _method, _path, payload):
+                self.archived_queries.append(payload["is_archived"])
+                start = int(payload.get("start_cursor", "0"))
+                end = min(start + se.NOTION_QUERY_PAGE_SIZE, self.total)
+                has_more = end < self.total
+                return {"object": "list", "type": "page_or_data_source",
+                        "page_or_data_source": {}, "results": [None] * (end - start),
+                        "has_more": has_more,
+                        "next_cursor": str(end) if has_more else None}
+
+        for archived in (False, True):
+            for total, rejected in ((9999, False), (10000, True)):
+                with self.subTest(archived=archived, total=total):
+                    notion = SizedNotion(total)
+                    if rejected:
+                        with self.assertRaisesRegex(se.SyncError, "10,000"):
+                            se.query_all(notion, SOURCE_ID, archived)
+                    else:
+                        rows = se.query_all(notion, SOURCE_ID, archived)
+                        self.assertEqual(len(rows), total)
+                    self.assertEqual(set(notion.archived_queries), {archived})
+
+    def test_query_shape_diagnostics_do_not_log_remote_values(self):
+        class SingleResponse:
+            def request(self, *_args, **_kwargs):
+                return {"object": "list", "type": "page_or_data_source",
+                        "page_or_data_source": {"remote_marker": "BODY_CANARY"},
+                        "results": [{"id": "ROW_CANARY"}], "has_more": False,
+                        "next_cursor": "CURSOR_CANARY",
+                        "request_status": {"type": "STATUS_CANARY",
+                                          "incomplete_reason": "REASON_CANARY"}}
+
+        diagnostics = io.StringIO()
+        with contextlib.redirect_stderr(diagnostics):
+            with self.assertRaises(se.SyncError):
+                se.query_all(SingleResponse(), SOURCE_ID, False, diagnostics=True)
+        output = diagnostics.getvalue()
+        for value in ("BODY_CANARY", "ROW_CANARY", "CURSOR_CANARY", "STATUS_CANARY", "REASON_CANARY"):
+            self.assertNotIn(value, output)
+        self.assertIn("request_status=other", output)
+        self.assertIn("incomplete_reason=other", output)
+        self.assertIn("results_count=1", output)
+        self.assertIn("next_cursor_type=string", output)
 
     def test_transport_mutation_is_not_retried_and_read_can_retry(self):
         class Response:
@@ -848,7 +1049,15 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
             "number": ISSUE_NUMBER, "state": "open"}])
         self.project = ProjectAPI([make_project_item(option=None)])
-        self.notion = FakeNotion([control_page(control_internal()),
+        previous_success = "2026-09-29T12:00:00Z"
+        saved_control_state = json.loads(control_internal())
+        saved_control_state["last_success_at"] = previous_success
+        control = control_page(se.canonical_json(saved_control_state))
+        control["properties"]["동기화 시각"] = {"date": {"start": previous_success}}
+        control["properties"]["메모"] = se.text_property("private team note")
+        control["properties"]["일정"] = {"date": {"start": "2026-12-24"}}
+        control["body"] = "private control-page body"
+        self.notion = FakeNotion([control,
             active_issue_page(task="백로그", internal=se.canonical_json(state))])
 
         ordinary = self.run_sync()
@@ -859,10 +1068,24 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(held["hold"]["code"], "PROJECT_STATUS_UNSET")
         self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "백로그")
         self.assertEqual(self.project.writes, [])
+        summary = self.notion.pages[CONTROL_ID]
+        self.assertEqual(title_text(summary), f"Replica 동기화 · 부분 반영 · {NOW}")
+        self.assertEqual(summary["properties"]["GitHub URL"]["url"], se.ACTIONS_WORKFLOW_URL)
+        self.assertEqual(se.read_text(summary, "확인 필요"), "보류 1건: 18")
+        self.assertEqual(se.read_date(summary, "동기화 시각"), previous_success)
+        summary_state = se.decode_internal(se.read_text(summary, "동기화 내부 상태"),
+            kind="control", project_id=gp.EXPECTED_PROJECT_ID)
+        self.assertEqual(summary_state["last_result"]["kind"], "partial")
+        self.assertEqual(summary_state["last_result"]["at"], NOW)
+        self.assertEqual(summary_state["last_result"]["holds"], [18])
+        self.assertEqual(summary_state["last_success_at"], previous_success)
+        self.assertEqual(se.read_text(summary, "메모"), "private team note")
+        self.assertEqual(summary["properties"]["일정"]["date"]["start"], "2026-12-24")
+        self.assertEqual(summary["body"], "private control-page body")
         control = se.decode_internal(
             se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
             kind="control", project_id=gp.EXPECTED_PROJECT_ID)
-        self.assertIsNone(control["last_success_at"])
+        self.assertEqual(control["last_success_at"], previous_success)
 
         still_unset = self.run_sync(resolve_issue_numbers="18", env=pm_env(918401))
         self.assertEqual(still_unset["held"], 1)
@@ -874,7 +1097,7 @@ class SyncEngineCoreTests(unittest.TestCase):
         control = se.decode_internal(
             se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
             kind="control", project_id=gp.EXPECTED_PROJECT_ID)
-        self.assertIsNone(control["last_success_at"])
+        self.assertEqual(control["last_success_at"], previous_success)
 
         self.run_sync()
         self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "백로그")
@@ -1379,8 +1602,11 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
             "number": ISSUE_NUMBER, "state": "open"}])
         self.project = ProjectAPI([make_project_item(option="진행 중")])
-        self.notion = FakeNotion([control_page(control_internal()),
-                                  active_issue_page(task=None)])
+        control = control_page(control_internal())
+        control["properties"]["메모"] = se.text_property("private team note")
+        control["properties"]["일정"] = {"date": {"start": "2026-12-24"}}
+        control["body"] = "private control-page body"
+        self.notion = FakeNotion([control, active_issue_page(task=None)])
 
         self.run_sync()
 
@@ -1393,6 +1619,19 @@ class SyncEngineCoreTests(unittest.TestCase):
                                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
                                    object_id=ISSUE_ID)
         self.assertTrue(state["migration_complete"])
+        summary = self.notion.pages[CONTROL_ID]
+        self.assertEqual(title_text(summary), f"Replica 동기화 · 전체 완료 · {NOW}")
+        self.assertEqual(summary["properties"]["GitHub URL"]["url"], se.ACTIONS_WORKFLOW_URL)
+        self.assertEqual(se.read_text(summary, "확인 필요"), "")
+        self.assertEqual(se.read_date(summary, "동기화 시각"), NOW)
+        control_state = se.decode_internal(se.read_text(summary, "동기화 내부 상태"),
+            kind="control", project_id=gp.EXPECTED_PROJECT_ID)
+        self.assertEqual(control_state["last_result"]["kind"], "complete")
+        self.assertEqual(control_state["last_result"]["at"], NOW)
+        self.assertEqual(control_state["last_success_at"], NOW)
+        self.assertEqual(se.read_text(summary, "메모"), "private team note")
+        self.assertEqual(summary["properties"]["일정"]["date"]["start"], "2026-12-24")
+        self.assertEqual(summary["body"], "private control-page body")
 
     def test_failed_hold_display_remains_durable_when_values_later_match(self):
         self.repo_graph = RepoGraph(issues=[make_issue()])

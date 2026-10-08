@@ -21,9 +21,12 @@ import github_project as gp
 REPOSITORY = gp.REPOSITORY
 REPOSITORY_ID = gp.REPOSITORY_ID
 CONTROL_KEY = "replica-sync-control"
+ACTIONS_WORKFLOW_URL = "https://github.com/Aurelia-aurity/Replica/actions/workflows/notion-sync.yml"
 KEY_RE = re.compile(r"gh:([1-9][0-9]*):issue:([1-9][0-9]*)\Z")
 MAX_PROPERTY_TEXT = 20000
 MAX_INTERNAL_TEXT = 18000
+NOTION_QUERY_PAGE_SIZE = 100
+NOTION_QUERY_MAX_RESULTS = 10000
 BOUNDARY_SECONDS = 1.0
 GENERAL_STATES = ("백로그", "준비 중", "진행 중")
 RESUMABLE_HOLD_CODES = {
@@ -375,25 +378,114 @@ class NotionClient:
                 raise SyncError("Notion 응답 형식 오류") from None
 
 
-def query_all(notion, source_id, archived):
+def _notion_query_diagnostic(response, *, archived, page_number, seen_cursors):
+    """Emit allowlisted response-shape facts without remote values or identifiers."""
+    if not isinstance(response, dict):
+        print("[notion-query] "
+              f"archived={str(archived).lower()} page={page_number} response=invalid",
+              file=sys.stderr)
+        return
+
+    object_value = response.get("object")
+    object_kind = "list" if object_value == "list" else (
+        "missing" if "object" not in response else "other")
+    type_value = response.get("type")
+    response_type = "page_or_data_source" if type_value == "page_or_data_source" else (
+        "missing" if "type" not in response else "other")
+    parent_kind = "object" if isinstance(response.get("page_or_data_source"), dict) else (
+        "missing" if "page_or_data_source" not in response else "other")
+
+    results = response.get("results")
+    results_count = str(len(results)) if isinstance(results, list) else (
+        "missing" if "results" not in response else "invalid")
+    has_more_value = response.get("has_more")
+    has_more = str(has_more_value).lower() if type(has_more_value) is bool else (
+        "missing" if "has_more" not in response else "invalid")
+    cursor_present = "next_cursor" in response
+    cursor = response.get("next_cursor")
+    cursor_kind = "null" if cursor is None else "string" if isinstance(cursor, str) else "other"
+    if has_more_value is True:
+        cursor_valid = isinstance(cursor, str) and bool(cursor) and cursor not in seen_cursors
+    elif has_more_value is False:
+        cursor_valid = cursor is None
+    else:
+        cursor_valid = False
+
+    status = response.get("request_status")
+    if "request_status" not in response:
+        status_kind = "missing"
+        reason_kind = "unavailable"
+    elif not isinstance(status, dict):
+        status_kind = "malformed"
+        reason_kind = "unavailable"
+    else:
+        status_value = status.get("type")
+        status_kind = status_value if isinstance(status_value, str) and status_value in {
+            "complete", "incomplete"} else (
+            "missing" if "type" not in status else "other")
+        if "incomplete_reason" not in status:
+            reason_kind = "absent"
+        else:
+            reason = status.get("incomplete_reason")
+            reason_kind = "query_result_limit_reached" if reason == "query_result_limit_reached" else (
+                "other" if isinstance(reason, str) else "malformed")
+
+    print("[notion-query] "
+          f"archived={str(archived).lower()} page={page_number} "
+          f"object={object_kind} type={response_type} page_or_data_source={parent_kind} "
+          f"results_count={results_count} has_more={has_more} "
+          f"next_cursor_present={str(cursor_present).lower()} next_cursor_type={cursor_kind} "
+          f"next_cursor_valid={str(cursor_valid).lower()} "
+          f"request_status={status_kind} incomplete_reason={reason_kind}",
+          file=sys.stderr)
+
+
+def query_all(notion, source_id, archived, *, diagnostics=False):
     rows, cursor, seen = [], None, set()
+    page_number = 0
     while True:
-        payload = {"page_size": 100, "is_archived": archived}
+        payload = {"page_size": NOTION_QUERY_PAGE_SIZE, "is_archived": archived}
         if cursor is not None:
             payload["start_cursor"] = cursor
         response = notion.request("POST", f"/data_sources/{source_id}/query", payload)
-        request_status = response.get("request_status")
-        require(isinstance(request_status, dict) and request_status.get("type") == "complete",
-                "Notion 조회 상태 누락 또는 complete 이외 상태")
+        page_number += 1
+        if diagnostics:
+            _notion_query_diagnostic(response, archived=archived, page_number=page_number,
+                                     seen_cursors=seen)
+        require(isinstance(response, dict), "Notion query 응답 object 형식 오류")
+        require(response.get("object") == "list" and
+                response.get("type") == "page_or_data_source" and
+                isinstance(response.get("page_or_data_source"), dict),
+                "Notion query 응답 envelope 형식 오류")
         batch = response.get("results")
         require(isinstance(batch, list), "Notion query results 형식 오류")
-        rows.extend(batch)
         has_more = response.get("has_more")
         require(type(has_more) is bool, "Notion has_more 형식 오류")
+        require("next_cursor" in response, "Notion next_cursor 필드 누락")
+        cursor = response.get("next_cursor")
+        if has_more:
+            require(isinstance(cursor, str) and cursor, "Notion 다음 페이지 cursor 누락/형식 오류")
+            require(cursor not in seen, "Notion cursor 반복")
+        else:
+            require(cursor is None, "Notion terminal cursor는 null이어야 합니다")
+
+        if "request_status" in response:
+            request_status = response["request_status"]
+            require(isinstance(request_status, dict), "Notion request_status 형식 오류")
+            status_type = request_status.get("type")
+            require(isinstance(status_type, str) and status_type in {"complete", "incomplete"},
+                    "Notion request_status type 형식/값 오류")
+            if "incomplete_reason" in request_status:
+                require(request_status["incomplete_reason"] == "query_result_limit_reached",
+                        "Notion incomplete_reason 형식/값 오류")
+            require(status_type == "complete", "Notion query 결과가 불완전합니다")
+
+        total = len(rows) + len(batch)
+        require(total < NOTION_QUERY_MAX_RESULTS,
+                "Notion query 결과가 10,000건 경계에 도달했습니다; 전체 조회를 보장할 수 없습니다")
+        rows.extend(batch)
         if not has_more:
             return rows
-        cursor = response.get("next_cursor")
-        require(isinstance(cursor, str) and cursor and cursor not in seen, "Notion cursor 누락/반복")
         seen.add(cursor)
 
 
@@ -428,19 +520,22 @@ def check_control(page, source_id, control_id):
             "동기화 관리 행 ID/활성 상태 불일치")
     require(read_text(page, "동기화 키") == CONTROL_KEY and read_select(page, "종류") == "Sync",
             "동기화 관리 행 키/종류 불일치")
-    for name, kind in {"번호": "number", "GitHub URL": "url", "GitHub 상태": "select",
+    workflow_url = page["properties"]["GitHub URL"]["url"]
+    require(workflow_url is None or workflow_url == ACTIONS_WORKFLOW_URL,
+            "동기화 관리행 Actions URL 형식 오류")
+    for name, kind in {"번호": "number", "GitHub 상태": "select",
                        "GitHub 수정": "date"}.items():
         require(page["properties"][name][kind] is None, "동기화 관리 행 고정 필드는 비어 있어야 합니다")
 
 
-def preflight_notion(notion, source_id, control_id, project_id):
+def preflight_notion(notion, source_id, control_id, project_id, *, diagnostics=False):
     source_id, control_id = identifier(source_id), identifier(control_id)
     _schema(notion, source_id)
     direct_control = notion.request("GET", f"/pages/{control_id}")
     check_control(direct_control, source_id, control_id)
     index, archived_keys = {}, set()
     for archived in (False, True):
-        for row in query_all(notion, source_id, archived):
+        for row in query_all(notion, source_id, archived, diagnostics=diagnostics):
             bound_page(row, source_id)
             key = read_text(row, "동기화 키")
             if not key:
@@ -1582,7 +1677,9 @@ def _update_control_summary(notion, source_id, control, control_state, issue_row
                                      "at": now, "holds": holds,
                                      "counts": {key: counts.get(key, 0) for key in
                                                 ("created", "updated", "project_changes", "held")}}
-    props = {"제목": text_property("Replica 동기화", "title"),
+    result_label = "전체 완료" if success else "부분 반영"
+    props = {"제목": text_property(f"Replica 동기화 · {result_label} · {now}", "title"),
+             "GitHub URL": {"url": ACTIONS_WORKFLOW_URL},
              "확인 필요": text_property("" if not holds else
                                      "보류 " + str(len(holds)) + "건: " + ", ".join(map(str, holds))),
              "동기화 내부 상태": text_property(canonical_json(control_state))}
@@ -1751,7 +1848,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
     source_id, control_id = identifier(config["notion_source_id"]), identifier(config["notion_control_id"])
     facts = gp.fetch_repository_facts(github, rest)
     project = _project_snapshot(project_client, config, facts)
-    notion_state = preflight_notion(notion, source_id, control_id, config["project_id"])
+    notion_state = preflight_notion(notion, source_id, control_id, config["project_id"],
+                                    diagnostics=dry_run)
     cutoff = (notion_state["control_state"] or {}).get("migration_cutoff")
     if cutoff is None:
         cutoff = _iso(facts["server_time"])
