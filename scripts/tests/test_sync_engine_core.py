@@ -148,6 +148,16 @@ class ProjectAPI:
         self.add_calls = 0
         self.add_response_loss_count = 1
         self.add_response_loss = False
+        self.add_visibility_delay_snapshots = 0
+        self.post_add_snapshot_calls = 0
+        self.added_item_ids = []
+        self.add_item_transform = None
+        self.after_add = None
+        self.add_result_item_id_override = None
+        self.add_response_override = None
+        self.next_project_items_override = None
+        self.sleep_calls = []
+        self.sleep = self.sleep_calls.append
         self.item_page_calls = 0
         self.fail_late_item_page = False
         self.item_pages = None
@@ -160,12 +170,23 @@ class ProjectAPI:
                 self.add_calls += 1
                 if self.add_response_loss:
                     for index in range(self.add_response_loss_count):
-                        self.items.append(make_project_item(
-                            item_id=f"PVTI_added_{self.add_calls}_{index}", option=None))
+                        item = make_project_item(
+                            item_id=f"PVTI_added_{self.add_calls}_{index}", option=None)
+                        self.items.append(item)
+                        self.added_item_ids.append(item["id"])
                     raise gp.SyncError("synthetic lost add response")
                 item_id = f"PVTI_added_{self.add_calls}_0"
-                self.items.append(make_project_item(item_id=item_id, option=None))
-                return {"addProjectV2ItemById": {"item": {"id": item_id}}}, None
+                item = make_project_item(item_id=item_id, option=None)
+                if self.add_item_transform:
+                    item = self.add_item_transform(item)
+                self.items.append(item)
+                self.added_item_ids.append(item["id"])
+                if self.after_add:
+                    self.after_add(self, item, variables)
+                if self.add_response_override is not None:
+                    return copy.deepcopy(self.add_response_override), None
+                returned_id = self.add_result_item_id_override or item["id"]
+                return {"addProjectV2ItemById": {"item": {"id": returned_id}}}, None
             item_id = variables["item"]
             if query == gp.SET_STATUS_MUTATION:
                 option = variables["option"]
@@ -200,6 +221,18 @@ class ProjectAPI:
                 return {"node": self._project(items={"nodes": [],
                     "pageInfo": {"hasNextPage": True}})}, None
             pages = self.item_pages or [self.items]
+            hidden_ids = set()
+            if variables.get("after") is None and self.add_calls:
+                self.post_add_snapshot_calls += 1
+                if self.post_add_snapshot_calls <= self.add_visibility_delay_snapshots:
+                    hidden_ids = set(self.added_item_ids)
+                if self.next_project_items_override is not None:
+                    response_items = self.next_project_items_override
+                    self.next_project_items_override = None
+                    return {"node": self._project(items=response_items)}, None
+            if hidden_ids:
+                pages = [[row for row in page if row["id"] not in hidden_ids]
+                         for page in pages]
             after = variables.get("after")
             page_index = 0 if after is None else int(after.rsplit("-", 1)[1])
             rows = pages[page_index]
@@ -421,6 +454,46 @@ class SyncEngineCoreTests(unittest.TestCase):
         env = kwargs.pop("env", {})
         return se.sync(self.repo_graph, self.rest, self.project, self.notion,
                        config(), now=NOW, env=env, **kwargs)
+
+    def _configure_post_cutoff_project_add(self):
+        self.repo_graph = RepoGraph(issues=[make_issue(created_at="2026-10-03T00:00:00Z")])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI()
+        self.notion = FakeNotion([control_page(control_internal())])
+
+    def _leave_confirmed_add_marker_after_readback_loss(self):
+        self._configure_post_cutoff_project_add()
+
+        def lose_confirmed_marker_readback(path, properties, notion):
+            internal = properties.get("동기화 내부 상태")
+            if not path.startswith("/pages/") or not internal:
+                return
+            saved = json.loads(rich_text_value(internal))
+            pending = saved.get("pending") or {}
+            if pending.get("kind") == "add" and pending.get("confirmed"):
+                notion.after_patch = None
+                notion.fail_readback_after_patch.add(path.rsplit("/", 1)[1])
+
+        self.notion.after_patch = lose_confirmed_marker_readback
+        with self.assertRaisesRegex(se.SyncError, "synthetic page readback failure"):
+            self.run_sync()
+
+        _, state = self._stored_issue_state()
+        pending = state["pending"]
+        self.assertTrue(pending["confirmed"])
+        self.assertEqual(pending["project_item_id"], pending["checkpoint"]["item_id"])
+        self.assertIsNone(state["project_item_id"])
+        self.assertEqual(self.project.add_calls, 1)
+        return pending["project_item_id"]
+
+    def _stored_issue_state(self):
+        key = se.key_for(gp.REPOSITORY_ID, ISSUE_ID)
+        page = next(page for page in self.notion.pages.values()
+                    if se.read_text(page, "동기화 키") == key)
+        state = se.decode_internal(se.read_text(page, "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        return page, state
 
     def _install_historical_pending_snapshot(self, issue, state, *,
                                              pending_option="완료", pending_task="완료"):
@@ -1895,6 +1968,242 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertIsNone(persisted["resume"])
         self.assertTrue(se.read_text(self.notion.pages[ISSUE_PAGE_ID], "확인 필요").startswith("보류:"))
         self.assertEqual(self.project.writes, [])
+
+    def test_project_add_readback_retries_complete_absence_and_accepts_blank_initial_status(self):
+        self.repo_graph = RepoGraph(issues=[make_issue()])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI()
+        self.project.add_visibility_delay_snapshots = 1
+        self.notion = FakeNotion([control_page(control_internal()),
+                                  active_issue_page(task="진행 중")])
+
+        self.run_sync()
+
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual(self.project.post_add_snapshot_calls, 2)
+        self.assertEqual(self.project.sleep_calls, [se.PROJECT_ADD_READBACK_BACKOFF_SECONDS[0]])
+        self.assertEqual(self.project.status_values["PVTI_added_1_0"][0]["optionId"],
+                         gp.EXPECTED_STATUS_OPTIONS["진행 중"])
+        _, state = self._stored_issue_state()
+        self.assertEqual(state["project_item_id"], "PVTI_added_1_0")
+        self.assertTrue(state["migration_complete"])
+        self.assertIsNone(state["pending"])
+
+    def test_confirmed_add_checkpoint_never_rebinds_replacement_item_in_normal_or_pm_run(self):
+        for path in ("ordinary_then_pm", "pm_direct"):
+            with self.subTest(path=path):
+                original_item_id = self._leave_confirmed_add_marker_after_readback_loss()
+                replacement = make_project_item(item_id="PVTI_replacement_B", option=None)
+                self.project.items = [replacement]
+
+                if path == "ordinary_then_pm":
+                    normal = self.run_sync()
+                    self.assertEqual(normal["held"], 1)
+                    _, held = self._stored_issue_state()
+                    self.assertEqual(held["pending"]["project_item_id"], original_item_id)
+                    self.assertEqual(held["pending"]["checkpoint"]["item_id"], original_item_id)
+                    self.assertIsNone(held["project_item_id"])
+                    self.assertEqual(held["hold"]["code"], "PROJECT_ADD_UNCERTAIN")
+
+                    preview = self.run_sync(dry_run=True, resolve_issue_numbers="18",
+                                             env=pm_env(918402))
+                    self.assertEqual(preview["resolution_preview"][0]["result"], "still_held")
+
+                resumed = self.run_sync(resolve_issue_numbers="18", env=pm_env(918403))
+                _, recovered = self._stored_issue_state()
+                self.assertEqual(resumed["held"], 1)
+                self.assertTrue(recovered["pending"]["confirmed"])
+                self.assertEqual(recovered["pending"]["project_item_id"], original_item_id)
+                self.assertEqual(recovered["pending"]["checkpoint"]["item_id"], original_item_id)
+                self.assertIsNone(recovered["project_item_id"])
+                self.assertEqual(recovered["hold"]["code"], "PROJECT_ADD_UNCERTAIN")
+                self.assertIsNone(recovered["resume"])
+                self.assertEqual([item["id"] for item in self.project.items],
+                                 ["PVTI_replacement_B"])
+                self.assertEqual(self.project.add_calls, 1)
+                self.assertEqual([query for query, _ in self.project.writes],
+                                 [gp.ADD_ISSUE_MUTATION])
+
+    def test_confirmed_add_checkpoint_recovers_same_item_without_readding(self):
+        original_item_id = self._leave_confirmed_add_marker_after_readback_loss()
+
+        result = self.run_sync(resolve_issue_numbers="18", env=pm_env(918404))
+
+        _, recovered = self._stored_issue_state()
+        self.assertEqual(result["held"], 0)
+        self.assertIsNone(recovered["pending"])
+        self.assertIsNone(recovered["hold"])
+        self.assertEqual(recovered["project_item_id"], original_item_id)
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual([query for query, _ in self.project.writes].count(gp.ADD_ISSUE_MUTATION), 1)
+
+    def test_project_add_readback_scans_second_page_for_match_and_returned_id_conflict(self):
+        for mismatch in (False, True):
+            with self.subTest(mismatch=mismatch):
+                self._configure_post_cutoff_project_add()
+                unrelated = make_project_item(item_id="PVTI_unrelated_foreign", issue_id=992,
+                                              issue_node="I_foreign")
+                unrelated["content"]["repository"]["id"] = "R_foreign"
+
+                def place_items_on_two_pages(project, added, _variables):
+                    if mismatch:
+                        added["content"]["repository"]["id"] = "R_foreign"
+                    project.item_pages = [[unrelated], [added]]
+
+                self.project.after_add = place_items_on_two_pages
+                if mismatch:
+                    with self.assertRaisesRegex(se.SyncError, "Project 추가 결과"):
+                        self.run_sync()
+                    _, pending_state = self._stored_issue_state()
+                    self.assertTrue(pending_state["pending"])
+                    self.assertFalse(pending_state["pending"]["confirmed"])
+                    self.assertEqual(self.project.post_add_snapshot_calls, 1)
+                    self.assertEqual(self.project.sleep_calls, [])
+                    self.assertEqual([query for query, _ in self.project.writes],
+                                     [gp.ADD_ISSUE_MUTATION])
+                else:
+                    self.run_sync()
+                    _, recovered = self._stored_issue_state()
+                    self.assertIsNone(recovered["pending"])
+                    self.assertEqual(recovered["project_item_id"], "PVTI_added_1_0")
+                    self.assertEqual(self.project.post_add_snapshot_calls, 1)
+                self.assertEqual(self.project.add_calls, 1)
+
+    def test_project_add_readback_budget_exhaustion_keeps_pending_for_pm_recovery(self):
+        self._configure_post_cutoff_project_add()
+        self.project.add_visibility_delay_snapshots = se.PROJECT_ADD_READBACK_MAX_ATTEMPTS
+
+        with self.assertRaisesRegex(se.SyncError, "Project 추가 결과 0개/대상 불일치"):
+            self.run_sync()
+
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual(self.project.post_add_snapshot_calls,
+                         se.PROJECT_ADD_READBACK_MAX_ATTEMPTS)
+        self.assertEqual(self.project.sleep_calls,
+                         list(se.PROJECT_ADD_READBACK_BACKOFF_SECONDS))
+        self.assertEqual([query for query, _ in self.project.writes], [gp.ADD_ISSUE_MUTATION])
+        _, pending_state = self._stored_issue_state()
+        self.assertEqual(pending_state["pending"]["kind"], "add")
+        self.assertFalse(pending_state["pending"]["confirmed"])
+        self.assertIsNone(pending_state["pending"]["project_item_id"])
+        self.assertEqual(pending_state["pending"]["checkpoint"], {"content_id": ISSUE_NODE})
+
+        ordinary = self.run_sync()
+        _, held_state = self._stored_issue_state()
+        self.assertGreaterEqual(ordinary["held"], 1)
+        self.assertEqual(held_state["hold"]["code"], "PROJECT_ADD_UNCERTAIN")
+        self.assertEqual(self.project.add_calls, 1)
+
+        preview = self.run_sync(dry_run=True, resolve_issue_numbers="18", env=pm_env(918320))
+        self.assertEqual(preview["resolution_preview"][0]["result"], "would_resume")
+        self.assertEqual(self.project.add_calls, 1)
+        self.run_sync(resolve_issue_numbers="18", env=pm_env(918321))
+        _, resumed_state = self._stored_issue_state()
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual(resumed_state["project_item_id"], "PVTI_added_1_0")
+        self.assertIsNone(resumed_state["pending"])
+        self.assertIsNone(resumed_state["hold"])
+
+    def test_project_add_returned_item_mismatches_stop_without_readback_retry(self):
+        for scenario in ("foreign_repository", "another_issue", "pull_request_content",
+                         "archived_returned_id", "alternate_active_target_id",
+                         "active_archive_conflict"):
+            with self.subTest(scenario=scenario):
+                self._configure_post_cutoff_project_add()
+                if scenario == "foreign_repository":
+                    def transform(item):
+                        item["content"]["repository"]["id"] = "R_foreign"
+                        return item
+                    self.project.add_item_transform = transform
+                elif scenario == "another_issue":
+                    other = make_issue()
+                    other.update({"id": "I_kwDOIssue19", "databaseId": 556, "number": 19,
+                                  "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+                    self.repo_graph = RepoGraph(issues=[make_issue(created_at="2026-10-03T00:00:00Z"),
+                                                        other])
+                    self.rest = LegacyREST(issues=[
+                        {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "open"},
+                        {"id": 556, "node_id": other["id"], "number": 19, "state": "open"},
+                    ])
+                    def transform(item):
+                        item["content"].update({"id": other["id"], "databaseId": 556,
+                                                "number": 19})
+                        return item
+                    self.project.add_item_transform = transform
+                elif scenario == "pull_request_content":
+                    def transform(item):
+                        item["content"].update({"__typename": "PullRequest", "id": "PR_wrong",
+                                                "databaseId": 4782243920, "number": 19})
+                        return item
+                    self.project.add_item_transform = transform
+                elif scenario == "archived_returned_id":
+                    self.project.add_item_transform = lambda item: {**item, "isArchived": True}
+                elif scenario == "alternate_active_target_id":
+                    def transform(item):
+                        item["id"] = "PVTI_alternate_target"
+                        return item
+                    self.project.add_item_transform = transform
+                    self.project.add_result_item_id_override = "PVTI_returned_not_in_snapshot"
+                else:
+                    def add_archived_twin(project, item, _variables):
+                        archived = copy.deepcopy(item)
+                        archived["id"] = "PVTI_archived_race"
+                        archived["isArchived"] = True
+                        project.items.append(archived)
+                    self.project.after_add = add_archived_twin
+
+                with self.assertRaisesRegex(se.SyncError, "Project 추가 결과"):
+                    self.run_sync()
+
+                self.assertEqual(self.project.add_calls, 1)
+                self.assertEqual(self.project.post_add_snapshot_calls, 1)
+                self.assertEqual(self.project.sleep_calls, [])
+                self.assertEqual([query for query, _ in self.project.writes], [gp.ADD_ISSUE_MUTATION])
+                _, state = self._stored_issue_state()
+                self.assertEqual(state["pending"]["kind"], "add")
+                self.assertFalse(state["pending"]["confirmed"])
+                self.assertIsNone(state["pending"]["project_item_id"])
+
+    def test_project_add_readback_partial_pagination_fails_without_retry(self):
+        self._configure_post_cutoff_project_add()
+
+        def return_incomplete_items(project, _item, _variables):
+            project.next_project_items_override = {
+                "nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": None}, "totalCount": 1}
+
+        self.project.after_add = return_incomplete_items
+        with self.assertRaisesRegex(gp.SyncError, "cursor"):
+            self.run_sync()
+
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual(self.project.post_add_snapshot_calls, 1)
+        self.assertEqual(self.project.sleep_calls, [])
+        self.assertEqual([query for query, _ in self.project.writes], [gp.ADD_ISSUE_MUTATION])
+        _, state = self._stored_issue_state()
+        self.assertEqual(state["pending"]["kind"], "add")
+        self.assertFalse(state["pending"]["confirmed"])
+        self.assertEqual(state["pending"]["checkpoint"], {"content_id": ISSUE_NODE})
+
+    def test_malformed_project_add_response_keeps_pending_and_never_reads_or_readds(self):
+        for response in ({}, {"addProjectV2ItemById": None},
+                         {"addProjectV2ItemById": {"item": None}},
+                         {"addProjectV2ItemById": {"item": {"id": ""}}},
+                         {"addProjectV2ItemById": {"item": {"id": 17}}}):
+            with self.subTest(response=response):
+                self._configure_post_cutoff_project_add()
+                self.project.add_response_override = response
+
+                with self.assertRaisesRegex(se.SyncError, "Project 추가 결과 불명"):
+                    self.run_sync()
+
+                self.assertEqual(self.project.add_calls, 1)
+                self.assertEqual(self.project.post_add_snapshot_calls, 0)
+                self.assertEqual([query for query, _ in self.project.writes], [gp.ADD_ISSUE_MUTATION])
+                _, state = self._stored_issue_state()
+                self.assertEqual(state["pending"]["kind"], "add")
+                self.assertFalse(state["pending"]["confirmed"])
+                self.assertEqual(state["pending"]["checkpoint"], {"content_id": ISSUE_NODE})
 
     def test_lost_project_add_response_never_retries_for_zero_one_or_duplicates(self):
         for observed in (0, 1, 2):

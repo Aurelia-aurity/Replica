@@ -28,6 +28,8 @@ MAX_INTERNAL_TEXT = 18000
 NOTION_QUERY_PAGE_SIZE = 100
 NOTION_QUERY_MAX_RESULTS = 10000
 BOUNDARY_SECONDS = 1.0
+PROJECT_ADD_READBACK_MAX_ATTEMPTS = 3
+PROJECT_ADD_READBACK_BACKOFF_SECONDS = (0.25, 0.5)
 GENERAL_STATES = ("백로그", "준비 중", "진행 중")
 RESUMABLE_HOLD_CODES = {
     "MIGRATION_CONFLICT", "MIGRATION_UNSET", "MIGRATION_INPUT_CHANGED",
@@ -1152,11 +1154,16 @@ def update_control_pending(notion, source_id, control, value):
     _patch_page(notion, source_id, control, {"Pending create": text_property(value)})
 
 
-def _project_snapshot(client, config, facts):
+def _project_snapshot(client, config, facts, *, add_readback_item_id=None, add_target_issue=None):
     project = gp.fetch_project(client, project_id=config["project_id"], owner_id=config["owner_id"],
                                status_field_id=config["status_field_id"],
                                status_options=config["status_options"],
-                               repository_node_id=facts["repository_node_id"])
+                               repository_node_id=facts["repository_node_id"],
+                               add_readback_item_id=add_readback_item_id,
+                               add_target_issue_id=(add_target_issue["databaseId"]
+                                                    if add_target_issue is not None else None),
+                               add_target_issue_node_id=(add_target_issue["id"]
+                                                         if add_target_issue is not None else None))
     for issue_id, item in project["items"].items():
         issue = facts["issues"].get(issue_id)
         require(issue is not None, "Project 대상 저장소 Issue가 GraphQL 전체 목록에 없습니다")
@@ -1168,6 +1175,60 @@ def _project_snapshot(client, config, facts):
         require(all(item.get("content_id") == issue["id"] for item in archived_items),
                 "보관 Project item의 Issue content node ID 불일치")
     return project
+
+
+def _confirmed_add_item_matches(pending, item):
+    if not pending["confirmed"]:
+        return True
+    if item is None:
+        return False
+    checkpoint = pending["checkpoint"]
+    return (item.get("id") == pending.get("project_item_id") and
+            item.get("id") == checkpoint.get("item_id"))
+
+
+def _added_project_item_from_snapshot(project, returned_item_id, issue, facts):
+    observations = project.get("add_readback_items")
+    require(isinstance(observations, list), "Project add readback 관측 오류")
+    returned = [row for row in observations if row.get("item_id") == returned_item_id]
+    target = [row for row in observations
+              if (row.get("content_id") == issue["id"] or
+                  (row.get("content_type") == "Issue" and
+                   row.get("content_database_id") == issue["databaseId"]))]
+    if not returned and not target:
+        return None
+
+    require(len(returned) == 1 and len(target) == 1 and
+            returned[0]["item_id"] == target[0]["item_id"] == returned_item_id,
+            "Project 추가 결과 returned ID와 대상 Issue가 불일치; pending 유지")
+    observed = returned[0]
+    require(observed.get("is_archived") is False and
+            observed.get("content_type") == "Issue" and
+            observed.get("content_id") == issue["id"] and
+            observed.get("content_database_id") == issue["databaseId"] and
+            observed.get("repository_id") == facts["repository_node_id"] and
+            observed.get("repository_database_id") == REPOSITORY_ID,
+            "Project 추가 결과 ID/Issue/repository/archive 관계 불일치; pending 유지")
+
+    item = project["items"].get(issue["databaseId"])
+    archived = project.get("archived_items", {}).get(issue["databaseId"], [])
+    require(item is not None and item["id"] == returned_item_id and
+            item["content_id"] == issue["id"] and not archived,
+            "Project 추가 결과 active/archive 항목 충돌; pending 유지")
+    return item
+
+
+def _read_added_project_item(project_client, config, facts, issue, returned_item_id):
+    for attempt in range(PROJECT_ADD_READBACK_MAX_ATTEMPTS):
+        project = _project_snapshot(project_client, config, facts,
+                                    add_readback_item_id=returned_item_id,
+                                    add_target_issue=issue)
+        item = _added_project_item_from_snapshot(project, returned_item_id, issue, facts)
+        if item is not None:
+            return project, item
+        if attempt + 1 < PROJECT_ADD_READBACK_MAX_ATTEMPTS:
+            project_client.sleep(PROJECT_ADD_READBACK_BACKOFF_SECONDS[attempt])
+    raise SyncError("Project 추가 결과 0개/대상 불일치; pending 유지")
 
 
 def _status_option(project, name):
@@ -1279,6 +1340,11 @@ def _resolve_pending_add(notion, github, source_id, row, state, project, facts, 
         return None, _new_hold("PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 확인할 수 없습니다.",
                                fingerprint)
     require(item["content_id"] == issue["id"], "pending Project item content ID 불일치")
+    if not _confirmed_add_item_matches(pending, item):
+        return None, _new_hold(
+            "PROJECT_ADD_UNCERTAIN",
+            "확정된 Project add checkpoint와 현재 항목 ID가 다릅니다. 재바인딩하지 않았습니다.",
+            fingerprint)
     latest = gp.fetch_issue_detail(github, issue["id"])
     latest_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
     latest_fingerprint = _source_fingerprint(latest, latest_refs, None)
@@ -1485,15 +1551,12 @@ def _add_project_item_once(notion, github, project_client, source_id, row, state
         state["hold"] = hold
         return latest_project, raced_item, hold
     try:
-        gp.add_project_issue(project_client, config["project_id"], issue["id"])
+        returned_item_id = gp.add_project_issue(project_client, config["project_id"], issue["id"])
     except gp.SyncError:
         # The request may have committed. Leave the durable pending marker for a
         # later PM-confirmed read; do not read back and write again in this run.
         raise SyncError("Project 추가 결과 불명; pending을 유지하고 수동 확인 필요") from None
-    project = _project_snapshot(project_client, config, facts)
-    item = project["items"].get(issue["databaseId"])
-    require(item is not None and item["content_id"] == issue["id"],
-            "Project 추가 결과 0개/대상 불일치; pending 유지")
+    project, item = _read_added_project_item(project_client, config, facts, issue, returned_item_id)
     if pending["migration_fingerprint"] is not None:
         unchanged, latest_page = _migration_input_unchanged(
             notion, source_id, row, pending, config["project_id"])
@@ -1733,6 +1796,11 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
         if state["pending"]:
             pending = state["pending"]
             if pending["kind"] == "add":
+                if pending["confirmed"] and not _confirmed_add_item_matches(pending, item):
+                    result["hold"] = {"code": "PROJECT_ADD_UNCERTAIN",
+                                       "message": "저장된 Project add checkpoint와 현재 항목 ID가 다릅니다."}
+                    plans.append(result)
+                    continue
                 linked, _ = _linked_pr_facts(issue, facts)
                 current_source_fingerprint = _source_fingerprint(issue, linked, None)
                 if (number not in resume_numbers or item is None or

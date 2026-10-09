@@ -601,9 +601,16 @@ def parse_status_options(raw):
 
 
 def fetch_project(client, *, project_id, owner_id, status_field_id, status_options,
-                  repository_node_id):
+                  repository_node_id, add_readback_item_id=None,
+                  add_target_issue_id=None, add_target_issue_node_id=None):
     require(project_id == EXPECTED_PROJECT_ID, "PROJECT_ID가 확인된 Replica Project와 다릅니다")
     require(owner_id == EXPECTED_PROJECT_OWNER_ID, "PROJECT_OWNER_ID가 확인된 PM 계정과 다릅니다")
+    add_readback_args = (add_readback_item_id, add_target_issue_id, add_target_issue_node_id)
+    require(all(value is None for value in add_readback_args) or
+            (isinstance(add_readback_item_id, str) and add_readback_item_id and
+             type(add_target_issue_id) is int and add_target_issue_id > 0 and
+             isinstance(add_target_issue_node_id, str) and add_target_issue_node_id),
+            "Project add readback 대상 형식 오류")
     fields, cursor, seen = [], None, set()
     project_meta = None
     while True:
@@ -657,7 +664,7 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
         cursor = info.get("endCursor")
         require(cursor not in seen, "Project item cursor 반복")
         seen.add(cursor)
-    issue_items, archived_issue_items = {}, {}
+    issue_items, archived_issue_items, add_readback_items = {}, {}, []
     seen_item_ids = set()
     for item in rows:
         require(isinstance(item.get("id"), str) and item["id"], "Project item ID 누락")
@@ -668,8 +675,26 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
         require(isinstance(field_values, dict), "Project fieldValues 조회 오류")
         all_values = _all_item_field_values(client, item["id"], field_values)
         content = item.get("content")
+        content_row = content if isinstance(content, dict) else {}
+        content_repo = content_row.get("repository")
+        if (add_readback_item_id is not None and
+                (item["id"] == add_readback_item_id or
+                 content_row.get("id") == add_target_issue_node_id or
+                 (content_row.get("__typename") == "Issue" and
+                  content_row.get("databaseId") == add_target_issue_id))):
+            add_readback_items.append({
+                "item_id": item["id"],
+                "is_archived": item["isArchived"],
+                "content_type": content_row.get("__typename"),
+                "content_id": content_row.get("id"),
+                "content_database_id": content_row.get("databaseId"),
+                "repository_id": content_repo.get("id") if isinstance(content_repo, dict) else None,
+                "repository_database_id": (content_repo.get("databaseId")
+                                            if isinstance(content_repo, dict) else None),
+            })
         if content is None:
             continue
+        require(isinstance(content, dict), "Project item content 형식 오류")
         kind = content.get("__typename")
         if kind == "PullRequest":
             continue
@@ -703,6 +728,7 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
     return {"project_id": project_id, "owner_id": owner_id, "status_field_id": status_field_id,
             "status_options": dict(status_options), "items": issue_items,
             "archived_items": archived_issue_items,
+            "add_readback_items": add_readback_items,
             "item_count": len(rows), "project_node": project_meta}
 
 
@@ -793,7 +819,12 @@ def clear_project_status(client, project_id, item_id, field_id):
 def add_project_issue(client, project_id, content_id):
     data, _ = client.request(ADD_ISSUE_MUTATION,
                              {"project": project_id, "content": content_id}, mutation=True)
-    require(isinstance(data.get("addProjectV2ItemById"), dict), "Project Issue 추가 응답 누락")
+    result = data.get("addProjectV2ItemById")
+    require(isinstance(result, dict), "Project Issue 추가 응답 누락")
+    item = result.get("item")
+    require(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"],
+            "Project Issue 추가 응답 item ID 누락")
+    return item["id"]
 
 
 def resolve_actor(client, login):
