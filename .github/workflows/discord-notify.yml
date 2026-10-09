@@ -3,6 +3,19 @@ name: GitHub → Discord
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: '실행 종류 (probe 구현 검토 전에는 브랜치 실행이 스킵됨)'
+        type: choice
+        options: [notify, probe]
+        default: notify
+      draft_pr:
+        description: '검증할 Draft PR 번호'
+        type: string
+        default: ''
+      send_test:
+        description: '검증 완료 후 테스트 알림·PM 멘션 전송'
+        type: boolean
+        default: false
       approved_sha:
         description: '검토한 main의 전체 40자리 SHA (최초 기준선/전송 보류 조치)'
         type: string
