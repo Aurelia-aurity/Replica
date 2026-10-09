@@ -751,11 +751,12 @@ def diagnostic_reason(error):
         "Source pagination incomplete": "pagination_incomplete",
         "Source pagination limit exceeded": "pagination_limit",
         "Main changed during observation": "main_changed",
+        "Invalid API path": "api_path",
     }
     return fixed.get(str(error), "unclassified") if isinstance(error, dt.Error) else "unclassified"
 
 
-def main(argv=None, env=None):
+def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, discord_factory=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=".github/discord-notifications.json")
     args = parser.parse_args(argv)
@@ -769,11 +770,11 @@ def main(argv=None, env=None):
         if config != {"repository_id": REPO_ID, "sync_workflow_id": SYNC_ID, "ci_workflows": config.get("ci_workflows")}:
             raise dt.Error("Notification configuration mismatch")
         mapping = user_map(env.get("DISCORD_USER_MAP", "{}"))
-        discord = dt.Discord(env.get("DISCORD_WEBHOOK_URL", ""), env.get("DISCORD_CHANNEL_ID", ""))
+        discord = (discord_factory or dt.Discord)(env.get("DISCORD_WEBHOOK_URL", ""), env.get("DISCORD_CHANNEL_ID", ""))
         stage = "destination_verify"
         discord.verify()  # Configuration/destination failures do not consume baseline/events.
-        gh = dt.GitHub(env.get("GITHUB_TOKEN", ""))
-        ledger = dt.Ledger(gh)
+        gh = (github_factory or dt.GitHub)(env.get("GITHUB_TOKEN", ""))
+        ledger = (ledger_factory or dt.Ledger)(gh)
         workflows = workflows_config(json.dumps(config["ci_workflows"]), gh)
         stage = "ledger_load"
         state = ledger.load()

@@ -133,4 +133,90 @@ class Transport(unittest.TestCase):
             self.assertEqual(dn.project_backlog("synthetic", []), set())
 
 
+class DraftSinglePost(unittest.TestCase):
+    def client(self):
+        return dt.Discord("https://discord.com/api/webhooks/111111111111111111/" + "a" * 40, dt.CHANNEL_ID)
+
+    def test_no_retry_mode_limits_actual_post_on_errors_and_success(self):
+        payload = {"content": "synthetic test"}
+        receipt = {"id": "333333333333333333", "channel_id": dt.CHANNEL_ID,
+                   "webhook_id": "111111111111111111", **payload}
+        outcomes = [dt.HTTPError(429, body=b'{"retry_after":0}'), dt.HTTPError(403),
+                    dt.HTTPError(500), dt.Error("ambiguous"), (200, {}, json.dumps(receipt).encode())]
+        for outcome in outcomes:
+            with self.subTest(outcome=type(outcome).__name__), patch.object(dt, "request") as request, \
+                    patch.object(dt.time, "sleep") as sleep:
+                request.side_effect = [outcome]
+                if isinstance(outcome, Exception):
+                    with self.assertRaises(dt.Error): self.client().send(payload, retry_rate_limit=False)
+                else:
+                    self.assertEqual(self.client().send(payload, retry_rate_limit=False), receipt["id"])
+                self.assertEqual(request.call_count, 1)
+                self.assertEqual(request.call_args.kwargs["method"], "POST")
+                sleep.assert_not_called()
+
+    def test_operational_rate_limit_retry_remains_default(self):
+        payload = {"content": "synthetic test"}
+        receipt = {"id": "333333333333333333", "channel_id": dt.CHANNEL_ID,
+                   "webhook_id": "111111111111111111", **payload}
+        with patch.object(dt, "request", side_effect=[dt.HTTPError(429, body=b'{"retry_after":0}'),
+                                                     (200, {}, json.dumps(receipt).encode())]) as request, \
+                patch.object(dt.time, "sleep") as sleep:
+            self.assertEqual(self.client().send(payload), receipt["id"])
+            self.assertEqual(request.call_count, 2)
+            sleep.assert_called_once_with(0.0)
+
+
+class ComparePathRegression(unittest.TestCase):
+    def test_actual_call_accepts_exact_compare_and_regular_route(self):
+        gh = dt.GitHub("synthetic")
+        path = f"/repos/{dt.REPO}/compare/{SHA}...{'b' * 40}"
+        with patch.object(dt, "request", return_value=(200, {}, b'{}')) as request:
+            gh.call(path)
+            request.assert_called_once_with("https://api.github.com" + path, method="GET", token="synthetic", payload=None)
+        with patch.object(dt, "request", return_value=(200, {}, b'[]')) as request:
+            gh.repo("/issues")
+            self.assertEqual(request.call_count, 1)
+        with patch.object(dt, "request", return_value=(200, {}, b'{}')) as request:
+            gh.repo("/contents/docs/file%20name.md?ref=automation%2Fdiscord-state")
+            self.assertEqual(request.call_count, 1)
+
+    def test_compare_malformed_encoded_and_mutating_rejected_before_http(self):
+        prefix = f"/repos/{dt.REPO}/compare/"
+        paths = [prefix + "main", prefix + "main%2E%2E%2Emain",
+                 prefix + SHA + "%2e%2e%2e" + SHA,
+                 prefix + SHA + "..." + SHA + "/extra",
+                 prefix + SHA + "..." + SHA + "?x=1",
+                 f"/repos/other/Replica/compare/{SHA}...{SHA}",
+                 f"/repos/other/Replica/compare/main",
+                 f"/repos/{dt.REPO}/compare%2Fmain",
+                 f"/repos/{dt.REPO}/%63ompare/main",
+                 f"/repos/{dt.REPO}/%2E/compare/main",
+                 f"/repos/{dt.REPO}/%2e%2e/Replica/compare/main",
+                 f"/repos/{dt.REPO}/issues/%2e%2e/pulls",
+                 f"/repos/{dt.REPO}/issues%2F1",
+                 f"/repos/{dt.REPO}/issues/%252e%252e/pulls",
+                 f"/repos/{dt.REPO}/issues/%5C../pulls",
+                 f"/repos/{dt.REPO}/issues/%0a/pulls",
+                 "/repos/../issues", "relative", prefix + "A" * 40 + "..." + SHA]
+        for path in paths:
+            with self.subTest(path=path), patch.object(dt, "request") as request:
+                with self.assertRaises(dt.Error): dt.GitHub("synthetic").call(path)
+                request.assert_not_called()
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            with self.subTest(method=method), patch.object(dt, "request") as request:
+                with self.assertRaises(dt.Error):
+                    dt.GitHub("synthetic").call(prefix + SHA + "..." + SHA, method=method)
+                request.assert_not_called()
+
+    def test_sync_context_uses_real_transport_ancestry_guard(self):
+        source = {**run(9), "workflow_id": dn.SYNC_ID, "path": dn.SYNC_PATH, "event": "schedule"}
+        for status, base, expected in [("ahead", SHA, True), ("identical", SHA, True),
+                                       ("behind", SHA, False), ("ahead", "c" * 40, False)]:
+            with self.subTest(status=status, base=base), patch.object(dt, "request", return_value=(
+                    200, {}, dt.canonical({"status": status, "base_commit": {"sha": base}}))) as request:
+                self.assertEqual(dn.sync_context(dt.GitHub("synthetic"), source, "b" * 40), expected)
+                self.assertEqual(request.call_count, 1)
+
+
 if __name__ == "__main__": unittest.main()

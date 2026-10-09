@@ -59,6 +59,24 @@ Project 선택 토큰은 classic scope `read:project`가 확인되고 쓰기 sco
 
 알림 상태는 `automation/discord-state` 브랜치의 `discord-state.json`에 저장한다. 초기 브랜치는 데이터 파일 하나만 가진 독립된 root commit으로 생성하며 main을 수정하지 않는다. 단일 Actions concurrency 그룹과 기존 파일 SHA 비교, 저장 후 재조회가 충돌과 중복을 방지한다. 파일이 사라지거나 손상되면 실패 처리하며 정기 작업은 기준선을 다시 만들지 않는다. 상태 파일에는 알림 본문·전송 상태·메시지 ID·관측 키가 저장되며 비밀값은 저장하지 않는다. 상태 크기 제한을 초과하면 실패 처리하므로 장기 운영 시 크기를 점검한다.
 
+## Draft PR에서 병합 전 검증
+
+기존 workflow가 main에 등록되어 있으므로, 같은 저장소의 검토된 Draft 브랜치 버전을 `--ref`로 수동 실행할 수 있다. PM은 현재 Draft PR HEAD의 전체 SHA를 확인하고 다음과 같이 실행한다.
+
+```sh
+gh workflow run discord-notify.yml --repo Aurelia-aurity/Replica \
+  --ref <Draft-브랜치> -f mode=probe -f draft_pr=<PR번호> \
+  -f approved_sha=<검토한-40자리-HEAD-SHA> -f send_test=false
+```
+
+`probe`는 지정 PM의 첫 attempt만 허용한다. 같은 저장소·main 대상·열린 Draft·현재 HEAD·체크아웃 SHA를 확인하고, GitHub 읽기 권한만 사용한다. 기존 상태 브랜치를 읽어 메모리에서 계산하며 운영 상태·활성화 변수·Project·Notion을 변경하지 않는다. 기존 상태가 없거나 손상되면 초기화하지 않고 실패한다. 모의 전송 수는 실제 전달 수신 기록이 아니다. 일반 이벤트 알림은 전송하지 않는다.
+
+검토된 같은 커밋에서 실제 멘션 검증을 승인한 경우에만 `send_test=true`로 새 수동 실행을 한다. 관측 뒤에도 Draft·HEAD를 다시 확인하고 `개발-알림`에 “테스트 알림”과 PM 멘션을 1건 보낸다. PM 숫자 ID 매핑이 없으면 실패한다. 운영 알림의 확인 버튼이나 승인 절차를 추가하는 기능은 아니다.
+
+결과 artifact `discord-probe-<run_id>-<attempt>`의 `probe-result.json`에는 관측 결과·모의 전송 수·상태 브랜치 불변 여부와 테스트 메시지의 `pending`·`confirmed`·`rejected`·`unknown` 및 실제 메시지 ID만 기록한다. 예외 본문·Secret·Webhook URL은 기록하지 않는다. 전송 결과가 불명확하거나 artifact 업로드가 실패하면 채널 표시를 먼저 확인하고 자동 재전송하지 않는다. Actions 재실행은 허용하지 않는다. 새 수동 실행은 별도의 테스트이므로 앞선 불명확한 결과를 해결하기 위해 임의로 반복하지 않는다.
+
+Draft 검증 성공은 main 운영 검증과 구분한다. main 반영 후 운영 상태 저장·실제 이벤트·반복 실행을 확인해야 #18을 완료할 수 있다.
+
 ## 전송 결과가 불확실할 때
 
 Discord POST 전에 상태를 `pending`으로 저장·재조회한다. 확인된 메시지 ID를 받으면 `delivered`로 저장한다. 명시적인 429 거절만 제한적으로 재시도한다. 연결 오류·시간 초과·5xx·응답 유실은 자동 재전송하지 않는다. 다른 독립 알림은 계속 처리한다. 최초 장애 안내가 확인되지 않은 경우 복구 안내는 기다린다.
@@ -80,3 +98,5 @@ Actions 경고에 표시된 짧은 키를 상태 파일의 알림 key 해시와 
 소비자는 고정 저장소·동기화 workflow·main 이력·실제 attempt와 artifact를 대조한다. 이전 attempt artifact를 대신 쓰지 않으며 ZIP 안의 정확한 JSON 파일 하나만 크기·경로·종류를 확인해서 읽는다. 보고서 코드를 실행하지 않는다. 중간 실행의 실패·보고서 부재는 연속 보류 횟수를 끊는다.
 
 로컬 합성 검사: `python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'`. 실제 Webhook 전송·팀원 알림 수신은 활성화 후 별도로 확인한다.
+
+Draft 테스트 전송은 HTTP POST도 최대 한 번만 시도하며 429 응답에도 재시도하지 않는다. 운영 전송의 기존 제한된 429 재시도 정책은 유지한다.

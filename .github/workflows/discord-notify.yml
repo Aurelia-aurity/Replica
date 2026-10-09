@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '실행 종류 (probe 구현 검토 전에는 브랜치 실행이 스킵됨)'
+        description: 'notify: main 운영 알림 / probe: Draft 브랜치 검증'
         type: choice
         options: [notify, probe]
         default: notify
@@ -17,7 +17,7 @@ on:
         type: boolean
         default: false
       approved_sha:
-        description: '검토한 main의 전체 40자리 SHA (최초 기준선/전송 보류 조치)'
+        description: '검토한 실행 커밋의 전체 40자리 SHA'
         type: string
         required: true
       resolve_key:
@@ -57,7 +57,7 @@ jobs:
       github.repository == 'Aurelia-aurity/Replica' &&
       (github.event_name != 'pull_request_target' || github.base_ref == 'main') &&
       (github.event_name != 'workflow_dispatch' ||
-       (github.ref == 'refs/heads/main' &&
+       (inputs.mode != 'probe' && github.ref == 'refs/heads/main' &&
         format('{0}', github.actor_id) == '97959897' &&
         github.actor == github.triggering_actor &&
         format('{0}', github.run_attempt) == '1' && inputs.approved_sha == github.sha))
@@ -89,3 +89,46 @@ jobs:
           DISCORD_RESOLVE_OUTCOME: ${{ inputs.resolve_outcome }}
           DISCORD_RESOLVE_MESSAGE_ID: ${{ inputs.resolve_message_id }}
         run: python3 -B scripts/discord_notify.py
+
+  probe:
+    if: >-
+      github.repository == 'Aurelia-aurity/Replica' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'probe' &&
+      startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' &&
+      format('{0}', github.actor_id) == '97959897' &&
+      github.actor == github.triggering_actor &&
+      format('{0}', github.run_attempt) == '1' && inputs.approved_sha == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    steps:
+      # Explicit PM dispatch of the reviewed same-repository Draft SHA only.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify notification implementation
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_discord*.py'
+      - name: Observe Draft without production writes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_MODE: ${{ inputs.mode }}
+          DISCORD_DRAFT_PR: ${{ inputs.draft_pr }}
+          DISCORD_SEND_TEST: ${{ inputs.send_test }}
+          DISCORD_APPROVED_SHA: ${{ inputs.approved_sha }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
+          DISCORD_USER_MAP: ${{ vars.DISCORD_USER_MAP }}
+        run: python3 -B scripts/discord_probe.py
+      - name: Preserve bounded probe receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: discord-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: probe-result.json
+          if-no-files-found: warn
+          retention-days: 30
