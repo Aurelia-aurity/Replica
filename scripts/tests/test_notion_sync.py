@@ -348,9 +348,147 @@ class HTTPTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_secret_bearing_workflow_uses_only_trusted_main(self):
+    @staticmethod
+    def _workflow():
+        return (MODULE.parents[1] / ".github/workflows/notion-sync.yml").read_text()
+
+    @staticmethod
+    def _evaluate_actions_expression(expression, context):
+        import ast
+
+        value = expression.strip()
+        if value.startswith("${{") and value.endswith("}}"):
+            value = value[3:-2].strip()
+        value = value.replace("format('{0}', github.actor_id)", repr(str(context["actor_id"])))
+        value = value.replace("format('{0}', github.run_attempt)",
+                              repr(str(context["run_attempt"])))
+        names = {
+            "github.repository": context["repository"],
+            "github.event_name": context["event_name"],
+            "github.actor_id": context["actor_id"],
+            "github.actor": context["actor"],
+            "github.triggering_actor": context["triggering_actor"],
+            "github.run_attempt": context["run_attempt"],
+            "github.sha": context["sha"],
+            "github.ref": context["ref"],
+            "inputs.approved_sha": context["approved_sha"],
+            "vars.PM_GITHUB_USER_ID": context["pm_id"],
+            "vars.NOTION_SYNC_ENABLED": context["enabled"],
+        }
+        for name in sorted(names, key=len, reverse=True):
+            value = value.replace(name, repr(names[name]))
+        value = value.replace("&&", " and ").replace("||", " or ")
+
+        def evaluate(node):
+            if isinstance(node, ast.Expression):
+                return evaluate(node.body)
+            if isinstance(node, ast.Constant):
+                return node.value
+            if isinstance(node, ast.BoolOp):
+                if isinstance(node.op, ast.And):
+                    result = evaluate(node.values[0])
+                    for part in node.values[1:]:
+                        if not result:
+                            return result
+                        result = evaluate(part)
+                    return result
+                if isinstance(node.op, ast.Or):
+                    result = evaluate(node.values[0])
+                    for part in node.values[1:]:
+                        if result:
+                            return result
+                        result = evaluate(part)
+                    return result
+            if isinstance(node, ast.Compare) and len(node.ops) == 1:
+                left, right = evaluate(node.left), evaluate(node.comparators[0])
+                if isinstance(node.ops[0], ast.Eq):
+                    return left == right
+                if isinstance(node.ops[0], ast.NotEq):
+                    return left != right
+            raise AssertionError("Unexpected workflow expression syntax")
+
+        return evaluate(ast.parse(value, mode="eval"))
+
+    @staticmethod
+    def _base_context():
+        sha = "a" * 40
+        return {"repository": "Aurelia-aurity/Replica", "event_name": "workflow_dispatch",
+                "actor_id": "97959897", "pm_id": "97959897", "actor": "Just-Simple0",
+                "triggering_actor": "Just-Simple0", "run_attempt": "1",
+                "approved_sha": sha, "sha": sha,
+                "ref": "refs/heads/fix/17-project-add-readback", "enabled": "false"}
+
+    def test_manual_job_gate_matrix_binds_pm_sha_ref_and_first_attempt(self):
+        content = self._workflow()
+        start = content.index("  sync:\n    if: >-\n") + len("  sync:\n    if: >-\n")
+        end = content.index("\n    runs-on:", start)
+        gate = " ".join(line.strip() for line in content[start:end].splitlines())
+        base = self._base_context()
+        cases = [
+            ("PM dry-run", {"dry_run": True}, True),
+            ("PM live branch", {"dry_run": False}, True),
+            ("PM main", {"ref": "refs/heads/main"}, True),
+            ("non-PM", {"actor_id": "123", "actor": "other", "triggering_actor": "other"}, False),
+            ("different triggering actor", {"triggering_actor": "other"}, False),
+            ("rerun same PM", {"run_attempt": "2"}, False),
+            ("rerun other actor", {"run_attempt": "2", "triggering_actor": "other"}, False),
+            ("SHA mismatch", {"approved_sha": "b" * 40}, False),
+            ("empty SHA", {"approved_sha": ""}, False),
+            ("truncated SHA", {"approved_sha": "a" * 39}, False),
+            ("other branch", {"ref": "refs/heads/feat/unreviewed"}, False),
+            ("tag", {"ref": "refs/tags/v1"}, False),
+        ]
+        for label, changes, expected in cases:
+            with self.subTest(case=label):
+                context = {**base, **changes}
+                self.assertEqual(self._evaluate_actions_expression(gate, context), expected)
+
+        self.assertIn("format('{0}', github.actor_id) == vars.PM_GITHUB_USER_ID", gate)
+        self.assertIn("github.actor == github.triggering_actor", gate)
+        self.assertIn("format('{0}', github.run_attempt) == '1'", gate)
+        self.assertIn("inputs.approved_sha == github.sha", gate)
+        self.assertIn("github.ref == 'refs/heads/main'", gate)
+        self.assertIn("github.ref == 'refs/heads/fix/17-project-add-readback'", gate)
+
+    def test_automatic_event_gate_uses_switch_and_main_while_manual_uses_sha(self):
         import re
-        content = (MODULE.parents[1] / ".github/workflows/notion-sync.yml").read_text()
+        content = self._workflow()
+        start = content.index("  sync:\n    if: >-\n") + len("  sync:\n    if: >-\n")
+        end = content.index("\n    runs-on:", start)
+        gate = " ".join(line.strip() for line in content[start:end].splitlines())
+        base = self._base_context()
+        cases = [
+            ("schedule disabled", {"event_name": "schedule", "enabled": "false"}, False),
+            ("schedule enabled", {"event_name": "schedule", "enabled": "true"}, True),
+            ("issues enabled", {"event_name": "issues", "enabled": "true"}, True),
+            ("pull request target enabled", {"event_name": "pull_request_target", "enabled": "true"}, True),
+            ("pull request target disabled", {"event_name": "pull_request_target", "enabled": "false"}, False),
+        ]
+        for label, changes, expected in cases:
+            with self.subTest(case=label):
+                self.assertEqual(self._evaluate_actions_expression(gate, {**base, **changes}), expected)
+
+        checkout_ref = re.search(r"(?m)^\s+ref: (.+)$", content)[1]
+        self.assertEqual(self._evaluate_actions_expression(checkout_ref, base), base["sha"])
+        self.assertEqual(self._evaluate_actions_expression(
+            checkout_ref, {**base, "event_name": "schedule"}), "main")
+        sync_enabled = re.search(r"(?m)^\s+NOTION_SYNC_ENABLED: (.+)$", content)[1]
+        self.assertEqual(self._evaluate_actions_expression(sync_enabled, base), "true")
+        self.assertEqual(self._evaluate_actions_expression(
+            sync_enabled, {**base, "event_name": "schedule", "enabled": "false"}), "false")
+        self.assertEqual(self._evaluate_actions_expression(
+            sync_enabled, {**base, "event_name": "schedule", "enabled": "true"}), "true")
+
+        verify_index = content.index("- name: Verify sync implementation")
+        sync_index = content.index("- name: Sync current GitHub state")
+        secrets_index = content.index("NOTION_TOKEN:")
+        self.assertLess(verify_index, sync_index)
+        self.assertLess(sync_index, secrets_index)
+        self.assertNotIn("secrets.", content[:verify_index])
+
+    def test_workflow_permissions_and_event_inputs_remain_fixed(self):
+        import re
+        content = self._workflow()
         self.assertIn("pull_request_target:", content)
         self.assertIn("workflow_dispatch:", content)
         self.assertIn("issues:", content)
@@ -359,14 +497,83 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", content)
         self.assertRegex(content, r"actions/checkout@[0-9a-f]{40}")
         self.assertIn("actions/checkout@11d5960a326750d5838078e36cf38b85af677262", content)
-        self.assertIn("ref: main", content)
+        self.assertIn("ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || 'main' }}", content)
+        self.assertIn("approved_sha:", content)
+        self.assertIn("required: true", content)
+        self.assertIn("type: string", content)
         self.assertIn("persist-credentials: false", content)
         self.assertNotIn("github.event.", content)
         self.assertNotIn("write", content)
         permission_lines = re.search(r"permissions:\n(.*?)\n\n", content, re.S)[1]
         self.assertEqual(set(permission_lines.splitlines()), {"  contents: read", "  issues: read", "  pull-requests: read"})
-        self.assertLess(content.index("vars.NOTION_SYNC_ENABLED == 'true'"), content.index("secrets.NOTION_TOKEN"))
-        self.assertLess(content.index("vars.NOTION_SYNC_ENABLED == 'true'"), content.index("steps:"))
+        self.assertLess(content.index("inputs.approved_sha == github.sha"), content.index("steps:"))
+        self.assertLess(content.index("github.ref == 'refs/heads/fix/17-project-add-readback'"),
+                        content.index("steps:"))
+        steps = content.split("    steps:\n", 1)[1]
+        self.assertNotIn("inputs.approved_sha", steps)
+        sync_step = content.split("- name: Sync current GitHub state", 1)[1]
+        run_script = sync_step.split("run: |", 1)[1]
+        self.assertNotIn("inputs.resolve_issue_numbers", run_script)
+        self.assertNotIn("inputs.diagnose_date_readback", run_script)
+        self.assertIn('os.environ.get("SYNC_RESOLVE_ISSUES")', run_script)
+        self.assertIn('os.environ.get("SYNC_DIAGNOSE_DATE_READBACK")', run_script)
+        self.assertIn('args.append("--diagnose-date-readback")', run_script)
+        self.assertIn("diagnose_date_readback:", content)
+        self.assertIn("default: false", content[content.index("diagnose_date_readback:"):])
+
+    def test_date_diagnostic_workflow_wrapper_builds_argv_and_guards_before_run(self):
+        import os
+        import re
+        import sys
+        import textwrap
+
+        content = self._workflow()
+        sync_step = content.split("- name: Sync current GitHub state", 1)[1]
+        run_script = sync_step.split("run: |", 1)[1]
+        match = re.search(
+            r"(?m)^\s+python3 -B - <<'PY'\n(?P<body>.*?)^\s+PY\s*$",
+            run_script,
+            re.S,
+        )
+        self.assertIsNotNone(match)
+        source = textwrap.dedent(match.group("body"))
+
+        captured = []
+        normal_env = {
+            "SYNC_DRY_RUN": "true",
+            "SYNC_DIAGNOSE_DATE_READBACK": "true",
+            "SYNC_RESOLVE_ISSUES": "1,2",
+        }
+        with patch.dict(os.environ, normal_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
+                exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [(
+            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run",
+             "--resolve-issue-numbers", "1,2", "--diagnose-date-readback"], True)])
+
+        captured.clear()
+        default_env = {
+            "SYNC_DRY_RUN": "true",
+            "SYNC_DIAGNOSE_DATE_READBACK": "false",
+            "SYNC_RESOLVE_ISSUES": "",
+        }
+        with patch.dict(os.environ, default_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
+                exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [(
+            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run"], True)])
+
+        captured.clear()
+        denied_env = {
+            "SYNC_DRY_RUN": "false",
+            "SYNC_DIAGNOSE_DATE_READBACK": "true",
+            "SYNC_RESOLVE_ISSUES": "",
+        }
+        with patch.dict(os.environ, denied_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda *args, **kwargs: captured.append(args)):
+                with self.assertRaisesRegex(SystemExit, "requires --dry-run"):
+                    exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [])
 
 
 if __name__ == "__main__":

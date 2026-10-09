@@ -194,6 +194,46 @@ class GitHubProjectTests(unittest.TestCase):
     def test_project_items_query_requests_archived_and_active_items(self):
         self.assertIn("archivedStates: [ARCHIVED, NOT_ARCHIVED]", gp.PROJECT_ITEMS_QUERY)
 
+    def test_add_readback_observes_returned_id_before_repository_filter_without_rejecting_other_repos(self):
+        returned = project_item("PVTI_returned")
+        returned["content"]["repository"]["id"] = "R_foreign"
+        unrelated = project_item("PVTI_unrelated", field_values=[],)
+        unrelated["content"].update({"id": "I_other", "databaseId": 42, "number": 19})
+        unrelated["content"]["repository"]["id"] = "R_another_foreign"
+        reader = ProjectReader([returned, unrelated])
+
+        result = gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE,
+            add_readback_item_id="PVTI_returned", add_target_issue_id=41,
+            add_target_issue_node_id=ISSUE_NODE)
+
+        self.assertEqual(result["items"], {})
+        self.assertEqual(result["add_readback_items"], [{
+            "item_id": "PVTI_returned", "is_archived": False, "content_type": "Issue",
+            "content_id": ISSUE_NODE, "content_database_id": 41,
+            "repository_id": "R_foreign", "repository_database_id": gp.REPOSITORY_ID,
+        }])
+        self.assertEqual(result["item_count"], 2)
+
+    def test_add_readback_observes_target_issue_by_node_or_database_id(self):
+        by_database_id = project_item("PVTI_wrong_node")
+        by_database_id["content"]["id"] = "I_wrong"
+        by_node_id = project_item("PVTI_wrong_database")
+        by_node_id["content"]["databaseId"] = 42
+        reader = ProjectReader([by_database_id, by_node_id])
+
+        result = gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE,
+            add_readback_item_id="PVTI_not_present", add_target_issue_id=41,
+            add_target_issue_node_id=ISSUE_NODE)
+
+        self.assertEqual({row["item_id"] for row in result["add_readback_items"]},
+                         {"PVTI_wrong_node", "PVTI_wrong_database"})
+        self.assertEqual(result["items"][41]["content_id"], "I_wrong")
+        self.assertEqual(result["items"][42]["content_id"], ISSUE_NODE)
+
     def test_archived_replica_items_are_found_active_and_archived_in_all_pages(self):
         scenarios = (
             ([project_item("PVTI_archived", archived=True)], {}, ["PVTI_archived"]),

@@ -28,6 +28,8 @@ MAX_INTERNAL_TEXT = 18000
 NOTION_QUERY_PAGE_SIZE = 100
 NOTION_QUERY_MAX_RESULTS = 10000
 BOUNDARY_SECONDS = 1.0
+PROJECT_ADD_READBACK_MAX_ATTEMPTS = 3
+PROJECT_ADD_READBACK_BACKOFF_SECONDS = (0.25, 0.5)
 GENERAL_STATES = ("백로그", "준비 중", "진행 중")
 RESUMABLE_HOLD_CODES = {
     "MIGRATION_CONFLICT", "MIGRATION_UNSET", "MIGRATION_INPUT_CHANGED",
@@ -46,6 +48,11 @@ SCHEMA = {
     "일정": "date", "메모": "rich_text", "종료 사유": "select", "대표 이슈": "url",
     "확인 필요": "rich_text", "동기화 내부 상태": "rich_text",
 }
+DATE_DIAGNOSTIC_METADATA_WHITELIST = (
+    "제목", "종류", "번호", "GitHub URL", "GitHub 상태", "작성자", "담당자",
+    "라벨", "GitHub 수정", "동기화 키",
+)
+DISPLAY_MINUTE_DATE_PROPERTIES = frozenset({"GitHub 수정", "동기화 시각"})
 OPTIONS = {
     "종류": {"Issue", "PR", "Sync"},
     "GitHub 상태": {"Open", "Closed", "Draft", "Merged"},
@@ -559,28 +566,28 @@ def preflight_notion(notion, source_id, control_id, project_id, *, diagnostics=F
             elif kind == "PR":
                 require(not read_text(row, "동기화 내부 상태"), "PR 행에 Issue 내부 상태가 있습니다")
                 positive(row["properties"]["번호"]["number"], "Notion PR 번호 오류")
-            date = read_date(row, "GitHub 수정")
-            if date:
-                timestamp(date)
+            _display_date_instant(row, "GitHub 수정", allow_null=True)
             index[key] = row
     require(CONTROL_KEY not in archived_keys and CONTROL_KEY in index,
             "동기화 관리 행이 조회되지 않거나 보관 상태입니다")
     check_control(index[CONTROL_KEY], source_id, control_id)
     pending = read_text(direct_control, "Pending create")
     require(read_text(index[CONTROL_KEY], "Pending create") == pending, "관리 행 snapshot 불일치")
-    require(read_text(index[CONTROL_KEY], "동기화 내부 상태") ==
-            read_text(direct_control, "동기화 내부 상태") and
-            read_date(index[CONTROL_KEY], "동기화 시각") == read_date(direct_control, "동기화 시각") and
+    control_text = read_text(direct_control, "동기화 내부 상태")
+    control_state = decode_internal(control_text, kind="control", project_id=project_id) if control_text else None
+    listed_date = _display_date_instant(index[CONTROL_KEY], "동기화 시각", allow_null=True)
+    direct_date = _display_date_instant(direct_control, "동기화 시각", allow_null=True)
+    require(read_text(index[CONTROL_KEY], "동기화 내부 상태") == control_text and
+            listed_date == direct_date and
             read_text(index[CONTROL_KEY], "확인 필요") == read_text(direct_control, "확인 필요"),
             "관리행 내부 상태/표시 snapshot 불일치")
     require(not any(key in archived_keys for key in index), "Notion 보관 키 상태 오류")
     if pending:
         require(valid_key(pending) and pending in index, "Pending create 결과 불명; 수동 조사 필요")
-    control_text = read_text(direct_control, "동기화 내부 상태")
-    control_state = decode_internal(control_text, kind="control", project_id=project_id) if control_text else None
-    visible_date = read_date(direct_control, "동기화 시각")
+    visible_date = direct_date
     if control_state and control_state["last_success_at"]:
-        require(visible_date and timestamp(visible_date) == timestamp(control_state["last_success_at"]),
+        require(visible_date is not None and
+                visible_date == timestamp(_minute_iso(control_state["last_success_at"])),
                 "관리행 성공 시각/internal checkpoint 불일치")
     return {"source_id": source_id, "control_id": control_id, "index": index,
             "control": direct_control, "control_state": control_state, "pending_create": pending,
@@ -589,6 +596,38 @@ def preflight_notion(notion, source_id, control_id, project_id, *, diagnostics=F
 
 def _iso(value):
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _minute_iso(value):
+    parsed = timestamp(value)
+    return _iso(parsed.replace(second=0, microsecond=0))
+
+
+def _display_date_instant(page, name, *, allow_null=False):
+    properties = page.get("properties") if isinstance(page, dict) else None
+    require(isinstance(properties, dict), "Notion 날짜 readback 형식 오류")
+    prop = properties.get(name)
+    require(isinstance(prop, dict) and "date" in prop,
+            "Notion 날짜 readback 형식 오류")
+    date_value = prop["date"]
+    if date_value is None:
+        require(allow_null, "Notion 날짜 readback 누락")
+        return None
+    require(isinstance(date_value, dict) and date_value.get("end") is None and
+            date_value.get("time_zone") is None,
+            "Notion 날짜 readback range/timezone 불일치")
+    return timestamp(date_value.get("start"))
+
+
+def _expected_display_date_instant(name, body):
+    require(name in DISPLAY_MINUTE_DATE_PROPERTIES and isinstance(body, dict) and
+            body.get("end") is None and body.get("time_zone") is None,
+            "표시 날짜 expected 형식 오류")
+    start = body.get("start")
+    expected = timestamp(start)
+    require(start == _iso(expected.replace(second=0, microsecond=0)),
+            "표시 날짜 expected UTC minute projection 오류")
+    return expected
 
 
 def _digest(value):
@@ -615,6 +654,13 @@ def _notion_value(page, name, kind):
 def _verify_properties(page, expected):
     for name, value in expected.items():
         kind, body = next(iter(value.items()))
+        if name in DISPLAY_MINUTE_DATE_PROPERTIES:
+            require(kind == "date", "표시 날짜 속성 타입 오류")
+            wanted = _expected_display_date_instant(name, body)
+            actual = _display_date_instant(page, name)
+            require(actual == wanted,
+                    "Notion write readback 불일치; 다음 실행에서 복구 필요")
+            continue
         if kind in {"title", "rich_text"}:
             wanted = "".join(part["text"]["content"] for part in body)
         elif kind == "select":
@@ -625,6 +671,114 @@ def _verify_properties(page, expected):
             wanted = body
         require(_notion_value(page, name, kind) == wanted,
                 "Notion write readback 불일치; 다음 실행에서 복구 필요")
+
+
+def _date_format_shape(value):
+    if not isinstance(value, str):
+        return None, "missing" if value is None else "non_string", None
+    fraction = re.search(r"\.(\d+)(?=(?:Z|[+-]\d{2}:\d{2})$)", value)
+    fractional_digits = len(fraction.group(1)) if fraction else None
+    if value.endswith("Z"):
+        offset_shape = "z_suffix"
+    else:
+        offset = re.search(r"([+-])(\d{2}):(\d{2})$", value)
+        if offset:
+            offset_shape = ("zero_offset" if offset.group(2) == "00" and
+                            offset.group(3) == "00" else "nonzero_offset")
+        else:
+            offset_shape = "no_offset"
+    try:
+        parsed = timestamp(value)
+    except (SyncError, gp.SyncError):
+        parsed = None
+    if parsed is not None and fractional_digits is None:
+        fractional_digits = 0
+    return parsed, offset_shape, fractional_digits
+
+
+def _date_shape_summary(value):
+    parsed, offset_shape, fractional_digits = _date_format_shape(value)
+    return {"parseable": parsed is not None,
+            "fractional_digits": fractional_digits,
+            "offset_shape": offset_shape}
+
+
+def _compare_redacted_dates(expected, actual):
+    expected_time, expected_offset, expected_fraction = _date_format_shape(expected)
+    actual_time, actual_offset, actual_fraction = _date_format_shape(actual)
+    expected_ok, actual_ok = expected_time is not None, actual_time is not None
+    if expected_ok and actual_ok:
+        same_instant = expected_time == actual_time
+        same_minute = (expected_time.replace(second=0, microsecond=0) ==
+                       actual_time.replace(second=0, microsecond=0))
+        parseable = "both"
+    else:
+        same_instant = None
+        same_minute = None
+        parseable = ("expected_only" if expected_ok else
+                     "actual_only" if actual_ok else "neither")
+    return {
+        "literal_equal": (isinstance(expected, str) and isinstance(actual, str) and
+                          expected == actual),
+        "parseable": parseable,
+        "same_instant": same_instant,
+        "same_minute": same_minute,
+        "expected_fractional_digits": expected_fraction,
+        "actual_fractional_digits": actual_fraction,
+        "expected_offset_shape": expected_offset,
+        "actual_offset_shape": actual_offset,
+        "actual_seconds_zero": None if actual_time is None else actual_time.second == 0,
+        "actual_microseconds_zero": None if actual_time is None else actual_time.microsecond == 0,
+    }
+
+
+def _diagnose_date_readback(source, index, now):
+    issue_number = 1
+    matches = [(key, row_data) for key, (kind, _, row_data) in source.items()
+               if kind == "Issue" and row_data.get("number") == issue_number]
+    diagnostic = {"issue_number": issue_number, "property": "GitHub 수정"}
+    if not matches:
+        return {**diagnostic, "row_match": "source_missing"}
+    if len(matches) != 1:
+        return {**diagnostic, "row_match": "source_ambiguous"}
+    key, issue = matches[0]
+    row = index.get(key)
+    if row is None:
+        return {**diagnostic, "row_match": "notion_missing"}
+    expected_metadata = _make_metadata("Issue", issue, key)
+    metadata_matches = []
+    for name in DATE_DIAGNOSTIC_METADATA_WHITELIST:
+        value = expected_metadata[name]
+        kind, body = next(iter(value.items()))
+        if kind in {"title", "rich_text"}:
+            wanted = "".join(part["text"]["content"] for part in body)
+        elif kind == "select":
+            wanted = body.get("name") if body else None
+        elif kind == "date":
+            wanted = body.get("start") if body else None
+        else:
+            wanted = body
+        if name in DISPLAY_MINUTE_DATE_PROPERTIES:
+            matches_property = (_display_date_instant(row, name) ==
+                                _expected_display_date_instant(name, body))
+        else:
+            matches_property = _notion_value(row, name, kind) == wanted
+        metadata_matches.append({
+            "property": name,
+            "matches": matches_property,
+        })
+    first_metadata_mismatch = next(
+        (entry["property"] for entry in metadata_matches if not entry["matches"]), None)
+    return {**diagnostic, "row_match": "matched",
+            **_compare_redacted_dates(issue.get("updatedAt"),
+                                      read_date(row, "GitHub 수정")),
+            "metadata_matches": metadata_matches,
+            "first_metadata_mismatch": first_metadata_mismatch,
+            "clock_shape": {
+                "property": "동기화 시각",
+                "current_run_would_write": _date_shape_summary(_minute_iso(now)),
+                "stored_value": _date_shape_summary(read_date(row, "동기화 시각")),
+            }}
 
 
 def _patch_page(notion, source_id, page, properties):
@@ -687,7 +841,8 @@ def _make_metadata(kind, row, key):
         "작성자": text_property(author.get("login") or ""),
         "담당자": text_property(", ".join(assignee_names)),
         "라벨": text_property(", ".join(label_names)),
-        "GitHub 수정": {"date": {"start": updated}}, "동기화 키": text_property(key),
+        "GitHub 수정": {"date": {"start": _minute_iso(updated)}},
+        "동기화 키": text_property(key),
     }
 
 
@@ -1123,7 +1278,7 @@ def _ensure_notion_row(notion, source_id, control, index, kind, row, canonical_i
     if key in index:
         raise SyncError("Notion canonical key collision")
     update_control_pending(notion, source_id, control, key)
-    properties = {**metadata, "동기화 시각": {"date": {"start": now}},
+    properties = {**metadata, "동기화 시각": {"date": {"start": _minute_iso(now)}},
                   "Pending create": text_property("")}
     if kind == "Issue":
         properties["작업 상태"] = {"select": None}
@@ -1152,11 +1307,16 @@ def update_control_pending(notion, source_id, control, value):
     _patch_page(notion, source_id, control, {"Pending create": text_property(value)})
 
 
-def _project_snapshot(client, config, facts):
+def _project_snapshot(client, config, facts, *, add_readback_item_id=None, add_target_issue=None):
     project = gp.fetch_project(client, project_id=config["project_id"], owner_id=config["owner_id"],
                                status_field_id=config["status_field_id"],
                                status_options=config["status_options"],
-                               repository_node_id=facts["repository_node_id"])
+                               repository_node_id=facts["repository_node_id"],
+                               add_readback_item_id=add_readback_item_id,
+                               add_target_issue_id=(add_target_issue["databaseId"]
+                                                    if add_target_issue is not None else None),
+                               add_target_issue_node_id=(add_target_issue["id"]
+                                                         if add_target_issue is not None else None))
     for issue_id, item in project["items"].items():
         issue = facts["issues"].get(issue_id)
         require(issue is not None, "Project 대상 저장소 Issue가 GraphQL 전체 목록에 없습니다")
@@ -1168,6 +1328,60 @@ def _project_snapshot(client, config, facts):
         require(all(item.get("content_id") == issue["id"] for item in archived_items),
                 "보관 Project item의 Issue content node ID 불일치")
     return project
+
+
+def _confirmed_add_item_matches(pending, item):
+    if not pending["confirmed"]:
+        return True
+    if item is None:
+        return False
+    checkpoint = pending["checkpoint"]
+    return (item.get("id") == pending.get("project_item_id") and
+            item.get("id") == checkpoint.get("item_id"))
+
+
+def _added_project_item_from_snapshot(project, returned_item_id, issue, facts):
+    observations = project.get("add_readback_items")
+    require(isinstance(observations, list), "Project add readback 관측 오류")
+    returned = [row for row in observations if row.get("item_id") == returned_item_id]
+    target = [row for row in observations
+              if (row.get("content_id") == issue["id"] or
+                  (row.get("content_type") == "Issue" and
+                   row.get("content_database_id") == issue["databaseId"]))]
+    if not returned and not target:
+        return None
+
+    require(len(returned) == 1 and len(target) == 1 and
+            returned[0]["item_id"] == target[0]["item_id"] == returned_item_id,
+            "Project 추가 결과 returned ID와 대상 Issue가 불일치; pending 유지")
+    observed = returned[0]
+    require(observed.get("is_archived") is False and
+            observed.get("content_type") == "Issue" and
+            observed.get("content_id") == issue["id"] and
+            observed.get("content_database_id") == issue["databaseId"] and
+            observed.get("repository_id") == facts["repository_node_id"] and
+            observed.get("repository_database_id") == REPOSITORY_ID,
+            "Project 추가 결과 ID/Issue/repository/archive 관계 불일치; pending 유지")
+
+    item = project["items"].get(issue["databaseId"])
+    archived = project.get("archived_items", {}).get(issue["databaseId"], [])
+    require(item is not None and item["id"] == returned_item_id and
+            item["content_id"] == issue["id"] and not archived,
+            "Project 추가 결과 active/archive 항목 충돌; pending 유지")
+    return item
+
+
+def _read_added_project_item(project_client, config, facts, issue, returned_item_id):
+    for attempt in range(PROJECT_ADD_READBACK_MAX_ATTEMPTS):
+        project = _project_snapshot(project_client, config, facts,
+                                    add_readback_item_id=returned_item_id,
+                                    add_target_issue=issue)
+        item = _added_project_item_from_snapshot(project, returned_item_id, issue, facts)
+        if item is not None:
+            return project, item
+        if attempt + 1 < PROJECT_ADD_READBACK_MAX_ATTEMPTS:
+            project_client.sleep(PROJECT_ADD_READBACK_BACKOFF_SECONDS[attempt])
+    raise SyncError("Project 추가 결과 0개/대상 불일치; pending 유지")
 
 
 def _status_option(project, name):
@@ -1243,7 +1457,7 @@ def _preview_resolutions(numbers, source_by_number, index, project, facts, confi
 def _projection_properties(metadata, *, target, end_reason, representative, confirmation,
                            state, now, kind):
     properties = dict(metadata)
-    properties["동기화 시각"] = {"date": {"start": now}}
+    properties["동기화 시각"] = {"date": {"start": _minute_iso(now)}}
     if kind == "Issue":
         properties.update({
             "작업 상태": {"select": {"name": target} if target else None},
@@ -1261,7 +1475,7 @@ def _display_hold(notion, source_id, row, metadata, state, hold, now, *, preserv
     _verify_issue_state_write(notion, source_id, row, state)
     visible = "보류: " + hold["message"]
     if preserve_task_status:
-        props = {**metadata, "동기화 시각": {"date": {"start": now}},
+        props = {**metadata, "동기화 시각": {"date": {"start": _minute_iso(now)}},
                  "확인 필요": text_property(visible),
                  "동기화 내부 상태": text_property(canonical_json(state))}
     else:
@@ -1279,6 +1493,11 @@ def _resolve_pending_add(notion, github, source_id, row, state, project, facts, 
         return None, _new_hold("PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 확인할 수 없습니다.",
                                fingerprint)
     require(item["content_id"] == issue["id"], "pending Project item content ID 불일치")
+    if not _confirmed_add_item_matches(pending, item):
+        return None, _new_hold(
+            "PROJECT_ADD_UNCERTAIN",
+            "확정된 Project add checkpoint와 현재 항목 ID가 다릅니다. 재바인딩하지 않았습니다.",
+            fingerprint)
     latest = gp.fetch_issue_detail(github, issue["id"])
     latest_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
     latest_fingerprint = _source_fingerprint(latest, latest_refs, None)
@@ -1485,15 +1704,12 @@ def _add_project_item_once(notion, github, project_client, source_id, row, state
         state["hold"] = hold
         return latest_project, raced_item, hold
     try:
-        gp.add_project_issue(project_client, config["project_id"], issue["id"])
+        returned_item_id = gp.add_project_issue(project_client, config["project_id"], issue["id"])
     except gp.SyncError:
         # The request may have committed. Leave the durable pending marker for a
         # later PM-confirmed read; do not read back and write again in this run.
         raise SyncError("Project 추가 결과 불명; pending을 유지하고 수동 확인 필요") from None
-    project = _project_snapshot(project_client, config, facts)
-    item = project["items"].get(issue["databaseId"])
-    require(item is not None and item["content_id"] == issue["id"],
-            "Project 추가 결과 0개/대상 불일치; pending 유지")
+    project, item = _read_added_project_item(project_client, config, facts, issue, returned_item_id)
     if pending["migration_fingerprint"] is not None:
         unchanged, latest_page = _migration_input_unchanged(
             notion, source_id, row, pending, config["project_id"])
@@ -1686,11 +1902,13 @@ def _update_control_summary(notion, source_id, control, control_state, issue_row
     if success:
         control_state["last_success_at"] = now
         props["동기화 내부 상태"] = text_property(canonical_json(control_state))
-        props["동기화 시각"] = {"date": {"start": now}}
+        props["동기화 시각"] = {"date": {"start": _minute_iso(now)}}
     _patch_page(notion, source_id, control, props)
     if success:
-        require(timestamp(read_date(control, "동기화 시각")) == timestamp(now),
-                "전체 성공 시각 readback 오류")
+        actual = _display_date_instant(control, "동기화 시각")
+        expected = _expected_display_date_instant(
+            "동기화 시각", {"start": _minute_iso(now)})
+        require(actual == expected, "전체 성공 시각 readback 오류")
     return holds
 
 
@@ -1733,6 +1951,11 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
         if state["pending"]:
             pending = state["pending"]
             if pending["kind"] == "add":
+                if pending["confirmed"] and not _confirmed_add_item_matches(pending, item):
+                    result["hold"] = {"code": "PROJECT_ADD_UNCERTAIN",
+                                       "message": "저장된 Project add checkpoint와 현재 항목 ID가 다릅니다."}
+                    plans.append(result)
+                    continue
                 linked, _ = _linked_pr_facts(issue, facts)
                 current_source_fingerprint = _source_fingerprint(issue, linked, None)
                 if (number not in resume_numbers or item is None or
@@ -1842,8 +2065,10 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
 
 
 def sync(github, rest, project_client, notion, config, *, dry_run=False,
-         resolve_issue_numbers="", env=None, now=None):
+         diagnose_date_readback=False, resolve_issue_numbers="", env=None, now=None):
     """Run one complete local/API sync; all global reads finish before the first write."""
+    require(not diagnose_date_readback or dry_run,
+            "--diagnose-date-readback requires --dry-run")
     env = os.environ if env is None else env
     source_id, control_id = identifier(config["notion_source_id"]), identifier(config["notion_control_id"])
     facts = gp.fetch_repository_facts(github, rest)
@@ -2094,6 +2319,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
     if dry_run:
         counts["issue_plans"] = _preview_issue_plans(notion, source_id, source, index, project, facts,
                                                        config, cutoff, resume_numbers)
+        if diagnose_date_readback:
+            counts["date_readback_diagnostic"] = _diagnose_date_readback(source, index, now)
         if resume_numbers:
             counts["resolution_preview"] = [plan for plan in counts["issue_plans"]
                                              if plan["issue_number"] in resume_numbers]
@@ -2124,7 +2351,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         if kind == "PR":
             metadata = _make_metadata(kind, row_data, key)
             if not created:
-                _patch_page(notion, source_id, row, {**metadata, "동기화 시각": {"date": {"start": now}}})
+                _patch_page(notion, source_id, row, {**metadata,
+                    "동기화 시각": {"date": {"start": _minute_iso(now)}}})
                 counts["updated"] += 1
             continue
 
@@ -2454,9 +2682,14 @@ def _load_config(env):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="전체 조회·검증만 하고 어떤 API에도 쓰지 않음")
+    parser.add_argument("--diagnose-date-readback", action="store_true",
+                        help="dry-run에서 Issue #1 metadata readback을 redacted 진단")
     parser.add_argument("--resolve-issue-numbers", default="",
                         help="PM 수동 재개 대상 Issue 번호를 comma-separated로 지정")
     args = parser.parse_args(argv)
+    if args.diagnose_date_readback and not args.dry_run:
+        print("--diagnose-date-readback requires --dry-run", file=sys.stderr)
+        return 2
     env = os.environ
     event = env.get("GITHUB_EVENT_NAME")
     enabled = env.get("NOTION_SYNC_ENABLED") == "true"
@@ -2471,6 +2704,7 @@ def main(argv=None):
         project_client = gp.GraphQLClient(env["PROJECT_TOKEN"])
         notion = NotionClient(env["NOTION_TOKEN"])
         counts = sync(gh, rest, project_client, notion, config, dry_run=args.dry_run,
+                      diagnose_date_readback=args.diagnose_date_readback,
                       resolve_issue_numbers=args.resolve_issue_numbers, env=env)
         print(json.dumps(counts, ensure_ascii=False, sort_keys=True))
         return 0

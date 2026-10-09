@@ -8,11 +8,20 @@ on:
         type: boolean
         required: true
         default: true
+      diagnose_date_readback:
+        description: 'dry-run에서 Issue #1 날짜 응답의 비밀 없는 형식 진단'
+        type: boolean
+        required: false
+        default: false
       resolve_issue_numbers:
         description: 'PM이 현재 Project 값을 승인한 보류 이슈 번호 (쉼표 구분)'
         type: string
         required: false
         default: ''
+      approved_sha:
+        description: '검토한 전체 40자리 commit SHA (실행 SHA와 정확히 일치해야 함)'
+        type: string
+        required: true
   schedule:
     - cron: '7,22,37,52 * * * *'
   issues:
@@ -33,15 +42,41 @@ jobs:
   sync:
     if: >-
       github.repository == 'Aurelia-aurity/Replica' &&
-      (vars.NOTION_SYNC_ENABLED == 'true' ||
-       (github.event_name == 'workflow_dispatch' && inputs.dry_run))
+      (
+        (
+          github.event_name == 'workflow_dispatch' &&
+          format('{0}', github.actor_id) == vars.PM_GITHUB_USER_ID &&
+          github.actor == github.triggering_actor &&
+          format('{0}', github.run_attempt) == '1' &&
+          inputs.approved_sha == github.sha &&
+          (github.ref == 'refs/heads/main' ||
+           github.ref == 'refs/heads/fix/17-project-add-readback')
+        ) ||
+        (
+          github.event_name != 'workflow_dispatch' &&
+          vars.NOTION_SYNC_ENABLED == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       # pull_request_target: use ONLY trusted main code, never a PR/fork ref or event-provided command.
+      - name: Validate exact manual ref
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SYNC_DISPATCH_REF: ${{ github.ref }}
+        run: |
+          case "$SYNC_DISPATCH_REF" in
+            refs/heads/main|refs/heads/fix/17-project-add-readback)
+              ;;
+            *)
+              echo "Manual workflow ref is not allowed" >&2
+              exit 1
+              ;;
+          esac
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || 'main' }}
           persist-credentials: false
       - name: Verify sync implementation
         run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
@@ -57,8 +92,9 @@ jobs:
           PM_GITHUB_USER_ID: ${{ vars.PM_GITHUB_USER_ID }}
           NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
           NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
-          NOTION_SYNC_ENABLED: ${{ vars.NOTION_SYNC_ENABLED }}
+          NOTION_SYNC_ENABLED: ${{ github.event_name == 'workflow_dispatch' && 'true' || vars.NOTION_SYNC_ENABLED }}
           SYNC_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          SYNC_DIAGNOSE_DATE_READBACK: ${{ inputs.diagnose_date_readback && 'true' || 'false' }}
           SYNC_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
         run: |
           python3 -B - <<'PY'
@@ -66,10 +102,15 @@ jobs:
           import subprocess
           import sys
 
+          diagnose_date = os.environ.get("SYNC_DIAGNOSE_DATE_READBACK") == "true"
+          if diagnose_date and os.environ.get("SYNC_DRY_RUN") != "true":
+              raise SystemExit("--diagnose-date-readback requires --dry-run")
           args = []
           if os.environ.get("SYNC_DRY_RUN") == "true":
               args.append("--dry-run")
           if os.environ.get("SYNC_RESOLVE_ISSUES"):
               args.extend(["--resolve-issue-numbers", os.environ["SYNC_RESOLVE_ISSUES"]])
+          if diagnose_date:
+              args.append("--diagnose-date-readback")
           subprocess.run([sys.executable, "-B", "scripts/notion_sync.py", *args], check=True)
           PY
