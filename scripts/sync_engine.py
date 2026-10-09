@@ -629,6 +629,86 @@ def _verify_properties(page, expected):
                 "Notion write readback 불일치; 다음 실행에서 복구 필요")
 
 
+def _date_format_shape(value):
+    if not isinstance(value, str):
+        return None, "missing" if value is None else "non_string", None
+    fraction = re.search(r"\.(\d+)(?=(?:Z|[+-]\d{2}:\d{2})$)", value)
+    fractional_digits = len(fraction.group(1)) if fraction else None
+    if value.endswith("Z"):
+        offset_shape = "z_suffix"
+    else:
+        offset = re.search(r"([+-])(\d{2}):(\d{2})$", value)
+        if offset:
+            offset_shape = ("zero_offset" if offset.group(2) == "00" and
+                            offset.group(3) == "00" else "nonzero_offset")
+        else:
+            offset_shape = "no_offset"
+    try:
+        parsed = timestamp(value)
+    except (SyncError, gp.SyncError):
+        parsed = None
+    if parsed is not None and fractional_digits is None:
+        fractional_digits = 0
+    return parsed, offset_shape, fractional_digits
+
+
+def _date_shape_summary(value):
+    parsed, offset_shape, fractional_digits = _date_format_shape(value)
+    return {"parseable": parsed is not None,
+            "fractional_digits": fractional_digits,
+            "offset_shape": offset_shape}
+
+
+def _compare_redacted_dates(expected, actual):
+    expected_time, expected_offset, expected_fraction = _date_format_shape(expected)
+    actual_time, actual_offset, actual_fraction = _date_format_shape(actual)
+    expected_ok, actual_ok = expected_time is not None, actual_time is not None
+    if expected_ok and actual_ok:
+        same_instant = expected_time == actual_time
+        same_minute = (expected_time.replace(second=0, microsecond=0) ==
+                       actual_time.replace(second=0, microsecond=0))
+        parseable = "both"
+    else:
+        same_instant = None
+        same_minute = None
+        parseable = ("expected_only" if expected_ok else
+                     "actual_only" if actual_ok else "neither")
+    return {
+        "literal_equal": (isinstance(expected, str) and isinstance(actual, str) and
+                          expected == actual),
+        "parseable": parseable,
+        "same_instant": same_instant,
+        "same_minute": same_minute,
+        "expected_fractional_digits": expected_fraction,
+        "actual_fractional_digits": actual_fraction,
+        "expected_offset_shape": expected_offset,
+        "actual_offset_shape": actual_offset,
+    }
+
+
+def _diagnose_date_readback(source, index, now):
+    issue_number = 1
+    matches = [(key, row_data) for key, (kind, _, row_data) in source.items()
+               if kind == "Issue" and row_data.get("number") == issue_number]
+    diagnostic = {"issue_number": issue_number, "property": "GitHub 수정"}
+    if not matches:
+        return {**diagnostic, "row_match": "source_missing"}
+    if len(matches) != 1:
+        return {**diagnostic, "row_match": "source_ambiguous"}
+    key, issue = matches[0]
+    row = index.get(key)
+    if row is None:
+        return {**diagnostic, "row_match": "notion_missing"}
+    return {**diagnostic, "row_match": "matched",
+            **_compare_redacted_dates(issue.get("updatedAt"),
+                                      read_date(row, "GitHub 수정")),
+            "clock_shape": {
+                "property": "동기화 시각",
+                "current_run_would_write": _date_shape_summary(now),
+                "stored_value": _date_shape_summary(read_date(row, "동기화 시각")),
+            }}
+
+
 def _patch_page(notion, source_id, page, properties):
     page_id = identifier(page.get("id"))
     notion.request("PATCH", f"/pages/{page_id}", {"properties": properties}, write=True)
@@ -1910,8 +1990,10 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
 
 
 def sync(github, rest, project_client, notion, config, *, dry_run=False,
-         resolve_issue_numbers="", env=None, now=None):
+         diagnose_date_readback=False, resolve_issue_numbers="", env=None, now=None):
     """Run one complete local/API sync; all global reads finish before the first write."""
+    require(not diagnose_date_readback or dry_run,
+            "--diagnose-date-readback requires --dry-run")
     env = os.environ if env is None else env
     source_id, control_id = identifier(config["notion_source_id"]), identifier(config["notion_control_id"])
     facts = gp.fetch_repository_facts(github, rest)
@@ -2162,6 +2244,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
     if dry_run:
         counts["issue_plans"] = _preview_issue_plans(notion, source_id, source, index, project, facts,
                                                        config, cutoff, resume_numbers)
+        if diagnose_date_readback:
+            counts["date_readback_diagnostic"] = _diagnose_date_readback(source, index, now)
         if resume_numbers:
             counts["resolution_preview"] = [plan for plan in counts["issue_plans"]
                                              if plan["issue_number"] in resume_numbers]
@@ -2522,9 +2606,14 @@ def _load_config(env):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="전체 조회·검증만 하고 어떤 API에도 쓰지 않음")
+    parser.add_argument("--diagnose-date-readback", action="store_true",
+                        help="dry-run에서 Issue #1의 GitHub 수정 날짜 형식만 redacted 진단")
     parser.add_argument("--resolve-issue-numbers", default="",
                         help="PM 수동 재개 대상 Issue 번호를 comma-separated로 지정")
     args = parser.parse_args(argv)
+    if args.diagnose_date_readback and not args.dry_run:
+        print("--diagnose-date-readback requires --dry-run", file=sys.stderr)
+        return 2
     env = os.environ
     event = env.get("GITHUB_EVENT_NAME")
     enabled = env.get("NOTION_SYNC_ENABLED") == "true"
@@ -2539,6 +2628,7 @@ def main(argv=None):
         project_client = gp.GraphQLClient(env["PROJECT_TOKEN"])
         notion = NotionClient(env["NOTION_TOKEN"])
         counts = sync(gh, rest, project_client, notion, config, dry_run=args.dry_run,
+                      diagnose_date_readback=args.diagnose_date_readback,
                       resolve_issue_numbers=args.resolve_issue_numbers, env=env)
         print(json.dumps(counts, ensure_ascii=False, sort_keys=True))
         return 0

@@ -514,7 +514,66 @@ class WorkflowTests(unittest.TestCase):
         sync_step = content.split("- name: Sync current GitHub state", 1)[1]
         run_script = sync_step.split("run: |", 1)[1]
         self.assertNotIn("inputs.resolve_issue_numbers", run_script)
+        self.assertNotIn("inputs.diagnose_date_readback", run_script)
         self.assertIn('os.environ.get("SYNC_RESOLVE_ISSUES")', run_script)
+        self.assertIn('os.environ.get("SYNC_DIAGNOSE_DATE_READBACK")', run_script)
+        self.assertIn('args.append("--diagnose-date-readback")', run_script)
+        self.assertIn("diagnose_date_readback:", content)
+        self.assertIn("default: false", content[content.index("diagnose_date_readback:"):])
+
+    def test_date_diagnostic_workflow_wrapper_builds_argv_and_guards_before_run(self):
+        import os
+        import re
+        import sys
+        import textwrap
+
+        content = self._workflow()
+        sync_step = content.split("- name: Sync current GitHub state", 1)[1]
+        run_script = sync_step.split("run: |", 1)[1]
+        match = re.search(
+            r"(?m)^\s+python3 -B - <<'PY'\n(?P<body>.*?)^\s+PY\s*$",
+            run_script,
+            re.S,
+        )
+        self.assertIsNotNone(match)
+        source = textwrap.dedent(match.group("body"))
+
+        captured = []
+        normal_env = {
+            "SYNC_DRY_RUN": "true",
+            "SYNC_DIAGNOSE_DATE_READBACK": "true",
+            "SYNC_RESOLVE_ISSUES": "1,2",
+        }
+        with patch.dict(os.environ, normal_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
+                exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [(
+            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run",
+             "--resolve-issue-numbers", "1,2", "--diagnose-date-readback"], True)])
+
+        captured.clear()
+        default_env = {
+            "SYNC_DRY_RUN": "true",
+            "SYNC_DIAGNOSE_DATE_READBACK": "false",
+            "SYNC_RESOLVE_ISSUES": "",
+        }
+        with patch.dict(os.environ, default_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
+                exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [(
+            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run"], True)])
+
+        captured.clear()
+        denied_env = {
+            "SYNC_DRY_RUN": "false",
+            "SYNC_DIAGNOSE_DATE_READBACK": "true",
+            "SYNC_RESOLVE_ISSUES": "",
+        }
+        with patch.dict(os.environ, denied_env, clear=True):
+            with patch("subprocess.run", side_effect=lambda *args, **kwargs: captured.append(args)):
+                with self.assertRaisesRegex(SystemExit, "requires --dry-run"):
+                    exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
+        self.assertEqual(captured, [])
 
 
 if __name__ == "__main__":

@@ -8,6 +8,11 @@ on:
         type: boolean
         required: true
         default: true
+      diagnose_date_readback:
+        description: 'dry-run에서 Issue #1 날짜 응답의 비밀 없는 형식 진단'
+        type: boolean
+        required: false
+        default: false
       resolve_issue_numbers:
         description: 'PM이 현재 Project 값을 승인한 보류 이슈 번호 (쉼표 구분)'
         type: string
@@ -89,6 +94,7 @@ jobs:
           NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
           NOTION_SYNC_ENABLED: ${{ github.event_name == 'workflow_dispatch' && 'true' || vars.NOTION_SYNC_ENABLED }}
           SYNC_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          SYNC_DIAGNOSE_DATE_READBACK: ${{ inputs.diagnose_date_readback && 'true' || 'false' }}
           SYNC_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
         run: |
           python3 -B - <<'PY'
@@ -96,10 +102,15 @@ jobs:
           import subprocess
           import sys
 
+          diagnose_date = os.environ.get("SYNC_DIAGNOSE_DATE_READBACK") == "true"
+          if diagnose_date and os.environ.get("SYNC_DRY_RUN") != "true":
+              raise SystemExit("--diagnose-date-readback requires --dry-run")
           args = []
           if os.environ.get("SYNC_DRY_RUN") == "true":
               args.append("--dry-run")
           if os.environ.get("SYNC_RESOLVE_ISSUES"):
               args.extend(["--resolve-issue-numbers", os.environ["SYNC_RESOLVE_ISSUES"]])
+          if diagnose_date:
+              args.append("--diagnose-date-readback")
           subprocess.run([sys.executable, "-B", "scripts/notion_sync.py", *args], check=True)
           PY

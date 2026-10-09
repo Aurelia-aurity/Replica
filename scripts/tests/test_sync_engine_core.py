@@ -452,8 +452,84 @@ class SyncEngineCoreTests(unittest.TestCase):
 
     def run_sync(self, **kwargs):
         env = kwargs.pop("env", {})
+        now = kwargs.pop("now", NOW)
         return se.sync(self.repo_graph, self.rest, self.project, self.notion,
-                       config(), now=NOW, env=env, **kwargs)
+                       config(), now=now, env=env, **kwargs)
+
+    def _configure_date_readback_diagnostic(self, expected, actual, sync_time_actual=None):
+        issue = make_issue()
+        issue.update({"number": 1,
+                      "url": f"https://github.com/{gp.REPOSITORY}/issues/1",
+                      "updatedAt": expected})
+        self.repo_graph = RepoGraph(issues=[issue])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": 1, "state": "open"}])
+        row = active_issue_page(number=1)
+        row["properties"]["GitHub 수정"] = {"date": {"start": actual}}
+        if sync_time_actual is not None:
+            row["properties"]["동기화 시각"] = {"date": {"start": sync_time_actual}}
+        self.project = ProjectAPI()
+        self.notion = FakeNotion([control_page(control_internal()), row])
+
+    def test_date_readback_diagnostic_is_redacted_and_dry_run_only(self):
+        sync_time = "2026-10-09T09:59:00.123Z"
+        current_run_time = "2026-10-09T10:00:31.972815Z"
+        cases = [
+            {"name": "fractional precision loss", "expected": "2026-10-02T00:00:00.123456Z",
+             "actual": "2026-10-02T00:00:00.123Z", "same_instant": False,
+             "expected_digits": 6, "actual_digits": 3, "actual_offset": "z_suffix"},
+            {"name": "equivalent UTC spelling", "expected": "2026-10-02T00:00:00.123Z",
+             "actual": "2026-10-02T00:00:00.123+00:00", "same_instant": True,
+             "expected_digits": 3, "actual_digits": 3, "actual_offset": "zero_offset"},
+        ]
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                self._configure_date_readback_diagnostic(
+                    case["expected"], case["actual"], sync_time_actual=sync_time)
+                result = self.run_sync(dry_run=True, diagnose_date_readback=True,
+                                       now=current_run_time)
+                diagnostic = result["date_readback_diagnostic"]
+                self.assertEqual(diagnostic["issue_number"], 1)
+                self.assertEqual(diagnostic["property"], "GitHub 수정")
+                self.assertEqual(diagnostic["row_match"], "matched")
+                self.assertFalse(diagnostic["literal_equal"])
+                self.assertEqual(diagnostic["parseable"], "both")
+                self.assertEqual(diagnostic["same_instant"], case["same_instant"])
+                self.assertTrue(diagnostic["same_minute"])
+                self.assertEqual(diagnostic["expected_fractional_digits"], case["expected_digits"])
+                self.assertEqual(diagnostic["actual_fractional_digits"], case["actual_digits"])
+                self.assertEqual(diagnostic["expected_offset_shape"], "z_suffix")
+                self.assertEqual(diagnostic["actual_offset_shape"], case["actual_offset"])
+                clock_shape = diagnostic["clock_shape"]
+                self.assertEqual(clock_shape["property"], "동기화 시각")
+                self.assertEqual(clock_shape["current_run_would_write"]["fractional_digits"], 6)
+                self.assertEqual(clock_shape["current_run_would_write"]["offset_shape"], "z_suffix")
+                self.assertEqual(clock_shape["stored_value"]["fractional_digits"], 3)
+                self.assertEqual(clock_shape["stored_value"]["offset_shape"], "z_suffix")
+                rendered = json.dumps(diagnostic, ensure_ascii=False, sort_keys=True)
+                self.assertNotIn(case["expected"], rendered)
+                self.assertNotIn(case["actual"], rendered)
+                self.assertNotIn(sync_time, rendered)
+                self.assertNotIn(current_run_time, rendered)
+                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.project.writes, [])
+                self.assertEqual(self.repo_graph.mutations, 0)
+
+    def test_date_readback_diagnostic_refuses_non_dry_run_before_any_api_call(self):
+        self._configure_date_readback_diagnostic("2026-10-02T00:00:00Z",
+                                                 "2026-10-02T00:00:00Z")
+        with self.assertRaisesRegex(se.SyncError, "requires --dry-run"):
+            self.run_sync(diagnose_date_readback=True)
+        self.assertEqual(self.repo_graph.queries, [])
+        self.assertEqual(self.rest.calls, [])
+        self.assertEqual(self.notion.calls, [])
+        self.assertEqual(self.project.writes, [])
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = se.main(["--diagnose-date-readback"])
+        self.assertEqual(result, 2)
+        self.assertIn("requires --dry-run", stderr.getvalue())
 
     def _configure_post_cutoff_project_add(self):
         self.repo_graph = RepoGraph(issues=[make_issue(created_at="2026-10-03T00:00:00Z")])
