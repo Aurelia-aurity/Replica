@@ -1,0 +1,78 @@
+name: GitHub → Discord
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_sha:
+        description: '검토한 main의 전체 40자리 SHA (최초 기준선/전송 보류 조치)'
+        type: string
+        required: true
+      resolve_key:
+        description: '전송 보류를 확인한 경우 상태 파일의 알림 key'
+        type: string
+        default: ''
+      resolve_outcome:
+        description: 'Discord 표시를 확인한 결과 (불명확하면 unknown 유지)'
+        type: choice
+        options: [unknown, found, not_sent]
+        default: unknown
+      resolve_message_id:
+        description: 'found인 경우 해당 Webhook 메시지의 숫자 ID'
+        type: string
+        default: ''
+  issues:
+    types: [opened, closed, reopened]
+  pull_request_target:
+    types: [opened, closed, reopened, review_requested, review_request_removed, synchronize]
+  workflow_run:
+    workflows: ['GitHub → Notion']
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replica-discord-notifications
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: >-
+      github.repository == 'Aurelia-aurity/Replica' &&
+      (github.event_name != 'pull_request_target' || github.base_ref == 'main') &&
+      (github.event_name != 'workflow_dispatch' ||
+       (github.ref == 'refs/heads/main' &&
+        format('{0}', github.actor_id) == '97959897' &&
+        github.actor == github.triggering_actor &&
+        format('{0}', github.run_attempt) == '1' && inputs.approved_sha == github.sha))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+      actions: read
+    steps:
+      # Always use the immutable trusted event SHA. Never check out PR/fork code.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify notification implementation
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_discord*.py'
+      - name: Reconcile notifications
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_NOTIFICATIONS_ENABLED: ${{ vars.DISCORD_NOTIFICATIONS_ENABLED }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
+          DISCORD_USER_MAP: ${{ vars.DISCORD_USER_MAP }}
+          DISCORD_PROJECT_READ_TOKEN: ${{ secrets.DISCORD_PROJECT_READ_TOKEN }}
+          DISCORD_APPROVED_SHA: ${{ inputs.approved_sha }}
+          DISCORD_RESOLVE_KEY: ${{ inputs.resolve_key }}
+          DISCORD_RESOLVE_OUTCOME: ${{ inputs.resolve_outcome }}
+          DISCORD_RESOLVE_MESSAGE_ID: ${{ inputs.resolve_message_id }}
+        run: python3 -B scripts/discord_notify.py

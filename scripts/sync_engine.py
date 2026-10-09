@@ -17,6 +17,7 @@ from pathlib import Path
 from uuid import UUID
 
 import github_project as gp
+import notification_report
 
 REPOSITORY = gp.REPOSITORY
 REPOSITORY_ID = gp.REPOSITORY_ID
@@ -2065,7 +2066,8 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
 
 
 def sync(github, rest, project_client, notion, config, *, dry_run=False,
-         diagnose_date_readback=False, resolve_issue_numbers="", env=None, now=None):
+         diagnose_date_readback=False, resolve_issue_numbers="", env=None, now=None,
+         notification_result=None):
     """Run one complete local/API sync; all global reads finish before the first write."""
     require(not diagnose_date_readback or dry_run,
             "--diagnose-date-readback requires --dry-run")
@@ -2658,6 +2660,9 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
     holds = _update_control_summary(notion, source_id, control, control_state,
                                     issue_rows_for_summary, now=now, run_id=run_id, counts=counts)
     counts["held"] = max(counts["held"], len(holds))
+    if notification_result is not None:
+        notification_result.update(scan_complete=True,
+                                   holds=notification_report.collect_holds(issue_rows_for_summary))
     return counts
 
 
@@ -2686,6 +2691,7 @@ def main(argv=None):
                         help="dry-run에서 Issue #1 metadata readback을 redacted 진단")
     parser.add_argument("--resolve-issue-numbers", default="",
                         help="PM 수동 재개 대상 Issue 번호를 comma-separated로 지정")
+    parser.add_argument("--notification-report", help="비밀 없는 Discord 알림 결과 파일")
     args = parser.parse_args(argv)
     if args.diagnose_date_readback and not args.dry_run:
         print("--diagnose-date-readback requires --dry-run", file=sys.stderr)
@@ -2695,9 +2701,13 @@ def main(argv=None):
     enabled = env.get("NOTION_SYNC_ENABLED") == "true"
     explicit_dispatch_dry_run = event == "workflow_dispatch" and args.dry_run
     if not enabled and not explicit_dispatch_dry_run:
+        if args.notification_report:
+            notification_report.write(args.notification_report, env, kind="skipped",
+                                      dry_run=args.dry_run)
         print("동기화 비활성: NOTION_SYNC_ENABLED=true 설정 후 실행하세요.")
         return 0
     try:
+        notification_result = {}
         config = _load_config(env)
         gh = gp.GraphQLClient(env["GITHUB_TOKEN"])
         rest = gp.RESTClient(env["GITHUB_TOKEN"])
@@ -2705,7 +2715,14 @@ def main(argv=None):
         notion = NotionClient(env["NOTION_TOKEN"])
         counts = sync(gh, rest, project_client, notion, config, dry_run=args.dry_run,
                       diagnose_date_readback=args.diagnose_date_readback,
-                      resolve_issue_numbers=args.resolve_issue_numbers, env=env)
+                      resolve_issue_numbers=args.resolve_issue_numbers, env=env,
+                      notification_result=notification_result)
+        if args.notification_report:
+            full = not args.dry_run and notification_result.get("scan_complete") is True
+            holds = notification_result.get("holds", []) if full else []
+            notification_report.write(args.notification_report, env,
+                                      kind=("partial" if holds or counts.get("failed", 0) else "complete") if full else "skipped",
+                                      dry_run=args.dry_run, scan_complete=full, holds=holds)
         print(json.dumps(counts, ensure_ascii=False, sort_keys=True))
         return 0
     except (SyncError, gp.SyncError) as exc:
@@ -2713,6 +2730,12 @@ def main(argv=None):
     except Exception:
         # Never emit request bodies, remote payloads or tracebacks that can contain secrets.
         print("동기화 실패: 원격 응답 또는 스키마를 확인하세요. 기존 데이터는 보존됩니다.", file=sys.stderr)
+    if args.notification_report:
+        try:
+            notification_report.write(args.notification_report, env, kind="failed",
+                                      dry_run=args.dry_run)
+        except Exception:
+            print("알림 결과 파일 기록 실패", file=sys.stderr)
     return 1
 
 

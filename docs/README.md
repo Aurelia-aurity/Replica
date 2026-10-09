@@ -11,6 +11,7 @@
 | 문서 | 확인할 내용 |
 | --- | --- |
 | [협업 안내](../CONTRIBUTING.md) | 역할, 담당자 지정, 이슈·브랜치·PR·리뷰·병합, 라벨 |
+| [Discord 운영](discord.md) | 알림·멘션·회의 채널, Actions 설정, 중복 억제와 전송 보류 조치 |
 | [자료 안내](materials.md) | GitHub·Drive·Notion 보관 기준, 최종 수행계획서 |
 | [개발 환경](development-environment.md) | 합의한 도구·버전과 미확인 세부 값 |
 | [AI 활용](ai-usage.md) | 공통 기준, 개인 로컬 문서 관리, PR·이슈 활용·검증 기록 |

@@ -371,6 +371,7 @@ class WorkflowTests(unittest.TestCase):
             "github.run_attempt": context["run_attempt"],
             "github.sha": context["sha"],
             "github.ref": context["ref"],
+            "github.base_ref": context.get("base_ref", "main"),
             "inputs.approved_sha": context["approved_sha"],
             "vars.PM_GITHUB_USER_ID": context["pm_id"],
             "vars.NOTION_SYNC_ENABLED": context["enabled"],
@@ -450,7 +451,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", gate)
         self.assertIn("github.ref == 'refs/heads/fix/17-project-add-readback'", gate)
 
-    def test_automatic_event_gate_uses_switch_and_main_while_manual_uses_sha(self):
+    def test_automatic_and_manual_checkout_use_immutable_event_sha(self):
         import re
         content = self._workflow()
         start = content.index("  sync:\n    if: >-\n") + len("  sync:\n    if: >-\n")
@@ -463,6 +464,7 @@ class WorkflowTests(unittest.TestCase):
             ("issues enabled", {"event_name": "issues", "enabled": "true"}, True),
             ("pull request target enabled", {"event_name": "pull_request_target", "enabled": "true"}, True),
             ("pull request target disabled", {"event_name": "pull_request_target", "enabled": "false"}, False),
+            ("non-main base", {"event_name": "pull_request_target", "enabled": "true", "base_ref": "feat/other"}, False),
         ]
         for label, changes, expected in cases:
             with self.subTest(case=label):
@@ -471,7 +473,7 @@ class WorkflowTests(unittest.TestCase):
         checkout_ref = re.search(r"(?m)^\s+ref: (.+)$", content)[1]
         self.assertEqual(self._evaluate_actions_expression(checkout_ref, base), base["sha"])
         self.assertEqual(self._evaluate_actions_expression(
-            checkout_ref, {**base, "event_name": "schedule"}), "main")
+            checkout_ref, {**base, "event_name": "schedule"}), base["sha"])
         sync_enabled = re.search(r"(?m)^\s+NOTION_SYNC_ENABLED: (.+)$", content)[1]
         self.assertEqual(self._evaluate_actions_expression(sync_enabled, base), "true")
         self.assertEqual(self._evaluate_actions_expression(
@@ -497,7 +499,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", content)
         self.assertRegex(content, r"actions/checkout@[0-9a-f]{40}")
         self.assertIn("actions/checkout@11d5960a326750d5838078e36cf38b85af677262", content)
-        self.assertIn("ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || 'main' }}", content)
+        self.assertIn("ref: ${{ github.sha }}", content)
         self.assertIn("approved_sha:", content)
         self.assertIn("required: true", content)
         self.assertIn("type: string", content)
@@ -548,7 +550,7 @@ class WorkflowTests(unittest.TestCase):
             with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
                 exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
         self.assertEqual(captured, [(
-            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run",
+            [sys.executable, "-B", "scripts/notion_sync.py", "--notification-report", "notion-notification-report.json", "--dry-run",
              "--resolve-issue-numbers", "1,2", "--diagnose-date-readback"], True)])
 
         captured.clear()
@@ -561,7 +563,7 @@ class WorkflowTests(unittest.TestCase):
             with patch("subprocess.run", side_effect=lambda argv, check: captured.append((argv, check))):
                 exec(compile(source, "notion-sync workflow wrapper", "exec"), {})
         self.assertEqual(captured, [(
-            [sys.executable, "-B", "scripts/notion_sync.py", "--dry-run"], True)])
+            [sys.executable, "-B", "scripts/notion_sync.py", "--notification-report", "notion-notification-report.json", "--dry-run"], True)])
 
         captured.clear()
         denied_env = {
