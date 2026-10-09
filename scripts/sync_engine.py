@@ -48,6 +48,10 @@ SCHEMA = {
     "일정": "date", "메모": "rich_text", "종료 사유": "select", "대표 이슈": "url",
     "확인 필요": "rich_text", "동기화 내부 상태": "rich_text",
 }
+DATE_DIAGNOSTIC_METADATA_WHITELIST = (
+    "제목", "종류", "번호", "GitHub URL", "GitHub 상태", "작성자", "담당자",
+    "라벨", "GitHub 수정", "동기화 키",
+)
 OPTIONS = {
     "종류": {"Issue", "PR", "Sync"},
     "GitHub 상태": {"Open", "Closed", "Draft", "Merged"},
@@ -683,6 +687,8 @@ def _compare_redacted_dates(expected, actual):
         "actual_fractional_digits": actual_fraction,
         "expected_offset_shape": expected_offset,
         "actual_offset_shape": actual_offset,
+        "actual_seconds_zero": None if actual_time is None else actual_time.second == 0,
+        "actual_microseconds_zero": None if actual_time is None else actual_time.microsecond == 0,
     }
 
 
@@ -699,9 +705,30 @@ def _diagnose_date_readback(source, index, now):
     row = index.get(key)
     if row is None:
         return {**diagnostic, "row_match": "notion_missing"}
+    expected_metadata = _make_metadata("Issue", issue, key)
+    metadata_matches = []
+    for name in DATE_DIAGNOSTIC_METADATA_WHITELIST:
+        value = expected_metadata[name]
+        kind, body = next(iter(value.items()))
+        if kind in {"title", "rich_text"}:
+            wanted = "".join(part["text"]["content"] for part in body)
+        elif kind == "select":
+            wanted = body.get("name") if body else None
+        elif kind == "date":
+            wanted = body.get("start") if body else None
+        else:
+            wanted = body
+        metadata_matches.append({
+            "property": name,
+            "matches": _notion_value(row, name, kind) == wanted,
+        })
+    first_metadata_mismatch = next(
+        (entry["property"] for entry in metadata_matches if not entry["matches"]), None)
     return {**diagnostic, "row_match": "matched",
             **_compare_redacted_dates(issue.get("updatedAt"),
                                       read_date(row, "GitHub 수정")),
+            "metadata_matches": metadata_matches,
+            "first_metadata_mismatch": first_metadata_mismatch,
             "clock_shape": {
                 "property": "동기화 시각",
                 "current_run_would_write": _date_shape_summary(now),
@@ -2607,7 +2634,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="전체 조회·검증만 하고 어떤 API에도 쓰지 않음")
     parser.add_argument("--diagnose-date-readback", action="store_true",
-                        help="dry-run에서 Issue #1의 GitHub 수정 날짜 형식만 redacted 진단")
+                        help="dry-run에서 Issue #1 metadata readback을 redacted 진단")
     parser.add_argument("--resolve-issue-numbers", default="",
                         help="PM 수동 재개 대상 Issue 번호를 comma-separated로 지정")
     args = parser.parse_args(argv)

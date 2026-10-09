@@ -456,7 +456,8 @@ class SyncEngineCoreTests(unittest.TestCase):
         return se.sync(self.repo_graph, self.rest, self.project, self.notion,
                        config(), now=now, env=env, **kwargs)
 
-    def _configure_date_readback_diagnostic(self, expected, actual, sync_time_actual=None):
+    def _configure_date_readback_diagnostic(self, expected, actual, sync_time_actual=None,
+                                            title_actual="#1 Original issue"):
         issue = make_issue()
         issue.update({"number": 1,
                       "url": f"https://github.com/{gp.REPOSITORY}/issues/1",
@@ -465,7 +466,17 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
             "number": 1, "state": "open"}])
         row = active_issue_page(number=1)
+        row["properties"]["제목"] = se.text_property(title_actual, "title")
+        row["properties"]["종류"] = {"select": {"name": "Issue"}}
+        row["properties"]["번호"] = {"number": 1}
+        row["properties"]["GitHub URL"] = {"url": issue["url"]}
+        row["properties"]["GitHub 상태"] = {"select": {"name": "Open"}}
+        row["properties"]["작성자"] = se.text_property("author")
+        row["properties"]["담당자"] = se.text_property("")
+        row["properties"]["라벨"] = se.text_property("")
         row["properties"]["GitHub 수정"] = {"date": {"start": actual}}
+        row["properties"]["동기화 키"] = se.text_property(
+            se.key_for(gp.REPOSITORY_ID, ISSUE_ID))
         if sync_time_actual is not None:
             row["properties"]["동기화 시각"] = {"date": {"start": sync_time_actual}}
         self.project = ProjectAPI()
@@ -475,12 +486,22 @@ class SyncEngineCoreTests(unittest.TestCase):
         sync_time = "2026-10-09T09:59:00.123Z"
         current_run_time = "2026-10-09T10:00:31.972815Z"
         cases = [
-            {"name": "fractional precision loss", "expected": "2026-10-02T00:00:00.123456Z",
-             "actual": "2026-10-02T00:00:00.123Z", "same_instant": False,
-             "expected_digits": 6, "actual_digits": 3, "actual_offset": "z_suffix"},
+            {"name": "fractional precision loss", "expected": "2026-10-02T00:00:37.123456Z",
+             "actual": "2026-10-02T00:00:37.123Z", "same_instant": False,
+             "expected_digits": 6, "actual_digits": 3, "actual_offset": "z_suffix",
+             "actual_seconds_zero": False, "actual_microseconds_zero": False},
             {"name": "equivalent UTC spelling", "expected": "2026-10-02T00:00:00.123Z",
              "actual": "2026-10-02T00:00:00.123+00:00", "same_instant": True,
-             "expected_digits": 3, "actual_digits": 3, "actual_offset": "zero_offset"},
+             "expected_digits": 3, "actual_digits": 3, "actual_offset": "zero_offset",
+             "actual_seconds_zero": True, "actual_microseconds_zero": False},
+            {"name": "minute truncation shape", "expected": "2026-10-02T00:00:37.000Z",
+             "actual": "2026-10-02T00:00:00.000+00:00", "same_instant": False,
+             "expected_digits": 3, "actual_digits": 3, "actual_offset": "zero_offset",
+             "actual_seconds_zero": True, "actual_microseconds_zero": True},
+            {"name": "seconds retained with zero fraction", "expected": "2026-10-02T00:00:37Z",
+             "actual": "2026-10-02T00:00:37.000+00:00", "same_instant": True,
+             "expected_digits": 0, "actual_digits": 3, "actual_offset": "zero_offset",
+             "actual_seconds_zero": False, "actual_microseconds_zero": True},
         ]
         for case in cases:
             with self.subTest(case=case["name"]):
@@ -500,6 +521,21 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertEqual(diagnostic["actual_fractional_digits"], case["actual_digits"])
                 self.assertEqual(diagnostic["expected_offset_shape"], "z_suffix")
                 self.assertEqual(diagnostic["actual_offset_shape"], case["actual_offset"])
+                self.assertEqual(diagnostic["actual_seconds_zero"],
+                                 case["actual_seconds_zero"])
+                self.assertEqual(diagnostic["actual_microseconds_zero"],
+                                 case["actual_microseconds_zero"])
+                metadata_matches = diagnostic["metadata_matches"]
+                self.assertEqual([entry["property"] for entry in metadata_matches],
+                                 list(se.DATE_DIAGNOSTIC_METADATA_WHITELIST))
+                self.assertTrue(all(set(entry) == {"property", "matches"}
+                                    and type(entry["matches"]) is bool
+                                    for entry in metadata_matches))
+                expected_metadata_results = [
+                    entry["property"] != "GitHub 수정" for entry in metadata_matches]
+                self.assertEqual([entry["matches"] for entry in metadata_matches],
+                                 expected_metadata_results)
+                self.assertEqual(diagnostic["first_metadata_mismatch"], "GitHub 수정")
                 clock_shape = diagnostic["clock_shape"]
                 self.assertEqual(clock_shape["property"], "동기화 시각")
                 self.assertEqual(clock_shape["current_run_would_write"]["fractional_digits"], 6)
@@ -511,9 +547,20 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertNotIn(case["actual"], rendered)
                 self.assertNotIn(sync_time, rendered)
                 self.assertNotIn(current_run_time, rendered)
+                self.assertNotIn("Original issue", rendered)
                 self.assertEqual(self.notion.writes, [])
                 self.assertEqual(self.project.writes, [])
                 self.assertEqual(self.repo_graph.mutations, 0)
+
+        self._configure_date_readback_diagnostic(
+            "2026-10-02T00:00:37Z", "2026-10-02T00:00:37Z",
+            title_actual="private title fixture")
+        diagnostic = self.run_sync(dry_run=True, diagnose_date_readback=True)[
+            "date_readback_diagnostic"]
+        self.assertEqual(diagnostic["first_metadata_mismatch"], "제목")
+        self.assertFalse(diagnostic["metadata_matches"][0]["matches"])
+        self.assertNotIn("private title fixture", json.dumps(diagnostic, ensure_ascii=False))
+        self.assertEqual(self.notion.writes, [])
 
     def test_date_readback_diagnostic_refuses_non_dry_run_before_any_api_call(self):
         self._configure_date_readback_diagnostic("2026-10-02T00:00:00Z",
