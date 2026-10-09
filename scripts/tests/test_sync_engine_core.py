@@ -134,7 +134,8 @@ class LegacyREST:
             return {"id": gp.REPOSITORY_ID, "full_name": gp.REPOSITORY}
         if "/issues?" in path:
             return list(self.issues)
-        if path.endswith("/pulls/19") and self.pull is not None:
+        if (self.pull is not None and
+                path.endswith(f"/pulls/{self.pull.get('number')}")):
             return copy.deepcopy(self.pull)
         raise AssertionError("Unexpected legacy REST path")
 
@@ -311,6 +312,21 @@ class FakeNotion:
         self.request_status = {"type": "complete"}
         self.omit_request_status = False
         self.query_response_transform = None
+        self.normalize_minute_dates = False
+
+    def _stored_properties(self, properties):
+        result = copy.deepcopy(properties)
+        if not self.normalize_minute_dates:
+            return result
+        for name in se.DISPLAY_MINUTE_DATE_PROPERTIES:
+            value = result.get(name)
+            date_value = value.get("date") if isinstance(value, dict) else None
+            if isinstance(date_value, dict) and isinstance(date_value.get("start"), str):
+                parsed = se.timestamp(date_value["start"])
+                result[name] = {"date": {
+                    "start": parsed.strftime("%Y-%m-%dT%H:%M:00.000+00:00"),
+                    "end": None, "time_zone": None}}
+        return result
 
     @staticmethod
     def schema():
@@ -350,7 +366,7 @@ class FakeNotion:
             self.creates += 1
             new_id = str(UUID(int=1000 + self.creates))
             page = notion_page(new_id)
-            page["properties"].update(copy.deepcopy(payload["properties"]))
+            page["properties"].update(self._stored_properties(payload["properties"]))
             self.pages[new_id] = page
             return {"id": new_id}
         if method == "PATCH":
@@ -358,7 +374,8 @@ class FakeNotion:
             if self.fail_patch and self.fail_patch(path, payload["properties"]):
                 self.fail_patch = None
                 raise se.SyncError("synthetic page write failure")
-            self.pages[page_id]["properties"].update(copy.deepcopy(payload["properties"]))
+            self.pages[page_id]["properties"].update(
+                self._stored_properties(payload["properties"]))
             if self.after_patch:
                 self.after_patch(path, payload["properties"], self)
             if page_id in self.fail_readback_after_patch:
@@ -532,13 +549,18 @@ class SyncEngineCoreTests(unittest.TestCase):
                                     and type(entry["matches"]) is bool
                                     for entry in metadata_matches))
                 expected_metadata_results = [
-                    entry["property"] != "GitHub 수정" for entry in metadata_matches]
+                    (entry["property"] != "GitHub 수정" or
+                     case["name"] == "minute truncation shape")
+                    for entry in metadata_matches]
                 self.assertEqual([entry["matches"] for entry in metadata_matches],
                                  expected_metadata_results)
-                self.assertEqual(diagnostic["first_metadata_mismatch"], "GitHub 수정")
+                expected_first_mismatch = (None if case["name"] == "minute truncation shape"
+                                            else "GitHub 수정")
+                self.assertEqual(diagnostic["first_metadata_mismatch"],
+                                 expected_first_mismatch)
                 clock_shape = diagnostic["clock_shape"]
                 self.assertEqual(clock_shape["property"], "동기화 시각")
-                self.assertEqual(clock_shape["current_run_would_write"]["fractional_digits"], 6)
+                self.assertEqual(clock_shape["current_run_would_write"]["fractional_digits"], 0)
                 self.assertEqual(clock_shape["current_run_would_write"]["offset_shape"], "z_suffix")
                 self.assertEqual(clock_shape["stored_value"]["fractional_digits"], 3)
                 self.assertEqual(clock_shape["stored_value"]["offset_shape"], "z_suffix")
@@ -577,6 +599,122 @@ class SyncEngineCoreTests(unittest.TestCase):
             result = se.main(["--diagnose-date-readback"])
         self.assertEqual(result, 2)
         self.assertIn("requires --dry-run", stderr.getvalue())
+
+    def test_display_date_readback_requires_exact_projected_instant_and_single_date(self):
+        for name in sorted(se.DISPLAY_MINUTE_DATE_PROPERTIES):
+            expected = {name: {"date": {"start": "2026-10-02T00:00:00Z"}}}
+            accepted = (
+                {"start": "2026-10-02T00:00:00.000+00:00", "end": None,
+                 "time_zone": None},
+                {"start": "2026-10-02T05:30:00+05:30", "end": None,
+                 "time_zone": None},
+            )
+            for actual in accepted:
+                with self.subTest(name=name, actual=actual):
+                    se._verify_properties({"properties": {name: {"date": actual}}}, expected)
+
+            rejected = (
+                {"start": "2026-10-02T00:00:01.000+00:00", "end": None,
+                 "time_zone": None},
+                {"start": "2026-10-02T00:01:00.000+00:00", "end": None,
+                 "time_zone": None},
+                None,
+                {"start": "2026-10-02", "end": None, "time_zone": None},
+                {"start": "2026-10-02T00:00:00", "end": None, "time_zone": None},
+                {"start": "not-a-date", "end": None, "time_zone": None},
+                {"start": "2026-10-02T00:00:00Z", "end": "2026-10-03T00:00:00Z",
+                 "time_zone": None},
+                {"start": "2026-10-02T00:00:00Z", "end": None,
+                 "time_zone": "UTC"},
+            )
+            for actual in rejected:
+                with self.subTest(name=name, rejected=actual):
+                    with self.assertRaises((se.SyncError, gp.SyncError)):
+                        se._verify_properties({"properties": {name: {"date": actual}}}, expected)
+            with self.subTest(name=name, expected_nonminute=True):
+                with self.assertRaises((se.SyncError, gp.SyncError)):
+                    se._verify_properties(
+                        {"properties": {name: {"date": {"start": "2026-10-02T00:00:00Z"}}}},
+                        {name: {"date": {"start": "2026-10-02T00:00:12Z"}}})
+
+        scheduled = {"properties": {"일정": {"date": {
+            "start": "2026-10-12", "end": "2026-10-13"}}}}
+        se._verify_properties(scheduled, {"일정": {"date": {"start": "2026-10-12"}}})
+        with self.assertRaises(se.SyncError):
+            se._verify_properties(
+                {"properties": {"일정": {"date": {"start": "2026-10-13"}}}},
+                {"일정": {"date": {"start": "2026-10-12"}}})
+
+    def test_control_date_preflight_preserves_legacy_null_and_compares_instants(self):
+        precise_success = "2026-10-09T09:59:41.123456Z"
+        minute_visible = "2026-10-09T09:59:00.000+00:00"
+        internal = json.loads(control_internal())
+        internal["last_success_at"] = precise_success
+        control = control_page(se.canonical_json(internal))
+        control["properties"]["동기화 시각"] = {"date": {
+            "start": minute_visible, "end": None, "time_zone": None}}
+        self.notion = FakeNotion([control])
+
+        def same_instant_different_offset(response, payload):
+            if payload["is_archived"]:
+                return response
+            for row in response["results"]:
+                if se.read_text(row, "동기화 키") == se.CONTROL_KEY:
+                    row["properties"]["동기화 시각"]["date"]["start"] = (
+                        "2026-10-09T19:29:00+09:30")
+            return response
+
+        self.notion.query_response_transform = same_instant_different_offset
+        self.run_sync(dry_run=True)
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.project.writes, [])
+        self.assertEqual(json.loads(se.read_text(self.notion.pages[CONTROL_ID],
+                                                "동기화 내부 상태"))["last_success_at"],
+                         precise_success)
+
+        legacy = control_page(control_internal())
+        legacy_visible = "2026-09-20T12:34:56Z"
+        legacy["properties"]["동기화 시각"] = {"date": {"start": legacy_visible}}
+        self.notion = FakeNotion([legacy])
+        self.run_sync(dry_run=True)
+        self.assertEqual(se.read_date(self.notion.pages[CONTROL_ID], "동기화 시각"),
+                         legacy_visible)
+        self.assertEqual(self.notion.writes, [])
+
+        initial = control_page(control_internal())
+        self.notion = FakeNotion([initial])
+        self.run_sync(dry_run=True)
+        self.assertEqual(self.notion.writes, [])
+
+        for visible in ("2026-10-09T09:59:22Z", None):
+            with self.subTest(rejected_visible=visible):
+                bad_state = json.loads(control_internal())
+                bad_state["last_success_at"] = precise_success
+                bad_control = control_page(se.canonical_json(bad_state))
+                bad_control["properties"]["동기화 시각"] = {
+                    "date": None if visible is None else {"start": visible}}
+                self.notion = FakeNotion([bad_control])
+                with self.assertRaises(se.SyncError):
+                    self.run_sync(dry_run=True)
+                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.project.writes, [])
+
+        mismatch = control_page(control_internal())
+        mismatch["properties"]["동기화 시각"] = {"date": {"start": minute_visible}}
+        self.notion = FakeNotion([mismatch])
+
+        def alter_listed_seconds(response, payload):
+            if not payload["is_archived"]:
+                for row in response["results"]:
+                    if se.read_text(row, "동기화 키") == se.CONTROL_KEY:
+                        row["properties"]["동기화 시각"]["date"]["start"] = (
+                            "2026-10-09T09:59:01Z")
+            return response
+        self.notion.query_response_transform = alter_listed_seconds
+        with self.assertRaisesRegex(se.SyncError, "snapshot 불일치"):
+            self.run_sync(dry_run=True)
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.project.writes, [])
 
     def _configure_post_cutoff_project_add(self):
         self.repo_graph = RepoGraph(issues=[make_issue(created_at="2026-10-03T00:00:00Z")])
@@ -643,6 +781,7 @@ class SyncEngineCoreTests(unittest.TestCase):
 
     def test_pr19_rest_issues_id_reuses_existing_row_and_preserves_manual_content(self):
         pr = make_pr()
+        pr["updatedAt"] = "2026-09-03T14:27:48.987654Z"
         self.repo_graph = RepoGraph(pulls=[pr])
         self.rest = LegacyREST(issues=[{"id": PR_REST_ID, "node_id": PR_NODE, "number": 19,
             "state": "closed", "pull_request": {"url": "https://api.github.com/pulls/19"}}],
@@ -656,6 +795,7 @@ class SyncEngineCoreTests(unittest.TestCase):
         old["properties"]["일정"] = {"date": {"start": "2026-10-21"}}
         old["body"] = "human page body"
         self.notion = FakeNotion([control_page(control_internal()), old])
+        self.notion.normalize_minute_dates = True
 
         facts = gp.fetch_repository_facts(self.repo_graph, self.rest)
         self.assertEqual(list(facts["pulls"]), [PR_REST_ID])
@@ -668,10 +808,129 @@ class SyncEngineCoreTests(unittest.TestCase):
         updated = self.notion.pages[PR_PAGE_ID]
         self.assertEqual(se.read_text(updated, "동기화 키"), key)
         self.assertEqual(se.read_select(updated, "GitHub 상태"), "Merged")
+        self.assertEqual(se.read_date(updated, "GitHub 수정"),
+                         "2026-09-03T14:27:00.000+00:00")
+        self.assertEqual(se.read_date(updated, "동기화 시각"),
+                         "2026-10-08T00:00:00.000+00:00")
         self.assertEqual(se.read_text(updated, "메모"), "human note")
         self.assertEqual(updated["properties"]["일정"]["date"]["start"], "2026-10-21")
         self.assertEqual(updated["body"], "human page body")
         self.assertEqual(self.project.writes, [])
+
+    def test_minute_display_roundtrip_preserves_full_precision_and_repeat_is_idempotent(self):
+        issue = make_issue(created_at="2026-10-03T00:00:00Z")
+        issue["updatedAt"] = "2026-10-03T14:27:48.987654Z"
+        self.repo_graph = RepoGraph(issues=[issue])
+        self.repo_graph.server_time = datetime(2026, 10, 1, 0, 0, 12, 345678,
+                                               tzinfo=timezone.utc)
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI()
+        self.notion = FakeNotion([control_page("")])
+        self.notion.normalize_minute_dates = True
+        first_now = "2026-10-09T09:59:41.987654Z"
+
+        first = self.run_sync(now=first_now)
+
+        self.assertEqual(first["created"], 1)
+        self.assertEqual(self.notion.creates, 1)
+        self.assertEqual(self.project.add_calls, 1)
+        issue_row = next(page for page in self.notion.pages.values()
+                         if se.read_text(page, "동기화 키") ==
+                         se.key_for(gp.REPOSITORY_ID, ISSUE_ID))
+        self.assertEqual(se.read_date(issue_row, "GitHub 수정"),
+                         "2026-10-03T14:27:00.000+00:00")
+        self.assertEqual(se.read_date(issue_row, "동기화 시각"),
+                         "2026-10-09T09:59:00.000+00:00")
+        issue_post = next(payload for method, path, payload, _ in self.notion.writes
+                          if method == "POST" and path == "/pages")
+        self.assertEqual(issue_post["properties"]["GitHub 수정"]["date"]["start"],
+                         "2026-10-03T14:27:00Z")
+        self.assertEqual(issue_post["properties"]["동기화 시각"]["date"]["start"],
+                         "2026-10-09T09:59:00Z")
+        saved_control = se.decode_internal(
+            se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
+            kind="control", project_id=gp.EXPECTED_PROJECT_ID)
+        self.assertEqual(saved_control["migration_cutoff"],
+                         "2026-10-01T00:00:12.345678Z")
+        self.assertEqual(saved_control["last_success_at"], first_now)
+        self.assertEqual(saved_control["last_result"]["at"], first_now)
+        self.assertEqual(se.read_date(self.notion.pages[CONTROL_ID], "동기화 시각"),
+                         "2026-10-09T09:59:00.000+00:00")
+
+        project_writes = copy.deepcopy(self.project.writes)
+        second_now = "2026-10-09T10:00:03.456789Z"
+        second = self.run_sync(now=second_now)
+
+        self.assertEqual(second["created"], 0)
+        self.assertEqual(self.notion.creates, 1)
+        self.assertEqual(self.project.add_calls, 1)
+        self.assertEqual(self.project.writes, project_writes)
+        self.assertEqual(se.read_date(issue_row, "GitHub 수정"),
+                         "2026-10-03T14:27:00.000+00:00")
+        self.assertEqual(se.read_date(issue_row, "동기화 시각"),
+                         "2026-10-09T10:00:00.000+00:00")
+        repeated_control = se.decode_internal(
+            se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
+            kind="control", project_id=gp.EXPECTED_PROJECT_ID)
+        self.assertEqual(repeated_control["migration_cutoff"],
+                         "2026-10-01T00:00:12.345678Z")
+        self.assertEqual(repeated_control["last_success_at"], second_now)
+        self.assertEqual(repeated_control["last_result"]["at"], second_now)
+
+    def test_pr28_linked_issue13_still_enters_review_with_minute_dates(self):
+        pr = make_pr()
+        pr.update({"number": 28, "url": f"https://github.com/{gp.REPOSITORY}/pull/28",
+                   "state": "OPEN", "isDraft": False, "mergedAt": None,
+                   "updatedAt": "2026-10-08T10:22:39.123456Z"})
+        reference = pr_reference(pr)
+        issue = make_issue(linked=[reference])
+        issue.update({"number": 13,
+                      "url": f"https://github.com/{gp.REPOSITORY}/issues/13",
+                      "updatedAt": "2026-10-08T10:21:57.654321Z"})
+        self.repo_graph = RepoGraph(issues=[issue], pulls=[pr])
+        self.rest = LegacyREST(issues=[
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": 13, "state": "open"},
+            {"id": PR_REST_ID, "node_id": PR_NODE, "number": 28, "state": "open",
+             "pull_request": {"url": "https://api.github.com/repos/Aurelia-aurity/Replica/pulls/28"}},
+        ], pull={"id": PR_DATABASE_ID, "node_id": PR_NODE, "number": 28,
+                 "state": "open", "draft": False, "merged": False,
+                 "base": {"ref": "main", "repo": {"id": gp.REPOSITORY_ID,
+                     "node_id": REPO_NODE}}})
+        self.project = ProjectAPI([make_project_item(option="백로그", number=13)])
+        issue_row = active_issue_page(task="백로그", number=13)
+        issue_row["properties"]["메모"] = se.text_property("issue memo")
+        issue_row["properties"]["일정"] = {"date": {
+            "start": "2026-10-12", "end": "2026-10-13"}}
+        issue_row["body"] = "issue body"
+        self.notion = FakeNotion([control_page(control_internal()), issue_row])
+        self.notion.normalize_minute_dates = True
+
+        result = self.run_sync(now="2026-10-09T11:11:51.987654Z")
+
+        self.assertEqual(result["held"], 0)
+        self.assertEqual(self.project.add_calls, 0)
+        self.assertEqual(self.project.items[0]["fieldValues"]["nodes"][0]["optionId"],
+                         gp.EXPECTED_STATUS_OPTIONS["검토 중"])
+        updated_issue = self.notion.pages[ISSUE_PAGE_ID]
+        self.assertEqual(se.read_select(updated_issue, "작업 상태"), "검토 중")
+        self.assertEqual(se.read_date(updated_issue, "GitHub 수정"),
+                         "2026-10-08T10:21:00.000+00:00")
+        self.assertEqual(se.read_date(updated_issue, "동기화 시각"),
+                         "2026-10-09T11:11:00.000+00:00")
+        self.assertEqual(se.read_text(updated_issue, "메모"), "issue memo")
+        self.assertEqual(updated_issue["properties"]["일정"]["date"], {
+            "start": "2026-10-12", "end": "2026-10-13"})
+        self.assertEqual(updated_issue["body"], "issue body")
+        created_pr = next(page for page in self.notion.pages.values()
+                          if se.read_select(page, "종류") == "PR")
+        self.assertEqual(se.read_date(created_pr, "GitHub 수정"),
+                         "2026-10-08T10:22:00.000+00:00")
+        control_state = se.decode_internal(
+            se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
+            kind="control", project_id=gp.EXPECTED_PROJECT_ID)
+        self.assertEqual(control_state["last_success_at"],
+                         "2026-10-09T11:11:51.987654Z")
 
     def test_missing_rest_issue_mapping_fails_before_any_notion_write(self):
         self.repo_graph = RepoGraph(pulls=[make_pr()])
@@ -1255,8 +1514,10 @@ class SyncEngineCoreTests(unittest.TestCase):
         control["body"] = "private control-page body"
         self.notion = FakeNotion([control,
             active_issue_page(task="백로그", internal=se.canonical_json(state))])
+        self.notion.normalize_minute_dates = True
+        hold_now = "2026-10-08T00:00:41.987654Z"
 
-        ordinary = self.run_sync()
+        ordinary = self.run_sync(now=hold_now)
         self.assertEqual(ordinary["held"], 1)
         held = se.decode_internal(
             se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
@@ -1265,14 +1526,16 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "백로그")
         self.assertEqual(self.project.writes, [])
         summary = self.notion.pages[CONTROL_ID]
-        self.assertEqual(title_text(summary), f"Replica 동기화 · 부분 반영 · {NOW}")
+        self.assertEqual(title_text(summary), f"Replica 동기화 · 부분 반영 · {hold_now}")
         self.assertEqual(summary["properties"]["GitHub URL"]["url"], se.ACTIONS_WORKFLOW_URL)
         self.assertEqual(se.read_text(summary, "확인 필요"), "보류 1건: 18")
         self.assertEqual(se.read_date(summary, "동기화 시각"), previous_success)
+        self.assertEqual(se.read_date(self.notion.pages[ISSUE_PAGE_ID], "동기화 시각"),
+                         "2026-10-08T00:00:00.000+00:00")
         summary_state = se.decode_internal(se.read_text(summary, "동기화 내부 상태"),
             kind="control", project_id=gp.EXPECTED_PROJECT_ID)
         self.assertEqual(summary_state["last_result"]["kind"], "partial")
-        self.assertEqual(summary_state["last_result"]["at"], NOW)
+        self.assertEqual(summary_state["last_result"]["at"], hold_now)
         self.assertEqual(summary_state["last_result"]["holds"], [18])
         self.assertEqual(summary_state["last_success_at"], previous_success)
         self.assertEqual(se.read_text(summary, "메모"), "private team note")

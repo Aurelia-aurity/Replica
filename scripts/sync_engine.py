@@ -52,6 +52,7 @@ DATE_DIAGNOSTIC_METADATA_WHITELIST = (
     "제목", "종류", "번호", "GitHub URL", "GitHub 상태", "작성자", "담당자",
     "라벨", "GitHub 수정", "동기화 키",
 )
+DISPLAY_MINUTE_DATE_PROPERTIES = frozenset({"GitHub 수정", "동기화 시각"})
 OPTIONS = {
     "종류": {"Issue", "PR", "Sync"},
     "GitHub 상태": {"Open", "Closed", "Draft", "Merged"},
@@ -565,28 +566,28 @@ def preflight_notion(notion, source_id, control_id, project_id, *, diagnostics=F
             elif kind == "PR":
                 require(not read_text(row, "동기화 내부 상태"), "PR 행에 Issue 내부 상태가 있습니다")
                 positive(row["properties"]["번호"]["number"], "Notion PR 번호 오류")
-            date = read_date(row, "GitHub 수정")
-            if date:
-                timestamp(date)
+            _display_date_instant(row, "GitHub 수정", allow_null=True)
             index[key] = row
     require(CONTROL_KEY not in archived_keys and CONTROL_KEY in index,
             "동기화 관리 행이 조회되지 않거나 보관 상태입니다")
     check_control(index[CONTROL_KEY], source_id, control_id)
     pending = read_text(direct_control, "Pending create")
     require(read_text(index[CONTROL_KEY], "Pending create") == pending, "관리 행 snapshot 불일치")
-    require(read_text(index[CONTROL_KEY], "동기화 내부 상태") ==
-            read_text(direct_control, "동기화 내부 상태") and
-            read_date(index[CONTROL_KEY], "동기화 시각") == read_date(direct_control, "동기화 시각") and
+    control_text = read_text(direct_control, "동기화 내부 상태")
+    control_state = decode_internal(control_text, kind="control", project_id=project_id) if control_text else None
+    listed_date = _display_date_instant(index[CONTROL_KEY], "동기화 시각", allow_null=True)
+    direct_date = _display_date_instant(direct_control, "동기화 시각", allow_null=True)
+    require(read_text(index[CONTROL_KEY], "동기화 내부 상태") == control_text and
+            listed_date == direct_date and
             read_text(index[CONTROL_KEY], "확인 필요") == read_text(direct_control, "확인 필요"),
             "관리행 내부 상태/표시 snapshot 불일치")
     require(not any(key in archived_keys for key in index), "Notion 보관 키 상태 오류")
     if pending:
         require(valid_key(pending) and pending in index, "Pending create 결과 불명; 수동 조사 필요")
-    control_text = read_text(direct_control, "동기화 내부 상태")
-    control_state = decode_internal(control_text, kind="control", project_id=project_id) if control_text else None
-    visible_date = read_date(direct_control, "동기화 시각")
+    visible_date = direct_date
     if control_state and control_state["last_success_at"]:
-        require(visible_date and timestamp(visible_date) == timestamp(control_state["last_success_at"]),
+        require(visible_date is not None and
+                visible_date == timestamp(_minute_iso(control_state["last_success_at"])),
                 "관리행 성공 시각/internal checkpoint 불일치")
     return {"source_id": source_id, "control_id": control_id, "index": index,
             "control": direct_control, "control_state": control_state, "pending_create": pending,
@@ -595,6 +596,38 @@ def preflight_notion(notion, source_id, control_id, project_id, *, diagnostics=F
 
 def _iso(value):
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _minute_iso(value):
+    parsed = timestamp(value)
+    return _iso(parsed.replace(second=0, microsecond=0))
+
+
+def _display_date_instant(page, name, *, allow_null=False):
+    properties = page.get("properties") if isinstance(page, dict) else None
+    require(isinstance(properties, dict), "Notion 날짜 readback 형식 오류")
+    prop = properties.get(name)
+    require(isinstance(prop, dict) and "date" in prop,
+            "Notion 날짜 readback 형식 오류")
+    date_value = prop["date"]
+    if date_value is None:
+        require(allow_null, "Notion 날짜 readback 누락")
+        return None
+    require(isinstance(date_value, dict) and date_value.get("end") is None and
+            date_value.get("time_zone") is None,
+            "Notion 날짜 readback range/timezone 불일치")
+    return timestamp(date_value.get("start"))
+
+
+def _expected_display_date_instant(name, body):
+    require(name in DISPLAY_MINUTE_DATE_PROPERTIES and isinstance(body, dict) and
+            body.get("end") is None and body.get("time_zone") is None,
+            "표시 날짜 expected 형식 오류")
+    start = body.get("start")
+    expected = timestamp(start)
+    require(start == _iso(expected.replace(second=0, microsecond=0)),
+            "표시 날짜 expected UTC minute projection 오류")
+    return expected
 
 
 def _digest(value):
@@ -621,6 +654,13 @@ def _notion_value(page, name, kind):
 def _verify_properties(page, expected):
     for name, value in expected.items():
         kind, body = next(iter(value.items()))
+        if name in DISPLAY_MINUTE_DATE_PROPERTIES:
+            require(kind == "date", "표시 날짜 속성 타입 오류")
+            wanted = _expected_display_date_instant(name, body)
+            actual = _display_date_instant(page, name)
+            require(actual == wanted,
+                    "Notion write readback 불일치; 다음 실행에서 복구 필요")
+            continue
         if kind in {"title", "rich_text"}:
             wanted = "".join(part["text"]["content"] for part in body)
         elif kind == "select":
@@ -718,9 +758,14 @@ def _diagnose_date_readback(source, index, now):
             wanted = body.get("start") if body else None
         else:
             wanted = body
+        if name in DISPLAY_MINUTE_DATE_PROPERTIES:
+            matches_property = (_display_date_instant(row, name) ==
+                                _expected_display_date_instant(name, body))
+        else:
+            matches_property = _notion_value(row, name, kind) == wanted
         metadata_matches.append({
             "property": name,
-            "matches": _notion_value(row, name, kind) == wanted,
+            "matches": matches_property,
         })
     first_metadata_mismatch = next(
         (entry["property"] for entry in metadata_matches if not entry["matches"]), None)
@@ -731,7 +776,7 @@ def _diagnose_date_readback(source, index, now):
             "first_metadata_mismatch": first_metadata_mismatch,
             "clock_shape": {
                 "property": "동기화 시각",
-                "current_run_would_write": _date_shape_summary(now),
+                "current_run_would_write": _date_shape_summary(_minute_iso(now)),
                 "stored_value": _date_shape_summary(read_date(row, "동기화 시각")),
             }}
 
@@ -796,7 +841,8 @@ def _make_metadata(kind, row, key):
         "작성자": text_property(author.get("login") or ""),
         "담당자": text_property(", ".join(assignee_names)),
         "라벨": text_property(", ".join(label_names)),
-        "GitHub 수정": {"date": {"start": updated}}, "동기화 키": text_property(key),
+        "GitHub 수정": {"date": {"start": _minute_iso(updated)}},
+        "동기화 키": text_property(key),
     }
 
 
@@ -1232,7 +1278,7 @@ def _ensure_notion_row(notion, source_id, control, index, kind, row, canonical_i
     if key in index:
         raise SyncError("Notion canonical key collision")
     update_control_pending(notion, source_id, control, key)
-    properties = {**metadata, "동기화 시각": {"date": {"start": now}},
+    properties = {**metadata, "동기화 시각": {"date": {"start": _minute_iso(now)}},
                   "Pending create": text_property("")}
     if kind == "Issue":
         properties["작업 상태"] = {"select": None}
@@ -1411,7 +1457,7 @@ def _preview_resolutions(numbers, source_by_number, index, project, facts, confi
 def _projection_properties(metadata, *, target, end_reason, representative, confirmation,
                            state, now, kind):
     properties = dict(metadata)
-    properties["동기화 시각"] = {"date": {"start": now}}
+    properties["동기화 시각"] = {"date": {"start": _minute_iso(now)}}
     if kind == "Issue":
         properties.update({
             "작업 상태": {"select": {"name": target} if target else None},
@@ -1429,7 +1475,7 @@ def _display_hold(notion, source_id, row, metadata, state, hold, now, *, preserv
     _verify_issue_state_write(notion, source_id, row, state)
     visible = "보류: " + hold["message"]
     if preserve_task_status:
-        props = {**metadata, "동기화 시각": {"date": {"start": now}},
+        props = {**metadata, "동기화 시각": {"date": {"start": _minute_iso(now)}},
                  "확인 필요": text_property(visible),
                  "동기화 내부 상태": text_property(canonical_json(state))}
     else:
@@ -1856,11 +1902,13 @@ def _update_control_summary(notion, source_id, control, control_state, issue_row
     if success:
         control_state["last_success_at"] = now
         props["동기화 내부 상태"] = text_property(canonical_json(control_state))
-        props["동기화 시각"] = {"date": {"start": now}}
+        props["동기화 시각"] = {"date": {"start": _minute_iso(now)}}
     _patch_page(notion, source_id, control, props)
     if success:
-        require(timestamp(read_date(control, "동기화 시각")) == timestamp(now),
-                "전체 성공 시각 readback 오류")
+        actual = _display_date_instant(control, "동기화 시각")
+        expected = _expected_display_date_instant(
+            "동기화 시각", {"start": _minute_iso(now)})
+        require(actual == expected, "전체 성공 시각 readback 오류")
     return holds
 
 
@@ -2303,7 +2351,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         if kind == "PR":
             metadata = _make_metadata(kind, row_data, key)
             if not created:
-                _patch_page(notion, source_id, row, {**metadata, "동기화 시각": {"date": {"start": now}}})
+                _patch_page(notion, source_id, row, {**metadata,
+                    "동기화 시각": {"date": {"start": _minute_iso(now)}}})
                 counts["updated"] += 1
             continue
 
