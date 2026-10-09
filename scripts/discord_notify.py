@@ -738,6 +738,23 @@ def manual_guard(env):
             bool(re.fullmatch(r"[0-9a-f]{40}", env.get("GITHUB_SHA", ""))))
 
 
+def diagnostic_reason(error):
+    """Emit only fixed classifications, never exception text or response data."""
+    if isinstance(error, dt.HTTPError):
+        status = error.status
+        return f"http_{status}" if type(status) is int and 100 <= status <= 599 else "http"
+    fixed = {
+        "Remote request outcome unknown": "request_unknown",
+        "Response size limit exceeded": "response_limit",
+        "Duplicate JSON key": "duplicate_json_key",
+        "Incomplete paginated response": "pagination_count",
+        "Source pagination incomplete": "pagination_incomplete",
+        "Source pagination limit exceeded": "pagination_limit",
+        "Main changed during observation": "main_changed",
+    }
+    return fixed.get(str(error), "unclassified") if isinstance(error, dt.Error) else "unclassified"
+
+
 def main(argv=None, env=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=".github/discord-notifications.json")
@@ -746,16 +763,19 @@ def main(argv=None, env=None):
     if env.get("DISCORD_NOTIFICATIONS_ENABLED") != "true":
         print("Discord 알림 비활성: 상태와 기준선을 변경하지 않습니다.")
         return 0
+    stage = "configuration"
     try:
         config = dt.json_data(Path(args.config).read_bytes())
         if config != {"repository_id": REPO_ID, "sync_workflow_id": SYNC_ID, "ci_workflows": config.get("ci_workflows")}:
             raise dt.Error("Notification configuration mismatch")
         mapping = user_map(env.get("DISCORD_USER_MAP", "{}"))
         discord = dt.Discord(env.get("DISCORD_WEBHOOK_URL", ""), env.get("DISCORD_CHANNEL_ID", ""))
+        stage = "destination_verify"
         discord.verify()  # Configuration/destination failures do not consume baseline/events.
         gh = dt.GitHub(env.get("GITHUB_TOKEN", ""))
         ledger = dt.Ledger(gh)
         workflows = workflows_config(json.dumps(config["ci_workflows"]), gh)
+        stage = "ledger_load"
         state = ledger.load()
         bootstrap = state is None
         if bootstrap and not manual_guard(env):
@@ -766,19 +786,23 @@ def main(argv=None, env=None):
             resolve(state, env["DISCORD_RESOLVE_KEY"], env.get("DISCORD_RESOLVE_OUTCOME"),
                     env.get("DISCORD_RESOLVE_MESSAGE_ID"), discord)
             ledger.save(state)
+        stage = "source_collect"
         objects, pulls, timelines = collect_objects(gh)
         backlog = project_backlog(env.get("DISCORD_PROJECT_READ_TOKEN"), objects)
         events = source_events(objects, timelines, mapping, backlog)
         if bootstrap:
             state = new_state()
             reconcile_events(state, events, bootstrap=True)
+            stage = "baseline_save"
             ledger.save(state, bootstrap=True)
             # Durable activation boundary. A same-second unseen ID is still new.
+            stage = "source_refresh"
             objects, pulls, timelines = collect_objects(gh)
             events = source_events(objects, timelines, mapping, backlog)
         before = copy.deepcopy(state)
         reconcile_events(state, events)
         main_sha = gh.repo("/git/ref/heads/main")["object"]["sha"]
+        stage = "ci_observe"
         ci_runs = []
         for workflow in workflows:
             ci_runs.extend(gh.pages(f"/actions/workflows/{workflow['id']}/runs", "workflow_runs"))
@@ -795,16 +819,20 @@ def main(argv=None, env=None):
         if main_sha != gh.repo("/git/ref/heads/main")["object"]["sha"]:
             raise dt.Error("Main changed during observation")
         reconcile_ci(state, ci_runs, refreshed, workflows, main_sha, mapping)
+        stage = "sync_observe"
         sync_runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
         reconcile_sync_runs(state, gh, sync_runs, main_sha, mapping)
         if state != before:
+            stage = "ledger_save"
             ledger.save(state)
+        stage = "delivery"
         return 1 if deliver(state, ledger, discord,
                             event_check=lambda key: current_pr_event(gh, key, mapping),
                             ci_check=lambda key: current_ci_notice(gh, key, workflows)) else 0
-    except Exception:
+    except Exception as error:
         # Fixed message only: no exception repr, API response, token or webhook URL.
-        print("::error::Discord 알림 처리 실패: 설정·실행 기록·전송 보류 상태를 확인하세요.")
+        print("::error::Discord 알림 처리 실패: 설정·실행 기록·전송 보류 상태를 확인하세요. "
+              + f"stage={stage}; reason={diagnostic_reason(error)}")
         return 1
 
 
