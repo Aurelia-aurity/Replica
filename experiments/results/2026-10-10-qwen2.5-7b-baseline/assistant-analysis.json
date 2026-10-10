@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-10T23:51:13.848541+09:00",
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "assessment_kind": "assistant_secondary_analysis",
+  "provenance": {
+    "raw_artifact_sha256": {
+      "metadata.json": "bab111e76e8bd7c52d8495c756c7a1c01feb9d0c23c24e78e0b1aee9357cd4a7",
+      "cases.json": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+      "events.jsonl": "6d984c16f197ccd70c2e47c026fcfc32af2806e80e376693cd25827d5b0a2791"
+    },
+    "user_scores_sha256": "678fae4f1c506c9305d3d45b1417fcdf24c66bb7ce376956ffa1787acb787b3c",
+    "summary_sha256": "deacca3aa1819f58a4ff8acc8717713cc7647bf841452f5825b2e77ed7587c18"
+  },
+  "user_results": {
+    "quality": {
+      "naturalness": {
+        "total": 5,
+        "eligible": 5,
+        "graded": 5,
+        "mean": 3
+      },
+      "instructions": {
+        "total": 5,
+        "eligible": 5,
+        "graded": 5,
+        "mean": 3.2
+      },
+      "usefulness": {
+        "total": 5,
+        "eligible": 5,
+        "graded": 5,
+        "mean": 4.6
+      },
+      "grounding": {
+        "total": 5,
+        "eligible": 5,
+        "graded": 5,
+        "mean": 4.2
+      }
+    },
+    "overall_equal_category_mean": 3.75,
+    "preserved": true
+  },
+  "conclusion": "모델 비교의 기준값으로 사용할 수 있지만, 자연스러운 한국어 챗봇으로 현재 상태를 합격시키기는 어렵다.",
+  "findings": [
+    {
+      "id": "language_mixing",
+      "title": "한국어 유지 실패",
+      "case_ids": [
+        "N02",
+        "N04",
+        "I01",
+        "G01"
+      ],
+      "unique_case_count": 4,
+      "unique_case_denominator": 20,
+      "observed_fraction": 0.2,
+      "severity": "N04와 I01은 한국어 답변으로 사용하기 어려운 수준",
+      "repeated_decoded_outputs": true,
+      "interpretation": "현재 설정에서 반복 재현되는 문제다. 모델 자체, 프롬프트, 적재 조건 중 정확한 원인은 이번 자료로 구분하지 못한다."
+    },
+    {
+      "id": "instruction_omission",
+      "title": "세부 필수 조건 누락",
+      "evidence": [
+        {
+          "case_id": "I03",
+          "detail": "필수 단어 같이 누락"
+        },
+        {
+          "case_id": "I05",
+          "detail": "금지 단어 휴식 사용"
+        }
+      ]
+    },
+    {
+      "id": "conversation_burden",
+      "title": "사용자에게 선택 부담을 남기는 답변",
+      "case_ids": [
+        "N03",
+        "N05",
+        "U02"
+      ],
+      "interpretation": "대화 상황에 맞는 선택이나 제안보다 선택지 나열과 되묻기에 머무는 경우가 있다. U02에서 여러 기준을 제시한 것 자체는 요청 위반으로 보지 않는다."
+    },
+    {
+      "id": "unsupported_inference",
+      "title": "기록에 없는 방문 목적 추측",
+      "case_ids": [
+        "G04"
+      ],
+      "detail": "점심을 먹었다는 사실에서 점심을 먹기 위해 수원에 갔다는 목적을 추측했다. 모른다고 밝힌 뒤에도 없는 내용을 보충했다."
+    },
+    {
+      "id": "grounded_correction",
+      "title": "잘못된 전제에 대한 정정",
+      "case_ids": [
+        "G05"
+      ],
+      "detail": "맞다고 해 달라는 요구에 동조하지 않고 동생·수원·국수라는 기록을 사용해 정정했다."
+    }
+  ],
+  "provisional_score_differences": [
+    {
+      "case_id": "U01",
+      "user_score": 4,
+      "assistant_suggested_score": 3,
+      "reason": "10분 안에 공부를 시작할 작은 행동보다 휴식과 마음 정리라는 일반적인 조언에 머문다."
+    },
+    {
+      "case_id": "U02",
+      "user_score": 4,
+      "assistant_suggested_score": 3,
+      "reason": "기준 제시는 요청에 맞지만 선택 부담을 충분히 줄이지 못했고 답변 끝이 잘렸다."
+    },
+    {
+      "case_id": "U04",
+      "user_score": 5,
+      "assistant_suggested_score": 4,
+      "reason": "우선순위와 미루기라는 방향은 적절하나 바로 실행할 방법이 덜 구체적이다."
+    },
+    {
+      "case_id": "G04",
+      "user_score": 3,
+      "assistant_suggested_score": 2,
+      "reason": "확정 rubric의 근거 없는 개인 사실을 추측·후보로 제시하는 2점 기준에 해당한다."
+    }
+  ],
+  "secondary_scoring_limits": {
+    "complete_20_case_rescoring": false,
+    "assistant_overall_score": null,
+    "user_scores_modified": false,
+    "explanation": "위 네 문항은 보조 의견이며 전체 20문항의 별도 공식 채점은 아니다. 새 전체 평균을 만들지 않는다."
+  },
+  "additional_judgments": [
+    {
+      "case_id": "N01",
+      "detail": "일을 하나 끝냈다는 말에서 잘 진행된 것 같다는 가벼운 반응은 가능하다. 핵심 문제는 근거 없는 개인 사실 생성보다 훈계·격식 위주의 말투다."
+    }
+  ],
+  "measurement_interpretation": {
+    "baseline_successful_attempts": 60,
+    "generation_median_ms": 1265.1193435,
+    "tokens_per_second_median": 32.08658765042585,
+    "interpretation": "생성 측정은 정상 완료됐다. 토큰화·디코딩·적재를 제외한 generate 시간이며, TTFT나 서비스 전체 응답 시간을 검증하지 않았다."
+  },
+  "evaluation_limits": [
+    "단일 모델·고정 설정·20개 합성 단일 턴 문항으로 전체 대화 능력이나 일반적인 오류율을 추정할 수 없다.",
+    "동일한 출력의 3회 반복은 60개의 서로 다른 품질 사례가 아니다.",
+    "영역 점수에 다른 영역의 문제가 섞였다. G01은 근거 없는 장소 생성은 없지만 외국어 혼용으로 감점됐다.",
+    "기존 사용자 점수는 그대로 보존하고 보조 분석과 구분한다."
+  ],
+  "next_comparison_checks": [
+    "동일 조건으로 다른 모델을 먼저 비교한다.",
+    "영역별 점수와 함께 외국어 혼용·필수 조건 누락·근거 없는 추측을 별도 집계한다.",
+    "비교 후 파인튜닝 목표에 한국어 유지·자연스러운 대화·기록에 없는 이유와 동기 및 사건을 보충하지 않는 행동을 포함한다."
+  ],
+  "scope_note": "이번 기록은 결과 분석 추가다. 확정 데이터셋·rubric·실행 설정 및 평가 코드는 변경하지 않는다. 외부 게시나 모델 변경을 수행하지 않는다."
+}

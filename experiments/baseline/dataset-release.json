@@ -1,0 +1,8 @@
+{
+  "dataset_id": "replica-baseline-20",
+  "version": "1.0",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "rubric_sha256": "f71be011988574ed7443bf45c5a6721ef275dbd6c9fc722e1d002345c903af9e",
+  "decision": "User explicitly confirmed current twenty questions and rubric and authorized proceeding on 2026-10-10",
+  "confirmation_status": "user_confirmed"
+}
