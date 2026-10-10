@@ -149,7 +149,19 @@ class GitHub:
         self.token = token
 
     def call(self, path, *, method="GET", payload=None):
-        if not path.startswith("/") or ".." in path or "\n" in path:
+        raw_path = path.split("?", 1)[0]
+        decoded = urllib.parse.unquote(raw_path)
+        if (any(part in {".", ".."} for part in decoded.split("/")) or
+                decoded.count("/") != raw_path.count("/") or "\\" in decoded or
+                any(ord(char) < 32 or ord(char) == 127 for char in decoded) or
+                re.search(r"%[0-9a-fA-F]{2}", decoded)):
+            raise Error("Invalid API path")
+        compare = re.match(r"^/repos/[^/]+/[^/]+/compare", decoded)
+        exact_compare = re.fullmatch(r"/repos/" + re.escape(REPO) +
+                                    r"/compare/[0-9a-f]{40}\.\.\.[0-9a-f]{40}", path)
+        if (not path.startswith("/") or "\n" in path or
+                compare and (not exact_compare or method != "GET" or payload is not None) or
+                not compare and ".." in path):
             raise Error("Invalid API path")
         _, headers, body = request("https://api.github.com" + path,
                                    method=method, token=self.token, payload=payload)
@@ -262,13 +274,13 @@ class Discord:
         if info.get("guild_id") != "1554806404320075786" or info.get("channel_id") != self.channel_id:
             raise Error("Discord destination mismatch")
 
-    def send(self, payload):
-        for attempt in range(3):
+    def send(self, payload, *, retry_rate_limit=True):
+        for attempt in range(3 if retry_rate_limit else 1):
             try:
                 _, _, body = request(self.url + "?wait=true", method="POST", payload=payload, limit=100000)
                 return self.validate_message(json_data(body), payload)
             except HTTPError as exc:
-                if exc.status == 429 and attempt < 2:
+                if retry_rate_limit and exc.status == 429 and attempt < 2:
                     try:
                         seconds = float(json_data(exc.body)["retry_after"])
                     except (KeyError, ValueError, TypeError, Error):

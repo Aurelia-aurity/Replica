@@ -632,4 +632,20 @@ class Contract(unittest.TestCase):
             self.assertEqual(dn.main([], env={}), 0)
 
 
+class DiagnosticTests(unittest.TestCase):
+    def test_only_fixed_classifications_are_exposed(self):
+        secret = "https://discord.com/api/webhooks/123/not-a-real-secret"
+        self.assertEqual(dn.diagnostic_reason(dt.Error(secret)), "unclassified")
+        self.assertEqual(dn.diagnostic_reason(ValueError(secret)), "unclassified")
+        self.assertEqual(dn.diagnostic_reason(dt.HTTPError(403, {"Location": secret}, secret.encode())), "http_403")
+        self.assertEqual(dn.diagnostic_reason(dt.Error("Incomplete paginated response")), "pagination_count")
+
+    def test_failure_log_has_stage_but_no_exception_payload(self):
+        output = io.StringIO()
+        with patch.object(dn.dt, "Discord", side_effect=ValueError("private credential")), patch("sys.stdout", output):
+            self.assertEqual(dn.main([], env={"DISCORD_NOTIFICATIONS_ENABLED": "true"}), 1)
+        self.assertIn("stage=configuration; reason=unclassified", output.getvalue())
+        self.assertNotIn("private credential", output.getvalue())
+
+
 if __name__ == "__main__": unittest.main()
