@@ -14,10 +14,12 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import github_project as gp
 import notification_report
+import observation_clock
+import issue_status_sync as status_sync
 
 REPOSITORY = gp.REPOSITORY
 REPOSITORY_ID = gp.REPOSITORY_ID
@@ -39,6 +41,9 @@ RESUMABLE_HOLD_CODES = {
     "REOPEN_ORDER_AMBIGUOUS", "SOURCE_CHANGED_BEFORE_WRITE", "PROJECT_ADD_UNCERTAIN",
     "PROJECT_ITEM_RACE", "PROJECT_ITEM_ARCHIVED", "PENDING_RESULT_UNCLEAR",
     "PENDING_FACTS_CHANGED", "PROJECTION_CHECKPOINT_CHANGED", "PROJECT_STATUS_UNSET",
+    "STATUS_CONFLICT", "STATUS_ORDER_UNKNOWN", "STATUS_REQUEST_INVALID",
+    "BIDIRECTIONAL_CONFLICT", "REQUEST_RACE", "ADD_READBACK_EXHAUSTED",
+    "GITHUB_FACTS_CHANGED", "DEFERRED_REQUEST_PENDING", "ADD_READBACK_CONTRADICTION",
 }
 
 SCHEMA = {
@@ -48,6 +53,7 @@ SCHEMA = {
     "동기화 시각": "date", "Pending create": "rich_text", "작업 상태": "select",
     "일정": "date", "메모": "rich_text", "종료 사유": "select", "대표 이슈": "url",
     "확인 필요": "rich_text", "동기화 내부 상태": "rich_text",
+    "요청 처리": "select", "요청 상태": "select",
 }
 DATE_DIAGNOSTIC_METADATA_WHITELIST = (
     "제목", "종류", "번호", "GitHub URL", "GitHub 상태", "작성자", "담당자",
@@ -58,19 +64,29 @@ OPTIONS = {
     "종류": {"Issue", "PR", "Sync"},
     "GitHub 상태": {"Open", "Closed", "Draft", "Merged"},
     "작업 상태": {"백로그", "준비 중", "진행 중", "검토 중", "완료"},
+    "요청 처리": set(status_sync.REQUEST_UI_STATES),
+    "요청 상태": set(status_sync.ALL_STATES),
     "종료 사유": {"완료", "미계획", "중복", "확인 필요"},
 }
-ISSUE_STATE_KEYS = {
+ISSUE_STATE_V1_KEYS = {
     "v", "repository_id", "issue_id", "project_id", "project_item_id", "migration_complete",
     "reopen_baseline_id", "reopen_last_id", "review_cycle", "review_return_cycle",
     "review_pr_hash", "pending", "hold", "resume", "projection",
 }
+ISSUE_STATE_V2_LEGACY_KEYS = ISSUE_STATE_V1_KEYS | {"baseline", "request", "readback", "notion_write"}
+ISSUE_STATE_V2_KEYS = ISSUE_STATE_V2_LEGACY_KEYS | {"deferred_request"}
+ISSUE_STATE_KEYS = ISSUE_STATE_V2_KEYS
 CONTROL_STATE_KEYS = {"v", "project_id", "migration_cutoff", "last_success_at", "run_id", "last_result"}
 LEGACY_RESUME_KEYS = {"actor_id", "run_id", "approved_option_id", "fingerprint", "display_pending"}
-RESUME_KEYS = LEGACY_RESUME_KEYS | {"expected_option_id", "expected_fingerprint"}
+CHECKPOINT_RESUME_KEYS = LEGACY_RESUME_KEYS | {"expected_option_id", "expected_fingerprint"}
+RESUME_KEYS = CHECKPOINT_RESUME_KEYS | {
+    "request_id", "facts_fingerprint", "fact_contract", "approved_notion_status"}
 STATUS_CHECKPOINT_KEYS = {"migration_complete", "review_cycle", "review_return_cycle",
                           "reopen_last_id", "review_pr_hash"}
 PROJECTION_KEYS = {"expected_option_id", "expected_fingerprint", "checkpoint"}
+SEMANTIC_PROJECTION_KEYS = PROJECTION_KEYS | {
+    "fact_contract", "request_id", "expected_notion_status", "result_notion_status"}
+CHECKPOINTED_PROJECTION_KEYS = SEMANTIC_PROJECTION_KEYS | {"display_checkpoint"}
 
 
 class SyncError(Exception):
@@ -148,10 +164,14 @@ def decode_internal(value, *, kind, project_id, object_id=None):
         parsed = json.loads(value)
     except (ValueError, TypeError):
         raise SyncError("동기화 내부 상태 JSON 오류") from None
-    require(isinstance(parsed, dict) and type(parsed.get("v")) is int and parsed["v"] == 1,
+    require(isinstance(parsed, dict) and type(parsed.get("v")) is int and parsed["v"] in {1, 2},
             "동기화 내부 상태 버전/형식 오류")
     if kind == "issue":
-        require(set(parsed) == ISSUE_STATE_KEYS, "Issue 내부 상태 속성 집합 오류")
+        version = parsed["v"]
+        require(set(parsed) == (ISSUE_STATE_V1_KEYS if version == 1 else
+                                ISSUE_STATE_V2_KEYS if "deferred_request" in parsed else
+                                ISSUE_STATE_V2_LEGACY_KEYS),
+                "Issue 내부 상태 속성 집합 오류")
         require(parsed.get("repository_id") == REPOSITORY_ID and parsed.get("project_id") == project_id,
                 "Issue 내부 상태 저장소/Project ID 불일치")
         require(type(parsed.get("issue_id")) is int and parsed["issue_id"] > 0 and
@@ -174,6 +194,13 @@ def decode_internal(value, *, kind, project_id, object_id=None):
         _validate_hold(parsed["hold"])
         _validate_resume(parsed["resume"])
         _validate_projection(parsed["projection"])
+        if version == 1:
+            parsed.update({"v": 2, "baseline": None, "request": None,
+                           "readback": None, "notion_write": None,
+                           "deferred_request": None})
+        elif "deferred_request" not in parsed:
+            parsed["deferred_request"] = None
+        _validate_issue_v2_state(parsed)
         require(parsed["pending"] is None or parsed["projection"] is None,
                 "Issue pending/projection 동시 보유 오류")
         if parsed["projection"] is not None:
@@ -200,12 +227,28 @@ def decode_internal(value, *, kind, project_id, object_id=None):
 def _validate_pending(pending, project_id, issue_id):
     if pending is None:
         return
-    keys = {"kind", "issue_id", "item_id", "event_id", "before_option_id", "target_option_id",
+    legacy_keys = {"kind", "issue_id", "item_id", "event_id", "before_option_id", "target_option_id",
             "facts_fingerprint", "migration_fingerprint", "notion_status", "confirmed",
             "project_item_id", "checkpoint"}
-    require(set(pending) == keys and type(pending.get("issue_id")) is int and
-            pending.get("issue_id") == issue_id and
+    v2_keys = legacy_keys | {"fact_contract", "semantic_fingerprint"}
+    semantic_request_keys = v2_keys | {"request_id"}
+    keys = set(pending)
+    stamped_request_keys = semantic_request_keys | {"before_status_stamp"}
+    stamped_legacy_request_keys = v2_keys | {"before_status_stamp"}
+    require(keys in (legacy_keys, v2_keys, semantic_request_keys, stamped_request_keys,
+                     stamped_legacy_request_keys) and
+            type(pending.get("issue_id")) is int and pending.get("issue_id") == issue_id and
             pending.get("kind") in {"status", "add"}, "Issue pending 구조 오류")
+    if keys in (v2_keys, semantic_request_keys, stamped_request_keys,
+                stamped_legacy_request_keys):
+        require(pending.get("fact_contract") == "semantic_v2" and
+                isinstance(pending.get("semantic_fingerprint"), str) and
+                len(pending["semantic_fingerprint"]) == 64,
+                "pending semantic fingerprint 계약 오류")
+    if keys in (semantic_request_keys, stamped_request_keys):
+        require(pending.get("request_id") is None or
+                isinstance(pending.get("request_id"), str) and pending["request_id"],
+                "pending status request ID 오류")
     require(pending.get("item_id") is None or isinstance(pending.get("item_id"), str), "pending item ID 오류")
     require(pending.get("project_item_id") is None or isinstance(pending.get("project_item_id"), str),
             "pending Project item ID 오류")
@@ -228,6 +271,19 @@ def _validate_pending(pending, project_id, issue_id):
             "pending Notion 상태 미등록")
     checkpoint = pending["checkpoint"]
     if pending["kind"] == "status":
+        if keys in (semantic_request_keys, stamped_request_keys):
+            require(pending.get("request_id") is None or
+                    isinstance(pending.get("request_id"), str) and pending["request_id"],
+                    "pending status request ID 오류")
+        if keys in (stamped_request_keys, stamped_legacy_request_keys):
+            stamp = pending.get("before_status_stamp")
+            require(isinstance(stamp, dict) and set(stamp) ==
+                    {"field_id", "option_id", "value_id", "updated_at"} and
+                    stamp.get("option_id") == pending.get("before_option_id") and
+                    isinstance(stamp.get("field_id"), str) and stamp["field_id"] and
+                    (stamp.get("value_id") is None or isinstance(stamp["value_id"], str)) and
+                    (stamp.get("updated_at") is None or isinstance(stamp["updated_at"], str)),
+                    "pending before Project status stamp 오류")
         _validate_status_checkpoint(checkpoint)
         require(isinstance(pending.get("item_id"), str) and pending["item_id"] and
                 pending.get("project_item_id") == pending["item_id"] and
@@ -277,13 +333,195 @@ def _apply_status_checkpoint(state, checkpoint):
 def _validate_projection(projection):
     if projection is None:
         return
-    require(set(projection) == PROJECTION_KEYS and
+    keys = set(projection)
+    require(keys in (PROJECTION_KEYS, SEMANTIC_PROJECTION_KEYS,
+                     CHECKPOINTED_PROJECTION_KEYS) and
             (projection.get("expected_option_id") is None or
              projection["expected_option_id"] in gp.EXPECTED_STATUS_OPTIONS.values()) and
             isinstance(projection.get("expected_fingerprint"), str) and
             len(projection["expected_fingerprint"]) == 64,
             "Issue projection checkpoint 형식 오류")
+    if keys in (SEMANTIC_PROJECTION_KEYS, CHECKPOINTED_PROJECTION_KEYS):
+        require(projection.get("fact_contract") == "semantic_v2" and
+                (projection.get("request_id") is None or
+                 isinstance(projection.get("request_id"), str) and projection["request_id"]) and
+                (projection.get("expected_notion_status") is None or
+                 projection.get("expected_notion_status") in OPTIONS["작업 상태"]) and
+                (projection.get("result_notion_status") is None or
+                 projection.get("result_notion_status") in OPTIONS["작업 상태"]),
+                "Issue projection semantic fingerprint 계약 오류")
+    if keys == CHECKPOINTED_PROJECTION_KEYS:
+        display = projection["display_checkpoint"]
+        require(isinstance(display, dict) and set(display) ==
+                {"phase", "expected_fields", "expected_fingerprint"} and
+                display.get("phase") in {"display_sent", "completion_pending"} and
+                isinstance(display.get("expected_fields"), dict) and
+                bool(display["expected_fields"]) and
+                all(name in SCHEMA and kind == SCHEMA[name] and
+                    name != "동기화 내부 상태"
+                    for name, kind in display["expected_fields"].items()) and
+                isinstance(display.get("expected_fingerprint"), str) and
+                re.fullmatch(r"[0-9a-f]{64}", display["expected_fingerprint"]) is not None,
+                "Issue projection display checkpoint 오류")
     _validate_status_checkpoint(projection.get("checkpoint"))
+
+
+def _validate_issue_v2_state(state):
+    require(state.get("v") == 2, "Issue 내부 상태 v2 누락")
+    baseline = state.get("baseline")
+    if baseline is not None:
+        require(isinstance(baseline, dict) and set(baseline) ==
+                {"notion_status", "project", "project_item_id", "facts_fingerprint",
+                 "observed_at"}, "Status baseline 구조 오류")
+        try:
+            status_sync.make_baseline(baseline["notion_status"], baseline["project"],
+                                      baseline["project_item_id"],
+                                      baseline["facts_fingerprint"], baseline["observed_at"])
+        except status_sync.StatusSyncError as exc:
+            raise SyncError("Status baseline 값 오류") from exc
+        require(state.get("project_item_id") == baseline["project_item_id"],
+                "Status baseline과 Issue 고정 Project item ID 불일치")
+    request = state.get("request")
+    if request is not None:
+        keys = {"id", "target", "phase", "observed_from", "observed_to",
+                "prior_notion_status", "project_option_id", "requested_by", "reason"}
+        require(isinstance(request, dict) and set(request) == keys,
+                "Status request 구조 오류")
+        try:
+            validated = status_sync.request_record(
+                request["id"], request["target"], observed_from=request["observed_from"],
+                observed_to=request["observed_to"],
+                prior_notion_status=request["prior_notion_status"],
+                project_option_id=request["project_option_id"], phase=request["phase"],
+                reason=request["reason"])
+        except (status_sync.StatusSyncError, KeyError) as exc:
+            raise SyncError("Status request 값 오류") from exc
+        require(request["requested_by"] is None and validated["id"] == request["id"],
+                "Status request actor 추정/구조 오류")
+        if request["phase"] in {"prepared", "sent", "uncertain", "confirmed"}:
+            notion_write = state.get("notion_write")
+            require(isinstance(notion_write, dict) and
+                    notion_write.get("request_id") == request["id"] and
+                    notion_write.get("target") == request["target"] and
+                    notion_write.get("kind") == "request" and
+                    notion_write.get("phase") == request["phase"],
+                    "활성 status request/notion_write 결속 불일치")
+            pending = state.get("pending")
+            projection = state.get("projection")
+            if pending and pending.get("kind") == "status" and pending.get("fact_contract") == "semantic_v2":
+                request_id_matches = (pending.get("request_id") == request["id"]
+                                      if "request_id" in pending else True)
+                require(request_id_matches and
+                        gp.EXPECTED_STATUS_OPTIONS.get(request["target"]) ==
+                        pending.get("target_option_id") and
+                        pending.get("notion_status") == request["target"],
+                        "활성 status request/pending ID 또는 target 결속 불일치")
+            elif projection and projection.get("fact_contract") == "semantic_v2":
+                require(projection.get("request_id") == request["id"] and
+                        projection.get("result_notion_status") == request["target"],
+                        "활성 status request/projection ID 또는 target 결속 불일치")
+            elif request["phase"] == "prepared" and pending is None and projection is None:
+                # Compatibility for v2 prepare markers written immediately before the
+                # pending checkpoint was introduced; prepared is safe to reconstruct.
+                pass
+        elif request["phase"] in {"accepted", "waiting", "held", "rejected", "completed"}:
+            pass
+        else:
+            raise SyncError("활성 status request에 연결된 pending/projection이 없습니다")
+    deferred = state.get("deferred_request")
+    if deferred is not None:
+        keys = {"id", "target", "phase", "observed_from", "observed_to",
+                "prior_notion_status", "project_option_id", "requested_by", "reason"}
+        require(isinstance(deferred, dict) and set(deferred) == keys and
+                deferred.get("phase") in {"waiting", "held", "rejected"},
+                "Deferred status request 구조 오류")
+        try:
+            validated = status_sync.request_record(
+                deferred["id"], deferred["target"],
+                observed_from=deferred["observed_from"], observed_to=deferred["observed_to"],
+                prior_notion_status=deferred["prior_notion_status"],
+                project_option_id=deferred["project_option_id"], phase=deferred["phase"],
+                reason=deferred["reason"])
+        except (status_sync.StatusSyncError, KeyError) as exc:
+            raise SyncError("Deferred status request 값 오류") from exc
+        require(deferred["requested_by"] is None and validated["id"] == deferred["id"],
+                "Deferred status request actor/ID 오류")
+    readback = state.get("readback")
+    if readback is not None:
+        keys = {"returned_item_id", "validated", "attempts", "reservation", "last_result"}
+        reservation = readback.get("reservation") if isinstance(readback, dict) else None
+        reservation_valid = (reservation is None or
+            isinstance(reservation, dict) and set(reservation) ==
+            {"token", "run_id", "run_attempt", "attempt"} and
+            isinstance(reservation["token"], str) and reservation["token"] and
+            isinstance(reservation["run_id"], str) and reservation["run_id"] and
+            isinstance(reservation["run_attempt"], str) and reservation["run_attempt"] and
+            type(reservation["attempt"]) is int and
+            1 <= reservation["attempt"] <= PROJECT_ADD_READBACK_MAX_ATTEMPTS)
+        require(isinstance(readback, dict) and set(readback) == keys and
+                (readback["returned_item_id"] is None or
+                 isinstance(readback["returned_item_id"], str) and readback["returned_item_id"]) and
+                type(readback["validated"]) is bool and type(readback["attempts"]) is int and
+                0 <= readback["attempts"] <= PROJECT_ADD_READBACK_MAX_ATTEMPTS and
+                reservation_valid and
+                (readback["last_result"] is None or readback["last_result"] in
+                 {"not_visible", "network_error", "confirmed", "contradiction"}),
+                "Project add readback v2 구조 오류")
+        require(not readback["validated"] or readback["returned_item_id"] is not None,
+                "Project add validated ID 누락")
+        require(readback["attempts"] == 0 or readback["reservation"] is not None,
+                "Project add readback reservation 누락")
+        if readback["attempts"]:
+            require(readback["reservation"]["attempt"] == readback["attempts"],
+                    "Project add readback reservation/횟수 불일치")
+        if readback["returned_item_id"] is not None:
+            pending = state.get("pending")
+            require((pending is not None and pending.get("kind") == "add" and
+                     pending.get("project_item_id") in {None, readback["returned_item_id"]}) or
+                    (state.get("project_item_id") == readback["returned_item_id"] and
+                     (pending is None or pending.get("kind") == "status")),
+                    "Project add readback ID와 pending/item checkpoint 불일치")
+        require(not readback["validated"] or
+                readback["last_result"] == "confirmed",
+                "Project add validated/readback 결과 불일치")
+    notion_write = state.get("notion_write")
+    if notion_write is not None:
+        legacy_keys = {"request_id", "expected_before", "target", "kind", "phase"}
+        restore_keys = legacy_keys | {"project_item_id", "project_stamp", "facts_fingerprint"}
+        verified_restore_keys = restore_keys | {"expected_fields", "expected_fingerprint"}
+        keys_ok = (isinstance(notion_write, dict) and
+                   (set(notion_write) == legacy_keys or
+                    notion_write.get("kind") == "restore" and
+                    frozenset(notion_write) in {frozenset(restore_keys),
+                                                frozenset(verified_restore_keys)}))
+        require(keys_ok and
+                (notion_write["request_id"] is None or
+                 isinstance(notion_write["request_id"], str)) and
+                (notion_write["expected_before"] is None or
+                 notion_write["expected_before"] in status_sync.ALL_STATES) and
+                (notion_write["target"] is None or
+                 notion_write["target"] in status_sync.ALL_STATES) and
+                notion_write["kind"] in {"request", "restore", "projection"} and
+                notion_write["phase"] in {"prepared", "sent", "uncertain", "confirmed"},
+                "Notion write v2 구조 오류")
+        if frozenset(notion_write) in {frozenset(restore_keys),
+                                      frozenset(verified_restore_keys)}:
+            status_sync.validate_stamp(notion_write["project_stamp"])
+            require(isinstance(notion_write["project_item_id"], str) and
+                    bool(notion_write["project_item_id"]) and
+                    isinstance(notion_write["facts_fingerprint"], str) and
+                    len(notion_write["facts_fingerprint"]) == 64,
+                    "Notion restore checkpoint 구조 오류")
+            if set(notion_write) == verified_restore_keys:
+                fields = notion_write["expected_fields"]
+                require(isinstance(fields, dict) and fields and
+                        all(name in SCHEMA and kind == SCHEMA[name] and
+                            name != "동기화 내부 상태"
+                            for name, kind in fields.items()) and
+                        isinstance(notion_write["expected_fingerprint"], str) and
+                        re.fullmatch(r"[0-9a-f]{64}",
+                                     notion_write["expected_fingerprint"]) is not None,
+                        "Notion restore projection readback checkpoint 오류")
 
 
 def _validate_hold(hold):
@@ -299,7 +537,7 @@ def _validate_resume(resume):
     if resume is None:
         return
     keys = set(resume)
-    require(keys in (LEGACY_RESUME_KEYS, RESUME_KEYS) and
+    require(keys in (LEGACY_RESUME_KEYS, CHECKPOINT_RESUME_KEYS, RESUME_KEYS) and
             type(resume.get("actor_id")) is int and resume["actor_id"] == gp.EXPECTED_PM_USER_ID and
             isinstance(resume.get("run_id"), str) and
             (resume.get("approved_option_id") is None or isinstance(resume["approved_option_id"], str)) and
@@ -308,7 +546,7 @@ def _validate_resume(resume):
     require(resume.get("approved_option_id") is None or
             resume["approved_option_id"] in gp.EXPECTED_STATUS_OPTIONS.values(),
             "Issue resume option ID 미등록")
-    if keys == RESUME_KEYS:
+    if keys in (CHECKPOINT_RESUME_KEYS, RESUME_KEYS):
         expected_option = resume.get("expected_option_id")
         expected_fingerprint = resume.get("expected_fingerprint")
         require(expected_option is None or
@@ -318,15 +556,26 @@ def _validate_resume(resume):
         require((expected_option is None and expected_fingerprint is None) or
                 (isinstance(expected_fingerprint, str) and len(expected_fingerprint) == 64),
                 "Issue resume checkpoint fingerprint 오류")
+    if keys == RESUME_KEYS:
+        require((resume.get("request_id") is None or
+                 isinstance(resume.get("request_id"), str) and resume["request_id"]) and
+                isinstance(resume.get("facts_fingerprint"), str) and
+                len(resume["facts_fingerprint"]) == 64 and
+                resume.get("fact_contract") == "semantic_v2" and
+                (resume.get("approved_notion_status") is None or
+                 resume.get("approved_notion_status") in OPTIONS["작업 상태"]),
+                "Issue resume request/facts binding 오류")
 
 
 def new_issue_state(issue_id, project_id, baseline_id=None):
     state = {
-        "v": 1, "repository_id": REPOSITORY_ID, "issue_id": issue_id, "project_id": project_id,
+        "v": 2, "repository_id": REPOSITORY_ID, "issue_id": issue_id, "project_id": project_id,
         "project_item_id": None, "migration_complete": False,
         "reopen_baseline_id": baseline_id, "reopen_last_id": baseline_id,
         "review_cycle": 0, "review_return_cycle": 0, "review_pr_hash": "",
         "pending": None, "hold": None, "resume": None, "projection": None,
+        "baseline": None, "request": None, "deferred_request": None,
+        "readback": None, "notion_write": None,
     }
     return state
 
@@ -513,7 +762,7 @@ def _schema(notion, source_id):
     schema = notion.request("GET", f"/data_sources/{source_id}")
     require(identifier(schema.get("id")) == source_id, "Notion data source ID 불일치")
     properties = schema.get("properties")
-    require(isinstance(properties, dict) and set(properties) == set(SCHEMA), "Notion 19개 속성 집합 불일치")
+    require(isinstance(properties, dict) and set(properties) == set(SCHEMA), "Notion 21개 속성 집합 불일치")
     for name, kind in SCHEMA.items():
         require(properties.get(name, {}).get("type") == kind, "Notion 속성 타입 불일치")
     for name, expected in OPTIONS.items():
@@ -672,6 +921,72 @@ def _verify_properties(page, expected):
             wanted = body
         require(_notion_value(page, name, kind) == wanted,
                 "Notion write readback 불일치; 다음 실행에서 복구 필요")
+
+
+def _properties_match(page, expected):
+    try:
+        _verify_properties(page, expected)
+    except SyncError:
+        return False
+    return True
+
+
+def _projection_property_value(name, kind, body):
+    if kind in {"title", "rich_text"}:
+        return "".join(part["text"]["content"] for part in body)
+    if kind == "select":
+        return body.get("name") if body else None
+    if kind == "date":
+        return (_iso(_expected_display_date_instant(name, body))
+                if name in DISPLAY_MINUTE_DATE_PROPERTIES else
+                _iso(timestamp(body["start"])) if body else None)
+    return body
+
+
+def _restore_projection_checkpoint(properties):
+    fields = {name: next(iter(value)) for name, value in properties.items()
+              if name != "동기화 내부 상태"}
+    normalized = {name: _projection_property_value(name, kind, properties[name][kind])
+                  for name, kind in fields.items()}
+    return fields, _digest(normalized)
+
+
+def _restore_projection_matches(page, marker):
+    fields = marker.get("expected_fields")
+    if not isinstance(fields, dict):
+        return False
+    try:
+        normalized = {}
+        for name, kind in fields.items():
+            if name in DISPLAY_MINUTE_DATE_PROPERTIES:
+                value = _display_date_instant(page, name, allow_null=True)
+                normalized[name] = _iso(value) if value is not None else None
+            else:
+                normalized[name] = _notion_value(page, name, kind)
+        return _digest(normalized) == marker.get("expected_fingerprint")
+    except (KeyError, TypeError, ValueError, SyncError):
+        return False
+
+
+def _projection_display_matches(page, projection):
+    display = projection.get("display_checkpoint") or {}
+    return _restore_projection_matches(page, {
+        "expected_fields": display.get("expected_fields"),
+        "expected_fingerprint": display.get("expected_fingerprint"),
+    })
+
+
+def _projection_display_matches_except_sync_clock(page, properties):
+    """Match the saved legacy display while ignoring only its refreshed sync clock."""
+    fields, _ = _restore_projection_checkpoint(properties)
+    fields.pop("동기화 시각", None)
+    if not fields:
+        return False
+    expected = {name: properties[name] for name in fields}
+    return _restore_projection_matches(page, {
+        "expected_fields": fields,
+        "expected_fingerprint": _restore_projection_checkpoint(expected)[1],
+    })
 
 
 def _date_format_shape(value):
@@ -958,29 +1273,103 @@ def _source_fingerprint(issue, linked_refs, item):
     })
 
 
+def _status_facts_fingerprint(issue, linked_refs):
+    """Bind a status baseline to semantic Issue/PR facts, excluding cosmetic Issue edits."""
+    duplicate = issue.get("duplicateOf") or {}
+    return status_sync.fingerprint({
+        "issue_id": issue.get("databaseId"), "issue_node_id": issue.get("id"),
+        "state": issue.get("state"), "stateReason": issue.get("stateReason"),
+        "closedAt": issue.get("closedAt"), "duplicate_id": duplicate.get("id"),
+        "reopens": [{"id": event["id"], "createdAt": event["createdAt"]}
+                    for _, event in _issue_reopens(issue)],
+        "linked_prs": linked_refs,
+    })
+
+
+def _pending_semantic_fingerprint(issue, linked_refs, item, kind):
+    facts = _status_facts_fingerprint(issue, linked_refs)
+    binding = None
+    if kind == "status":
+        binding = {"item_id": item.get("id") if item else None,
+                   "option_id": item.get("status_option_id") if item else None}
+    return status_sync.fingerprint({"facts": facts, "kind": kind, "item": binding})
+
+
+def _status_operation_fingerprint(issue, linked_refs, item):
+    return status_sync.fingerprint({
+        "semantic": _pending_semantic_fingerprint(issue, linked_refs, item, "status"),
+        "status_value_id": item.get("status_value_id") if item else None,
+        "status_updated_at": item.get("status_updated_at") if item else None,
+    })
+
+
+def _pending_fingerprint(issue, linked_refs, item, pending):
+    """Use semantic facts for new v2 checkpoints; preserve exact v1 hash semantics."""
+    if pending.get("fact_contract") == "semantic_v2":
+        return _pending_semantic_fingerprint(issue, linked_refs, item, pending["kind"])
+    return _source_fingerprint(issue, linked_refs, item)
+
+
+def _status_stamp(item, config):
+    return {"field_id": config["status_field_id"],
+            "option_id": item.get("status_option_id") if item else None,
+            "value_id": item.get("status_value_id") if item else None,
+            "updated_at": item.get("status_updated_at") if item else None}
+
+
+def _new_status_baseline(notion_status, item, issue, linked_refs, config, observed_at):
+    return status_sync.make_baseline(
+        notion_status, _status_stamp(item, config), item["id"],
+        _status_facts_fingerprint(issue, linked_refs), observed_at)
+
+
 def _resume_checkpoint_matches(resume, issue, facts, item):
     """Only a checkpointed, exact current Project/source snapshot can recover display."""
-    if (not isinstance(resume, dict) or set(resume) != RESUME_KEYS or
+    if (not isinstance(resume, dict) or set(resume) not in
+            (CHECKPOINT_RESUME_KEYS, RESUME_KEYS) or
             not resume.get("display_pending") or resume.get("expected_fingerprint") is None or
             item is None or item.get("status_option_id") != resume.get("expected_option_id")):
         return False
     linked, _ = _linked_pr_facts(issue, facts)
+    if set(resume) == RESUME_KEYS:
+        return (_status_facts_fingerprint(issue, linked) == resume["facts_fingerprint"] and
+        _status_operation_fingerprint(issue, linked, item) ==
+                resume["expected_fingerprint"])
     return _source_fingerprint(issue, linked, item) == resume["expected_fingerprint"]
 
 
 def _resume_approval_matches(resume, issue, facts, item):
     """An uncheckpointed saved approval may continue only from its original exact snapshot."""
-    if (not isinstance(resume, dict) or set(resume) != RESUME_KEYS or
+    if (not isinstance(resume, dict) or set(resume) not in
+            (CHECKPOINT_RESUME_KEYS, RESUME_KEYS) or
             not resume.get("display_pending") or resume.get("expected_fingerprint") is not None or
             item is None or item.get("status_option_id") != resume.get("approved_option_id")):
         return False
     linked, _ = _linked_pr_facts(issue, facts)
+    if set(resume) == RESUME_KEYS:
+        return (_status_facts_fingerprint(issue, linked) == resume["facts_fingerprint"] and
+        _status_operation_fingerprint(issue, linked, item) ==
+                resume["fingerprint"])
     return _source_fingerprint(issue, linked, item) == resume["fingerprint"]
 
 
-def _resume_matches(resume, issue, facts, item):
+def _resume_matches(resume, issue, facts, item, *, request_id=None, notion_status=None):
+    if isinstance(resume, dict):
+        if set(resume) == RESUME_KEYS:
+            if (resume.get("request_id") != request_id or
+                    resume.get("approved_notion_status") != notion_status):
+                return False
+        elif request_id is not None:
+            # Pre-v2 approvals did not bind to a status request and cannot authorize one.
+            return False
     return (_resume_checkpoint_matches(resume, issue, facts, item) or
             _resume_approval_matches(resume, issue, facts, item))
+
+
+def _projection_fingerprint(projection, issue, linked_refs, item):
+    if projection.get("fact_contract") == "semantic_v2":
+        return _status_operation_fingerprint(issue, linked_refs, item)
+    return _source_fingerprint(issue, linked_refs, item)
 
 
 def _migration_input_fingerprint(page, state):
@@ -1009,8 +1398,9 @@ def _migration_input_unchanged(notion, source_id, row, pending, project_id):
         return False, latest
     pre_pending_state = json.loads(json.dumps(latest_state))
     pre_pending_state["pending"] = None
-    if (pending["kind"] == "add" and (pre_pending_state.get("hold") or {}).get("code") ==
-            "PROJECT_ADD_UNCERTAIN"):
+    if (pending["kind"] == "add" and (pre_pending_state.get("hold") or {}).get("code") in
+            {"PROJECT_ADD_UNCERTAIN", "ADD_READBACK_EXHAUSTED",
+             "ADD_READBACK_CONTRADICTION"}):
         # This visible hold is our recovery marker, not a change to the migration input.
         pre_pending_state["hold"] = None
     return (_migration_input_fingerprint(latest, pre_pending_state) ==
@@ -1170,11 +1560,11 @@ def _plan_issue(issue, item, notion_row, state, facts, cutoff, project_id, statu
             return {"target": current, "end_reason": None, "representative": None, "confirmation": "",
                     "state": state, "fingerprint": fingerprint, "event_id": None,
                     "automatic": False, "migration_complete": True, "initial_migration": True}
-        if current is None and notion_status in GENERAL_STATES:
-            state["migration_complete"] = True
-            return {"target": notion_status, "end_reason": None, "representative": None, "confirmation": "",
-                    "state": state, "fingerprint": fingerprint, "event_id": None,
-                    "automatic": False, "migration_complete": True, "initial_migration": True}
+        if current is None:
+            return {"hold": _new_hold(
+                "MIGRATION_UNSET",
+                "기존 이슈의 Project 상태가 미지정입니다. PM이 Project 상태를 정한 뒤 새 수동 실행으로 재개해야 합니다.",
+                fingerprint), "fingerprint": fingerprint}
         if current in GENERAL_STATES and notion_status is None:
             state["migration_complete"] = True
             return {"target": current, "end_reason": None, "representative": None, "confirmation": "",
@@ -1207,12 +1597,25 @@ def _plan_issue(issue, item, notion_row, state, facts, cutoff, project_id, statu
 def _pending_saved_migration_approval(state, pending):
     resume = state.get("resume")
     hold = state.get("hold")
-    return bool(
-        pending["migration_fingerprint"] is not None and hold and
-        hold.get("code") in RESUMABLE_HOLD_CODES and resume and
-        resume.get("display_pending") and
-        resume.get("approved_option_id") == pending["before_option_id"] and
-        resume.get("fingerprint") == pending["facts_fingerprint"])
+    if not (pending["migration_fingerprint"] is not None and hold and
+            hold.get("code") in RESUMABLE_HOLD_CODES and resume and
+            resume.get("display_pending") and
+            resume.get("approved_option_id") == pending["before_option_id"]):
+        return False
+    if set(resume) == RESUME_KEYS:
+        stamp = pending.get("before_status_stamp")
+        expected_operation = (status_sync.fingerprint({
+            "semantic": pending.get("semantic_fingerprint"),
+            "status_value_id": stamp.get("value_id"),
+            "status_updated_at": stamp.get("updated_at"),
+        }) if isinstance(stamp, dict) and pending.get("fact_contract") == "semantic_v2"
+            else pending.get("semantic_fingerprint"))
+        return (resume.get("fact_contract") == "semantic_v2" and
+                resume.get("facts_fingerprint") and
+                resume.get("approved_notion_status") == pending.get("notion_status") and
+                resume.get("request_id") == pending.get("request_id") and
+                resume.get("fingerprint") == expected_operation)
+    return resume.get("fingerprint") == pending["facts_fingerprint"]
 
 
 def _canonical_pending_status_plan(issue, state, facts, cutoff, config, pending, *,
@@ -1283,6 +1686,8 @@ def _ensure_notion_row(notion, source_id, control, index, kind, row, canonical_i
                   "Pending create": text_property("")}
     if kind == "Issue":
         properties["작업 상태"] = {"select": None}
+        properties["요청 처리"] = {"select": None}
+        properties["요청 상태"] = {"select": None}
         properties["종료 사유"] = {"select": None}
         properties["대표 이슈"] = {"url": None}
         properties["확인 필요"] = text_property("")
@@ -1295,6 +1700,8 @@ def _ensure_notion_row(notion, source_id, control, index, kind, row, canonical_i
             "Notion 생성 응답 ID 누락; 생성 fence 유지")
     page_id = identifier(created["id"])
     confirmed = notion.request("GET", f"/pages/{page_id}")
+    require(identifier(confirmed.get("id")) == page_id,
+            "Notion 생성행 ID readback이 POST 응답과 달라 생성 fence 유지")
     bound_page(confirmed, source_id)
     require(not is_archived(confirmed) and read_text(confirmed, "동기화 키") == key and
             read_select(confirmed, "종류") == kind, "Notion 생성행 식별 readback 오류; fence 유지")
@@ -1341,7 +1748,7 @@ def _confirmed_add_item_matches(pending, item):
             item.get("id") == checkpoint.get("item_id"))
 
 
-def _added_project_item_from_snapshot(project, returned_item_id, issue, facts):
+def _added_project_item_from_snapshot(project, direct_item, returned_item_id, issue, facts):
     observations = project.get("add_readback_items")
     require(isinstance(observations, list), "Project add readback 관측 오류")
     returned = [row for row in observations if row.get("item_id") == returned_item_id]
@@ -1349,40 +1756,194 @@ def _added_project_item_from_snapshot(project, returned_item_id, issue, facts):
               if (row.get("content_id") == issue["id"] or
                   (row.get("content_type") == "Issue" and
                    row.get("content_database_id") == issue["databaseId"]))]
-    if not returned and not target:
+    if not returned and not target and direct_item is None:
         return None
-
-    require(len(returned) == 1 and len(target) == 1 and
-            returned[0]["item_id"] == target[0]["item_id"] == returned_item_id,
-            "Project 추가 결과 returned ID와 대상 Issue가 불일치; pending 유지")
-    observed = returned[0]
-    require(observed.get("is_archived") is False and
-            observed.get("content_type") == "Issue" and
-            observed.get("content_id") == issue["id"] and
-            observed.get("content_database_id") == issue["databaseId"] and
-            observed.get("repository_id") == facts["repository_node_id"] and
-            observed.get("repository_database_id") == REPOSITORY_ID,
-            "Project 추가 결과 ID/Issue/repository/archive 관계 불일치; pending 유지")
+    if returned or target:
+        require(len(returned) == 1 and len(target) == 1 and
+                returned[0]["item_id"] == target[0]["item_id"] == returned_item_id,
+                "Project 추가 결과 returned ID와 대상 Issue가 불일치; pending 유지")
+        observed = returned[0]
+        require(observed.get("is_archived") is False and
+                observed.get("content_type") == "Issue" and
+                observed.get("content_id") == issue["id"] and
+                observed.get("content_database_id") == issue["databaseId"] and
+                observed.get("repository_id") == facts["repository_node_id"] and
+                observed.get("repository_database_id") == REPOSITORY_ID,
+                "Project 추가 결과 ID/Issue/repository/archive 관계 불일치; pending 유지")
 
     item = project["items"].get(issue["databaseId"])
     archived = project.get("archived_items", {}).get(issue["databaseId"], [])
-    require(item is not None and item["id"] == returned_item_id and
-            item["content_id"] == issue["id"] and not archived,
-            "Project 추가 결과 active/archive 항목 충돌; pending 유지")
+    if item is not None:
+        require(item["id"] == returned_item_id and item["content_id"] == issue["id"] and
+                not archived, "Project 추가 결과 active/archive 항목 충돌; pending 유지")
+    elif archived:
+        raise gp.SyncError("Project add 반환 ID가 보관된 항목과 충돌합니다")
+    if direct_item is not None:
+        require(direct_item.get("id") == returned_item_id and
+                direct_item.get("content_id") == issue["id"] and
+                direct_item.get("is_archived") is False,
+                "Project add 직접 node ID/Issue/archive 관계 불일치")
+    if item is None or direct_item is None:
+        return None
+    require(item["id"] == direct_item["id"] and
+            item["status_option_id"] == direct_item["status_option_id"] and
+            item["status_value_id"] == direct_item["status_value_id"] and
+            item["status_updated_at"] == direct_item["status_updated_at"],
+            "Project add 직접 node와 전체 목록의 Status 값 불일치")
     return item
 
 
-def _read_added_project_item(project_client, config, facts, issue, returned_item_id):
-    for attempt in range(PROJECT_ADD_READBACK_MAX_ATTEMPTS):
+def _project_readback_network_error(exc):
+    message = str(exc)
+    return ("연결/응답 실패" in message or
+            any(f"HTTP {status}" in message for status in (429, 500, 502, 503, 504, 529)))
+
+
+def _read_added_project_item_once(notion, source_id, row, state, project_client,
+                                  config, facts, issue, run_identity):
+    readback = state.get("readback")
+    require(isinstance(readback, dict) and readback.get("returned_item_id"),
+            "Project add 응답 item ID가 없어 자동 readback할 수 없습니다")
+    require(not readback["validated"], "이미 검증된 Project add 결과를 다시 예약할 수 없습니다")
+    if (readback["attempts"] == PROJECT_ADD_READBACK_MAX_ATTEMPTS and
+            readback.get("last_result") is None and readback.get("reservation")):
+        # The final reservation was durably recorded, but its query result was not.
+        # Treat the consumed attempt conservatively and hand it to PM without querying again.
+        hold = _new_hold("ADD_READBACK_EXHAUSTED",
+                         "Project 추가 결과를 3회 확인하지 못해 PM 확인이 필요합니다.",
+                         _digest(readback["reservation"]))
+        state["hold"] = hold
+        _verify_issue_state_write(notion, source_id, row, state)
+        return None, None, hold
+    if (readback["attempts"] == PROJECT_ADD_READBACK_MAX_ATTEMPTS and
+            not readback["validated"] and
+            readback.get("last_result") in {"network_error", "not_visible"} and
+            state.get("hold") is None):
+        # The final result was persisted, but the process stopped before persisting
+        # the exhaustion hold. Never spend a fourth query to repair that split write.
+        hold = _new_hold("ADD_READBACK_EXHAUSTED",
+                         "Project 추가 결과를 3회 확인하지 못해 PM 확인이 필요합니다.",
+                         _digest(readback.get("reservation")))
+        state["hold"] = hold
+        _verify_issue_state_write(notion, source_id, row, state)
+        return None, None, hold
+    require(readback["attempts"] < PROJECT_ADD_READBACK_MAX_ATTEMPTS,
+            "Project add readback 횟수 초과")
+    reservation = readback.get("reservation")
+    if (reservation and reservation.get("run_id") == run_identity["run_id"] and
+            reservation.get("run_attempt") == run_identity["run_attempt"]):
+        return None, None, None
+    readback["attempts"] += 1
+    readback["reservation"] = {"token": str(uuid4()), "run_id": run_identity["run_id"],
+                               "run_attempt": run_identity["run_attempt"],
+                               "attempt": readback["attempts"]}
+    readback["last_result"] = None
+    _verify_issue_state_write(notion, source_id, row, state)
+    returned_item_id = readback["returned_item_id"]
+    try:
+        direct_item = gp.fetch_project_item(
+            project_client, config["project_id"], returned_item_id,
+            config["status_field_id"], allow_archived=True, allow_missing=True)
         project = _project_snapshot(project_client, config, facts,
                                     add_readback_item_id=returned_item_id,
                                     add_target_issue=issue)
-        item = _added_project_item_from_snapshot(project, returned_item_id, issue, facts)
-        if item is not None:
-            return project, item
-        if attempt + 1 < PROJECT_ADD_READBACK_MAX_ATTEMPTS:
-            project_client.sleep(PROJECT_ADD_READBACK_BACKOFF_SECONDS[attempt])
-    raise SyncError("Project 추가 결과 0개/대상 불일치; pending 유지")
+    except gp.SyncError as exc:
+        if not _project_readback_network_error(exc):
+            readback["last_result"] = "contradiction"
+            hold = _new_hold("ADD_READBACK_CONTRADICTION",
+                             "Project 추가 결과의 대상/저장소 관계를 검증하지 못했습니다.",
+                             _digest(readback["reservation"]))
+            state["hold"] = hold
+            _verify_issue_state_write(notion, source_id, row, state)
+            return None, None, hold
+        readback["last_result"] = "network_error"
+        _verify_issue_state_write(notion, source_id, row, state)
+        if readback["attempts"] >= PROJECT_ADD_READBACK_MAX_ATTEMPTS:
+            hold = _new_hold("ADD_READBACK_EXHAUSTED",
+                             "Project 추가 결과를 3회 확인하지 못해 PM 확인이 필요합니다.",
+                             _digest(readback["reservation"]))
+            state["hold"] = hold
+            _verify_issue_state_write(notion, source_id, row, state)
+            return None, None, hold
+        return None, None, None
+    try:
+        item = _added_project_item_from_snapshot(
+            project, direct_item, returned_item_id, issue, facts)
+    except (SyncError, gp.SyncError):
+        readback["last_result"] = "contradiction"
+        hold = _new_hold("ADD_READBACK_CONTRADICTION",
+                         "Project add 응답 ID가 대상 Issue/저장소의 활성 항목과 일치하지 않습니다.",
+                         _digest(readback["reservation"]))
+        state["hold"] = hold
+        _verify_issue_state_write(notion, source_id, row, state)
+        return project, None, hold
+    if item is None:
+        readback["last_result"] = "not_visible"
+        _verify_issue_state_write(notion, source_id, row, state)
+        if readback["attempts"] >= PROJECT_ADD_READBACK_MAX_ATTEMPTS:
+            hold = _new_hold("ADD_READBACK_EXHAUSTED",
+                             "Project 추가 결과를 3회 확인하지 못해 PM 확인이 필요합니다.",
+                             _digest(readback["reservation"]))
+            state["hold"] = hold
+            _verify_issue_state_write(notion, source_id, row, state)
+            return project, None, hold
+        return project, None, None
+    readback["validated"] = True
+    readback["last_result"] = "confirmed"
+    _verify_issue_state_write(notion, source_id, row, state)
+    return project, item, None
+
+
+def _read_added_project_item_immediate(notion, source_id, row, state, project_client,
+                                       config, facts, issue):
+    readback = state["readback"]
+    returned_item_id = readback["returned_item_id"]
+    try:
+        direct_item = gp.fetch_project_item(
+            project_client, config["project_id"], returned_item_id,
+            config["status_field_id"], allow_archived=True, allow_missing=True)
+        project = _project_snapshot(project_client, config, facts,
+                                    add_readback_item_id=returned_item_id,
+                                    add_target_issue=issue)
+    except gp.SyncError as exc:
+        readback["last_result"] = "network_error" if _project_readback_network_error(exc) else "contradiction"
+        if readback["last_result"] == "contradiction":
+            hold = _new_hold("ADD_READBACK_CONTRADICTION",
+                             "Project 추가 결과의 대상/저장소 관계를 검증하지 못했습니다.",
+                             _digest({"item_id": returned_item_id, "result": "contradiction"}))
+            state["hold"] = hold
+        _verify_issue_state_write(notion, source_id, row, state)
+        return None, None, state.get("hold")
+    try:
+        item = _added_project_item_from_snapshot(project, direct_item, returned_item_id, issue, facts)
+    except (SyncError, gp.SyncError):
+        readback["last_result"] = "contradiction"
+        hold = _new_hold("ADD_READBACK_CONTRADICTION",
+                         "Project add 응답 ID와 직접 node/전체 목록의 관계가 모순됩니다.",
+                         _digest({"item_id": returned_item_id, "result": "contradiction"}))
+        state["hold"] = hold
+        _verify_issue_state_write(notion, source_id, row, state)
+        return project, None, hold
+    if item is None:
+        readback["last_result"] = "not_visible"
+        _verify_issue_state_write(notion, source_id, row, state)
+        return project, None, None
+    readback["validated"] = True
+    readback["last_result"] = "confirmed"
+    _verify_issue_state_write(notion, source_id, row, state)
+    return project, item, None
+
+
+def _display_add_readback_waiting(notion, source_id, row, state, now):
+    readback = state["readback"]
+    confirmation = (f"Project 추가 결과를 자동 확인 중입니다 "
+                    f"({readback['attempts']}/{PROJECT_ADD_READBACK_MAX_ATTEMPTS}).")
+    _patch_page(notion, source_id, row, {
+        "동기화 시각": {"date": {"start": _minute_iso(now)}},
+        "요청 처리": {"select": None}, "요청 상태": {"select": None},
+        "확인 필요": text_property(confirmation),
+        "동기화 내부 상태": text_property(canonical_json(state)),
+    })
 
 
 def _status_option(project, name):
@@ -1391,6 +1952,20 @@ def _status_option(project, name):
 
 def _verify_issue_state_write(notion, source_id, row, state):
     _save_issue_state(notion, source_id, row, state)
+
+
+def _issue_state_binding_matches(row, state):
+    saved = decode_internal(read_text(row, "동기화 내부 상태"), kind="issue",
+                            project_id=state["project_id"], object_id=state["issue_id"])
+    if saved is None:
+        return False
+    return (saved.get("projection") == state.get("projection") and
+            (saved.get("request") or {}).get("id") ==
+            (state.get("request") or {}).get("id") and
+            (saved.get("request") or {}).get("phase") ==
+            (state.get("request") or {}).get("phase") and
+            saved.get("notion_write") == state.get("notion_write") and
+            saved.get("baseline") == state.get("baseline"))
 
 
 def _resume_numbers(raw):
@@ -1405,12 +1980,39 @@ def _resume_numbers(raw):
     return sorted(numbers)
 
 
-def _validate_manual_resume(github, raw, env):
+def _validate_manual_resume(github, raw, env, *, dry_run=False):
     numbers = _resume_numbers(raw)
+    event_name = env.get("GITHUB_EVENT_NAME")
+    ref = env.get("GITHUB_REF")
+    if event_name == "workflow_dispatch":
+        # Feature refs are useful for read-only previews, but all live writes
+        # and every PM resolution must come from the trusted main checkout.
+        feature_refs = {"refs/heads/fix/17-project-add-readback",
+                        "refs/heads/feat/32-bidirectional-sync"}
+        require(ref == "refs/heads/main" or
+                ref in feature_refs and dry_run and not numbers,
+                "수동 실행은 main에서만 쓰기/보류 재개할 수 있습니다")
+        dispatch_ref = env.get("SYNC_DISPATCH_REF")
+        dispatch_dry_run = env.get("SYNC_DISPATCH_DRY_RUN")
+        dispatch_resolve = env.get("SYNC_DISPATCH_RESOLVE_ISSUES")
+        require(dispatch_ref in (None, ref) and
+                dispatch_dry_run in (None, "true" if dry_run else "false") and
+                dispatch_resolve in (None, raw or ""),
+                "수동 실행 입력과 검증된 dispatch 문맥이 일치하지 않습니다")
+    elif env.get("GITHUB_ACTIONS") == "true":
+        require(ref == "refs/heads/main",
+                "자동 동기화 쓰기는 trusted main에서만 허용됩니다")
     if not numbers:
         return set(), None
-    require(env.get("GITHUB_EVENT_NAME") == "workflow_dispatch",
+    require(event_name == "workflow_dispatch",
             "수동 보류 재개는 workflow_dispatch에서만 허용됩니다")
+    require(ref == "refs/heads/main",
+            "PM 보류 재개는 refs/heads/main에서만 허용됩니다")
+    sha = env.get("GITHUB_SHA", "")
+    approved_sha = env.get("SYNC_APPROVED_SHA", "")
+    require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) is not None and
+            approved_sha == sha,
+            "PM 재개 승인 SHA가 현재 workflow SHA와 일치하지 않습니다")
     actor = env.get("GITHUB_ACTOR")
     triggering_actor = env.get("GITHUB_TRIGGERING_ACTOR")
     run_id = env.get("GITHUB_RUN_ID")
@@ -1460,14 +2062,212 @@ def _projection_properties(metadata, *, target, end_reason, representative, conf
     properties = dict(metadata)
     properties["동기화 시각"] = {"date": {"start": _minute_iso(now)}}
     if kind == "Issue":
+        request = _visible_status_request(state)
+        if request and request.get("reason"):
+            confirmation = request["reason"]
         properties.update({
             "작업 상태": {"select": {"name": target} if target else None},
             "종료 사유": {"select": {"name": end_reason} if end_reason else None},
             "대표 이슈": {"url": representative},
             "확인 필요": text_property(confirmation),
             "동기화 내부 상태": text_property(canonical_json(state)),
+            "요청 처리": {"select": {"name": _request_ui_status(state, request)}
+                         if request else None},
+            "요청 상태": {"select": {"name": request["target"]}
+                         if request and request["target"] else None},
         })
     return properties
+
+
+def _visible_status_request(state):
+    return state.get("deferred_request") or state.get("request")
+
+
+def _request_ui_status(state, request=None):
+    request = request or _visible_status_request(state)
+    if not request:
+        return None
+    phase = request["phase"]
+    return {
+        "accepted": "반영 대기", "waiting": "자동 확인 중",
+        "prepared": "반영 대기", "sent": "자동 확인 중",
+        "uncertain": "자동 확인 중", "confirmed": "자동 확인 중",
+        "completed": "반영 완료", "rejected": "요청 거절", "held": "PM 확인 필요",
+    }[phase]
+
+
+def _status_request_properties(state):
+    request = _visible_status_request(state)
+    return {"요청 처리": {"select": {"name": _request_ui_status(state, request)} if request else None},
+            "요청 상태": {"select": {"name": request["target"]}
+                          if request and request["target"] else None},
+            "확인 필요": text_property(request["reason"] if request else ""),
+            "동기화 내부 상태": text_property(canonical_json(state))}
+
+
+def _save_status_request(notion, source_id, row, state):
+    _patch_page(notion, source_id, row, _status_request_properties(state))
+
+
+def _verify_project_status_page_before_mutation(notion, source_id, row):
+    page_id = identifier(row.get("id"))
+    latest = notion.request("GET", f"/pages/{page_id}")
+    bound_page(latest, source_id)
+    require(identifier(latest.get("id")) == page_id and not is_archived(latest),
+            "Project 상태 변경 직전 Notion 페이지 대상이 달라졌습니다")
+    expected = row.get("properties") or {}
+    actual = latest.get("properties") or {}
+    for name in ("작업 상태", "요청 처리", "요청 상태", "확인 필요",
+                 "동기화 시각", "동기화 내부 상태"):
+        require(actual.get(name) == expected.get(name),
+                f"Project 상태 변경 직전 Notion {name} readback이 달라졌습니다")
+    row.clear()
+    row.update(latest)
+
+
+def _confirmed_restore_echo(state, notion_status):
+    marker = state.get("notion_write") or {}
+    request = state.get("request") or {}
+    return (marker.get("kind") == "restore" and marker.get("phase") == "confirmed" and
+            marker.get("request_id") == request.get("id") and
+            marker.get("target") == notion_status)
+
+
+def _card_move_needs_preservation(state, row):
+    if _confirmed_restore_echo(state, read_select(row, "작업 상태")):
+        return True
+    baseline = state.get("baseline")
+    if baseline is None:
+        return False
+    if read_select(row, "작업 상태") != baseline["notion_status"]:
+        return True
+    request = state.get("request") or {}
+    unresolved_request = request.get("phase") in {
+        "accepted", "waiting", "prepared", "sent", "uncertain", "confirmed", "held"}
+    unresolved_write = ((state.get("notion_write") or {}).get("phase") in
+                        {"prepared", "sent", "uncertain"})
+    return bool(state.get("pending") or state.get("projection") or
+                state.get("deferred_request") or unresolved_request or unresolved_write)
+
+
+def _record_held_card_request(notion, source_id, row, state, item, issue, facts,
+                              config, observed_at):
+    """Persist the latest card move without replacing an older uncertain request."""
+    target = read_select(row, "작업 상태")
+    if _confirmed_restore_echo(state, target):
+        return False
+    baseline = state.get("baseline")
+    if baseline is None:
+        return False
+    active = state.get("request") or {}
+    deferred = state.get("deferred_request")
+    if (active.get("phase") == "held" and active.get("target") == target and
+            deferred is None):
+        # The same held card is still the same request, with or without PM approval.
+        # Once a deferred move was observed, a return to this value is a new move.
+        return False
+    if (deferred and deferred.get("phase") == "held" and
+            (state.get("hold") or {}).get("code") == "DEFERRED_REQUEST_PENDING" and
+            active.get("phase") in {"completed", "rejected"} and
+            target in {baseline.get("notion_status"),
+                       active.get("target") if active.get("phase") == "completed" else None}):
+        # After A is settled, either the prior baseline or A's completed result
+        # can reappear as a display echo. Keep the separately observed B request.
+        return False
+    restore_marker = state.get("notion_write") or {}
+    confirmed_restore_context = (
+        restore_marker.get("kind") == "restore" and
+        restore_marker.get("phase") == "confirmed" and
+        restore_marker.get("request_id") == active.get("id"))
+    older_result_unresolved = bool(state.get("pending") or state.get("projection") or
+        active.get("phase") in {"accepted", "waiting", "prepared", "sent", "uncertain",
+                                 "confirmed", "held"} or confirmed_restore_context)
+    if target == baseline["notion_status"] and not (deferred or older_result_unresolved):
+        return False
+    use_deferred = (deferred is not None or older_result_unresolved or
+                    active.get("phase") in {"prepared", "sent", "uncertain", "confirmed", "held"} or
+                    confirmed_restore_context)
+    current = deferred if use_deferred else active
+    linked, _ = _linked_pr_facts(issue, facts, allow_snapshot_drift=True)
+    project_option_id = item.get("status_option_id") if isinstance(item, dict) else None
+    reason = (state.get("hold") or {}).get(
+        "message", "기존 상태 결과 확인이 끝날 때까지 새 Notion 상태 요청을 보류합니다.")
+    if not reason.startswith("보류:"):
+        reason = "보류: " + reason
+    if current and current.get("target") == target and current.get("phase") == "held":
+        changed = current.get("project_option_id") != project_option_id
+        if not changed:
+            return False
+        current["project_option_id"] = project_option_id
+        if use_deferred:
+            state["deferred_request"] = current
+        else:
+            state["request"] = current
+        _save_status_request(notion, source_id, row, state)
+        return True
+    new_request = status_sync.request_record(
+        str(uuid4()), target, observed_from=baseline["observed_at"],
+        observed_to=observed_at, prior_notion_status=baseline["notion_status"],
+        project_option_id=project_option_id, phase="held", reason=reason)
+    if use_deferred:
+        state["deferred_request"] = new_request
+    else:
+        state["request"] = new_request
+        state["notion_write"] = None
+    _save_status_request(notion, source_id, row, state)
+    return True
+
+
+def _deferred_card_matches(state, projection, notion_status):
+    request = state.get("request") or {}
+    deferred = state.get("deferred_request") or {}
+    return bool(
+        isinstance(projection, dict) and
+        request.get("id") == projection.get("request_id") and
+        deferred.get("id") and deferred.get("id") != request.get("id") and
+        deferred.get("phase") == "held" and
+        deferred.get("target") == notion_status and
+        notion_status != projection.get("result_notion_status"))
+
+
+def _classify_notion_status_change(state, row, item, issue, facts, config, observed_at):
+    baseline = state.get("baseline")
+    if baseline is None:
+        return {"action": "initialize", "target": None}, None
+    require(baseline["project_item_id"] == item["id"],
+            "Status baseline Project item ID changed")
+    linked, eligible = _linked_pr_facts(issue, facts, allow_snapshot_drift=True)
+    semantic_match = (_status_facts_fingerprint(issue, linked) ==
+                      baseline["facts_fingerprint"])
+    status_by_option = {value: name for name, value in config["status_options"].items()}
+    project_status = status_by_option.get(item.get("status_option_id"))
+    decision = status_sync.decide(
+        baseline, read_select(row, "작업 상태"), _status_stamp(item, config), project_status,
+        facts_override=(not semantic_match or issue.get("state") != "OPEN" or
+                        issue.get("duplicateOf") is not None or bool(eligible)),
+        facts_verified=semantic_match)
+    if not decision["notion_changed"]:
+        return decision, None
+    if decision["action"] == "converged":
+        # A verified common state is a safe baseline refresh, not a held user request.
+        return decision, None
+    reason_by_action = {
+        "conflict": "GitHub Project와 Notion 상태가 모두 바뀌었고 순서를 입증할 수 없어 PM 확인이 필요합니다.",
+        "hold_unknown": "Project 상태 변경 근거가 불완전해 Notion 요청을 자동 반영할 수 없습니다.",
+        "facts_override": "GitHub Issue/PR 사실 변경이 Notion 상태 요청보다 우선되어 PM 확인이 필요합니다.",
+        "hold_invalid_request": (
+            f"Notion 상태 요청 {read_select(row, '작업 상태')!r}은 허용되지 않습니다. "
+            "백로그·준비 중·진행 중 요청만 자동 반영할 수 있습니다."),
+    }
+    phase = "accepted" if decision["action"] == "notion_request" else (
+        "rejected" if decision["action"] == "hold_invalid_request" else "held")
+    request = status_sync.request_record(
+        str(uuid4()), read_select(row, "작업 상태"),
+        observed_from=baseline["observed_at"], observed_to=observed_at,
+        prior_notion_status=baseline["notion_status"],
+        project_option_id=item.get("status_option_id"), phase=phase,
+        reason=reason_by_action.get(decision["action"], ""))
+    return decision, request
 
 
 def _display_hold(notion, source_id, row, metadata, state, hold, now, *, preserve_task_status=False):
@@ -1475,7 +2275,20 @@ def _display_hold(notion, source_id, row, metadata, state, hold, now, *, preserv
     state["resume"] = None
     _verify_issue_state_write(notion, source_id, row, state)
     visible = "보류: " + hold["message"]
-    if preserve_task_status:
+    active_request = state.get("request") or {}
+    marker = state.get("notion_write") or {}
+    if (active_request.get("phase") == "rejected" and
+            marker.get("kind") == "restore" and marker.get("phase") == "confirmed" and
+            read_select(row, "작업 상태") in status_sync.ALL_STATES):
+        # Do not invalidate the exact terminal display fingerprint while the
+        # feature is paused or a newer card move is awaiting separate review.
+        return
+    preserve_task_status = preserve_task_status or (
+        active_request.get("phase") in {"prepared", "sent", "uncertain", "confirmed", "held",
+                                         "rejected"} and
+        read_select(row, "작업 상태") in status_sync.ALL_STATES)
+    if (preserve_task_status or state.get("deferred_request") is not None or
+            _confirmed_restore_echo(state, read_select(row, "작업 상태"))):
         props = {**metadata, "동기화 시각": {"date": {"start": _minute_iso(now)}},
                  "확인 필요": text_property(visible),
                  "동기화 내부 상태": text_property(canonical_json(state))}
@@ -1483,6 +2296,180 @@ def _display_hold(notion, source_id, row, metadata, state, hold, now, *, preserv
         props = _projection_properties(metadata, target=None, end_reason=None, representative=None,
                                        confirmation=visible, state=state, now=now, kind="Issue")
     _patch_page(notion, source_id, row, props)
+
+
+def _persist_restore_pm_approval(notion, source_id, row, state, issue, item,
+                                 linked_refs, actor, notion_status, config):
+    request_id = (state.get("request") or {}).get("id")
+    state["resume"] = {
+        "actor_id": actor["actor_id"], "run_id": actor["run_id"],
+        "approved_option_id": item.get("status_option_id"),
+        "fingerprint": _status_operation_fingerprint(issue, linked_refs, item),
+        "display_pending": True, "expected_option_id": None,
+        "expected_fingerprint": None, "request_id": request_id,
+        "facts_fingerprint": _status_facts_fingerprint(issue, linked_refs),
+        "fact_contract": "semantic_v2", "approved_notion_status": notion_status}
+    state["notion_write"] = None
+    if state.get("hold") is None:
+        state["hold"] = _new_hold(
+            "PENDING_RESULT_UNCLEAR",
+            "PM이 현재 GitHub/Notion snapshot으로 복원 결과를 다시 판정하도록 승인했습니다.",
+            _digest({"request_id": request_id,
+                     "facts": state["resume"]["facts_fingerprint"],
+                     "option_id": item.get("status_option_id")}))
+    _verify_issue_state_write(notion, source_id, row, state)
+
+
+def _recover_restore_write(notion, github, project_client, source_id, row, metadata,
+                           state, facts, issue, item, config, cutoff, now,
+                           *, manual_resume=False, resume_actor=None):
+    """Reconcile a durable Notion status restore without replaying an uncertain PATCH."""
+    marker = state.get("notion_write") or {}
+    if (marker.get("kind") != "restore" or "project_stamp" not in marker or
+            marker.get("phase") == "confirmed"):
+        return False
+
+    latest_issue = gp.fetch_issue_detail(github, issue["id"])
+    latest_refs, _ = _linked_pr_facts(latest_issue, facts, allow_snapshot_drift=True)
+    latest_item = gp.fetch_project_item(
+        project_client, config["project_id"], marker["project_item_id"],
+        config["status_field_id"], allow_archived=True)
+    latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+    bound_page(latest_page, source_id)
+    latest_state = decode_internal(
+        read_text(latest_page, "동기화 내부 상태"), kind="issue",
+        project_id=config["project_id"], object_id=issue["databaseId"])
+    saved_marker = (latest_state or {}).get("notion_write") or {}
+    current_task = read_select(latest_page, "작업 상태")
+    request_id = marker.get("request_id")
+    request_matches = ((latest_state or {}).get("request") or {}).get("id") == request_id
+    fingerprint = _status_facts_fingerprint(latest_issue, latest_refs)
+    identity_ok = (latest_item.get("id") == marker["project_item_id"] and
+                   latest_item.get("content_id") == latest_issue.get("id") and
+                   latest_item.get("status_field_id") == config["status_field_id"] and
+                   not latest_item.get("is_archived"))
+    facts_ok = fingerprint == marker["facts_fingerprint"]
+    project_ok = _status_stamp(latest_item, config) == marker["project_stamp"]
+    marker_ok = (saved_marker.get("kind") == "restore" and
+                 saved_marker.get("request_id") == request_id and
+                 saved_marker.get("target") == marker.get("target"))
+
+    if not (identity_ok and facts_ok and project_ok and request_matches and marker_ok):
+        if (manual_resume and resume_actor and request_matches and
+                current_task == marker.get("expected_before")):
+            _persist_restore_pm_approval(notion, source_id, latest_page, state,
+                                         latest_issue, latest_item, latest_refs,
+                                         resume_actor, current_task, config)
+            return False
+        if (current_task not in {marker.get("target"), marker.get("expected_before")} and
+                state.get("baseline")):
+            _record_held_card_request(notion, source_id, latest_page, state,
+                                      latest_item, latest_issue, facts, config, now)
+        state["hold"] = _new_hold(
+            "PENDING_RESULT_UNCLEAR",
+            "Notion 상태 복원 중 Project 연결·상태 또는 GitHub 사실이 달라져 자동 복구를 멈췄습니다.",
+            _digest({"request_id": request_id, "facts": fingerprint,
+                     "item": latest_item.get("id"),
+                     "project_stamp": _status_stamp(latest_item, config)}))
+        if saved_marker.get("phase") in {"prepared", "sent", "uncertain"}:
+            state["notion_write"] = dict(saved_marker)
+            state["notion_write"]["phase"] = "uncertain"
+        _verify_issue_state_write(notion, source_id, latest_page, state)
+        _display_hold(notion, source_id, latest_page, metadata, state,
+                      state["hold"], now, preserve_task_status=True)
+        return True
+
+    phase = saved_marker.get("phase")
+    if phase == "confirmed":
+        if current_task == marker["target"]:
+            state["notion_write"] = dict(saved_marker)
+            _verify_issue_state_write(notion, source_id, latest_page, state)
+            return True
+        phase = "uncertain"
+    if phase in {"sent", "uncertain"}:
+        if current_task == marker["target"]:
+            if not _restore_projection_matches(latest_page, saved_marker):
+                state["notion_write"] = dict(saved_marker)
+                state["notion_write"]["phase"] = "uncertain"
+                state["hold"] = _new_hold(
+                    "PENDING_RESULT_UNCLEAR",
+                    "Notion 복원 목표는 보이지만 함께 전송한 표시 속성을 모두 확인하지 못했습니다.",
+                    _digest({"request_id": request_id,
+                             "expected": saved_marker.get("expected_fingerprint")}))
+                _verify_issue_state_write(notion, source_id, latest_page, state)
+                return True
+            state["notion_write"] = dict(saved_marker)
+            state["notion_write"]["phase"] = "confirmed"
+            _verify_issue_state_write(notion, source_id, latest_page, state)
+            return True
+        if (manual_resume and resume_actor and current_task == marker["expected_before"]):
+            _persist_restore_pm_approval(notion, source_id, latest_page, state,
+                                         latest_issue, latest_item, latest_refs,
+                                         resume_actor, current_task, config)
+            return False
+        if (current_task != marker["expected_before"] and state.get("baseline")):
+            _record_held_card_request(notion, source_id, latest_page, state,
+                                      latest_item, latest_issue, facts, config, now)
+        state["notion_write"] = dict(saved_marker)
+        state["notion_write"]["phase"] = "uncertain"
+        state["hold"] = _new_hold(
+            "PENDING_RESULT_UNCLEAR",
+            "Notion 복원 전송 결과를 확인할 수 없어 중복 쓰기를 멈췄습니다.",
+            _digest({"request_id": request_id, "phase": phase,
+                     "current_task": current_task}))
+        _verify_issue_state_write(notion, source_id, latest_page, state)
+        _display_hold(notion, source_id, latest_page, metadata, state,
+                      state["hold"], now, preserve_task_status=True)
+        return True
+
+    if phase != "prepared" or current_task != marker["expected_before"]:
+        state["hold"] = _new_hold(
+            "REQUEST_RACE", "Notion 상태 복원 직전 새 이동이 확인되어 요청을 보존했습니다.",
+            _digest({"request_id": request_id, "current_task": current_task}))
+        if (current_task not in {marker.get("target"), marker.get("expected_before")} and
+                state.get("baseline")):
+            _record_held_card_request(
+                notion, source_id, latest_page, state, latest_item, latest_issue,
+                facts, config, now)
+        _verify_issue_state_write(notion, source_id, latest_page, state)
+        _display_hold(notion, source_id, latest_page, metadata, state,
+                      state["hold"], now, preserve_task_status=True)
+        return True
+
+    plan = _plan_issue(latest_issue, latest_item, latest_page, state, facts, cutoff,
+                       config["project_id"], config["status_options"])
+    if plan.get("hold") or plan.get("target") != marker["target"]:
+        state["hold"] = _new_hold(
+            "GITHUB_FACTS_CHANGED", "현재 GitHub 사실로 복원 목표를 확인할 수 없어 보류했습니다.",
+            _digest({"request_id": request_id, "target": plan.get("target")}))
+        _verify_issue_state_write(notion, source_id, latest_page, state)
+        _display_hold(notion, source_id, latest_page, metadata, state,
+                      state["hold"], now, preserve_task_status=True)
+        return True
+
+    state["notion_write"] = dict(saved_marker)
+    state["notion_write"]["phase"] = "sent"
+    sent_properties = _projection_properties(
+        metadata, target=plan.get("target"), end_reason=plan.get("end_reason"),
+        representative=plan.get("representative"),
+        confirmation=plan.get("confirmation", ""), state=state,
+        now=now, kind="Issue")
+    fields, fingerprint = _restore_projection_checkpoint(sent_properties)
+    state["notion_write"]["expected_fields"] = fields
+    state["notion_write"]["expected_fingerprint"] = fingerprint
+    task_before_marker = current_task
+    _verify_issue_state_write(notion, source_id, latest_page, state)
+    if (read_select(latest_page, "작업 상태") != task_before_marker or
+            not _issue_state_binding_matches(latest_page, state)):
+        _persist_observed_card_race(
+            notion, source_id, latest_page, metadata, state, item=latest_item,
+            issue=latest_issue, facts=facts, config=config, now=now,
+            message="상태 복원 checkpoint 확인 중 Notion에 새 이동이 있어 복원 쓰기를 멈추고 보류했습니다.")
+        return True
+    _update_row(notion, source_id, latest_page, metadata, plan, state, now, kind="Issue")
+    state["notion_write"]["phase"] = "confirmed"
+    _verify_issue_state_write(notion, source_id, latest_page, state)
+    return True
 
 
 def _resolve_pending_add(notion, github, source_id, row, state, project, facts, issue):
@@ -1501,8 +2488,8 @@ def _resolve_pending_add(notion, github, source_id, row, state, project, facts, 
             fingerprint)
     latest = gp.fetch_issue_detail(github, issue["id"])
     latest_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
-    latest_fingerprint = _source_fingerprint(latest, latest_refs, None)
-    if latest_fingerprint != pending["facts_fingerprint"]:
+    latest_fingerprint = _pending_fingerprint(latest, latest_refs, None, pending)
+    if latest_fingerprint != pending.get("semantic_fingerprint", pending["facts_fingerprint"]):
         state["pending"] = None
         state["project_item_id"] = item["id"]
         return item, _new_hold("SOURCE_CHANGED_BEFORE_WRITE",
@@ -1544,13 +2531,14 @@ def _pending_status_resolution(issue, item, notion_row, state, facts, config, cu
             "Project status pending 항목 식별 불일치")
     linked, _ = _linked_pr_facts(issue, facts, allow_snapshot_drift=True)
     before_item = {"id": item["id"], "status_option_id": pending["before_option_id"]}
-    current_fingerprint = _source_fingerprint(issue, linked, before_item)
+    current_fingerprint = _pending_fingerprint(issue, linked, before_item, pending)
 
     # A difference between the initial full snapshot and this per-issue reread is a
     # current-run race. Keep it issue-local and never authorize it as a historical delta.
     if snapshot_issue is not None:
         snapshot_linked, _ = _linked_pr_facts(snapshot_issue, facts)
-        snapshot_fingerprint = _source_fingerprint(snapshot_issue, snapshot_linked, before_item)
+        snapshot_fingerprint = _pending_fingerprint(snapshot_issue, snapshot_linked,
+                                                    before_item, pending)
         if current_fingerprint != snapshot_fingerprint:
             resolved_state["pending"] = None
             return {"mode": "hold", "state": resolved_state,
@@ -1559,7 +2547,8 @@ def _pending_status_resolution(issue, item, notion_row, state, facts, config, cu
                         "전체 조회 뒤 GitHub 원본이 달라져 이 이슈의 복구를 보류했습니다.",
                         _source_fingerprint(issue, linked, item))}
 
-    facts_match = current_fingerprint == pending["facts_fingerprint"]
+    facts_match = current_fingerprint == pending.get("semantic_fingerprint",
+                                                        pending["facts_fingerprint"])
     target_match = item["status_option_id"] == pending["target_option_id"]
     if manual_resume and (not facts_match or not target_match):
         # A fresh PM dispatch adopts only the active Project value when it agrees
@@ -1643,10 +2632,31 @@ def _recover_pending_status(notion, source_id, row, state, project, github, fact
     expected_fingerprint = _source_fingerprint(latest, linked, item)
     if state["resume"] and state["resume"]["display_pending"]:
         state["resume"]["expected_option_id"] = item["status_option_id"]
-        state["resume"]["expected_fingerprint"] = expected_fingerprint
+        if set(state["resume"]) == RESUME_KEYS:
+            state["resume"]["expected_fingerprint"] = _status_operation_fingerprint(
+                latest, linked, item)
+        else:
+            state["resume"]["expected_fingerprint"] = expected_fingerprint
     state["pending"]["confirmed"] = True
+    if state.get("request") and state["request"].get("phase") == "sent":
+        state["request"]["phase"] = "confirmed"
+        if state.get("notion_write"):
+            state["notion_write"]["phase"] = "confirmed"
     _verify_issue_state_write(notion, source_id, row, state)
     _apply_status_checkpoint(state, checkpoint)
+    active_request = state.get("request") or {}
+    expected_notion_status = active_request.get("target")
+    if (active_request.get("phase") == "confirmed" and
+            expected_notion_status in OPTIONS["작업 상태"]):
+        state["projection"] = {
+            "expected_option_id": item["status_option_id"],
+            "expected_fingerprint": _status_operation_fingerprint(latest, linked, item),
+            "checkpoint": checkpoint,
+            "fact_contract": "semantic_v2",
+            "request_id": (state.get("request") or {}).get("id"),
+            "expected_notion_status": pending.get("notion_status"),
+            "result_notion_status": expected_notion_status,
+        }
     state["pending"] = None
     _verify_issue_state_write(notion, source_id, row, state)
     return None
@@ -1661,13 +2671,17 @@ def _add_project_item_once(notion, github, project_client, source_id, row, state
                                          if not state["migration_complete"] else None),
                "notion_status": read_select(row, "작업 상태"),
                "confirmed": False, "project_item_id": None,
-               "checkpoint": {"content_id": issue["id"]}}
+               "checkpoint": {"content_id": issue["id"]},
+               "fact_contract": "semantic_v2",
+               "semantic_fingerprint": _pending_semantic_fingerprint(
+                   issue, _linked_pr_facts(issue, facts)[0], None, "add")}
     state["pending"] = pending
     _verify_issue_state_write(notion, source_id, row, state)
+
     latest = gp.fetch_issue_detail(github, issue["id"])
     latest_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
-    latest_fp = _source_fingerprint(latest, latest_refs, None)
-    if latest_fp != fingerprint:
+    latest_fp = _pending_fingerprint(latest, latest_refs, None, state["pending"])
+    if latest_fp != state["pending"].get("semantic_fingerprint", fingerprint):
         state["pending"] = None
         hold = _new_hold("SOURCE_CHANGED_BEFORE_WRITE",
                          "Project 추가 직전 GitHub 원본이 달라져 항목 추가를 멈췄습니다.",
@@ -1707,41 +2721,31 @@ def _add_project_item_once(notion, github, project_client, source_id, row, state
     try:
         returned_item_id = gp.add_project_issue(project_client, config["project_id"], issue["id"])
     except gp.SyncError:
-        # The request may have committed. Leave the durable pending marker for a
-        # later PM-confirmed read; do not read back and write again in this run.
+        # No returned ID means automatic readback cannot be safely targeted.
         raise SyncError("Project 추가 결과 불명; pending을 유지하고 수동 확인 필요") from None
-    project, item = _read_added_project_item(project_client, config, facts, issue, returned_item_id)
-    if pending["migration_fingerprint"] is not None:
-        unchanged, latest_page = _migration_input_unchanged(
-            notion, source_id, row, pending, config["project_id"])
-        if not unchanged:
-            state["pending"] = None
-            state["project_item_id"] = item["id"]
-            state["hold"] = _new_hold(
-                "MIGRATION_INPUT_CHANGED",
-                "Project 항목 추가 중 최초 이관 입력이 달라져 수동 확인이 필요합니다.",
-                _digest({"facts": pending["facts_fingerprint"],
-                         "migration_input": _migration_input_fingerprint(
-                             latest_page, decode_internal(read_text(latest_page, "동기화 내부 상태"),
-                                 kind="issue", project_id=config["project_id"],
-                                 object_id=issue["databaseId"]))}))
-            _verify_issue_state_write(notion, source_id, row, state)
-            return project, item, state["hold"]
-    state["pending"]["confirmed"] = True
-    state["pending"]["project_item_id"] = item["id"]
-    state["pending"]["checkpoint"] = {"content_id": issue["id"], "item_id": item["id"]}
+    state["readback"] = {"returned_item_id": returned_item_id, "validated": False,
+                         "attempts": 0, "reservation": None, "last_result": None}
     _verify_issue_state_write(notion, source_id, row, state)
-    state["project_item_id"] = item["id"]
-    state["pending"] = None
-    _verify_issue_state_write(notion, source_id, row, state)
-    return project, item, None
+    prior_project = project
+    readback_project, item, readback_hold = _read_added_project_item_immediate(
+        notion, source_id, row, state, project_client, config, facts, issue)
+    project = readback_project if readback_project is not None else prior_project
+    if readback_hold:
+        return project, item, readback_hold
+    if item is None:
+        return project, None, None
+    item, pending_hold = _resolve_pending_add(
+        notion, github, source_id, row, state, project, facts, issue)
+    return project, item, pending_hold
 
 
 def _apply_project_status(notion, github, project_client, source_id, row, state, project,
-                          facts, issue, item, plan, config):
+                          facts, issue, item, plan, config, observed_at):
     target_id = _status_option(project, plan["target"])
     before = item["status_option_id"]
     notion_status = read_select(row, "작업 상태")
+    semantic_fingerprint = _pending_semantic_fingerprint(
+        issue, _linked_pr_facts(issue, facts)[0], item, "status")
     pending = {"kind": "status", "issue_id": issue["databaseId"], "item_id": item["id"],
                "event_id": plan.get("event_id"), "before_option_id": before,
                "target_option_id": target_id, "facts_fingerprint": plan["fingerprint"],
@@ -1753,7 +2757,13 @@ def _apply_project_status(notion, github, project_client, source_id, row, state,
                               "review_cycle": plan["state"]["review_cycle"],
                               "review_return_cycle": plan["state"]["review_return_cycle"],
                               "reopen_last_id": plan["state"]["reopen_last_id"],
-                              "review_pr_hash": plan["state"]["review_pr_hash"]}}
+                              "review_pr_hash": plan["state"]["review_pr_hash"]},
+               "fact_contract": "semantic_v2",
+               "semantic_fingerprint": semantic_fingerprint,
+               "before_status_stamp": _status_stamp(item, config),
+               "request_id": ((state.get("request") or {}).get("id")
+                              if (state.get("request") or {}).get("phase") in
+                              {"prepared", "sent", "uncertain", "confirmed"} else None)}
     state["pending"] = pending
     _verify_issue_state_write(notion, source_id, row, state)
 
@@ -1761,6 +2771,25 @@ def _apply_project_status(notion, github, project_client, source_id, row, state,
     latest_item = gp.fetch_project_item(project_client, config["project_id"], item["id"],
                                         config["status_field_id"], allow_archived=True)
     latest_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
+    relation_ok = (latest_item.get("id") == item.get("id") and
+                   latest_item.get("content_id") == issue.get("id") and
+                   latest.get("id") == issue.get("id") and
+                   latest.get("databaseId") == issue.get("databaseId") and
+                   latest_item.get("status_field_id") == config["status_field_id"])
+    if not relation_ok:
+        state["pending"] = None
+        hold = _new_hold(
+            "PROJECT_ITEM_RACE",
+            "Project 쓰기 직전 항목의 Issue 연결 또는 Status 대상이 달라 자동 변경을 멈췄습니다.",
+            _digest({"expected_issue": issue.get("id"),
+                     "observed_issue": latest_item.get("content_id"),
+                     "expected_item": item.get("id"),
+                     "observed_item": latest_item.get("id")}))
+        updated_project = dict(project)
+        updated_items = dict(project["items"])
+        updated_items[issue["databaseId"]] = latest_item
+        updated_project["items"] = updated_items
+        return updated_project, latest_item, hold
     if latest_item.get("is_archived"):
         state["pending"] = None
         hold = _new_hold("PROJECT_ITEM_ARCHIVED",
@@ -1776,12 +2805,23 @@ def _apply_project_status(notion, github, project_client, source_id, row, state,
                                                  "is_archived": True}]
         updated_project["archived_items"] = archived_items
         return updated_project, None, hold
-    latest_fingerprint = _source_fingerprint(latest, latest_refs, latest_item)
-    if latest_fingerprint != plan["fingerprint"]:
+    latest_fingerprint = _pending_fingerprint(latest, latest_refs, latest_item, pending)
+    if latest_fingerprint != pending["semantic_fingerprint"]:
         state["pending"] = None
         hold = _new_hold("SOURCE_CHANGED_BEFORE_WRITE",
                          "Project 변경 직전 GitHub 또는 Project 값이 달라져 자동 변경을 멈췄습니다.",
                          latest_fingerprint)
+        updated_project = dict(project)
+        updated_items = dict(project["items"])
+        updated_items[issue["databaseId"]] = latest_item
+        updated_project["items"] = updated_items
+        return updated_project, latest_item, hold
+    if (_status_stamp(latest_item, config) != pending["before_status_stamp"]):
+        state["pending"] = None
+        hold = _new_hold(
+            "SOURCE_CHANGED_BEFORE_WRITE",
+            "쓰기 직전 Project Status 값 객체가 바뀌어 순서를 확인할 수 없습니다.",
+            _projection_fingerprint({}, latest, latest_refs, latest_item))
         updated_project = dict(project)
         updated_items = dict(project["items"])
         updated_items[issue["databaseId"]] = latest_item
@@ -1807,7 +2847,72 @@ def _apply_project_status(notion, github, project_client, source_id, row, state,
             updated_project["items"] = updated_items
             return updated_project, latest_item, hold
 
+    approval = state.get("resume")
+    if approval and set(approval) == RESUME_KEYS and approval.get("display_pending"):
+        latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+        bound_page(latest_page, source_id)
+        latest_state = decode_internal(
+            read_text(latest_page, "동기화 내부 상태"), kind="issue",
+            project_id=config["project_id"], object_id=issue["databaseId"])
+        saved_approval = latest_state.get("resume") if latest_state else None
+        current_refs, _ = _linked_pr_facts(latest, facts, allow_snapshot_drift=True)
+        if (approval.get("request_id") != (state.get("request") or {}).get("id") or
+                read_select(latest_page, "작업 상태") != approval["approved_notion_status"] or
+                latest_item.get("status_option_id") != approval["approved_option_id"] or
+                _status_facts_fingerprint(latest, current_refs) !=
+                approval["facts_fingerprint"] or
+                not isinstance(saved_approval, dict) or set(saved_approval) != RESUME_KEYS or
+                any(saved_approval.get(key) != approval.get(key) for key in
+                    ("run_id", "request_id", "approved_option_id",
+                     "approved_notion_status", "facts_fingerprint"))):
+            state["pending"] = None
+            state["hold"] = _new_hold(
+                "REQUEST_RACE",
+                "PM 승인 도중 Notion 요청, Project 상태 또는 GitHub 사실이 달라져 승인을 보존했습니다.",
+                _source_fingerprint(latest, current_refs, latest_item))
+            _verify_issue_state_write(notion, source_id, latest_page, state)
+            return project, latest_item, state["hold"]
+
+    if state.get("request") and state["request"].get("phase") == "prepared":
+        latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+        bound_page(latest_page, source_id)
+        latest_state = decode_internal(read_text(latest_page, "동기화 내부 상태"),
+                                       kind="issue", project_id=config["project_id"],
+                                       object_id=issue["databaseId"])
+        latest_task = read_select(latest_page, "작업 상태")
+        approval = state.get("resume") or {}
+        approved_card_echo = (
+            approval.get("request_id") == state["request"].get("id") and
+            approval.get("approved_notion_status") == latest_task and
+            latest_task == (state.get("notion_write") or {}).get("expected_before") and
+            approval.get("approved_option_id") == latest_item.get("status_option_id"))
+        if ((latest_task != state["request"]["target"] and not approved_card_echo) or
+                latest_state is None or
+                (latest_state.get("request") or {}).get("id") != state["request"]["id"]):
+            state["pending"] = None
+            state["request"]["phase"] = "held"
+            state["request"]["reason"] = (
+                "GitHub 쓰기 직전 Notion 요청 상태가 달라져 새 요청을 다시 확인해야 합니다.")
+            hold = _new_hold("REQUEST_RACE", state["request"]["reason"], plan["fingerprint"])
+            state["hold"] = hold
+            _record_held_card_request(
+                notion, source_id, latest_page, state, latest_item, latest, facts,
+                config, observed_at)
+            _verify_issue_state_write(notion, source_id, row, state)
+            _save_status_request(notion, source_id, row, state)
+            return project, latest_item, hold
+        state["request"]["phase"] = "sent"
+        state["notion_write"] = {"request_id": state["request"]["id"],
+                                 "expected_before": notion_status, "target": plan["target"],
+                                 "kind": "request", "phase": "sent"}
+        sent_properties = _status_request_properties(state)
+        if observed_at is not None:
+            sent_properties["동기화 시각"] = {
+                "date": {"start": _minute_iso(observed_at)}}
+        _patch_page(notion, source_id, row, sent_properties)
+
     if target_id != before:
+        _verify_project_status_page_before_mutation(notion, source_id, row)
         if target_id is None:
             gp.clear_project_status(project_client, config["project_id"], item["id"], config["status_field_id"])
         else:
@@ -1843,22 +2948,36 @@ def _apply_project_status(notion, github, project_client, source_id, row, state,
     state["pending"] = pending
     state["pending"]["confirmed"] = True
     state["pending"]["project_item_id"] = verified["id"]
+    if state.get("request") and state["request"].get("phase") == "sent":
+        state["request"]["phase"] = "confirmed"
+        state["notion_write"]["phase"] = "confirmed"
     resume_checkpoint = None
     if state["resume"] and state["resume"]["display_pending"]:
         resume_checkpoint = {
             "expected_option_id": verified["status_option_id"],
-            "expected_fingerprint": _source_fingerprint(latest, latest_refs, verified),
+            "expected_fingerprint": _status_operation_fingerprint(latest, latest_refs, verified),
         }
         state["resume"].update(resume_checkpoint)
     _verify_issue_state_write(notion, source_id, row, state)
+    saved_request = state.get("request")
+    saved_notion_write = state.get("notion_write")
+    saved_baseline = state.get("baseline")
     state.update(plan["state"])
+    state["request"] = saved_request
+    state["notion_write"] = saved_notion_write
+    state["baseline"] = saved_baseline
     _apply_status_checkpoint(state, pending["checkpoint"])
     state["pending"] = None
     state["project_item_id"] = verified["id"]
+    projection_fingerprint = _status_operation_fingerprint(latest, latest_refs, verified)
     state["projection"] = {
         "expected_option_id": target_id,
-        "expected_fingerprint": _source_fingerprint(latest, latest_refs, verified),
+        "expected_fingerprint": projection_fingerprint,
         "checkpoint": pending["checkpoint"],
+        "fact_contract": "semantic_v2",
+        "request_id": (state.get("request") or {}).get("id"),
+        "expected_notion_status": pending.get("notion_status"),
+        "result_notion_status": plan.get("target"),
     }
     if resume_checkpoint is not None:
         state["resume"].update(resume_checkpoint)
@@ -1879,12 +2998,349 @@ def _update_row(notion, source_id, row, metadata, plan, state, now, *, kind):
     _patch_page(notion, source_id, row, props)
 
 
+def _persist_observed_card_race(notion, source_id, row, metadata, state, *,
+                                item, issue, facts, config, now, message):
+    """Keep an already-observed Notion move separate from the operation in flight."""
+    hold = _new_hold(
+        "REQUEST_RACE", message,
+        _projection_fingerprint(state.get("projection") or {}, issue,
+                                _linked_pr_facts(issue, facts, allow_snapshot_drift=True)[0],
+                                item))
+    state["hold"] = hold
+    _record_held_card_request(notion, source_id, row, state, item, issue,
+                              facts, config, now)
+    _verify_issue_state_write(notion, source_id, row, state)
+    _save_status_request(notion, source_id, row, state)
+    _display_hold(notion, source_id, row, metadata, state, hold, now,
+                  preserve_task_status=True)
+    return False
+
+
+def _write_checkpointed_projection(notion, source_id, row, metadata, plan, state, now,
+                                   *, item=None, issue=None, facts=None, config=None,
+                                   preserve_task_status=None):
+    projection = state.get("projection")
+    require(isinstance(projection, dict), "Status display projection checkpoint 누락")
+    properties = _projection_properties(
+        metadata, target=plan.get("target"), end_reason=plan.get("end_reason"),
+        representative=plan.get("representative"),
+        confirmation=plan.get("confirmation", ""), state=state, now=now, kind="Issue")
+    if preserve_task_status is not None:
+        properties["작업 상태"] = {"select": {"name": preserve_task_status}}
+    if projection.get("fact_contract") != "semantic_v2":
+        # The original v1 projection has only its raw source fingerprint and
+        # checkpoint. Do not manufacture semantic fields or re-sign that record.
+        # If the exact display already landed before a crash, finish the durable
+        # exchange without replaying its user-facing PATCH.
+        if _projection_display_matches_except_sync_clock(row, properties):
+            return True
+        task = read_select(row, "작업 상태")
+        baseline = state.get("baseline")
+        if (baseline is not None and
+                task not in {baseline.get("notion_status"), plan.get("target")}):
+            require(item is not None and issue is not None and facts is not None and
+                    config is not None,
+                    "새 Notion 이동 보존 문맥 누락")
+            return _persist_observed_card_race(
+                notion, source_id, row, metadata, state, item=item, issue=issue,
+                facts=facts, config=config, now=now,
+                message="legacy 표시 복구 중 Notion에 새 상태 이동이 있어 이전 표시를 멈추고 보류했습니다.")
+        _patch_page(notion, source_id, row, properties)
+        return True
+    properties = _projection_properties(
+        metadata, target=plan.get("target"), end_reason=plan.get("end_reason"),
+        representative=plan.get("representative"),
+        confirmation=plan.get("confirmation", ""), state=state, now=now, kind="Issue")
+    if preserve_task_status is not None:
+        properties["작업 상태"] = {"select": {"name": preserve_task_status}}
+    fields, fingerprint = _restore_projection_checkpoint(properties)
+    display_checkpoint = projection.get("display_checkpoint") or {}
+    if (display_checkpoint.get("phase") == "display_sent" and
+            _projection_display_matches(row, projection) and
+            _issue_state_binding_matches(row, state)):
+        # The complete user-facing projection was already read back. Replaying
+        # an identical PATCH creates a needless race window during restart.
+        return True
+    task_before_checkpoint = read_select(row, "작업 상태")
+    projection["display_checkpoint"] = {
+        "phase": "display_sent", "expected_fields": fields,
+        "expected_fingerprint": fingerprint}
+    _verify_issue_state_write(notion, source_id, row, state)
+    # A fresh GET is an observation boundary: do not send the older projection
+    # when the card has already moved, including a move back to the baseline.
+    if (read_select(row, "작업 상태") != task_before_checkpoint or
+            not _issue_state_binding_matches(row, state)):
+        require(item is not None and issue is not None and facts is not None and
+                config is not None, "새 Notion 이동 보존 문맥 누락")
+        return _persist_observed_card_race(
+            notion, source_id, row, metadata, state, item=item, issue=issue,
+            facts=facts, config=config, now=now,
+            message="표시 checkpoint 확인 중 Notion에 새 상태 이동이 있어 이전 표시를 멈추고 보류했습니다.")
+    # The user-facing write must carry the already-durable marker too.  The
+    # internal property is excluded from the display fingerprint, so rebuilding
+    # this payload preserves the exact readback contract.
+    properties = _projection_properties(
+        metadata, target=plan.get("target"), end_reason=plan.get("end_reason"),
+        representative=plan.get("representative"),
+        confirmation=plan.get("confirmation", ""), state=state, now=now, kind="Issue")
+    _patch_page(notion, source_id, row, properties)
+    return True
+
+
+def _completed_projection_state(state, *, issue, item, linked_refs, config,
+                                notion_status, observed_at, approved_resume=False,
+                                preserve_task_status=None):
+    completed = json.loads(json.dumps(state))
+    completed["project_item_id"] = item["id"]
+    deferred = state.get("deferred_request")
+    request = state.get("request") or {}
+    unresolved_deferred = bool(
+        deferred and deferred.get("phase") not in {"rejected", "completed"} and
+        deferred.get("id") != request.get("id"))
+    if (unresolved_deferred and preserve_task_status is not None and
+            preserve_task_status != notion_status):
+        # A settled older operation may finish while the page already shows a
+        # separate deferred request. Its result is not a joint Project/Notion
+        # observation, so keep the previous baseline until both sides converge.
+        completed["baseline"] = json.loads(json.dumps(state.get("baseline")))
+    else:
+        completed["baseline"] = _new_status_baseline(
+            notion_status, item, issue, linked_refs, config, observed_at)
+    completed["projection"] = None
+    completed["pending"] = None
+    completed["hold"] = None
+    completed["resume"] = None
+    request = completed.get("request")
+    if request and (request.get("phase") == "confirmed" or
+                    approved_resume and request.get("phase") in {"held", "rejected"}):
+        if approved_resume and request.get("target") != notion_status:
+            request["phase"] = "rejected"
+            request["reason"] = (
+                "PM 재개에서 확인된 현재 GitHub 사실이 기존 요청과 달라 요청값은 반영하지 않았습니다.")
+        else:
+            request["phase"] = "completed"
+            request["reason"] = "Project 상태와 Notion 표시를 확인했습니다."
+        completed["notion_write"] = None
+    marker = completed.get("notion_write") or {}
+    if (request and request.get("phase") == "rejected" and
+            marker.get("kind") == "restore" and marker.get("phase") == "confirmed" and
+            marker.get("request_id") == request.get("id") and
+            marker.get("target") == notion_status and
+            marker.get("project_item_id") == item.get("id") and
+            marker.get("project_stamp") == _status_stamp(item, config) and
+            marker.get("facts_fingerprint") ==
+            _status_facts_fingerprint(issue, linked_refs)):
+        # A PM rejection is terminal only after the exact confirmed restore is
+        # promoted against its current card, item, Project stamp and facts.
+        completed["notion_write"] = None
+    deferred = completed.get("deferred_request")
+    if deferred and deferred.get("phase") not in {"rejected", "completed"}:
+        deferred["phase"] = "held"
+        deferred["reason"] = (
+            "이전 요청 결과를 확정했습니다. 후속 요청은 PM이 현재 GitHub 상태를 확인한 뒤 처리해야 합니다.")
+        completed["hold"] = _new_hold(
+            "DEFERRED_REQUEST_PENDING", deferred["reason"],
+            _digest({"request_id": deferred["id"], "target": deferred["target"],
+                     "facts": _status_facts_fingerprint(issue, linked_refs)}))
+    return completed
+
+
+def _terminal_restore_binding_matches(state, *, page, item, config, notion_status):
+    request = state.get("request") or {}
+    marker = state.get("notion_write") or {}
+    return bool(
+        request.get("phase") == "rejected" and
+        marker.get("kind") == "restore" and marker.get("phase") == "confirmed" and
+        marker.get("request_id") == request.get("id") and
+        marker.get("target") == notion_status and
+        marker.get("project_item_id") == item.get("id") and
+        marker.get("project_stamp") == _status_stamp(item, config) and
+        _restore_projection_matches(page, marker))
+
+
+def _terminal_restore_marker_matches(state, *, page, issue, item, linked_refs, config,
+                                     notion_status):
+    return bool(
+        _terminal_restore_binding_matches(
+            state, page=page, item=item, config=config, notion_status=notion_status) and
+        state["notion_write"].get("facts_fingerprint") ==
+        _status_facts_fingerprint(issue, linked_refs))
+
+
+def _closed_facts_supersede_restore(state, *, page, issue, item, linked_refs, config):
+    """Allow a new CLOSED operation, never promote a restore under changed facts."""
+    if (not config.get("bidirectional_enabled") or item is None or
+            not state.get("baseline") or state.get("pending") or state.get("projection") or
+            state.get("deferred_request") is not None or state.get("resume") or
+            (state.get("hold") or {}).get("code") not in {None, "STATUS_REQUEST_INVALID"} or
+            issue.get("state") != "CLOSED" or issue.get("stateReason") != "COMPLETED"):
+        return False
+    notion_status = read_select(page, "작업 상태")
+    project_status = {value: name for name, value in config["status_options"].items()}.get(
+        item.get("status_option_id"))
+    return bool(
+        project_status == notion_status and
+        _terminal_restore_binding_matches(
+            state, page=page, item=item, config=config, notion_status=notion_status) and
+        state["notion_write"].get("facts_fingerprint") !=
+        _status_facts_fingerprint(issue, linked_refs))
+
+
+def _promote_held_terminal_restore(notion, source_id, row, state, *, issue, item,
+                                   linked_refs, config, observed_at, facts,
+                                   metadata, now):
+    """Resolve an exact rejected-request restore that an older hold was masking."""
+    hold = state.get("hold") or {}
+    if item is None:
+        return False
+    project_status = {value: name for name, value in config["status_options"].items()}.get(
+        item.get("status_option_id"))
+    notion_status = read_select(row, "작업 상태")
+    if (not config.get("bidirectional_enabled") or hold.get("code") !=
+            "STATUS_REQUEST_INVALID" or state.get("deferred_request") is not None or
+            project_status != notion_status or
+            not _terminal_restore_marker_matches(
+                state, page=row, issue=issue, item=item, linked_refs=linked_refs,
+                config=config, notion_status=notion_status)):
+        return False
+    marker = json.loads(json.dumps(state["notion_write"]))
+    previous = json.loads(json.dumps(state))
+    state["baseline"] = _new_status_baseline(
+        notion_status, item, issue, linked_refs, config, observed_at)
+    state["notion_write"] = None
+    state["hold"] = None
+    _verify_issue_state_write(notion, source_id, row, state)
+    if (read_select(row, "작업 상태") != notion_status or
+            not _restore_projection_matches(row, marker) or
+            not _issue_state_binding_matches(row, state)):
+        state.clear()
+        state.update(previous)
+        state["hold"] = _new_hold(
+            "REQUEST_RACE",
+            "확정된 복원 표시 정리 중 Notion 요청 또는 카드가 달라 결과 승격을 보류했습니다.",
+            _digest({"request_id": (state.get("request") or {}).get("id"),
+                     "observed_status": read_select(row, "작업 상태")}))
+        _persist_observed_card_race(
+            notion, source_id, row, metadata, state, item=item, issue=issue,
+            facts=facts, config=config, now=now, message=state["hold"]["message"])
+    return True
+
+
+def _finalize_bidirectional_projection(notion, source_id, row, state, *,
+                                       issue, item, linked_refs, config,
+                                       notion_status, observed_at, approved_resume=False,
+                                       facts=None, metadata=None, now=None,
+                                       preserve_task_status=None):
+    """Mark completion durable only after every terminal display property reads back."""
+    completed = _completed_projection_state(
+        state, issue=issue, item=item, linked_refs=linked_refs, config=config,
+        notion_status=notion_status, observed_at=observed_at,
+        approved_resume=approved_resume, preserve_task_status=preserve_task_status)
+
+    # Keep the old baseline and confirmed request in the durable stage. The
+    # terminal UI payload is prepared separately and completion is promoted
+    # only after its full readback succeeds.
+    require(isinstance(state.get("projection"), dict),
+            "Status completion projection checkpoint 누락")
+    terminal_display = _status_request_properties(completed)
+    terminal_task_status = (preserve_task_status if preserve_task_status is not None
+                            else notion_status)
+    terminal_display["작업 상태"] = {
+        "select": {"name": terminal_task_status}
+        if terminal_task_status is not None else None}
+    fields, fingerprint = _restore_projection_checkpoint(terminal_display)
+    task_before_checkpoint = read_select(row, "작업 상태")
+    state["projection"]["display_checkpoint"] = {
+        "phase": "completion_pending", "expected_fields": fields,
+        "expected_fingerprint": fingerprint}
+    _verify_issue_state_write(notion, source_id, row, state)
+
+    # The checkpoint write itself performs a fresh GET. A card move already
+    # visible there belongs to a separate request and must stop completion.
+    if (read_select(row, "작업 상태") != task_before_checkpoint or
+            not _issue_state_binding_matches(row, state)):
+        require(isinstance(facts, dict) and isinstance(metadata, dict) and now is not None,
+                "완료 중 새 Notion 이동을 보존할 동기화 문맥이 없습니다")
+        return _persist_observed_card_race(
+            notion, source_id, row, metadata, state, item=item, issue=issue,
+            facts=facts, config=config, now=now,
+            message="완료 checkpoint 확인 중 Notion에 새 상태 이동이 있어 기존 결과와 분리해 보류합니다.")
+
+    terminal_display["동기화 내부 상태"] = text_property(canonical_json(state))
+    page_id = identifier(row.get("id"))
+    notion.request("PATCH", f"/pages/{page_id}",
+                   {"properties": terminal_display}, write=True)
+    confirmed = notion.request("GET", f"/pages/{page_id}")
+    bound_page(confirmed, source_id)
+    require(identifier(confirmed.get("id")) == page_id and not is_archived(confirmed),
+            "Notion 변경 대상 페이지 readback 오류")
+    row.clear()
+    row.update(confirmed)
+    approved_card_status = (state.get("resume") or {}).get("approved_notion_status")
+    approved_card_echo = (approved_resume and approved_card_status is not None and
+                          read_select(row, "작업 상태") == approved_card_status)
+    preserved_deferred_echo = (
+        preserve_task_status is not None and
+        read_select(row, "작업 상태") == preserve_task_status and
+        _deferred_card_matches(state, state.get("projection"), preserve_task_status))
+    if (read_select(row, "작업 상태") != notion_status and not approved_card_echo and
+            not preserved_deferred_echo):
+        require(isinstance(facts, dict) and isinstance(metadata, dict) and now is not None,
+                "완료 readback 중 새 Notion 이동을 보존할 동기화 문맥이 없습니다")
+        hold = _new_hold(
+            "REQUEST_RACE",
+            "완료 표시 readback 중 Notion에 새 상태 이동이 있어 기존 결과와 분리해 보류합니다.",
+            _projection_fingerprint(state["projection"], issue, linked_refs, item))
+        state["hold"] = hold
+        _record_held_card_request(
+            notion, source_id, row, state, item, issue, facts, config, observed_at)
+        _verify_issue_state_write(notion, source_id, row, state)
+        _save_status_request(notion, source_id, row, state)
+        _display_hold(notion, source_id, row, metadata, state, hold, now,
+                      preserve_task_status=True)
+        return False
+    _verify_properties(row, terminal_display)
+    terminal_state = decode_internal(
+        read_text(row, "동기화 내부 상태"), kind="issue",
+        project_id=state["project_id"], object_id=state["issue_id"])
+    require(terminal_state.get("projection") == state.get("projection") and
+            (terminal_state.get("request") or {}).get("id") ==
+            (state.get("request") or {}).get("id"),
+            "완료 readback의 projection/request 결속 불일치")
+    inflight_state = json.loads(json.dumps(state))
+    task_before_promotion = read_select(row, "작업 상태")
+    state.update(completed)
+    _verify_issue_state_write(notion, source_id, row, state)
+    promotion_mismatch = {
+        "task_changed": read_select(row, "작업 상태") != task_before_promotion,
+        "state_binding_changed": not _issue_state_binding_matches(row, state),
+    }
+    if any(promotion_mismatch.values()):
+        # The completed marker may already have reached Notion. Roll it back
+        # durably before returning so restart cannot mistake it for success.
+        state.clear()
+        state.update(inflight_state)
+        return _persist_observed_card_race(
+            notion, source_id, row, metadata, state, item=item, issue=issue,
+            facts=facts, config=config, now=now,
+            message="완료 승격 readback에서 카드 또는 요청 결속이 달라 완료를 되돌리고 보류했습니다.")
+    return True
+
+
 def _update_control_summary(notion, source_id, control, control_state, issue_rows,
                             *, now, run_id, counts):
     holds = []
     for row, state in issue_rows:
+        awaiting_add_readback = bool(
+            state and state.get("pending") and state["pending"].get("kind") == "add" and
+            state.get("readback") and state["readback"].get("returned_item_id") and
+            not state["readback"].get("validated"))
+        awaiting_deferred_request = bool(
+            state and state.get("deferred_request") and
+            state["deferred_request"].get("phase") in {"waiting", "held"})
         if state and (state.get("hold") or state.get("projection") or
-                      (state.get("resume") or {}).get("display_pending")):
+                      (state.get("resume") or {}).get("display_pending") or
+                      awaiting_add_readback or awaiting_deferred_request):
             number = row["properties"]["번호"]["number"]
             holds.append(positive(number, "보류 Issue 번호 오류"))
     holds = sorted(set(holds))
@@ -1952,17 +3408,29 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
         if state["pending"]:
             pending = state["pending"]
             if pending["kind"] == "add":
+                readback = state.get("readback") or {}
+                auto_readback = bool(
+                    state["hold"] is None and readback.get("returned_item_id") and
+                    (readback.get("validated") or
+                     readback.get("attempts", 0) < PROJECT_ADD_READBACK_MAX_ATTEMPTS))
                 if pending["confirmed"] and not _confirmed_add_item_matches(pending, item):
                     result["hold"] = {"code": "PROJECT_ADD_UNCERTAIN",
                                        "message": "저장된 Project add checkpoint와 현재 항목 ID가 다릅니다."}
                     plans.append(result)
                     continue
                 linked, _ = _linked_pr_facts(issue, facts)
-                current_source_fingerprint = _source_fingerprint(issue, linked, None)
-                if (number not in resume_numbers or item is None or
-                        current_source_fingerprint != pending["facts_fingerprint"]):
+                current_source_fingerprint = _pending_fingerprint(issue, linked, None, pending)
+                expected_pending_fingerprint = pending.get("semantic_fingerprint",
+                                                          pending["facts_fingerprint"])
+                if ((number not in resume_numbers and not auto_readback) or
+                        current_source_fingerprint != expected_pending_fingerprint):
                     result["hold"] = {"code": "PROJECT_ADD_UNCERTAIN",
                                       "message": "PM 확인 전에는 이전 Project 추가 결과를 재사용할 수 없습니다."}
+                    plans.append(result)
+                    continue
+                if auto_readback and item is None:
+                    result["hold"] = {"code": "PROJECT_ADD_UNCERTAIN",
+                                      "message": "Project 추가 반환 ID를 확인했지만 목록에는 아직 나타나지 않았습니다."}
                     plans.append(result)
                     continue
                 if pending["migration_fingerprint"] is not None:
@@ -2008,9 +3476,17 @@ def _preview_issue_plans(notion, source_id, source, index, project, facts, confi
                     if state["resume"] and state["resume"]["display_pending"]:
                         linked, _ = _linked_pr_facts(issue, facts)
                         state["resume"]["expected_option_id"] = item["status_option_id"]
-                        state["resume"]["expected_fingerprint"] = _source_fingerprint(issue, linked, item)
+                        if set(state["resume"]) == RESUME_KEYS:
+                            state["resume"]["expected_fingerprint"] = _status_operation_fingerprint(
+                                issue, linked, item)
+                        else:
+                            state["resume"]["expected_fingerprint"] = _source_fingerprint(
+                                issue, linked, item)
                     state["pending"] = None
-        resume_candidate = _resume_matches(state["resume"], issue, facts, item)
+        resume_candidate = _resume_matches(
+            state["resume"], issue, facts, item,
+            request_id=(state.get("request") or {}).get("id"),
+            notion_status=read_select(notion_row, "작업 상태"))
         stale_resume = bool(state["resume"] and state["resume"]["display_pending"] and
                             number not in resume_numbers and not state["pending"] and
                             not resume_candidate)
@@ -2165,10 +3641,11 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 checkpoint_last = pending["checkpoint"]["reopen_last_id"]
                 checkpoint = pending["checkpoint"]
                 pending_refs, _ = _linked_pr_facts(issue, facts)
-                pending_facts_match = (_source_fingerprint(
+                pending_facts_match = (_pending_fingerprint(
                     issue, pending_refs, {"id": pending["item_id"],
-                                          "status_option_id": pending["before_option_id"]}) ==
-                    pending["facts_fingerprint"])
+                                          "status_option_id": pending["before_option_id"]},
+                    pending) == pending.get("semantic_fingerprint",
+                                             pending["facts_fingerprint"]))
                 already_applied_event = (pending_event is not None and
                                          pending_event == last_id)
                 if pending_facts_match:
@@ -2214,12 +3691,30 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                 issue, state, facts, cutoff, config, pending,
                                 restore_review_return=True))
                     def canonical_match(candidate):
+                        if candidate.get("hold") or not isinstance(candidate.get("state"), dict):
+                            return False
+                        same_checkpoint = all(
+                            candidate["state"][field] == checkpoint[field]
+                            for field in STATUS_CHECKPOINT_KEYS)
+                        canonical_target = (
+                            config["status_options"].get(candidate.get("target")) ==
+                            pending["target_option_id"])
+                        request = state.get("request") or {}
+                        notion_write = state.get("notion_write") or {}
+                        linked_request_target = (
+                            request.get("phase") in {"prepared", "sent", "uncertain", "confirmed"} and
+                            ("request_id" not in pending or
+                             request.get("id") == pending.get("request_id")) and
+                            request.get("target") == pending.get("notion_status") and
+                            config["status_options"].get(request.get("target")) ==
+                            pending["target_option_id"] and
+                            notion_write.get("request_id") == request.get("id") and
+                            notion_write.get("target") == request.get("target") and
+                            notion_write.get("kind") == "request" and
+                            notion_write.get("phase") == request.get("phase"))
                         return (not candidate.get("hold") and
                                 candidate.get("event_id") == pending_event and
-                                config["status_options"].get(candidate.get("target")) ==
-                                pending["target_option_id"] and
-                                all(candidate["state"][field] == checkpoint[field]
-                                    for field in STATUS_CHECKPOINT_KEYS))
+                                same_checkpoint and (canonical_target or linked_request_target))
                     require(any(canonical_match(candidate) for candidate in candidates),
                             "pending status가 현재 canonical 이벤트/target/checkpoint와 불일치합니다")
                 if pending_event is not None:
@@ -2289,13 +3784,19 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                 require(checkpoint_time.timestamp() >
                                         cutoff_time.timestamp() + BOUNDARY_SECONDS,
                                         "historical pending checkpoint가 cutoff 경계에 있습니다")
-    resume_numbers, resume_actor = _validate_manual_resume(github, resolve_issue_numbers, env)
+    resume_numbers, resume_actor = _validate_manual_resume(
+        github, resolve_issue_numbers, env, dry_run=dry_run)
     if now is None:
         now = _iso(datetime.now(timezone.utc))
     else:
         now = _iso(timestamp(now))
     run_id = env.get("GITHUB_RUN_ID") or "local"
     require(isinstance(run_id, str) and len(run_id) <= 128, "workflow run ID 형식 오류")
+    readback_identity = {"run_id": run_id if run_id != "local" else str(uuid4()),
+                         "run_attempt": env.get("GITHUB_RUN_ATTEMPT", "1")}
+    require(isinstance(readback_identity["run_attempt"], str) and
+            re.fullmatch(r"[1-9][0-9]*", readback_identity["run_attempt"]) is not None,
+            "Project add readback 실행 시도 형식 오류")
     counts = {"source_items": len(source), "created": 0, "updated": 0,
               "project_changes": 0, "held": 0, "failed": 0}
     # Validate that every requested number names an existing held Issue before any per-issue write.
@@ -2317,6 +3818,13 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 "수동 재개 대상이 현재 보류 상태가 아닙니다")
         require(not state["hold"] or state["hold"]["code"] in RESUMABLE_HOLD_CODES,
                 "GitHub 원본 모순은 수동 재개로 무시할 수 없습니다")
+
+    observation_mark = None
+    status_observed_at, status_observation_uncertainty_seconds = None, None
+    if not dry_run:
+        observation_mark = observation_clock.mark_snapshot()
+        status_observed_at, status_observation_uncertainty_seconds = observation_clock.verify_snapshot(
+            observation_mark, lambda: observation_clock.fetch_fresh_date(github))
 
     if dry_run:
         counts["issue_plans"] = _preview_issue_plans(notion, source_id, source, index, project, facts,
@@ -2370,7 +3878,12 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             fingerprint = _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], item)
             hold = _new_hold("PROJECT_ITEM_ARCHIVED", "이슈에 보관된 Project 항목이 있어 자동 추가/전환을 멈췄습니다.",
                              fingerprint)
-            _display_hold(notion, source_id, row, metadata, state, hold, now)
+            if (config.get("bidirectional_enabled") and
+                    _card_move_needs_preservation(state, row)):
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
+            _display_hold(notion, source_id, row, metadata, state, hold, now,
+                          preserve_task_status=True)
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
@@ -2380,21 +3893,128 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             code = "PROJECT_ITEM_MISSING" if item is None else "PROJECT_ITEM_ID_CHANGED"
             fingerprint = _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], item)
             hold = _new_hold(code, "기존 Project item 고정 식별자를 확인할 수 없습니다.", fingerprint)
-            _display_hold(notion, source_id, row, metadata, state, hold, now)
+            if (config.get("bidirectional_enabled") and
+                    _card_move_needs_preservation(state, row)):
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
+            _display_hold(notion, source_id, row, metadata, state, hold, now,
+                          preserve_task_status=True)
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
 
         issue_number = row_data["number"]
+        restore_marker = state.get("notion_write") or {}
+        if restore_marker.get("kind") == "restore":
+            if "project_stamp" not in restore_marker:
+                if (issue_number in resume_numbers and resume_actor and
+                        read_select(row, "작업 상태") == restore_marker.get("expected_before") and
+                        (state.get("request") or {}).get("id") ==
+                        restore_marker.get("request_id")):
+                    linked_for_resume, _ = _linked_pr_facts(row_data, facts)
+                    _persist_restore_pm_approval(
+                        notion, source_id, row, state, row_data, item,
+                        linked_for_resume, resume_actor,
+                        read_select(row, "작업 상태"), config)
+                else:
+                    legacy_restore_hold = _new_hold(
+                        "PENDING_RESULT_UNCLEAR",
+                        "이전 복원 checkpoint에 재검증 정보가 없어 자동 재전송을 멈췄습니다.",
+                        _digest(restore_marker))
+                    state["hold"] = legacy_restore_hold
+                    _verify_issue_state_write(notion, source_id, row, state)
+                    _display_hold(notion, source_id, row, metadata, state,
+                                  legacy_restore_hold, now, preserve_task_status=True)
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+            else:
+                if _recover_restore_write(
+                        notion, github, project_client, source_id, row, metadata, state,
+                        facts, row_data, item, config, cutoff, now,
+                        manual_resume=issue_number in resume_numbers,
+                        resume_actor=resume_actor):
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+        terminal_refs, _ = _linked_pr_facts(row_data, facts, allow_snapshot_drift=True)
+        if _promote_held_terminal_restore(
+                notion, source_id, row, state, issue=row_data, item=item,
+                linked_refs=terminal_refs, config=config,
+                observed_at=status_observed_at, facts=facts, metadata=metadata, now=now):
+            if state.get("hold"):
+                counts["held"] += 1
+            elif not created:
+                counts["updated"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
+        closed_supersedes_restore = _closed_facts_supersede_restore(
+            state, page=row, issue=row_data, item=item, linked_refs=terminal_refs,
+            config=config)
+        if closed_supersedes_restore:
+            # Keep A and its old baseline. The restore marker is retired only with
+            # the new operation's durable pending checkpoint below.
+            state["hold"] = None
+        if (config.get("bidirectional_enabled") and state.get("hold") and
+                state["hold"]["code"] != "BIDIRECTIONAL_DISABLED" and
+                issue_number not in resume_numbers and state.get("baseline") and
+                not state.get("pending") and not state.get("projection") and
+                _card_move_needs_preservation(state, row)):
+            # Preserve a later card move verbatim until the held request follows PM recovery.
+            _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                      facts, config, status_observed_at)
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
+        request_phase = (state.get("request") or {}).get("phase")
+        if (config.get("bidirectional_enabled") and state.get("hold") and
+                state["hold"]["code"] == "BIDIRECTIONAL_DISABLED"):
+            state["hold"] = None
+            _verify_issue_state_write(notion, source_id, row, state)
+        elif (not config.get("bidirectional_enabled") and
+              request_phase in {"prepared", "sent", "uncertain", "confirmed"}):
+            if state.get("hold") is None:
+                state["hold"] = _new_hold(
+                    "BIDIRECTIONAL_DISABLED",
+                    "양방향 동기화가 꺼져 있어 진행 중인 상태 요청을 보존하고 멈췄습니다.",
+                    _digest({"request_id": (state.get("request") or {}).get("id"),
+                             "phase": request_phase}))
+                _verify_issue_state_write(notion, source_id, row, state)
+                _patch_page(notion, source_id, row, {
+                    "확인 필요": text_property("보류: 양방향 동기화가 꺼져 있어 요청 checkpoint를 보존했습니다.")})
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
         projection = state["projection"]
+        approving_prior_request = bool(
+            issue_number in resume_numbers and projection and state.get("deferred_request") and
+            state.get("hold", {}).get("code") == "REQUEST_RACE" and
+            (state.get("request") or {}).get("id") == projection.get("request_id"))
+        if approving_prior_request:
+            linked_for_resume, _ = _linked_pr_facts(row_data, facts)
+            state["resume"] = {
+                "actor_id": resume_actor["actor_id"], "run_id": resume_actor["run_id"],
+                "approved_option_id": item["status_option_id"],
+                "fingerprint": _status_operation_fingerprint(
+                    row_data, linked_for_resume, item),
+                "display_pending": True, "expected_option_id": None,
+                "expected_fingerprint": None,
+                "request_id": (state.get("request") or {}).get("id"),
+                "facts_fingerprint": _status_facts_fingerprint(
+                    row_data, linked_for_resume),
+                "fact_contract": "semantic_v2",
+                "approved_notion_status": read_select(row, "작업 상태")}
+            _verify_issue_state_write(notion, source_id, row, state)
         saved_pm_display = bool(state["resume"] and state["resume"]["display_pending"])
         if (projection is not None and
-                (state["hold"] is None or issue_number in resume_numbers or saved_pm_display)):
+                (state["hold"] is None or issue_number in resume_numbers or saved_pm_display or
+                 state["hold"]["code"] == "REQUEST_RACE")):
             latest_issue = gp.fetch_issue_detail(github, row_data["id"])
             latest_refs, _ = _linked_pr_facts(latest_issue, facts, allow_snapshot_drift=True)
             latest_item = gp.fetch_project_item(project_client, config["project_id"], item["id"],
                                                 config["status_field_id"], allow_archived=True)
-            fresh_fingerprint = _source_fingerprint(latest_issue, latest_refs, latest_item)
+            fresh_fingerprint = _projection_fingerprint(
+                projection, latest_issue, latest_refs, latest_item)
             projection_hold = None
             if latest_item.get("is_archived"):
                 projection_hold = _new_hold(
@@ -2408,8 +4028,34 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                   fresh_fingerprint != projection["expected_fingerprint"]):
                 projection_hold = _new_hold(
                     "PROJECTION_CHECKPOINT_CHANGED",
-                    "Project 또는 원본 사실이 checkpoint 이후 달라졌습니다. 현재 값을 확인하고 PM 재승인이 필요합니다.",
+                    "Project 상태 stamp 또는 원본 사실이 checkpoint 이후 달라졌습니다. PM 확인이 필요합니다.",
                     fresh_fingerprint)
+            elif projection.get("fact_contract") == "semantic_v2":
+                display_checkpoint = projection.get("display_checkpoint") or {}
+                current_task = read_select(row, "작업 상태")
+                own_display_readback = (
+                    display_checkpoint.get("phase") == "display_sent" and
+                    _projection_display_matches(row, projection))
+                completion_task_present = (
+                    display_checkpoint.get("phase") == "completion_pending" and
+                    current_task == projection.get("result_notion_status"))
+                if projection.get("request_id") != (state.get("request") or {}).get("id"):
+                    projection_hold = _new_hold(
+                        "REQUEST_RACE",
+                        "Project 결과 확인 뒤 Notion 상태 요청이 달라져 이전 표시 복구를 멈췄습니다.",
+                        fresh_fingerprint)
+                elif (current_task != projection.get("expected_notion_status") and
+                      not approving_prior_request and not own_display_readback and
+                      not completion_task_present):
+                    code = ("PROJECTION_CHECKPOINT_CHANGED"
+                            if current_task == projection.get("result_notion_status") and
+                            display_checkpoint else "REQUEST_RACE")
+                    projection_hold = _new_hold(
+                        code,
+                        ("이전 Notion 표시와의 일치 근거가 달라 완료를 확정할 수 없습니다."
+                         if code == "PROJECTION_CHECKPOINT_CHANGED" else
+                         "Project 결과 확인 뒤 Notion에 새 상태 이동이 있어 이전 표시 복구를 멈췄습니다."),
+                        fresh_fingerprint)
 
             if projection_hold is None:
                 projection_state = json.loads(json.dumps(state))
@@ -2426,25 +4072,259 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                         "저장된 Project checkpoint를 현재 원본 사실로 재구성할 수 없습니다. PM 확인이 필요합니다.",
                         fresh_fingerprint)
                 else:
-                    state.update(projection_plan["state"])
-                    _apply_status_checkpoint(state, projection["checkpoint"])
-                    state["project_item_id"] = latest_item["id"]
-                    state["projection"] = None
-                    state["pending"] = None
-                    state["hold"] = None
-                    state["resume"] = None
-                    project_by_issue[issue_id] = latest_item
-                    _update_row(notion, source_id, row, metadata, projection_plan, state, now,
-                                kind="Issue")
-                    if not created:
-                        counts["updated"] += 1
-                    issue_rows_for_summary.append((row, state))
-                    continue
+                    latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+                    bound_page(latest_page, source_id)
+                    latest_state = decode_internal(
+                        read_text(latest_page, "동기화 내부 상태"), kind="issue",
+                        project_id=config["project_id"], object_id=issue_id)
+                    latest_projection = ((latest_state or {}).get("projection") or {})
+                    display_checkpoint = projection.get("display_checkpoint") or {}
+                    latest_task = read_select(latest_page, "작업 상태")
+                    preserve_deferred_status = (
+                        latest_task if (approving_prior_request or saved_pm_display) and
+                        latest_state is not None and
+                        _deferred_card_matches(latest_state, projection, latest_task) else None)
+                    checkpoint_still_bound = (
+                        latest_projection == projection and
+                        (latest_state.get("request") or {}).get("id") ==
+                        projection.get("request_id"))
+                    own_display_echo = (
+                        checkpoint_still_bound and
+                        display_checkpoint.get("phase") == "display_sent" and
+                        _projection_display_matches(latest_page, projection))
+                    completion_echo = (
+                        checkpoint_still_bound and
+                        display_checkpoint.get("phase") == "completion_pending" and
+                        (latest_task == projection.get("result_notion_status") or
+                         preserve_deferred_status is not None and
+                         _projection_display_matches(latest_page, projection)))
+                    approved_older_card_values = {
+                        projection.get("expected_notion_status"),
+                        projection.get("result_notion_status"),
+                        ((latest_state or {}).get("deferred_request") or {}).get("target"),
+                    }
+                    if (approving_prior_request and latest_state is not None and
+                            latest_task not in approved_older_card_values):
+                        # Recheck the page after persisting the PM approval. A newly
+                        # observed C is neither A's approval nor a reason to discard B.
+                        state = latest_state
+                        state["resume"] = None
+                        _persist_observed_card_race(
+                            notion, source_id, latest_page, metadata, state,
+                            item=latest_item, issue=latest_issue, facts=facts,
+                            config=config, now=now,
+                            message="이전 결과를 PM이 재개하는 동안 새 Notion 상태 이동이 확인되어 최신 이동을 보류했습니다.")
+                        counts["held"] += 1
+                        issue_rows_for_summary.append((latest_page, state))
+                        continue
+                    if (projection.get("fact_contract") == "semantic_v2" and
+                            (not checkpoint_still_bound or
+                             (latest_task != projection.get("expected_notion_status") and
+                              not own_display_echo and not completion_echo)) and
+                            not (approving_prior_request and latest_state and
+                                 (latest_state.get("request") or {}).get("id") ==
+                                 projection.get("request_id"))):
+                        projection_hold = _new_hold(
+                            "REQUEST_RACE",
+                            "표시 복구 직전 Notion 상태 요청이 달라져 최신 이동을 보존했습니다.",
+                            fresh_fingerprint)
+                        if (state.get("request") and
+                                state["request"].get("id") == projection.get("request_id")):
+                            state["request"]["phase"] = "held"
+                            state["request"]["reason"] = projection_hold["message"]
+                        state["hold"] = projection_hold
+                        _verify_issue_state_write(notion, source_id, latest_page, state)
+                        _save_status_request(notion, source_id, latest_page, state)
+                        row = latest_page
+                    elif (projection.get("fact_contract") == "semantic_v2" and
+                          display_checkpoint.get("phase") == "completion_pending"):
+                        approved_card_status = (state.get("resume") or {}).get(
+                            "approved_notion_status")
+                        approved_card_echo = (
+                            issue_number in resume_numbers and
+                            approved_card_status is not None and
+                            latest_task == approved_card_status)
+                        if (latest_task != projection.get("result_notion_status") and
+                                not approved_card_echo and
+                                preserve_deferred_status is None):
+                            projection_hold = _new_hold(
+                                "REQUEST_RACE",
+                                "완료 복구 중 Notion에 새 상태 이동이 있어 최신 이동을 보존했습니다.",
+                                fresh_fingerprint)
+                            state["hold"] = projection_hold
+                            _record_held_card_request(
+                                notion, source_id, latest_page, state, latest_item,
+                                latest_issue, facts, config, status_observed_at)
+                            _verify_issue_state_write(notion, source_id, latest_page, state)
+                            _save_status_request(notion, source_id, latest_page, state)
+                            _display_hold(notion, source_id, latest_page, metadata, state,
+                                          projection_hold, now, preserve_task_status=True)
+                            counts["held"] += 1
+                            issue_rows_for_summary.append((latest_page, state))
+                            continue
+                        if not _projection_display_matches(latest_page, projection):
+                            completed = _completed_projection_state(
+                                latest_state, issue=latest_issue, item=latest_item,
+                                linked_refs=latest_refs, config=config,
+                                notion_status=projection.get("result_notion_status"),
+                                observed_at=status_observed_at,
+                                approved_resume=issue_number in resume_numbers or
+                                saved_pm_display,
+                                preserve_task_status=preserve_deferred_status)
+                            repair = _status_request_properties(completed)
+                            repair_task_status = (preserve_deferred_status
+                                                  if preserve_deferred_status is not None else
+                                                  projection.get("result_notion_status"))
+                            repair["작업 상태"] = {"select": {
+                                "name": repair_task_status}
+                                if repair_task_status is not None else None}
+                            fields, fingerprint = _restore_projection_checkpoint(repair)
+                            latest_state["projection"]["display_checkpoint"] = {
+                                "phase": "completion_pending", "expected_fields": fields,
+                                "expected_fingerprint": fingerprint}
+                            _verify_issue_state_write(
+                                notion, source_id, latest_page, latest_state)
+                            if (read_select(latest_page, "작업 상태") != latest_task or
+                                    not _issue_state_binding_matches(latest_page, latest_state)):
+                                _persist_observed_card_race(
+                                    notion, source_id, latest_page, metadata,
+                                    latest_state, item=latest_item, issue=latest_issue,
+                                    facts=facts, config=config, now=now,
+                                    message="완료 표시 복구 checkpoint 확인 중 Notion에 새 이동이 있어 완료 표시를 멈추고 보류했습니다.")
+                                state = latest_state
+                                counts["held"] += 1
+                                issue_rows_for_summary.append((latest_page, state))
+                                continue
+                            projection = latest_state["projection"]
+                            state["projection"] = projection
+                            repair["동기화 내부 상태"] = text_property(
+                                canonical_json(latest_state))
+                            _patch_page(notion, source_id, latest_page, repair)
+                        else:
+                            completed = _completed_projection_state(
+                                latest_state, issue=latest_issue, item=latest_item,
+                                linked_refs=latest_refs, config=config,
+                                notion_status=projection.get("result_notion_status"),
+                                observed_at=status_observed_at,
+                                approved_resume=issue_number in resume_numbers or
+                                saved_pm_display,
+                                preserve_task_status=preserve_deferred_status)
+
+                        # Completion is promoted only after a final fresh GET
+                        # confirms both the terminal card value and its exact
+                        # durable projection/request checkpoint.
+                        latest_page = notion.request(
+                            "GET", f"/pages/{identifier(latest_page.get('id'))}")
+                        bound_page(latest_page, source_id)
+                        latest_state = decode_internal(
+                            read_text(latest_page, "동기화 내부 상태"), kind="issue",
+                            project_id=config["project_id"], object_id=issue_id)
+                        latest_projection = (latest_state or {}).get("projection") or {}
+                        latest_request_id = ((latest_state or {}).get("request") or {}).get("id")
+                        final_task_status = read_select(latest_page, "작업 상태")
+                        final_preserved_deferred = _deferred_card_matches(
+                            latest_state or {}, projection, final_task_status)
+                        if (final_task_status != projection.get("result_notion_status") and
+                                not final_preserved_deferred):
+                            projection_hold = _new_hold(
+                                "REQUEST_RACE",
+                                "완료 readback 중 Notion에 새 상태 이동이 있어 최신 이동을 보존했습니다.",
+                                fresh_fingerprint)
+                            state["hold"] = projection_hold
+                            _record_held_card_request(
+                                notion, source_id, latest_page, state, latest_item,
+                                latest_issue, facts, config, status_observed_at)
+                            _verify_issue_state_write(notion, source_id, latest_page, state)
+                            _save_status_request(notion, source_id, latest_page, state)
+                            _display_hold(notion, source_id, latest_page, metadata, state,
+                                          projection_hold, now, preserve_task_status=True)
+                            counts["held"] += 1
+                            issue_rows_for_summary.append((latest_page, state))
+                            continue
+                        if (latest_projection != projection or latest_request_id !=
+                                projection.get("request_id")):
+                            projection_hold = _new_hold(
+                                "REQUEST_RACE",
+                                "완료 readback에서 projection/request 결속이 달라져 완료를 확정하지 않았습니다.",
+                                fresh_fingerprint)
+                            state["hold"] = projection_hold
+                            _verify_issue_state_write(notion, source_id, latest_page, state)
+                            _display_hold(notion, source_id, latest_page, metadata, state,
+                                          projection_hold, now,
+                                          preserve_task_status=bool(state.get("deferred_request")))
+                            counts["held"] += 1
+                            issue_rows_for_summary.append((latest_page, state))
+                            continue
+                        require(_projection_display_matches(latest_page, projection),
+                                "완료 표시 복구 최종 readback 불일치")
+                        recovery_inflight_state = json.loads(json.dumps(latest_state))
+                        task_before_promotion = read_select(latest_page, "작업 상태")
+                        state.update(completed)
+                        _verify_issue_state_write(notion, source_id, latest_page, state)
+                        if (read_select(latest_page, "작업 상태") != task_before_promotion or
+                                not _issue_state_binding_matches(latest_page, state)):
+                            state.clear()
+                            state.update(recovery_inflight_state)
+                            _persist_observed_card_race(
+                                notion, source_id, latest_page, metadata, state,
+                                item=latest_item, issue=latest_issue, facts=facts,
+                                config=config, now=now,
+                                message="완료 복구 승격 readback에서 카드 또는 요청 결속이 달라 완료를 되돌리고 보류했습니다.")
+                            counts["held"] += 1
+                            issue_rows_for_summary.append((latest_page, state))
+                            continue
+                        row = latest_page
+                        if not created:
+                            counts["updated"] += 1
+                        issue_rows_for_summary.append((row, state))
+                        continue
+                    else:
+                        state.update(projection_plan["state"])
+                        _apply_status_checkpoint(state, projection["checkpoint"])
+                        state["project_item_id"] = latest_item["id"]
+                        project_by_issue[issue_id] = latest_item
+                        checkpoint_written = _write_checkpointed_projection(
+                            notion, source_id, row, metadata, projection_plan, state, now,
+                            item=latest_item, issue=latest_issue, facts=facts, config=config,
+                            preserve_task_status=preserve_deferred_status)
+                        if not checkpoint_written:
+                            counts["held"] += 1
+                            issue_rows_for_summary.append((row, state))
+                            continue
+                        if projection.get("fact_contract") == "semantic_v2":
+                            finalized = _finalize_bidirectional_projection(
+                                notion, source_id, row, state, issue=latest_issue,
+                                item=latest_item, linked_refs=latest_refs, config=config,
+                                notion_status=projection.get("result_notion_status"),
+                                observed_at=status_observed_at,
+                                approved_resume=issue_number in resume_numbers or saved_pm_display,
+                                facts=facts, metadata=metadata, now=now,
+                                preserve_task_status=preserve_deferred_status)
+                            if not finalized:
+                                counts["held"] += 1
+                                issue_rows_for_summary.append((row, state))
+                                continue
+                        else:
+                            state["projection"] = None
+                            state["pending"] = None
+                            state["hold"] = None
+                            state["resume"] = None
+                            _verify_issue_state_write(notion, source_id, row, state)
+                        if not created:
+                            counts["updated"] += 1
+                        issue_rows_for_summary.append((row, state))
+                        continue
 
             if (projection_hold is not None and saved_pm_display and
                     projection_hold["code"] == "PROJECTION_CHECKPOINT_CHANGED"):
                 projection_hold["code"] = "RESUME_CHECKPOINT_CHANGED"
-            state["projection"] = None
+            if projection_hold["code"] != "REQUEST_RACE":
+                state["projection"] = None
+            if (projection_hold["code"] == "REQUEST_RACE" and state.get("request") and
+                    state["request"].get("id") == projection.get("request_id")):
+                state["request"]["reason"] = projection_hold["message"]
+            _record_held_card_request(notion, source_id, row, state, latest_item,
+                                      latest_issue, facts, config, status_observed_at)
             _display_hold(notion, source_id, row, metadata, state, projection_hold, now,
                           preserve_task_status=True)
             if latest_item.get("is_archived"):
@@ -2455,7 +4335,22 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             issue_rows_for_summary.append((row, state))
             continue
 
-        resume_display_candidate = _resume_matches(state["resume"], row_data, facts, item)
+        terminal_refs, _ = _linked_pr_facts(row_data, facts, allow_snapshot_drift=True)
+        if _promote_held_terminal_restore(
+                notion, source_id, row, state, issue=row_data, item=item,
+                linked_refs=terminal_refs, config=config,
+                observed_at=status_observed_at, facts=facts, metadata=metadata, now=now):
+            if state.get("hold"):
+                counts["held"] += 1
+            elif not created:
+                counts["updated"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
+
+        current_request_id = (state.get("request") or {}).get("id")
+        resume_display_candidate = _resume_matches(
+            state["resume"], row_data, facts, item, request_id=current_request_id,
+            notion_status=read_select(row, "작업 상태"))
         stale_resume = bool(state["resume"] and state["resume"]["display_pending"] and
                             issue_number not in resume_numbers and not state["pending"] and
                             not resume_display_candidate)
@@ -2472,41 +4367,94 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             continue
         if (state["hold"] is not None and issue_number not in resume_numbers and
                 not state["pending"] and not resume_display_candidate):
+            if (config.get("bidirectional_enabled") and
+                    _card_move_needs_preservation(state, row)):
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
             _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
                           preserve_task_status=state["hold"]["code"] in
                           {"MIGRATION_INPUT_CHANGED", "RESUME_CHECKPOINT_CHANGED",
-                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET"})
+                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET", "MIGRATION_UNSET",
+                           "STATUS_REQUEST_INVALID"})
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
 
-        # A possibly lost add response is never adopted or retried without a PM choice.
+        # A returned add ID is read back automatically with a durable three-check budget.
         if state["pending"] and state["pending"]["kind"] == "add":
-            if issue_number not in resume_numbers:
-                fingerprint = _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], None)
-                hold = state["hold"] or _new_hold(
-                    "PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 확인할 수 없습니다.", fingerprint)
-                _display_hold(notion, source_id, row, metadata, state, hold, now)
-                counts["held"] += 1
-                issue_rows_for_summary.append((row, state))
-                continue
-            if state["hold"] is None:
-                state["hold"] = _new_hold(
-                    "PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 PM이 확인해야 합니다.",
-                    _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], None))
-                _verify_issue_state_write(notion, source_id, row, state)
-            item, pending_hold = _resolve_pending_add(
-                notion, github, source_id, row, state, project, facts, row_data)
-            if pending_hold:
-                _display_hold(notion, source_id, row, metadata, state, pending_hold, now,
-                              preserve_task_status=pending_hold["code"] in
-                              {"MIGRATION_INPUT_CHANGED", "PENDING_RESULT_UNCLEAR",
-                               "PROJECT_STATUS_UNSET"})
-                counts["held"] += 1
-                issue_rows_for_summary.append((row, state))
-                continue
-            require(item is not None, "PM 승인 Project 항목 readback 누락")
-            project_by_issue[issue_id] = item
+            readback = state.get("readback") or {}
+            if (issue_number not in resume_numbers and state["hold"] is None and
+                    readback.get("returned_item_id")):
+                if readback["validated"]:
+                    pending_hold = None
+                else:
+                    prior_project = project
+                    readback_project, readback_item, pending_hold = _read_added_project_item_once(
+                        notion, source_id, row, state, project_client, config, facts, row_data,
+                        readback_identity)
+                    project = readback_project if readback_project is not None else prior_project
+                    if pending_hold:
+                        _display_hold(notion, source_id, row, metadata, state, pending_hold, now,
+                                      preserve_task_status=True)
+                        counts["held"] += 1
+                        issue_rows_for_summary.append((row, state))
+                        continue
+                    if readback_item is None:
+                        _display_add_readback_waiting(notion, source_id, row, state, now)
+                        issue_rows_for_summary.append((row, state))
+                        continue
+                item, pending_hold = _resolve_pending_add(
+                    notion, github, source_id, row, state, project, facts, row_data)
+                if pending_hold:
+                    _display_hold(notion, source_id, row, metadata, state, pending_hold, now,
+                                  preserve_task_status=True)
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+                require(item is not None, "Project add 자동 readback checkpoint 누락")
+                project_by_issue[issue_id] = item
+            else:
+                if issue_number not in resume_numbers:
+                    fingerprint = _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], None)
+                    hold = state["hold"] or _new_hold(
+                        "PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 확인할 수 없습니다.", fingerprint)
+                    _display_hold(notion, source_id, row, metadata, state, hold, now)
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+                if state["hold"] is None:
+                    state["hold"] = _new_hold(
+                        "PROJECT_ADD_UNCERTAIN", "Project 추가 결과를 PM이 확인해야 합니다.",
+                        _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], None))
+                    _verify_issue_state_write(notion, source_id, row, state)
+                if ((state.get("readback") or {}).get("returned_item_id") and
+                        not state["readback"].get("validated")):
+                    checked_project, checked_item, check_hold = _read_added_project_item_immediate(
+                        notion, source_id, row, state, project_client, config, facts, row_data)
+                    if checked_project is not None:
+                        project = checked_project
+                    if check_hold or checked_item is None:
+                        hold = check_hold or state.get("hold") or _new_hold(
+                            "PROJECT_ADD_UNCERTAIN",
+                            "Project 반환 ID의 직접 조회와 전체 목록 관계를 확인하지 못했습니다.",
+                            _source_fingerprint(row_data, _linked_pr_facts(row_data, facts)[0], None))
+                        _display_hold(notion, source_id, row, metadata, state, hold, now,
+                                      preserve_task_status=True)
+                        counts["held"] += 1
+                        issue_rows_for_summary.append((row, state))
+                        continue
+                item, pending_hold = _resolve_pending_add(
+                    notion, github, source_id, row, state, project, facts, row_data)
+                if pending_hold:
+                    _display_hold(notion, source_id, row, metadata, state, pending_hold, now,
+                                  preserve_task_status=pending_hold["code"] in
+                                  {"MIGRATION_INPUT_CHANGED", "PENDING_RESULT_UNCLEAR",
+                                   "PROJECT_STATUS_UNSET"})
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+                require(item is not None, "PM 승인 Project 항목 readback 누락")
+                project_by_issue[issue_id] = item
 
         if item is None:
             if state["pending"] and state["pending"]["kind"] == "status":
@@ -2547,6 +4495,10 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 counts["held"] += 1
                 issue_rows_for_summary.append((row, state))
                 continue
+            if item is None and state.get("readback") and not state["readback"]["validated"]:
+                _display_add_readback_waiting(notion, source_id, row, state, now)
+                issue_rows_for_summary.append((row, state))
+                continue
             project_by_issue[issue_id] = item
 
         pending_hold = None
@@ -2555,26 +4507,82 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                                    github, facts, row_data, config, cutoff,
                                                    manual_resume=issue_number in resume_numbers)
             if pending_hold:
+                state["hold"] = pending_hold
+                if (config.get("bidirectional_enabled") and
+                        _card_move_needs_preservation(state, row)):
+                    _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                              facts, config, status_observed_at)
                 _display_hold(notion, source_id, row, metadata, state, pending_hold, now,
-                          preserve_task_status=pending_hold["code"] in
-                          {"MIGRATION_INPUT_CHANGED", "PENDING_RESULT_UNCLEAR",
-                           "PROJECT_STATUS_UNSET"})
+                              preserve_task_status=(pending_hold["code"] in
+                                  {"MIGRATION_INPUT_CHANGED", "PENDING_RESULT_UNCLEAR",
+                                   "PROJECT_STATUS_UNSET", "STATUS_REQUEST_INVALID"} or
+                                  state.get("deferred_request") is not None))
                 counts["held"] += 1
                 issue_rows_for_summary.append((row, state))
                 continue
 
+        projection = state.get("projection") or {}
+        if (config.get("bidirectional_enabled") and issue_number not in resume_numbers and
+                projection and
+                read_select(row, "작업 상태") != projection.get("expected_notion_status") and
+                (state.get("request") or {}).get("id") == projection.get("request_id")):
+            race_hold = _new_hold(
+                "REQUEST_RACE",
+                "이전 Project 결과 확인 중 새 Notion 상태 이동이 있어 두 요청을 분리해 보류합니다.",
+                _projection_fingerprint(projection, row_data,
+                                        _linked_pr_facts(row_data, facts)[0], item))
+            state["hold"] = race_hold
+            _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                      facts, config, status_observed_at)
+            _verify_issue_state_write(notion, source_id, row, state)
+            _save_status_request(notion, source_id, row, state)
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
+        if (config.get("bidirectional_enabled") and state.get("deferred_request") and
+                issue_number not in resume_numbers and
+                projection and read_select(row, "작업 상태") !=
+                projection.get("expected_notion_status")):
+            # Keep the older projection/request binding intact until its result is
+            # handled separately from the persisted newer card request.
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
         saved_resume_recovery = (issue_number not in resume_numbers and
-                                 _resume_matches(state["resume"], row_data, facts, item))
+                                 _resume_matches(state["resume"], row_data, facts, item,
+                                                 request_id=current_request_id,
+                                                 notion_status=read_select(row, "작업 상태")))
         approved_resume = False
+        promoted_deferred_request = False
         if issue_number in resume_numbers:
             prior_hold = state["hold"]
-            state["resume"] = {"actor_id": resume_actor["actor_id"], "run_id": resume_actor["run_id"],
-                               "approved_option_id": item["status_option_id"],
-                               "fingerprint": _source_fingerprint(row_data,
-                                   _linked_pr_facts(row_data, facts)[0], item),
-                               "display_pending": True,
-                               "expected_option_id": None, "expected_fingerprint": None}
-            _verify_issue_state_write(notion, source_id, row, state)
+            if (state.get("projection") is None and
+                    prior_hold.get("code") == "DEFERRED_REQUEST_PENDING" and
+                    state.get("deferred_request") is not None):
+                # The prior request is terminal. Transfer the saved follow-up using
+                # its own identity before binding this PM approval; never reuse A's ID.
+                state["request"] = state["deferred_request"]
+                state["deferred_request"] = None
+                promoted_deferred_request = True
+            # A pending add has its own immutable returned-ID and relationship fence.
+            # Do not alter its captured migration input with an unrelated resume marker;
+            # the authorized dispatch is revalidated by direct-node and full-list reads below.
+            pending_add_resume = bool(state.get("pending") and
+                                      state["pending"].get("kind") == "add")
+            if not pending_add_resume:
+                linked_for_resume, _ = _linked_pr_facts(row_data, facts)
+                state["resume"] = {"actor_id": resume_actor["actor_id"], "run_id": resume_actor["run_id"],
+                                   "approved_option_id": item["status_option_id"],
+                                   "fingerprint": _status_operation_fingerprint(
+                                       row_data, linked_for_resume, item),
+                                   "display_pending": True,
+                                   "expected_option_id": None, "expected_fingerprint": None,
+                                   "request_id": (state.get("request") or {}).get("id"),
+                                   "facts_fingerprint": _status_facts_fingerprint(
+                                       row_data, linked_for_resume),
+                                   "fact_contract": "semantic_v2",
+                                   "approved_notion_status": read_select(row, "작업 상태")}
+                _verify_issue_state_write(notion, source_id, row, state)
             approved_resume = prior_hold["code"] in RESUMABLE_HOLD_CODES
         elif saved_resume_recovery:
             approved_resume = bool(state["hold"] and
@@ -2583,28 +4591,583 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         plan_state = json.loads(json.dumps(state))
         plan = _plan_issue(row_data, item, row, plan_state, facts, cutoff, config["project_id"],
                            config["status_options"], approved_resume=approved_resume)
+        prepared_request = state.get("request") or {}
+        prepared_pm_resume = (
+            isinstance(state.get("resume"), dict) and
+            state["resume"].get("request_id") == prepared_request.get("id") and
+            state["resume"].get("approved_notion_status") ==
+            read_select(row, "작업 상태") and
+            state["resume"].get("approved_option_id") == item.get("status_option_id"))
+        prepared_recovery = (prepared_request.get("phase") == "prepared" and
+                             not prepared_pm_resume and
+                             state.get("pending") is None and
+                             state.get("projection") is None and
+                             (state.get("notion_write") or {}).get("kind") == "request")
+        if prepared_recovery:
+            linked_now, eligible_now = _linked_pr_facts(
+                row_data, facts, allow_snapshot_drift=True)
+            baseline_now = state.get("baseline") or {}
+            recovery_matches = (
+                prepared_request.get("target") in GENERAL_STATES and
+                read_select(row, "작업 상태") == prepared_request.get("target") and
+                item.get("id") == baseline_now.get("project_item_id") and
+                _status_stamp(item, config) == baseline_now.get("project") and
+                _status_facts_fingerprint(row_data, linked_now) ==
+                baseline_now.get("facts_fingerprint") and
+                row_data.get("state") == "OPEN" and
+                row_data.get("duplicateOf") is None and not eligible_now and
+                (state.get("notion_write") or {}).get("request_id") ==
+                prepared_request.get("id") and
+                (state.get("notion_write") or {}).get("target") ==
+                prepared_request.get("target"))
+            if not recovery_matches:
+                prepared_request["phase"] = "held"
+                prepared_request["reason"] = (
+                    "준비된 요청을 재개하는 동안 카드, Project stamp 또는 GitHub 사실이 달라져 PM 확인이 필요합니다.")
+                state["notion_write"] = None
+                state["hold"] = _new_hold(
+                    "RESUME_CHECKPOINT_CHANGED", prepared_request["reason"],
+                    _status_operation_fingerprint(row_data, linked_now, item))
+                if read_select(row, "작업 상태") != prepared_request.get("target"):
+                    _record_held_card_request(
+                        notion, source_id, row, state, item, row_data, facts,
+                        config, status_observed_at)
+                _save_status_request(notion, source_id, row, state)
+                _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
+                              preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+            # Reconstruct only the pending operation; preserve the saved request
+            # identity and target instead of accepting the ordinary source plan.
+            plan["target"] = prepared_request["target"]
+            plan["confirmation"] = ""
+        if promoted_deferred_request and approved_resume:
+            followup = state["request"]
+            if plan.get("hold"):
+                state["hold"] = plan["hold"]
+                followup["phase"] = "held"
+                followup["reason"] = plan["hold"]["message"]
+                _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
+                              preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+            state["hold"] = None
+            if plan.get("target") == followup.get("target"):
+                # PM selected the current Project value that agrees with the saved
+                # follow-up. Reuse B's ID and continue through the normal fenced write.
+                followup["phase"] = "prepared"
+                state["notion_write"] = {
+                    "request_id": followup["id"],
+                    "expected_before": read_select(row, "작업 상태"),
+                    "target": followup["target"], "kind": "request",
+                    "phase": "prepared"}
+                plan["target"] = followup["target"]
+                plan["confirmation"] = ""
+            else:
+                selected = plan.get("target")
+                followup["phase"] = "rejected"
+                followup["reason"] = (
+                    f"PM이 현재 GitHub 상태 {selected or '미지정'}을 선택하여 "
+                    f"후속 요청 {followup['target']}은 반영하지 않았습니다.")
+                state["resume"] = None
+                state["notion_write"] = {
+                    "request_id": followup["id"],
+                    "expected_before": read_select(row, "작업 상태"),
+                    "target": selected, "kind": "restore", "phase": "prepared",
+                    "project_item_id": item["id"],
+                    "project_stamp": _status_stamp(item, config),
+                    "facts_fingerprint": _status_facts_fingerprint(
+                        row_data, _linked_pr_facts(row_data, facts)[0])}
+                _verify_issue_state_write(notion, source_id, row, state)
+                _save_status_request(notion, source_id, row, state)
+                _recover_restore_write(
+                    notion, github, project_client, source_id, row, metadata, state,
+                    facts, row_data, item, config, cutoff, now)
+                if state.get("hold"):
+                    counts["held"] += 1
+                else:
+                    counts["updated"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+        if (state["hold"] is not None and issue_number not in resume_numbers and
+                config.get("bidirectional_enabled") and
+                _card_move_needs_preservation(state, row)):
+            # Do not let either the durable hold renderer or a source plan erase a later card move.
+            _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                      facts, config, status_observed_at)
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
         if plan.get("hold"):
+            if (config.get("bidirectional_enabled") and
+                    _card_move_needs_preservation(state, row)):
+                state["hold"] = plan["hold"]
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
             _display_hold(notion, source_id, row, metadata, state, plan["hold"], now,
                           preserve_task_status=plan["hold"]["code"] in
-                          {"MIGRATION_INPUT_CHANGED", "PROJECT_STATUS_UNSET"})
+                          {"MIGRATION_INPUT_CHANGED", "PROJECT_STATUS_UNSET", "MIGRATION_UNSET"})
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
         if state["hold"] is not None and issue_number not in resume_numbers and not saved_resume_recovery:
             # A durable hold cannot disappear merely because the source now looks consistent.
+            if (config.get("bidirectional_enabled") and
+                    _card_move_needs_preservation(state, row)):
+                # Keep a newer card move visible while the original PM hold remains unresolved.
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
             _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
                           preserve_task_status=state["hold"]["code"] in
                           {"MIGRATION_INPUT_CHANGED", "RESUME_CHECKPOINT_CHANGED",
-                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET"})
+                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET", "MIGRATION_UNSET",
+                           "STATUS_REQUEST_INVALID"})
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
 
+        if (config.get("bidirectional_enabled") and state.get("baseline") is None and
+                state.get("pending") is None and state.get("projection") is None and
+                state.get("hold") is None and state.get("resume") is None and
+                issue_number not in resume_numbers):
+            current_notion_status = read_select(row, "작업 상태")
+            current_project_status = {value: name for name, value in
+                                      config["status_options"].items()}.get(
+                                          item.get("status_option_id"))
+            issue_age_seconds = (timestamp(row_data["createdAt"]) - timestamp(cutoff)).total_seconds()
+            new_row_bootstrap = (
+                issue_age_seconds > BOUNDARY_SECONDS and
+                plan.get("target") == "백로그" and not plan.get("hold") and
+                current_notion_status in {None, "백로그"} and
+                current_project_status in {None, "백로그"})
+            refs, eligible_facts = _linked_pr_facts(row_data, facts)
+            source_authoritative = (row_data.get("state") == "CLOSED" or
+                                    row_data.get("duplicateOf") is not None or
+                                    bool(eligible_facts))
+            if (current_notion_status == current_project_status and
+                    plan.get("target") == current_notion_status):
+                latest_issue = gp.fetch_issue_detail(github, row_data["id"])
+                latest_refs, _ = _linked_pr_facts(
+                    latest_issue, facts, allow_snapshot_drift=True)
+                latest_item = gp.fetch_project_item(
+                    project_client, config["project_id"], item["id"],
+                    config["status_field_id"], allow_archived=True)
+                latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+                bound_page(latest_page, source_id)
+                latest_state = decode_internal(
+                    read_text(latest_page, "동기화 내부 상태"), kind="issue",
+                    project_id=config["project_id"], object_id=issue_id)
+                latest_plan = _plan_issue(
+                    latest_issue, latest_item, latest_page, state, facts, cutoff,
+                    config["project_id"], config["status_options"])
+                stable_facts = (_status_facts_fingerprint(latest_issue, latest_refs) ==
+                                _status_facts_fingerprint(row_data, refs))
+                stable = (not latest_item.get("is_archived") and
+                          latest_item.get("id") == item.get("id") and
+                          latest_item.get("content_id") == latest_issue.get("id") and
+                          latest_item.get("status_field_id") == config["status_field_id"] and
+                          _status_stamp(latest_item, config) == _status_stamp(item, config) and
+                          latest_issue.get("id") == row_data.get("id") and stable_facts and
+                          read_select(latest_page, "작업 상태") == current_notion_status and
+                          latest_state is not None and latest_state.get("baseline") is None and
+                          latest_state.get("pending") is None and
+                          latest_state.get("projection") is None and
+                          latest_state.get("hold") is None and
+                          latest_state.get("resume") is None and
+                          latest_state.get("project_item_id") in {None, latest_item.get("id")} and
+                          ((latest_state.get("request") or {}).get("phase") in
+                           {None, "completed", "rejected"}) and
+                          latest_state.get("notion_write") is None and
+                          (latest_state.get("readback") is None or
+                           latest_state["readback"].get("validated")) and
+                          latest_plan.get("target") == current_notion_status and
+                          not latest_plan.get("hold"))
+                if not stable:
+                    hold = _new_hold(
+                        "SOURCE_CHANGED_BEFORE_WRITE",
+                        "초기 기준 상태를 저장하기 직전 Project, Notion 또는 GitHub 사실이 달라졌습니다.",
+                        _digest({"issue": latest_issue.get("id"),
+                                 "item": latest_item.get("id"),
+                                 "facts": _status_facts_fingerprint(latest_issue, latest_refs)}))
+                    state["hold"] = hold
+                    _display_hold(notion, source_id, latest_page, metadata, state, hold, now,
+                                  preserve_task_status=True)
+                    counts["held"] += 1
+                    issue_rows_for_summary.append((row, state))
+                    continue
+                state["baseline"] = _new_status_baseline(
+                    current_notion_status, latest_item, latest_issue, latest_refs,
+                    config, status_observed_at)
+                state["project_item_id"] = latest_item["id"]
+                _verify_issue_state_write(notion, source_id, row, state)
+            elif not source_authoritative and not new_row_bootstrap:
+                code = ("MIGRATION_CONFLICT" if current_notion_status in GENERAL_STATES and
+                        current_project_status in GENERAL_STATES else "MIGRATION_UNSET")
+                message = ("기준 상태가 없어 서로 다른 Notion/Project 값을 선택할 수 없습니다."
+                           if code == "MIGRATION_CONFLICT" else
+                           "기준 상태를 만들기 위해 Notion과 Project의 유효한 상태 확인이 필요합니다.")
+                hold = _new_hold(code, message,
+                                 _pending_semantic_fingerprint(row_data, refs, item, "status"))
+                _display_hold(notion, source_id, row, metadata, state, hold, now,
+                              preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+
+        terminal_marker = state.get("notion_write") or {}
+        terminal_request = state.get("request") or {}
+        terminal_project_status = {value: name for name, value in
+                                   config["status_options"].items()}.get(
+                                       item.get("status_option_id"))
+        if (config.get("bidirectional_enabled") and kind == "Issue" and
+                not closed_supersedes_restore and
+                terminal_request.get("phase") == "rejected" and
+                terminal_marker.get("kind") == "restore" and
+                terminal_marker.get("phase") == "confirmed" and
+                not (terminal_project_status == read_select(row, "작업 상태") and
+                     _terminal_restore_marker_matches(
+                         state, page=row, issue=row_data, item=item,
+                         linked_refs=_linked_pr_facts(
+                             row_data, facts, allow_snapshot_drift=True)[0],
+                         config=config, notion_status=read_select(row, "작업 상태")))):
+            hold = _new_hold(
+                "PENDING_RESULT_UNCLEAR",
+                "확정된 요청 복원 표시의 카드·요청·Project·GitHub 확인이 달라 baseline 승격을 멈췄습니다.",
+                _digest({"request_id": terminal_request.get("id"),
+                         "marker_request_id": terminal_marker.get("request_id"),
+                         "item": item.get("id"),
+                         "project_stamp": _status_stamp(item, config)}))
+            state["hold"] = hold
+            _display_hold(notion, source_id, row, metadata, state, hold, now,
+                          preserve_task_status=True)
+            counts["held"] += 1
+            issue_rows_for_summary.append((row, state))
+            continue
+
+        status_request_action = None
+        status_decision = None
+        if (config.get("bidirectional_enabled") and kind == "Issue" and
+                issue_number not in resume_numbers and
+                not closed_supersedes_restore and
+                not promoted_deferred_request and
+                (state.get("request") or {}).get("phase") not in
+                {"prepared", "sent", "uncertain", "confirmed"}):
+            status_decision, status_request = _classify_notion_status_change(
+                state, row, item, row_data, facts, config, status_observed_at)
+            status_request_action = status_decision["action"]
+            if status_request is not None:
+                state["request"] = status_request
+                if status_decision["action"] == "notion_request":
+                    state["request"]["phase"] = "prepared"
+                    state["notion_write"] = {
+                        "request_id": status_request["id"],
+                        "expected_before": state["baseline"]["notion_status"],
+                        "target": status_request["target"], "kind": "request",
+                        "phase": "prepared"}
+                    plan["target"] = status_request["target"]
+                    plan["confirmation"] = ""
+                else:
+                    facts_invalid_request = (
+                        status_decision["action"] == "facts_override" and
+                        read_select(row, "작업 상태") not in status_sync.GENERAL_STATES)
+                    state["request"]["phase"] = (
+                        "rejected" if (status_decision["action"] == "hold_invalid_request" or
+                                       facts_invalid_request) else "held")
+                    status_hold_code = {
+                        "hold_invalid_request": "STATUS_REQUEST_INVALID",
+                        "conflict": "BIDIRECTIONAL_CONFLICT",
+                        "hold_unknown": "STATUS_ORDER_UNKNOWN",
+                        "facts_override": "GITHUB_FACTS_CHANGED",
+                    }.get(status_decision["action"], "STATUS_ORDER_UNKNOWN")
+                    if facts_invalid_request:
+                        # Reject the invalid card value, but let the independently
+                        # verified GitHub fact transition continue through the normal
+                        # Project mutation and final dual-side readback path.
+                        state["hold"] = None
+                        state["request"]["reason"] = status_request["reason"]
+                        state["notion_write"] = None
+                        _save_status_request(notion, source_id, row, state)
+                    else:
+                        state["hold"] = _new_hold(status_hold_code, status_request["reason"],
+                                                   _source_fingerprint(row_data,
+                                                       _linked_pr_facts(row_data, facts)[0], item))
+                        state["request"]["reason"] = state["hold"]["message"]
+                        state["notion_write"] = {"request_id": status_request["id"],
+                                                  "expected_before": status_request["target"],
+                                                  "target": plan.get("target"), "kind": "restore",
+                                                  "phase": "prepared",
+                                                  "project_item_id": item["id"],
+                                                  "project_stamp": _status_stamp(item, config),
+                                                  "facts_fingerprint": _status_facts_fingerprint(
+                                                      row_data, _linked_pr_facts(
+                                                          row_data, facts)[0])}
+                        _verify_issue_state_write(notion, source_id, row, state)
+                        _save_status_request(notion, source_id, row, state)
+                        _recover_restore_write(
+                            notion, github, project_client, source_id, row, metadata, state,
+                            facts, row_data, item, config, cutoff, now)
+                        counts["held"] += 1
+                        issue_rows_for_summary.append((row, state))
+                        continue
+
+        # Two independently changed sides that already show the same verified
+        # value are converged. Refresh only the durable baseline after one last
+        # source/page check; do not manufacture a task-status projection.
+        if (status_decision and status_decision.get("action") == "converged" and
+                status_decision.get("notion_changed") and
+                status_decision.get("project_changed") and
+                state.get("baseline") is not None and
+                state.get("pending") is None and state.get("projection") is None and
+                state.get("hold") is None and state.get("resume") is None and
+                state.get("deferred_request") is None and state.get("notion_write") is None and
+                plan.get("target") == read_select(row, "작업 상태") and
+                (state.get("request") or {}).get("phase") in {None, "completed", "rejected"}):
+            latest_issue = gp.fetch_issue_detail(github, row_data["id"])
+            latest_refs, _ = _linked_pr_facts(latest_issue, facts, allow_snapshot_drift=True)
+            latest_item = gp.fetch_project_item(
+                project_client, config["project_id"], item["id"],
+                config["status_field_id"], allow_archived=True)
+            latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+            bound_page(latest_page, source_id)
+            latest_state = decode_internal(
+                read_text(latest_page, "동기화 내부 상태"), kind="issue",
+                project_id=config["project_id"], object_id=issue_id)
+            same_value = {value: name for name, value in config["status_options"].items()}.get(
+                latest_item.get("status_option_id"))
+            stable = (
+                latest_issue.get("id") == row_data.get("id") and
+                latest_item.get("id") == item.get("id") and
+                latest_item.get("content_id") == latest_issue.get("id") and
+                latest_item.get("status_field_id") == config["status_field_id"] and
+                not latest_item.get("is_archived") and
+                _status_stamp(latest_item, config) == _status_stamp(item, config) and
+                _status_facts_fingerprint(latest_issue, latest_refs) ==
+                _status_facts_fingerprint(row_data,
+                    _linked_pr_facts(row_data, facts, allow_snapshot_drift=True)[0]) and
+                same_value == read_select(latest_page, "작업 상태") == plan.get("target") and
+                latest_state == state)
+            if not stable:
+                hold = _new_hold(
+                    "SOURCE_CHANGED_BEFORE_WRITE",
+                    "동일 상태 수렴 확인 중 Project, Notion 또는 GitHub 값이 달라 baseline 저장을 보류했습니다.",
+                    _projection_fingerprint({}, latest_issue, latest_refs, latest_item))
+                state["hold"] = hold
+                _display_hold(notion, source_id, latest_page, metadata, state, hold, now,
+                              preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((latest_page, state))
+                continue
+            state["baseline"] = _new_status_baseline(
+                same_value, latest_item, latest_issue, latest_refs, config, status_observed_at)
+            state["project_item_id"] = latest_item["id"]
+            _verify_issue_state_write(notion, source_id, latest_page, state)
+            row = latest_page
+            item = latest_item
+            project_by_issue[issue_id] = latest_item
+
+        # A genuinely unchanged, fully baselined row needs metadata and clock
+        # refreshes only. Recheck the semantic Project stamp and GitHub facts
+        # first so same-option resets and source changes still take the guarded
+        # reconciliation path below.
+        if (config.get("bidirectional_enabled") and kind == "Issue" and
+                state.get("pending") is None and state.get("projection") is None and
+                state.get("hold") is None and
+                _terminal_restore_marker_matches(
+                    state, page=row, issue=row_data, item=item,
+                    linked_refs=_linked_pr_facts(row_data, facts,
+                                                 allow_snapshot_drift=True)[0],
+                    config=config, notion_status=read_select(row, "작업 상태"))):
+            terminal_marker = state["notion_write"]
+            prior_baseline = state.get("baseline")
+            observed_status = read_select(row, "작업 상태")
+            state["baseline"] = _new_status_baseline(
+                observed_status, item, row_data,
+                _linked_pr_facts(row_data, facts, allow_snapshot_drift=True)[0],
+                config, status_observed_at)
+            state["notion_write"] = None
+            _verify_issue_state_write(notion, source_id, row, state)
+            if (read_select(row, "작업 상태") != observed_status or
+                    not _restore_projection_matches(row, terminal_marker)):
+                # The state PATCH readback also fetches the live card. If the
+                # terminal display changed in that interval, undo promotion and
+                # preserve the newly observed move as a separate held request.
+                state["baseline"] = prior_baseline
+                state["notion_write"] = terminal_marker
+                hold = _new_hold(
+                    "REQUEST_RACE",
+                    "확정된 복원 표시 확인 중 Notion 카드 변경이 확인되어 baseline 확정을 보류했습니다.",
+                    _digest({"request_id": (state.get("request") or {}).get("id"),
+                             "observed_status": read_select(row, "작업 상태")}))
+                _persist_observed_card_race(
+                    notion, source_id, row, metadata, state, item=item,
+                    issue=row_data, facts=facts, config=config,
+                    now=now,
+                    message=hold["message"])
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+
+        baseline = state.get("baseline")
+        request_phase = (state.get("request") or {}).get("phase")
+        if (config.get("bidirectional_enabled") and kind == "Issue" and
+                status_decision and status_decision.get("action") in {"unchanged", "converged"} and
+                baseline and baseline.get("notion_status") == read_select(row, "작업 상태") and
+                baseline.get("project_item_id") == item.get("id") and
+                baseline.get("project") == _status_stamp(item, config) and
+                baseline.get("facts_fingerprint") == _status_facts_fingerprint(
+                    row_data, _linked_pr_facts(row_data, facts)[0]) and
+                plan.get("target") == read_select(row, "작업 상태") and
+                state.get("migration_complete") and state.get("pending") is None and
+                state.get("projection") is None and state.get("hold") is None and
+                state.get("resume") is None and state.get("deferred_request") is None and
+                state.get("notion_write") is None and
+                (state.get("readback") is None or state["readback"].get("validated")) and
+                request_phase in {None, "completed", "rejected"}):
+            stable_issue = gp.fetch_issue_detail(github, row_data["id"])
+            stable_refs, _ = _linked_pr_facts(stable_issue, facts, allow_snapshot_drift=True)
+            stable_item = gp.fetch_project_item(
+                project_client, config["project_id"], item["id"],
+                config["status_field_id"], allow_archived=True)
+            stable_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+            bound_page(stable_page, source_id)
+            stable_state = decode_internal(
+                read_text(stable_page, "동기화 내부 상태"), kind="issue",
+                project_id=config["project_id"], object_id=issue_id)
+            stable = (
+                not stable_item.get("is_archived") and
+                stable_item.get("id") == baseline["project_item_id"] and
+                stable_item.get("content_id") == stable_issue.get("id") and
+                stable_item.get("status_field_id") == config["status_field_id"] and
+                _status_stamp(stable_item, config) == baseline["project"] and
+                _status_facts_fingerprint(stable_issue, stable_refs) ==
+                baseline["facts_fingerprint"] and
+                read_select(stable_page, "작업 상태") == baseline["notion_status"] and
+                stable_state == state)
+            if stable:
+                stable_metadata = _make_metadata(kind, stable_issue, key)
+                _patch_page(notion, source_id, stable_page, {
+                    **stable_metadata,
+                    "동기화 시각": {"date": {"start": _minute_iso(now)}},
+                })
+                project_by_issue[issue_id] = stable_item
+                if not created:
+                    counts["updated"] += 1
+                issue_rows_for_summary.append((stable_page, state))
+                continue
+
+        active_prepared = state.get("request") or {}
+        if (config.get("bidirectional_enabled") and kind == "Issue" and
+                active_prepared.get("phase") == "prepared" and
+                state.get("pending") is None and state.get("projection") is None):
+            request_ui = _status_request_properties(state)
+            if not _properties_match(row, request_ui):
+                _save_status_request(notion, source_id, row, state)
+            saved_ui_state = decode_internal(
+                read_text(row, "동기화 내부 상태"), kind="issue",
+                project_id=config["project_id"], object_id=issue_id)
+            current_card = read_select(row, "작업 상태")
+            approved_card_matches = (
+                prepared_pm_resume and
+                current_card == (state.get("notion_write") or {}).get("expected_before"))
+            if ((current_card != active_prepared.get("target") and
+                 not approved_card_matches) or
+                    saved_ui_state is None or
+                    (saved_ui_state.get("request") or {}).get("id") !=
+                    active_prepared.get("id") or
+                    (saved_ui_state.get("request") or {}).get("phase") != "prepared"):
+                active_prepared["phase"] = "held"
+                active_prepared["reason"] = (
+                    "반영 대기 표시를 확인하는 동안 Notion 카드 또는 요청이 바뀌어 Project 반영을 멈췄습니다.")
+                state["notion_write"] = None
+                state["hold"] = _new_hold(
+                    "REQUEST_RACE", active_prepared["reason"],
+                    _status_operation_fingerprint(row_data,
+                        _linked_pr_facts(row_data, facts, allow_snapshot_drift=True)[0], item))
+                _record_held_card_request(notion, source_id, row, state, item, row_data,
+                                          facts, config, status_observed_at)
+                _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
+                              preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+
         old_option = item["status_option_id"]
         target_option = _status_option(project, plan["target"])
-        project, item, migration_hold = _apply_project_status(
-            notion, github, project_client, source_id, row, state, project, facts,
-            row_data, item, plan, config)
+        if state.get("projection") is not None:
+            expected = state["projection"]
+            if (target_option != expected.get("expected_option_id") or
+                    plan.get("target") != expected.get("result_notion_status")):
+                migration_hold = _new_hold(
+                    "PROJECTION_CHECKPOINT_CHANGED",
+                    "복구된 Project 결과가 현재 원본 사실과 일치하지 않아 표시를 보류했습니다.",
+                    _projection_fingerprint(expected, row_data,
+                                            _linked_pr_facts(row_data, facts)[0], item))
+            else:
+                migration_hold = None
+        elif promoted_deferred_request and target_option == old_option:
+            # The PM selected the exact Project value requested by the follow-up.
+            # Confirm that unchanged Project value against fresh Issue/item reads,
+            # then checkpoint only the Notion projection; do not manufacture a
+            # status mutation or bind B to A's previous pending write.
+            latest_issue = gp.fetch_issue_detail(github, row_data["id"])
+            latest_item = gp.fetch_project_item(
+                project_client, config["project_id"], item["id"],
+                config["status_field_id"], allow_archived=True)
+            latest_refs, _ = _linked_pr_facts(latest_issue, facts, allow_snapshot_drift=True)
+            stable = (not latest_item.get("is_archived") and
+                      latest_issue.get("id") == row_data.get("id") and
+                      latest_item.get("id") == item.get("id") and
+                      latest_item.get("content_id") == latest_issue.get("id") and
+                      latest_item.get("status_field_id") == config["status_field_id"] and
+                      latest_item.get("status_option_id") == target_option and
+                      _status_stamp(latest_item, config) == _status_stamp(item, config) and
+                      _status_facts_fingerprint(latest_issue, latest_refs) ==
+                      _status_facts_fingerprint(row_data,
+                                                _linked_pr_facts(row_data, facts)[0]))
+            if not stable:
+                migration_hold = _new_hold(
+                    "SOURCE_CHANGED_BEFORE_WRITE",
+                    "PM이 후속 요청을 확인하는 동안 GitHub 사실 또는 Project 상태가 달라져 표시를 보류했습니다.",
+                    _projection_fingerprint({}, latest_issue, latest_refs, latest_item))
+            else:
+                checkpoint = {
+                    "migration_complete": bool(plan["state"].get("migration_complete")),
+                    "review_cycle": plan["state"]["review_cycle"],
+                    "review_return_cycle": plan["state"]["review_return_cycle"],
+                    "reopen_last_id": plan["state"]["reopen_last_id"],
+                    "review_pr_hash": plan["state"]["review_pr_hash"],
+                }
+                operation_fingerprint = _status_operation_fingerprint(
+                    latest_issue, latest_refs, latest_item)
+                state["request"]["phase"] = "confirmed"
+                state["notion_write"]["phase"] = "confirmed"
+                state["projection"] = {
+                    "expected_option_id": target_option,
+                    "expected_fingerprint": operation_fingerprint,
+                    "checkpoint": checkpoint,
+                    "fact_contract": "semantic_v2",
+                    "request_id": state["request"]["id"],
+                    "expected_notion_status": read_select(row, "작업 상태"),
+                    "result_notion_status": plan["target"],
+                }
+                if state.get("resume"):
+                    state["resume"]["expected_option_id"] = target_option
+                    state["resume"]["expected_fingerprint"] = operation_fingerprint
+                _verify_issue_state_write(notion, source_id, row, state)
+                item = latest_item
+                project_by_issue[issue_id] = latest_item
+                migration_hold = None
+        else:
+            if closed_supersedes_restore:
+                state["notion_write"] = None
+            project, item, migration_hold = _apply_project_status(
+                notion, github, project_client, source_id, row, state, project, facts,
+                row_data, item, plan, config, status_observed_at)
         project_by_issue[issue_id] = item
         if migration_hold:
             _display_hold(notion, source_id, row, metadata, state, migration_hold, now,
@@ -2620,7 +5183,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         latest_item = gp.fetch_project_item(project_client, config["project_id"], item["id"],
                                             config["status_field_id"], allow_archived=True)
         expected_projection = state["projection"]
-        current_projection_fingerprint = _source_fingerprint(latest_issue, latest_refs, latest_item)
+        current_projection_fingerprint = _projection_fingerprint(
+            expected_projection or {}, latest_issue, latest_refs, latest_item)
         if latest_item.get("is_archived"):
             projection_hold = _new_hold("PROJECT_ITEM_ARCHIVED",
                                         "Notion 표시 전에 Project 항목이 보관되었습니다.",
@@ -2629,6 +5193,10 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
               latest_item["status_option_id"] != target_option or
               expected_projection is None or
               expected_projection["expected_option_id"] != target_option or
+              (expected_projection.get("fact_contract") == "semantic_v2" and
+               (expected_projection.get("request_id") !=
+                (state.get("request") or {}).get("id") or
+               expected_projection.get("result_notion_status") != plan.get("target"))) or
               current_projection_fingerprint != expected_projection["expected_fingerprint"]):
             projection_hold = _new_hold(
                 "PROJECTION_CHECKPOINT_CHANGED",
@@ -2637,6 +5205,15 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         else:
             projection_hold = None
         if projection_hold:
+            if projection_hold.get("code") == "REQUEST_RACE":
+                state["hold"] = projection_hold
+                _record_held_card_request(notion, source_id, row, state, latest_item,
+                                          latest_issue, facts, config, status_observed_at)
+                _verify_issue_state_write(notion, source_id, row, state)
+                _save_status_request(notion, source_id, row, state)
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
             state["projection"] = None
             if latest_item.get("is_archived"):
                 project_by_issue.pop(issue_id, None)
@@ -2648,10 +5225,90 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             issue_rows_for_summary.append((row, state))
             continue
         project_by_issue[issue_id] = latest_item
-        state["hold"] = None
-        state["resume"] = None
-        state["projection"] = None
-        _update_row(notion, source_id, row, metadata, plan, state, now, kind="Issue")
+        if config.get("bidirectional_enabled") and kind == "Issue":
+            latest_page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+            bound_page(latest_page, source_id)
+            latest_state = decode_internal(
+                read_text(latest_page, "동기화 내부 상태"), kind="issue",
+                project_id=config["project_id"], object_id=issue_id)
+            approving_older_result = bool(
+                issue_number in resume_numbers and state.get("deferred_request") and
+                state.get("request") and
+                state["request"].get("id") == expected_projection.get("request_id"))
+            latest_task = read_select(latest_page, "작업 상태")
+            latest_deferred = (latest_state or {}).get("deferred_request") or {}
+            preserve_deferred_status = (
+                latest_task if approving_older_result and latest_state is not None and
+                _deferred_card_matches(latest_state, expected_projection, latest_task)
+                else None)
+            older_result_card_values = {expected_projection.get("expected_notion_status")}
+            if approving_older_result:
+                older_result_card_values.update({
+                    expected_projection.get("result_notion_status"),
+                    latest_deferred.get("target"),
+                })
+            if (approving_older_result and latest_state is not None and
+                    latest_task not in older_result_card_values):
+                # PM approval of A cannot consume a card move C that is already
+                # visible. Replace only the deferred snapshot (B -> latest C), keep
+                # A's operation checkpoint, and require a fresh PM decision later.
+                state = latest_state
+                state["resume"] = None
+                race = _new_hold(
+                    "REQUEST_RACE",
+                    "이전 결과를 PM이 재개하는 동안 새 Notion 상태 이동이 확인되어 최신 이동을 보류했습니다.",
+                    current_projection_fingerprint)
+                _persist_observed_card_race(
+                    notion, source_id, latest_page, metadata, state,
+                    item=latest_item, issue=latest_issue, facts=facts,
+                    config=config, now=now, message=race["message"])
+                counts["held"] += 1
+                issue_rows_for_summary.append((latest_page, state))
+                continue
+            card_matches_older_operation = latest_task in older_result_card_values
+            if (not card_matches_older_operation or latest_state is None or
+                    (latest_state.get("request") or {}).get("id") !=
+                    expected_projection.get("request_id")):
+                display_race = _new_hold(
+                    "REQUEST_RACE",
+                    "Project 결과 확인 뒤 Notion에 새 상태 이동이 있어 이전 표시 복구를 멈췄습니다.",
+                    current_projection_fingerprint)
+                state["hold"] = display_race
+                if (state.get("request") and
+                        state["request"].get("id") == expected_projection.get("request_id")):
+                    state["request"]["phase"] = "held"
+                    state["request"]["reason"] = display_race["message"]
+                _verify_issue_state_write(notion, source_id, latest_page, state)
+                _display_hold(notion, source_id, latest_page, metadata, state,
+                              display_race, now, preserve_task_status=True)
+                counts["held"] += 1
+                issue_rows_for_summary.append((latest_page, state))
+                continue
+            row = latest_page
+            # First verify the visible projection while the durable checkpoint remains.
+            checkpoint_written = _write_checkpointed_projection(
+                notion, source_id, row, metadata, plan, state, now,
+                item=latest_item, issue=latest_issue, facts=facts, config=config,
+                preserve_task_status=preserve_deferred_status)
+            if not checkpoint_written:
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+            finalized = _finalize_bidirectional_projection(
+                notion, source_id, row, state, issue=latest_issue, item=latest_item,
+                linked_refs=latest_refs, config=config, notion_status=plan.get("target"),
+                observed_at=status_observed_at, approved_resume=approved_resume,
+                facts=facts, metadata=metadata, now=now,
+                preserve_task_status=preserve_deferred_status)
+            if not finalized:
+                counts["held"] += 1
+                issue_rows_for_summary.append((row, state))
+                continue
+        else:
+            state["hold"] = None
+            state["resume"] = None
+            state["projection"] = None
+            _update_row(notion, source_id, row, metadata, plan, state, now, kind="Issue")
         if not created:
             counts["updated"] += 1
         issue_rows_for_summary.append((row, state))
@@ -2661,8 +5318,22 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                     issue_rows_for_summary, now=now, run_id=run_id, counts=counts)
     counts["held"] = max(counts["held"], len(holds))
     if notification_result is not None:
+        report_mark = observation_clock.mark_snapshot()
+        report_observed_at, report_uncertainty = observation_clock.verify_snapshot(
+            report_mark, lambda: observation_clock.fetch_fresh_date(github))
+        awaiting_add_readback = any(
+            bool(state and state.get("pending") and
+                 state["pending"].get("kind") == "add" and
+                 state.get("readback") and
+                 state["readback"].get("returned_item_id") and
+                 not state["readback"].get("validated"))
+            for _, state in issue_rows_for_summary)
         notification_result.update(scan_complete=True,
-                                   holds=notification_report.collect_holds(issue_rows_for_summary))
+                                   holds=notification_report.collect_holds(issue_rows_for_summary),
+                                   observed_at=report_observed_at,
+                                   observation_uncertainty_seconds=report_uncertainty)
+        if holds or counts.get("failed", 0) or awaiting_add_readback:
+            notification_result["partial"] = True
     return counts
 
 
@@ -2677,11 +5348,15 @@ def _load_config(env):
             env["PM_GITHUB_USER_ID"] == str(gp.EXPECTED_PM_USER_ID),
             "고정 Project/PM 설정이 확인된 ID와 다릅니다")
     require(len(env["PROJECT_STATUS_FIELD_ID"]) <= 128, "Project Status field ID 형식 오류")
+    bidirectional = env.get("NOTION_BIDIRECTIONAL_ENABLED", "false")
+    require(bidirectional in {"true", "false"},
+            "NOTION_BIDIRECTIONAL_ENABLED는 true 또는 false여야 합니다")
     return {"project_id": env["PROJECT_ID"], "owner_id": env["PROJECT_OWNER_ID"],
             "status_field_id": env["PROJECT_STATUS_FIELD_ID"],
             "status_options": gp.parse_status_options(env["PROJECT_STATUS_OPTIONS"]),
             "notion_source_id": identifier(env["NOTION_DATA_SOURCE_ID"]),
-            "notion_control_id": identifier(env["NOTION_CONTROL_PAGE_ID"])}
+            "notion_control_id": identifier(env["NOTION_CONTROL_PAGE_ID"]),
+            "bidirectional_enabled": bidirectional == "true"}
 
 
 def main(argv=None):
@@ -2721,8 +5396,15 @@ def main(argv=None):
             full = not args.dry_run and notification_result.get("scan_complete") is True
             holds = notification_result.get("holds", []) if full else []
             notification_report.write(args.notification_report, env,
-                                      kind=("partial" if holds or counts.get("failed", 0) else "complete") if full else "skipped",
-                                      dry_run=args.dry_run, scan_complete=full, holds=holds)
+                                      kind=("partial" if notification_result.get("partial") or
+                                            notification_result.get("holds") or
+                                            counts.get("failed", 0) else "complete")
+                                      if full else "skipped",
+                                      dry_run=args.dry_run, scan_complete=full, holds=holds,
+                                      observed_at=notification_result.get("observed_at") if full else None,
+                                      observation_uncertainty_seconds=(
+                                          notification_result.get("observation_uncertainty_seconds")
+                                          if full else None))
         print(json.dumps(counts, ensure_ascii=False, sort_keys=True))
         return 0
     except (SyncError, gp.SyncError) as exc:

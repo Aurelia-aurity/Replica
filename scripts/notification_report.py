@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
 REPO_ID = 1392442366
 FILE_NAME = "notion-notification-report.json"
@@ -10,12 +11,16 @@ MAX_BYTES = 2_000_000
 
 
 def validate(report, *, run_id=None, attempt=None, sha=None):
-    keys = {"schema", "repository_id", "run_id", "attempt", "workflow_sha",
-            "checked_out_sha", "dry_run", "kind", "scan_complete", "holds"}
-    if not isinstance(report, dict) or set(report) != keys:
+    common = {"repository_id", "run_id", "attempt", "workflow_sha",
+              "checked_out_sha", "dry_run", "kind", "scan_complete", "holds"}
+    if not isinstance(report, dict) or type(report.get("schema")) is not int:
         raise ValueError("Invalid notification report")
-    if (type(report["schema"]) is not int or report["schema"] != 1 or
-            type(report["repository_id"]) is not int or report["repository_id"] != REPO_ID):
+    schema = report["schema"]
+    keys = common | {"schema"} if schema == 1 else common | {
+        "schema", "observed_at", "observation_uncertainty_seconds"}
+    if schema not in (1, 2) or set(report) != keys:
+        raise ValueError("Invalid notification report")
+    if type(report["repository_id"]) is not int or report["repository_id"] != REPO_ID:
         raise ValueError("Invalid notification report identity")
     for key in ("run_id", "attempt"):
         if type(report[key]) is not int or report[key] <= 0:
@@ -32,6 +37,23 @@ def validate(report, *, run_id=None, attempt=None, sha=None):
     full = report["scan_complete"]
     if full and (report["dry_run"] or report["kind"] not in ("complete", "partial")):
         raise ValueError("Invalid notification report completion")
+    if schema == 2:
+        observed_at = report["observed_at"]
+        uncertainty = report["observation_uncertainty_seconds"]
+        if (observed_at is None) != (uncertainty is None):
+            raise ValueError("Incomplete notification observation time")
+        if observed_at is not None:
+            if (not isinstance(observed_at, str) or not observed_at.endswith("Z") or
+                    type(uncertainty) is not int or not 0 <= uncertainty <= 60):
+                raise ValueError("Invalid notification observation time")
+            try:
+                parsed = datetime.fromisoformat(observed_at[:-1] + "+00:00")
+            except ValueError:
+                raise ValueError("Invalid notification observation time") from None
+            if parsed.utcoffset().total_seconds() != 0:
+                raise ValueError("Invalid notification observation time")
+        if not full and (observed_at is not None or uncertainty is not None):
+            raise ValueError("Incomplete report cannot carry observation time")
     holds = report["holds"]
     if not isinstance(holds, list) or len(holds) > 10000:
         raise ValueError("Invalid notification report holds")
@@ -71,16 +93,20 @@ def collect_holds(rows):
     return [{"issue_number": n, "reason_code": c} for n, c in sorted(result)]
 
 
-def write(path, env, *, kind, dry_run=False, scan_complete=False, holds=()):
+def write(path, env, *, kind, dry_run=False, scan_complete=False, holds=(),
+          observed_at=None, observation_uncertainty_seconds=None):
     # No source data, titles, raw errors or credentials enter this artifact.
     checkout = subprocess.run(["git", "rev-parse", "HEAD"], check=True,
                               capture_output=True, text=True).stdout.strip()
-    report = validate({"schema": 1, "repository_id": REPO_ID,
+    report = validate({"schema": 2, "repository_id": REPO_ID,
                        "run_id": int(env["GITHUB_RUN_ID"]),
                        "attempt": int(env["GITHUB_RUN_ATTEMPT"]),
                        "workflow_sha": env["GITHUB_SHA"], "checked_out_sha": checkout,
                        "dry_run": dry_run, "kind": kind,
-                       "scan_complete": scan_complete, "holds": list(holds)})
+                       "scan_complete": scan_complete, "holds": list(holds),
+                       "observed_at": observed_at if scan_complete and not dry_run else None,
+                       "observation_uncertainty_seconds": (
+                           observation_uncertainty_seconds if scan_complete and not dry_run else None)})
     data = json.dumps(report, sort_keys=True).encode()
     if len(data) > MAX_BYTES:
         raise ValueError("Notification report too large")

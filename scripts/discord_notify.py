@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import discord_transport as dt
+import observation_clock
 
 REPO = dt.REPO
 REPO_ID = dt.REPO_ID
@@ -61,8 +62,32 @@ def payload(label, description, url, mapping, *, recipients=()):
 
 
 def new_state():
-    return {"schema": 1, "repository_id": REPO_ID, "seen": [], "outbox": {},
+    return {"schema": 2, "repository_id": REPO_ID, "seen": [], "outbox": {},
             "incidents": {}, "holds": {}, "sync_cursor": None, "invalidated": []}
+
+
+def _empty_episode(episode_id, *, run_id=None, attempt=None, observed_at=None,
+                   uncertainty=None):
+    timer = observed_at is not None
+    return {"episode_id": episode_id,
+            "first_observed_run_id": run_id, "first_observed_attempt": attempt,
+            "first_observed_at": observed_at,
+            "timer_origin_at": observed_at if timer else None,
+            "timer_origin_run_id": run_id if timer else None,
+            "timer_origin_uncertainty_seconds": uncertainty if timer else None,
+            "last_valid_observed_at": observed_at,
+            "last_observation_run_id": run_id, "last_observation_attempt": attempt,
+            "delay_alert_key": None, "delay_cancelled": False}
+
+
+def upgrade_state(state):
+    """Upgrade the v1 ledger in place while retaining every delivery fence."""
+    if state["schema"] == 1:
+        state["schema"] = 2
+        for number, target in state["holds"].items():
+            for code, reason in target["reasons"].items():
+                reason["episode"] = _empty_episode(f"legacy:{number}:{code}")
+    return state
 
 
 def valid_sha(value):
@@ -93,6 +118,34 @@ def invalidate(state, key):
     state["invalidated"] = sorted(set(state["invalidated"]) | {key})
     if state["outbox"][key]["status"] == "ready":
         state["outbox"][key]["status"] = "retired"
+
+
+def end_hold_episode(state, reason):
+    """Stop timers and unsent notices while retaining any delivery fence."""
+    episode = reason.get("episode") or {}
+    delay_key = episode.get("delay_alert_key")
+    if delay_key and delay_key != "cancelled":
+        invalidate(state, delay_key)
+    alert = reason.get("alert")
+    if alert:
+        invalidate(state, alert)
+    reason["streak"] = 0
+    reason["episode"] = None
+
+
+def retain_recovery_anchor(state, target, alert):
+    """Remember delivered or ambiguous hold notices until issue-level recovery."""
+    if (alert and alert.startswith(("hold:", "hold-delay:")) and
+            state["outbox"].get(alert, {}).get("status") in ("delivered", "pending")):
+        anchors = target.setdefault("recovery_alerts", [])
+        if alert not in anchors:
+            anchors.append(alert)
+
+
+def retain_episode_recovery_anchors(state, target, reason):
+    retain_recovery_anchor(state, target, reason.get("alert"))
+    episode = reason.get("episode") or {}
+    retain_recovery_anchor(state, target, episode.get("delay_alert_key"))
 
 
 def seal_message(key, message):
@@ -184,7 +237,10 @@ def source_events(objects, timelines, mapping, backlog=()):
             elif action == "review_requested" and pull:
                 identity = request_identity(event)
                 normalized = identity[0], identity[1].casefold()
-                active = normalized[1] in (current_users if identity[0] == "user" else current_teams)
+                # A stale requested_reviewers list can survive PR closure. Review
+                # requests are actionable only while the current PR is open.
+                active = (obj.get("state") == "open" and
+                          normalized[1] in (current_users if identity[0] == "user" else current_teams))
                 if active and latest_request.get(normalized) == event:
                     names = [identity[1]] if identity[0] == "user" else []
                     description = "리뷰 요청 · 변경 사항을 확인하고 리뷰해주세요."
@@ -217,6 +273,76 @@ def run_order(run):
     if any(type(x) is not int or x <= 0 for x in values):
         raise dt.Error("Invalid workflow run order")
     return values
+
+
+def sync_run_binding(run):
+    """Bind list and detail evidence used by sync notice decisions."""
+    if not isinstance(run, dict):
+        return None
+    try:
+        run_number, run_id, attempt = run_order(run)
+    except (KeyError, TypeError, dt.Error):
+        return None
+    repository, head_repository = run.get("repository"), run.get("head_repository")
+    repo_id = repository.get("id") if isinstance(repository, dict) else None
+    head_repo_id = head_repository.get("id") if isinstance(head_repository, dict) else None
+    workflow_id, path = run.get("workflow_id"), run.get("path")
+    head_sha, status, conclusion = run.get("head_sha"), run.get("status"), run.get("conclusion")
+    branch, event = run.get("head_branch"), run.get("event")
+    if (type(workflow_id) is not int or workflow_id <= 0 or not isinstance(path, str) or not path or
+            type(repo_id) is not int or repo_id <= 0 or type(head_repo_id) is not int or head_repo_id <= 0 or
+            not valid_sha(head_sha) or not isinstance(status, str) or
+            conclusion is not None and not isinstance(conclusion, str) or
+            not isinstance(branch, str) or not branch or not isinstance(event, str) or not event):
+        return None
+    actor = run.get("actor") if isinstance(run.get("actor"), dict) else {}
+    triggering_actor = (run.get("triggering_actor")
+                        if isinstance(run.get("triggering_actor"), dict) else {})
+    actor_id = actor.get("id") if event == "workflow_dispatch" else None
+    triggering_actor_id = triggering_actor.get("id") if event == "workflow_dispatch" else None
+    return (run_id, run_number, attempt, workflow_id, path, repo_id, head_repo_id,
+            head_sha, status, conclusion, branch, event, actor_id, triggering_actor_id)
+
+
+def verified_sync_run_detail(gh, listed):
+    binding = sync_run_binding(listed)
+    if binding is None:
+        return None
+    try:
+        detail = gh.repo(f"/actions/runs/{listed['id']}")
+    except Exception:
+        return None
+    return detail if sync_run_binding(detail) == binding else None
+
+
+def sync_counter_bound(run):
+    repository = run.get("repository") if isinstance(run, dict) else None
+    head_repository = run.get("head_repository") if isinstance(run, dict) else None
+    return (isinstance(run, dict) and type(run.get("workflow_id")) is int and
+            run["workflow_id"] == SYNC_ID and run.get("path") == SYNC_PATH and
+            isinstance(repository, dict) and type(repository.get("id")) is int and
+            repository["id"] == REPO_ID and isinstance(head_repository, dict) and
+            type(head_repository.get("id")) is int and head_repository["id"] == REPO_ID)
+
+
+def sync_run_status(run):
+    status = run.get("status") if isinstance(run, dict) else None
+    return status if isinstance(status, str) and status in {
+        "queued", "in_progress", "completed", "waiting", "requested", "pending"
+    } else None
+
+
+def reset_sync_streaks(state):
+    for target in state["holds"].values():
+        for reason in target["reasons"].values():
+            alert = reason.get("alert")
+            status = state["outbox"].get(alert, {}).get("status") if alert else None
+            if status in ("ready", "pending", "delivered"):
+                # A previously confirmed alert remains a valid notice even
+                # when a newer run is pending or an interval becomes unknown.
+                continue
+            retain_episode_recovery_anchors(state, target, reason)
+            end_hold_episode(state, reason)
 
 
 def failure_episode(state, stream, failed, run, mapping, *, owner, label, remaining=""):
@@ -306,8 +432,153 @@ def ci_verdict(run, pull, workflow, main_sha, *, historical=False):
     return None if incomplete else False
 
 
+def ci_run_binding(run):
+    """Normalize authorization-relevant CI identity without binding display metadata."""
+    if not isinstance(run, dict):
+        return None
+    try:
+        order = run_order(run)
+    except (KeyError, TypeError, dt.Error):
+        return None
+    repository, head_repository = run.get("repository"), run.get("head_repository")
+    repo_id = repository.get("id") if isinstance(repository, dict) else None
+    head_repo_id = head_repository.get("id") if isinstance(head_repository, dict) else None
+    workflow_id, path = run.get("workflow_id"), run.get("path")
+    head_sha, status, conclusion = run.get("head_sha"), run.get("status"), run.get("conclusion")
+    branch, event = run.get("head_branch"), run.get("event")
+    if (type(workflow_id) is not int or workflow_id <= 0 or not isinstance(path, str) or not path or
+            type(repo_id) is not int or repo_id <= 0 or type(head_repo_id) is not int or head_repo_id <= 0 or
+            not valid_sha(head_sha) or not isinstance(status, str) or
+            conclusion is not None and not isinstance(conclusion, str) or
+            not isinstance(branch, str) or not branch or not isinstance(event, str) or not event):
+        return None
+    associations = None
+    if event == "pull_request" and "pull_requests" in run:
+        values = run["pull_requests"]
+        if not isinstance(values, list):
+            return None
+        normalized = []
+        for association in values:
+            if not isinstance(association, dict):
+                return None
+            head, base = association.get("head") or {}, association.get("base") or {}
+            head_repo = head.get("repo") or {}
+            base_repo = base.get("repo") or {}
+            number, sha, head_id = association.get("number"), head.get("sha"), head_repo.get("id")
+            base_id, base_ref = base_repo.get("id"), base.get("ref")
+            if (type(number) is not int or number <= 0 or not valid_sha(sha) or
+                    type(head_id) is not int or head_id <= 0 or
+                    type(base_id) is not int or base_id <= 0 or
+                    not isinstance(base_ref, str) or not base_ref):
+                return None
+            normalized.append((number, sha, head_id, base_id, base_ref))
+        associations = tuple(sorted(normalized))
+    return (order, workflow_id, path, repo_id, head_repo_id, head_sha, status,
+            conclusion, branch, event, associations)
+
+
 def ci_matches(run, pull, workflow, main_sha):
     return ci_verdict(run, pull, workflow, main_sha) is True
+
+
+def ci_counter_bound(run, workflow):
+    repository = run.get("repository") if isinstance(run, dict) else None
+    return (isinstance(run, dict) and type(run.get("workflow_id")) is int and
+            run["workflow_id"] == workflow["id"] and
+            run.get("path") == workflow["path"] and isinstance(repository, dict) and
+            type(repository.get("id")) is int and repository["id"] == REPO_ID)
+
+
+def _excluded_counter_tail_verified(gh, runs, latest_order, *, workflow_id,
+                                    classify, verify_detail):
+    """Prove excluded same-counter rows before accepting a provisional latest."""
+    try:
+        for listed in runs:
+            repository = listed.get("repository") if isinstance(listed, dict) else None
+            if (not isinstance(listed, dict) or type(listed.get("workflow_id")) is not int or
+                    listed["workflow_id"] != workflow_id or not isinstance(repository, dict) or
+                    type(repository.get("id")) is not int or repository["id"] != REPO_ID):
+                continue
+            if (classify(listed) is not False or
+                    run_order(listed) <= latest_order):
+                continue
+            detail = verify_detail(gh, listed)
+            if detail is None or classify(detail) is not False:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _verified_ci_run_detail(gh, listed):
+    binding = ci_run_binding(listed)
+    if binding is None:
+        return None
+    try:
+        detail = gh.repo(f"/actions/runs/{listed['id']}")
+    except Exception:
+        return None
+    return detail if ci_run_binding(detail) == binding else None
+
+
+def _ci_counter_tail_verified(gh, runs, latest_order, pull, workflow, main_sha):
+    return _excluded_counter_tail_verified(
+        gh, runs, latest_order,
+        workflow_id=workflow["id"],
+        classify=lambda row: ci_verdict(row, pull, workflow, main_sha),
+        verify_detail=_verified_ci_run_detail)
+
+
+def _sync_counter_tail_verified(gh, runs, latest_order):
+    return _excluded_counter_tail_verified(
+        gh, runs, latest_order,
+        workflow_id=SYNC_ID,
+        classify=lambda row: sync_scope(row, workflow_endpoint=True),
+        verify_detail=verified_sync_run_detail)
+
+
+def ci_recovery_counter_rows(observed, workflow, boundary_order, latest_order):
+    """Require a gap-free workflow counter interval without borrowing foreign rows."""
+    rows_by_number, numbers_by_id = {}, {}
+    for run in observed:
+        if not isinstance(run, dict):
+            return None
+        workflow_id, path = run.get("workflow_id"), run.get("path")
+        repository = run.get("repository")
+        repository_id = repository.get("id") if isinstance(repository, dict) else None
+        if ((type(workflow_id) is int and workflow_id != workflow["id"]) or
+                (isinstance(path, str) and path != workflow["path"]) or
+                (type(repository_id) is int and repository_id != REPO_ID)):
+            continue
+        try:
+            order = run_order(run)
+        except (KeyError, TypeError, dt.Error):
+            return None
+        if order[0] < boundary_order[0] or order[0] > latest_order[0]:
+            continue
+        if not ci_counter_bound(run, workflow):
+            return None
+        run_number, run_id, attempt = order
+        previous_number = numbers_by_id.get(run_id)
+        if previous_number is not None and previous_number != run_number:
+            return None
+        numbers_by_id[run_id] = run_number
+        attempts = rows_by_number.setdefault(run_number, {})
+        existing_id = next(iter(attempts.values()))[0] if attempts else None
+        if existing_id is not None and existing_id != run_id:
+            return None
+        if attempt in attempts:
+            prior = attempts[attempt][1]
+            fields = ("workflow_id", "path", "repository", "head_repository", "head_sha",
+                      "status", "conclusion", "event", "pull_requests")
+            if any(prior.get(field) != run.get(field) for field in fields):
+                return None
+            continue
+        attempts[attempt] = (run_id, run)
+    if any(number not in rows_by_number
+           for number in range(boundary_order[0], latest_order[0] + 1)):
+        return None
+    return rows_by_number
 
 
 def reconcile_ci(state, runs, pulls, workflows, main_sha, mapping):
@@ -382,11 +653,23 @@ def reconcile_sync(state, run, report, mapping, *, current_snapshot=True):
     for number in list(state["holds"]):
         if number not in held:
             if not current_snapshot:
-                for reason in state["holds"][number]["reasons"].values():
-                    reason["streak"] = 0
+                target = state["holds"][number]
+                for reason in target["reasons"].values():
+                    retain_episode_recovery_anchors(state, target, reason)
+                    end_hold_episode(state, reason)
                 continue
             target = state["holds"].pop(number)
-            alerts = [r["alert"] for r in target["reasons"].values() if r.get("alert")]
+            for reason in target["reasons"].values():
+                retain_episode_recovery_anchors(state, target, reason)
+                episode = reason.get("episode") or {}
+                delay_key = episode.get("delay_alert_key")
+                if delay_key and delay_key != "cancelled":
+                    invalidate(state, delay_key)
+            alerts = list(dict.fromkeys(
+                target.get("recovery_alerts", []) +
+                [r["alert"] for r in target["reasons"].values() if r.get("alert")]))
+            alerts = [alert for alert in alerts
+                      if state["outbox"].get(alert, {}).get("status") in ("delivered", "pending")]
             if alerts:
                 for alert in alerts:
                     invalidate(state, alert)
@@ -401,22 +684,106 @@ def reconcile_sync(state, run, report, mapping, *, current_snapshot=True):
         target = state["holds"].setdefault(number, {"reasons": {}})
         for code, reason in target["reasons"].items():
             if code not in codes:
-                reason["streak"] = 0
-                if current_snapshot and reason["alert"]:
-                    invalidate(state, reason["alert"])
+                if current_snapshot:
+                    retain_episode_recovery_anchors(state, target, reason)
+                    if reason["alert"]:
+                        invalidate(state, reason["alert"])
+                    episode = reason.get("episode") or {}
+                    delay_key = episode.get("delay_alert_key")
+                    if delay_key and delay_key != "cancelled":
+                        invalidate(state, delay_key)
+                    # The latest complete/partial snapshot ended this reason's
+                    # episode. Keep old outbox records as fences; recurrence
+                    # starts with a clean alert reference and a fresh streak.
+                    reason.update(streak=0, alert=None, episode=None)
+                else:
+                    retain_episode_recovery_anchors(state, target, reason)
+                    end_hold_episode(state, reason)
         for code in sorted(codes):
-            reason = target["reasons"].setdefault(code, {"streak": 0, "alert": None})
+            reason = target["reasons"].setdefault(
+                code, {"streak": 0, "alert": None, "episode": None})
+            if reason["streak"] == 0 and reason["episode"] is None:
+                # A code returning after an observed clear starts a clean
+                # episode; an old pending outbox entry remains fenced by key.
+                reason["alert"] = None
             # One workflow run is one observation, regardless of attempt count.
             if not same_run:
                 reason["streak"] = min(2, reason["streak"] + 1)
             elif reason["streak"] == 0:
                 reason["streak"] = 1
-            if current_snapshot and reason["streak"] == 2 and not reason["alert"]:
+            episode = reason.get("episode")
+            observed_at = report.get("observed_at") if report.get("schema") == 2 else None
+            uncertainty = (report.get("observation_uncertainty_seconds")
+                           if observed_at is not None else None)
+            if episode is None:
+                episode = _empty_episode(
+                    f"{number}:{code}:{run['id']}:{run['run_attempt']}",
+                    run_id=run["id"], attempt=run["run_attempt"],
+                    observed_at=observed_at, uncertainty=uncertainty)
+                reason["episode"] = episode
+            else:
+                origin_run = episode.get("timer_origin_run_id")
+                if not same_run and origin_run is not None and run["id"] != origin_run:
+                    episode["delay_cancelled"] = True
+                    delay_key = episode.get("delay_alert_key")
+                    if delay_key and delay_key != "cancelled":
+                        retain_recovery_anchor(state, target, delay_key)
+                        invalidate(state, delay_key)
+                    episode["delay_alert_key"] = "cancelled"
+                # A legacy/clock-unknown episode starts a new timer only from a
+                # later v2 observation; its original run identity remains unknown.
+                if episode.get("timer_origin_at") is None and observed_at is not None:
+                    episode["timer_origin_at"] = observed_at
+                    episode["timer_origin_run_id"] = run["id"]
+                    episode["timer_origin_uncertainty_seconds"] = uncertainty
+                    episode["delay_cancelled"] = False
+                if not same_run:
+                    episode["last_valid_observed_at"] = observed_at
+                    episode["last_observation_run_id"] = run["id"]
+                    episode["last_observation_attempt"] = run["run_attempt"]
+            if reason["streak"] == 2 and not reason["alert"]:
                 key = f"hold:{number}:{code}:{run['id']}"
                 queue(state, key, payload(f"Replica · Issue #{number}",
                                           f"동기화 보류 · {escape(code, 80)}\n두 실행에서 계속 보류됐습니다. 원인을 확인해주세요.",
                                           object_url(int(number)), mapping, recipients=[PM]))
                 reason["alert"] = key
+
+
+def reconcile_hold_delays(state, clock_reading, mapping):
+    """Queue one PM notice only when both endpoint clock bounds are verified."""
+    if not clock_reading or clock_reading[0] is None or clock_reading[1] is None:
+        return
+    try:
+        now = datetime.datetime.fromisoformat(clock_reading[0].replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return
+    consumer_uncertainty = clock_reading[1]
+    if type(consumer_uncertainty) is not int or not 0 <= consumer_uncertainty <= 60:
+        return
+    for number, target in state["holds"].items():
+        for code, reason in target["reasons"].items():
+            episode = reason.get("episode")
+            if (not episode or episode.get("delay_cancelled") or
+                    episode.get("delay_alert_key") is not None or
+                    episode.get("timer_origin_at") is None or
+                    episode.get("last_observation_run_id") != episode.get("timer_origin_run_id")):
+                continue
+            try:
+                origin = datetime.datetime.fromisoformat(
+                    episode["timer_origin_at"].replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                continue
+            # The design fixes the combined conservative deduction at 120s
+            # after independently validating each endpoint's 0..60s bound.
+            elapsed = (now - origin).total_seconds() - 120
+            if elapsed < 15 * 60:
+                continue
+            key = f"hold-delay:{number}:{code}:{episode['episode_id']}"
+            queue(state, key, payload(f"Replica · Issue #{number}",
+                                      f"동기화 보류 후속 관측 지연 · {escape(code, 80)}\n"
+                                      "15분 동안 후속 유효 실행을 확인하지 못했습니다. 확인해주세요.",
+                                      object_url(int(number)), mapping, recipients=[PM]))
+            episode["delay_alert_key"] = key
 
 
 def notice_active(state, key):
@@ -430,13 +797,23 @@ def notice_active(state, key):
         return stream not in state["incidents"]
     if key.startswith("hold:"):
         _, number, code, _ = key.split(":")
-        return state["holds"].get(number, {}).get("reasons", {}).get(code, {}).get("alert") == key
+        reason = state["holds"].get(number, {}).get("reasons", {}).get(code, {})
+        return reason.get("alert") == key and reason.get("episode") is not None
+    if key.startswith("hold-delay:"):
+        parts = key.split(":", 3)
+        if len(parts) != 4:
+            return False
+        reason = state["holds"].get(parts[1], {}).get("reasons", {}).get(parts[2], {})
+        episode = reason.get("episode") or {}
+        return (episode.get("delay_alert_key") == key and
+                not episode.get("delay_cancelled"))
     if key.startswith("hold-recovery:"):
         return key.split(":")[1] not in state["holds"]
     return True
 
 
-def deliver(state, ledger, discord, *, event_check=None, ci_check=None):
+def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
+            hold_recovery_check=None, sync_check=None):
     errors = 0
     for key, item in state["outbox"].items():
         if item["hash"] != dt.digest(item["payload"]):
@@ -450,6 +827,16 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None):
             invalidate(state, key)
             ledger.save(state)
             continue
+        is_sync_notice = key.startswith(("hold:", "hold-delay:", "failure:sync:",
+                                         "recovery:failure:sync:"))
+        if sync_check and is_sync_notice:
+            current = sync_check(key)
+            if current is False:
+                invalidate(state, key)
+                ledger.save(state)
+                continue
+            if current is None:
+                continue  # Unknown latest sync evidence preserves the ready entry.
         if ci_check and key.startswith(("failure:ci:", "recovery:failure:ci:")):
             current = ci_check(key)
             if current is False:
@@ -461,6 +848,16 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None):
         deps = item["dependencies"]
         if deps and not any(state["outbox"].get(d, {}).get("status") == "delivered" for d in deps):
             continue
+        if key.startswith("hold-recovery:"):
+            if hold_recovery_check is None:
+                continue  # Recovery evidence is mandatory at the delivery boundary.
+            current = hold_recovery_check(key)
+            if current is None:
+                continue  # A pending/failed/invalid latest sync cannot confirm recovery.
+            if current is False:
+                invalidate(state, key)
+                ledger.save(state)
+                continue
         if event_check and re.fullmatch(r"pr:[1-9][0-9]*:timeline:[1-9][0-9]*", key):
             current_message = event_check(key)
             if current_message is None:
@@ -471,20 +868,83 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None):
             item["hash"] = dt.digest(item["payload"])
         item["status"] = "pending"
         ledger.save(state)  # A crash or ambiguous POST is fenced before sending.
+        dynamic_notice = (
+            bool(event_check and re.fullmatch(r"pr:[1-9][0-9]*:timeline:[1-9][0-9]*", key)) or
+            bool(ci_check and key.startswith(("failure:ci:", "recovery:failure:ci:"))) or
+            bool(key.startswith("hold-recovery:") and hold_recovery_check) or
+            bool(sync_check and is_sync_notice)
+        )
+
+        def revalidate_dynamic_notice():
+            if not notice_active(state, key):
+                return False
+            try:
+                if event_check and re.fullmatch(r"pr:[1-9][0-9]*:timeline:[1-9][0-9]*", key):
+                    return event_check(key) is not None
+                if ci_check and key.startswith(("failure:ci:", "recovery:failure:ci:")):
+                    return ci_check(key)
+                if key.startswith("hold-recovery:") and hold_recovery_check:
+                    return hold_recovery_check(key)
+                if sync_check and is_sync_notice:
+                    return sync_check(key)
+            except Exception:
+                return None
+            return True
+
+        previous_retry_guard = getattr(discord, "_before_rate_limit_retry", None)
+        if dynamic_notice:
+            discord._before_rate_limit_retry = revalidate_dynamic_notice
         try:
             mid = discord.send(item["payload"])
             if any(other_key != key and other.get("message_id") == mid for other_key, other in state["outbox"].items()):
                 raise dt.Error("Discord message ID already confirms another event")
-        except dt.HTTPError:
-            item["status"] = "rejected"
+        except dt.RateLimitRejected:
+            current = revalidate_dynamic_notice() if dynamic_notice else None
+            # The HTTP 429 proves rejection. Do not retry now without a safe
+            # retry time; keep it ready for a later fresh reconciliation.
+            item["status"] = "ready"
+            if current is False:
+                if key.startswith("pr:"):
+                    item["status"] = "retired"
+                else:
+                    invalidate(state, key)
             ledger.save(state)
-            errors += 1
-            print("::warning::Discord rejected delivery: " + dt.digest(key)[:12])
+            continue
+        except dt.HTTPError as error:
+            if error.status == 429 and dynamic_notice:
+                current = revalidate_dynamic_notice()
+                # A 429 is a confirmed rejection, so this attempt is no
+                # longer protected by the ambiguous-POST pending fence.
+                item["status"] = "ready"
+                if current is False:
+                    if key.startswith("pr:"):
+                        item["status"] = "retired"
+                    else:
+                        invalidate(state, key)
+                else:
+                    # 429 confirms this attempt was rejected. It is safe to
+                    # retry only on a later reconciliation after fresh checks.
+                    item["status"] = "ready"
+            else:
+                item["status"] = "rejected"
+            ledger.save(state)
+            if item["status"] == "rejected":
+                errors += 1
+                print("::warning::Discord rejected delivery: " + dt.digest(key)[:12])
             continue
         except dt.Error:
             errors += 1
             print("::warning::Discord delivery outcome unknown: " + dt.digest(key)[:12])
             continue
+        finally:
+            if dynamic_notice:
+                if previous_retry_guard is None:
+                    try:
+                        del discord._before_rate_limit_retry
+                    except AttributeError:
+                        pass
+                else:
+                    discord._before_rate_limit_retry = previous_retry_guard
         item.update(status="delivered", message_id=mid)
         ledger.save(state)  # Failed save keeps the remote pending fence; abort run.
     return errors
@@ -551,9 +1011,7 @@ def current_pr_event(gh, key, mapping):
         raise dt.Error("Incomplete current PR response")
     timeline = gh.pages(f"/issues/{number}/timeline")
     events = source_events([pull], {number: timeline}, mapping)
-    if key not in events:
-        raise dt.Error("Current PR event not confirmed")
-    return events[key]
+    return events.get(key)
 
 
 def current_ci_notice(gh, key, workflows):
@@ -580,21 +1038,23 @@ def current_ci_notice(gh, key, workflows):
             original.get("status") != "completed" or original.get("conclusion") not in FAILURES):
         return None
     observed = gh.pages(f"/actions/workflows/{workflow['id']}/runs", "workflow_runs")
-    fields = ("id", "run_attempt", "run_number", "head_sha", "status", "conclusion")
     listed_original = [r for r in observed if r.get("id") == original["id"]]
     if (len(listed_original) != 1 or
             ci_verdict(listed_original[0], pull, workflow, main_sha, historical=recovery) is not True or
-            any(k not in original or k not in listed_original[0] or original[k] != listed_original[0][k] for k in fields)):
+            ci_run_binding(original) is None or
+            ci_run_binding(original) != ci_run_binding(listed_original[0])):
         return None
     eligible = [r for r in observed if ci_matches(r, pull, workflow, main_sha)]
     if not eligible:
         return None
     candidate = max(eligible, key=run_order)
+    if not _ci_counter_tail_verified(gh, observed, run_order(candidate), pull, workflow, main_sha):
+        return None
     if any(ci_verdict(r, pull, workflow, main_sha) is None and run_order(r) >= run_order(candidate)
            for r in observed):
         return None
     latest = gh.repo(f"/actions/runs/{candidate['id']}")
-    if any(k not in latest or k not in candidate or latest[k] != candidate[k] for k in fields):
+    if ci_run_binding(candidate) is None or ci_run_binding(candidate) != ci_run_binding(latest):
         return None
     if recovery:
         if ":at:" not in key:
@@ -604,7 +1064,8 @@ def current_ci_notice(gh, key, workflows):
         listed_boundary = [r for r in observed if r.get("id") == bound_id]
         if (len(listed_boundary) != 1 or
                 ci_verdict(listed_boundary[0], pull, workflow, main_sha, historical=True) is not True or
-                any(k not in boundary or k not in listed_boundary[0] or boundary[k] != listed_boundary[0][k] for k in fields)):
+                ci_run_binding(boundary) is None or
+                ci_run_binding(boundary) != ci_run_binding(listed_boundary[0])):
             return None
         if (boundary.get("id") != bound_id or ci_verdict(boundary, pull, workflow, main_sha, historical=True) is not True or
                 type(boundary.get("run_number")) is not int or boundary["run_number"] <= 0):
@@ -613,24 +1074,45 @@ def current_ci_notice(gh, key, workflows):
                 boundary.get("conclusion") != "success"):
             return None
         bound_order = (boundary["run_number"], bound_id, bound_attempt)
-        # Every later possibly related observation needs consistent detail proof.
-        for prior in observed:
-            if run_order(prior) <= bound_order:
-                continue
-            association = ci_verdict(prior, pull, workflow, main_sha, historical=True)
-            if association is None:
-                return None
-            if association is False:
-                continue
-            detail = gh.repo(f"/actions/runs/{prior['id']}")
-            if any(k not in detail or k not in prior or detail[k] != prior[k] for k in fields):
-                return None
-            if ci_verdict(detail, pull, workflow, main_sha, historical=True) is not True or detail.get("status") != "completed":
-                return None
-            if detail.get("conclusion") in FAILURES:
-                return False
-            if detail.get("conclusion") not in {"success", "cancelled", "neutral", "skipped"}:
-                return None
+        latest_order = run_order(candidate)
+        origin_order = run_order(original)
+        if origin_order[0] > bound_order[0]:
+            return None
+        counter_rows = ci_recovery_counter_rows(observed, workflow, origin_order, latest_order)
+        if counter_rows is None:
+            return None
+        if (origin_order[0] not in counter_rows or
+                counter_rows[origin_order[0]].get(origin_order[2], (None,))[0] != origin_order[1]):
+            return None
+        # Verify the whole origin-to-latest interval. Failures before the first
+        # clear belong to the same unresolved incident; a later recurrence
+        # invalidates recovery anchored to the old failure.
+        cleared = False
+        for number in range(origin_order[0] + 1, latest_order[0] + 1):
+            attempts = counter_rows[number]
+            for run_id, prior in attempts.values():
+                association = ci_verdict(prior, pull, workflow, main_sha, historical=True)
+                if association is None:
+                    return None
+                detail = gh.repo(f"/actions/runs/{run_id}")
+                detail_association = ci_verdict(detail, pull, workflow, main_sha, historical=True)
+                if (ci_run_binding(detail) is None or ci_run_binding(detail) != ci_run_binding(prior) or
+                        detail_association is not association):
+                    return None
+                if association is False:
+                    continue  # The unrelated classification is bound to matching detail.
+                if prior.get("run_attempt") != 1:
+                    return None  # The workflow list may hide an earlier hold/failure attempt.
+                if ci_verdict(detail, pull, workflow, main_sha, historical=True) is not True or detail.get("status") != "completed":
+                    return None
+                if detail.get("conclusion") in FAILURES:
+                    if cleared:
+                        return False
+                    continue
+                if detail.get("conclusion") not in {"success", "cancelled", "neutral", "skipped"}:
+                    return None
+                if detail.get("conclusion") == "success":
+                    cleared = True
     if main_sha != gh.repo("/git/ref/heads/main")["object"]["sha"]:
         return None
     if pull is not None:
@@ -649,8 +1131,18 @@ def current_ci_notice(gh, key, workflows):
     return (latest["conclusion"] == "success") if recovery else (latest["conclusion"] in FAILURES)
 
 
-def refresh_ci_runs(gh, runs, candidates):
+def refresh_ci_runs(gh, runs, pulls, workflows, main_sha):
     """A conflicting detail read must not change incident state before POST checks."""
+    candidates = {}
+    for workflow in workflows:
+        for pull in [None] + pulls:
+            eligible = [r for r in runs if ci_matches(r, pull, workflow, main_sha)]
+            if not eligible:
+                continue
+            latest = max(eligible, key=run_order)
+            if not _ci_counter_tail_verified(gh, runs, run_order(latest), pull, workflow, main_sha):
+                raise dt.Error("Excluded CI run detail is unverified")
+            candidates[latest["id"]] = latest
     refreshed = {}
     fields = ("id", "run_attempt", "run_number", "head_sha", "status", "conclusion",
               "workflow_id", "path", "event", "head_branch", "repository", "head_repository")
@@ -664,12 +1156,44 @@ def refresh_ci_runs(gh, runs, candidates):
     return [refreshed.get(r["id"], r) for r in runs]
 
 
+def sync_scope(run, *, workflow_endpoint=False):
+    """Classify sync identity as related, incomplete, or definitely unrelated."""
+    if not isinstance(run, dict):
+        return False
+    repository = run.get("repository")
+    head_repository = run.get("head_repository")
+    repository_id = repository.get("id") if isinstance(repository, dict) else None
+    head_repository_id = head_repository.get("id") if isinstance(head_repository, dict) else None
+    workflow_id, path = run.get("workflow_id"), run.get("path")
+    event = run.get("event")
+    allowed_events = {"schedule", "issues", "pull_request_target", "workflow_dispatch"}
+    # Only well-typed positive mismatches prove that a run is unrelated.
+    # Missing or malformed identity fields are uncertainty, never proof.
+    if ((type(workflow_id) is int and workflow_id != SYNC_ID) or
+            (isinstance(path, str) and path != SYNC_PATH) or
+            (type(repository_id) is int and repository_id != REPO_ID) or
+            (type(head_repository_id) is int and head_repository_id != REPO_ID) or
+            (isinstance(run.get("head_branch"), str) and run["head_branch"] != "main") or
+            (isinstance(event, str) and event not in allowed_events)):
+        return False
+    positive_match = ((type(workflow_id) is int and workflow_id == SYNC_ID) or
+                      path == SYNC_PATH or
+                      (type(repository_id) is int and repository_id == REPO_ID) or
+                      (type(head_repository_id) is int and head_repository_id == REPO_ID))
+    complete_identity = (type(workflow_id) is int and workflow_id == SYNC_ID and path == SYNC_PATH and
+                         type(repository_id) is int and repository_id == REPO_ID and
+                         type(head_repository_id) is int and head_repository_id == REPO_ID and
+                         run.get("head_branch") == "main" and event in allowed_events)
+    if complete_identity:
+        return True
+    # The workflow-specific Actions endpoint itself is positive association
+    # evidence. If every per-run identity field is absent, treat the row as an
+    # incomplete candidate rather than silently skipping an observation gap.
+    return None if positive_match or workflow_endpoint else False
+
+
 def sync_context(gh, run, main_sha):
-    if (run.get("workflow_id") != SYNC_ID or run.get("path") != SYNC_PATH or
-            (run.get("repository") or {}).get("id") != REPO_ID or
-            (run.get("head_repository") or {}).get("id") != REPO_ID or
-            run.get("head_branch") != "main" or run.get("event") not in
-            {"schedule", "issues", "pull_request_target", "workflow_dispatch"}):
+    if sync_scope(run) is not True:
         return False
     if not re.fullmatch(r"[0-9a-f]{40}", run.get("head_sha", "")):
         return False
@@ -684,21 +1208,472 @@ def trusted_sync(gh, run, main_sha):
     if not sync_context(gh, run, main_sha):
         return False
     return run["event"] != "workflow_dispatch" or (
+        type((run.get("actor") or {}).get("id")) is int and
         (run.get("actor") or {}).get("id") == int(PM_ID) and
-        (run.get("triggering_actor") or {}).get("id") == int(PM_ID) and run["run_attempt"] == 1)
+        type((run.get("triggering_actor") or {}).get("id")) is int and
+        (run.get("triggering_actor") or {}).get("id") == int(PM_ID) and
+        run["run_attempt"] == 1)
+
+
+def latest_sync_holds(gh, main_sha):
+    """Return the latest trusted successful full snapshot's held issue IDs."""
+    try:
+        if not valid_sha(main_sha):
+            return None
+        runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
+        related = [(run, sync_scope(run, workflow_endpoint=True)) for run in runs]
+        related = [(run, scope) for run, scope in related if scope is not False]
+        if not related:
+            return None
+        latest, scope = max(related, key=lambda item: run_order(item[0]))
+        if not _sync_counter_tail_verified(gh, runs, run_order(latest)):
+            return None
+        if (scope is not True or not valid_sha(latest.get("head_sha")) or
+                latest.get("status") != "completed" or latest.get("conclusion") != "success" or
+                not sync_context(gh, latest, main_sha) or
+                not trusted_sync(gh, latest, main_sha)):
+            return None
+        report = dt.artifact_report(gh, latest)
+        if (not report or not report.get("scan_complete") or report.get("dry_run") or
+                report.get("kind") not in ("complete", "partial")):
+            return None
+        return {str(item["issue_number"]) for item in report["holds"]}
+    except Exception:
+        return None
+
+
+def current_hold_recovery(gh, key, observed_main_sha):
+    """Confirm recovery against fresh latest sync evidence and unchanged main."""
+    try:
+        match = re.fullmatch(r"hold-recovery:([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*)", key)
+        if not match or not valid_sha(observed_main_sha):
+            return None
+        ref = gh.repo("/git/ref/heads/main")
+        current_main = (ref.get("object") or {}).get("sha") if isinstance(ref, dict) else None
+        if not valid_sha(current_main) or current_main != observed_main_sha:
+            return None
+        verdict = sync_recovery_sequence(gh, match.group(1), int(match.group(2)),
+                                         int(match.group(3)), current_main)
+        after = gh.repo("/git/ref/heads/main")
+        after_main = (after.get("object") or {}).get("sha") if isinstance(after, dict) else None
+        if not valid_sha(after_main) or after_main != current_main or verdict is None:
+            return None
+        return verdict
+    except Exception:
+        return None
+
+
+def current_sync_notice(gh, key, observed_main_sha, state):
+    """Recheck sync-notice evidence immediately before each Discord POST."""
+    try:
+        kind, issue_number, reason_code = None, None, None
+        if match := re.fullmatch(r"hold:([1-9][0-9]*):([A-Z][A-Z0-9_]{0,79}):([1-9][0-9]*)", key):
+            kind, issue_number, reason_code = "hold", match.group(1), match.group(2)
+            origin_id = int(match.group(3))
+            origin_attempt = None
+        elif match := re.fullmatch(r"hold-delay:([1-9][0-9]*):([A-Z][A-Z0-9_]{0,79}):.+", key):
+            kind, issue_number, reason_code = "delay", match.group(1), match.group(2)
+            reason = state.get("holds", {}).get(issue_number, {}).get("reasons", {}).get(reason_code)
+            episode = (reason or {}).get("episode") or {}
+            origin_id = episode.get("timer_origin_run_id")
+            origin_attempt = episode.get("last_observation_attempt")
+            if (episode.get("delay_alert_key") != key or episode.get("delay_cancelled") or
+                    episode.get("last_observation_run_id") != origin_id):
+                return False
+            if type(origin_id) is not int or type(origin_attempt) is not int:
+                return None
+        elif match := re.fullmatch(r"failure:sync:([1-9][0-9]*):([1-9][0-9]*)", key):
+            kind, origin_id, origin_attempt = "failure", int(match.group(1)), int(match.group(2))
+        elif match := re.fullmatch(
+                r"recovery:failure:sync:([1-9][0-9]*):([1-9][0-9]*):at:([1-9][0-9]*):([1-9][0-9]*)", key):
+            kind, origin_id, origin_attempt = "failure-recovery", int(match.group(1)), int(match.group(2))
+            recovery_id, recovery_attempt = int(match.group(3)), int(match.group(4))
+        else:
+            return False
+
+        if not valid_sha(observed_main_sha):
+            return None
+        main_before = gh.repo("/git/ref/heads/main")
+        main_before = (main_before.get("object") or {}).get("sha") if isinstance(main_before, dict) else None
+        if not valid_sha(main_before) or main_before != observed_main_sha:
+            return None
+        runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
+        if not isinstance(runs, list):
+            return None
+
+        related, counter_rows, run_numbers_by_id = [], {}, {}
+        for run in runs:
+            if not isinstance(run, dict):
+                return None
+            scope = sync_scope(run, workflow_endpoint=True)
+            try:
+                order = run_order(run)
+            except (KeyError, TypeError, dt.Error):
+                if scope is False:
+                    continue
+                return None
+            if sync_counter_bound(run):
+                run_number, run_id, attempt = order
+                previous_number = run_numbers_by_id.get(run_id)
+                if previous_number is not None and previous_number != run_number:
+                    return None
+                run_numbers_by_id[run_id] = run_number
+                attempts = counter_rows.setdefault(run_number, {})
+                existing_id = next(iter(attempts.values()))[0] if attempts else None
+                if existing_id is not None and existing_id != run_id:
+                    return None
+                if attempt in attempts:
+                    prior = attempts[attempt][1]
+                    fields = ("workflow_id", "path", "repository", "head_repository", "head_sha",
+                              "status", "conclusion", "head_branch", "event", "actor",
+                              "triggering_actor")
+                    if any(prior.get(field) != run.get(field) for field in fields):
+                        return None
+                    continue
+                attempts[attempt] = (run_id, run)
+            if scope is not False:
+                related.append((run, scope, order))
+        if not related:
+            return None
+        related.sort(key=lambda entry: entry[2])
+        if not _sync_counter_tail_verified(gh, runs, related[-1][2]):
+            return None
+        origins = [(index, run, order) for index, (run, _, order) in enumerate(related)
+                   if run.get("id") == origin_id and
+                   (origin_attempt is None or run.get("run_attempt") == origin_attempt)]
+        if len(origins) != 1:
+            return None
+        origin_index, origin, origin_order = origins[0]
+        proof_start_index = origin_index
+        if kind == "hold":
+            reason = state.get("holds", {}).get(issue_number, {}).get("reasons", {}).get(reason_code, {})
+            episode = reason.get("episode") or {}
+            first_id, first_attempt = (episode.get("first_observed_run_id"),
+                                       episode.get("first_observed_attempt"))
+            first = [(index, run, order) for index, (run, _, order) in enumerate(related)
+                     if run.get("id") == first_id and run.get("run_attempt") == first_attempt]
+            if (type(first_id) is not int or type(first_attempt) is not int or len(first) != 1 or
+                    first[0][0] >= origin_index or first[0][2][0] >= origin_order[0]):
+                return None
+            proof_start_index = first[0][0]
+        proof_start_order = related[proof_start_index][2]
+        latest_order = related[-1][2]
+        if any(number not in counter_rows
+               for number in range(proof_start_order[0], latest_order[0] + 1)):
+            return None
+        # Successful snapshots are identity-bound by artifact_report(). Other
+        # statuses have no artifact, so bind their list classification directly
+        # to the run detail before treating them as current evidence.
+        for run, scope, order in related[proof_start_index:]:
+            status = sync_run_status(run)
+            if status == "completed" and run.get("conclusion") == "success":
+                continue
+            detail = verified_sync_run_detail(gh, run)
+            if detail is None or sync_scope(detail, workflow_endpoint=True) is not scope:
+                return None
+        # Same-workflow runs on another event/branch still prove counter slots.
+        # Verify that their unrelated classification survives the detail read.
+        for number in range(proof_start_order[0], latest_order[0] + 1):
+            for run_id, listed in counter_rows[number].values():
+                if sync_scope(listed, workflow_endpoint=True) is not False:
+                    continue
+                detail = verified_sync_run_detail(gh, listed)
+                if detail is None or sync_scope(detail, workflow_endpoint=True) is not False:
+                    return None
+        for run, scope, order in related[proof_start_index:]:
+            if scope is not True:
+                return None
+            if order[0] > origin_order[0] and order[2] != 1:
+                return None
+            status = sync_run_status(run)
+            if status is None:
+                return None
+            if (not valid_sha(run.get("head_sha")) or
+                    not sync_context(gh, run, observed_main_sha) or
+                    not trusted_sync(gh, run, observed_main_sha)):
+                return None
+
+        snapshots = []
+        for run, _, order in related[proof_start_index:]:
+            if run.get("status") != "completed" or run.get("conclusion") != "success":
+                continue
+            report = dt.artifact_report(gh, run)
+            if (not report or not report.get("scan_complete") or report.get("dry_run") or
+                    report.get("kind") not in ("complete", "partial")):
+                return None
+            held = {(str(item["issue_number"]), item["reason_code"])
+                    for item in report["holds"]}
+            snapshots.append((order, held))
+        origin_status = sync_run_status(origin)
+        origin_report = next((held for order, held in snapshots if order == origin_order), None)
+
+        if kind in ("hold", "delay"):
+            target = (issue_number, reason_code)
+            if origin_status != "completed" or origin.get("conclusion") != "success" or \
+                    origin_report is None or target not in origin_report:
+                return None
+            if kind == "hold":
+                first_order = related[proof_start_index][2]
+                first_report = next((held for order, held in snapshots if order == first_order), None)
+                confirming = [held for order, held in snapshots
+                              if first_order < order <= origin_order]
+                if (first_report is None or target not in first_report or len(confirming) < 1 or
+                        any(target not in held for held in confirming)):
+                    return None
+            later = [held for order, held in snapshots if order > origin_order]
+            if kind == "delay":
+                verdict = not later
+            else:
+                # A later clear ends this alert's episode permanently. A
+                # subsequent recurrence needs its own two-run alert and must
+                # not revive an older ready/delivered notice.
+                verdict = all(target in held for held in later)
+        elif kind == "failure":
+            if (origin_status != "completed" or origin.get("conclusion") not in FAILURES or
+                    origin_order[2] != origin_attempt):
+                return None
+            verdict = not any(order > origin_order for order, _ in snapshots)
+        else:
+            recovery_order = next((order for run, _, order in related
+                                   if run.get("id") == recovery_id and
+                                   run.get("run_attempt") == recovery_attempt), None)
+            if recovery_order is None:
+                return None
+            recovery_snapshot = next((held for order, held in snapshots
+                                      if order == recovery_order), None)
+            latest_run, latest_scope, latest_order = related[-1]
+            if latest_scope is not True or latest_order[0] < recovery_order[0]:
+                return None
+            if (origin_status != "completed" or origin.get("conclusion") not in FAILURES or
+                    origin_order[2] != origin_attempt or
+                    recovery_snapshot is None or recovery_order[0] <= origin_order[0]):
+                return None
+            latest_status = sync_run_status(latest_run)
+            if latest_status != "completed":
+                return None
+            cleared, recurrence = False, False
+            for run, _, order in related[origin_index + 1:]:
+                if sync_run_status(run) != "completed":
+                    return None
+                if run.get("conclusion") in FAILURES:
+                    if cleared:
+                        recurrence = True
+                        break
+                elif run.get("conclusion") == "success":
+                    if not any(snapshot_order == order for snapshot_order, _ in snapshots):
+                        return None
+                    cleared = True
+            if recurrence:
+                verdict = False
+            elif latest_run.get("conclusion") == "success":
+                verdict = any(order == latest_order for order, _ in snapshots)
+            else:
+                return None
+
+        main_after = gh.repo("/git/ref/heads/main")
+        main_after = (main_after.get("object") or {}).get("sha") if isinstance(main_after, dict) else None
+        if not valid_sha(main_after) or main_after != main_before:
+            return None
+        return verdict
+    except Exception:
+        return None
+
+
+def sync_recovery_sequence(gh, issue_number, origin_run_id, origin_attempt, main_sha):
+    """Validate a complete, attempt-safe counter interval before recovery."""
+    runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
+    related = []
+    counter_rows = {}
+    run_numbers_by_id = {}
+    for run in runs:
+        if not isinstance(run, dict):
+            return None
+        repository = run.get("repository")
+        repository_id = repository.get("id") if isinstance(repository, dict) else None
+        workflow_id, path = run.get("workflow_id"), run.get("path")
+        explicitly_unrelated = (
+            type(workflow_id) is int and workflow_id != SYNC_ID or
+            isinstance(path, str) and path != SYNC_PATH or
+            type(repository_id) is int and repository_id != REPO_ID
+        )
+        if explicitly_unrelated:
+            continue
+        try:
+            order = run_order(run)
+        except (KeyError, TypeError, dt.Error):
+            return None
+
+        # Only rows bound to this workflow and base repository can establish
+        # continuity of its run_number counter. Other workflow/repository rows
+        # never fill a hole, even when returned by the workflow-specific list.
+        counter_bound = sync_counter_bound(run)
+        if counter_bound:
+            run_number, run_id, attempt = order
+            known_number = run_numbers_by_id.get(run_id)
+            if known_number is not None and known_number != run_number:
+                return None
+            run_numbers_by_id[run_id] = run_number
+            attempts = counter_rows.setdefault(run_number, {})
+            existing_id = next(iter(attempts.values()))[0] if attempts else None
+            if existing_id is not None and existing_id != run_id:
+                return None
+            if attempt in attempts:
+                prior = attempts[attempt][1]
+                binding_fields = (
+                    "workflow_id", "path", "repository", "head_repository", "head_sha",
+                    "status", "conclusion", "head_branch", "event", "actor",
+                    "triggering_actor",
+                )
+                if any(prior.get(field) != run.get(field) for field in binding_fields):
+                    return None
+                continue  # Identical pagination/replay duplicate.
+            attempts[attempt] = (run_id, run)
+
+        scope = sync_scope(run, workflow_endpoint=True)
+        if scope is not False:
+            related.append((run, scope, order))
+    if not related:
+        return None
+    related.sort(key=lambda item: item[2])
+    if not _sync_counter_tail_verified(gh, runs, related[-1][2]):
+        return None
+    origins = [i for i, (run, _, _) in enumerate(related)
+               if run.get("id") == origin_run_id and run.get("run_attempt") == origin_attempt]
+    if len(origins) != 1:
+        return None
+    origin_index = origins[0]
+    origin_number = related[origin_index][2][0]
+    if any(scope is None and order[0] >= origin_number
+           for _, scope, order in related):
+        return None
+    origin_attempts = counter_rows.get(origin_number, {})
+    if (not origin_attempts or max(origin_attempts) != origin_attempt or
+            origin_attempts[origin_attempt][0] != origin_run_id):
+        return None
+
+    latest_number = related[-1][2][0]
+    if any(number not in counter_rows for number in range(origin_number, latest_number + 1)):
+        return None
+
+    # The workflow-runs list can expose only a run's current attempt. A later
+    # rerun may have replaced an earlier attempt that contained a valid hold;
+    # without that historical evidence a clear cannot authorize recovery.
+    for number in range(origin_number + 1, latest_number + 1):
+        if max(counter_rows[number]) > 1:
+            return None
+
+    # Prove same-workflow counter rows that were classified unrelated from
+    # their detail responses before allowing them to fill this interval.
+    for number in range(origin_number, latest_number + 1):
+        for _, listed in counter_rows[number].values():
+            if sync_scope(listed, workflow_endpoint=True) is not False:
+                continue
+            detail = verified_sync_run_detail(gh, listed)
+            if detail is None or sync_scope(detail, workflow_endpoint=True) is not False:
+                return None
+
+    for run, scope, order in related[origin_index:]:
+        # Explicitly unrelated branch/event rows can fill a counter slot, but
+        # their reports are never read or treated as sync snapshots.
+        if scope is False:
+            detail = verified_sync_run_detail(gh, run)
+            if detail is None or sync_scope(detail, workflow_endpoint=True) is not False:
+                return None
+            continue
+        if order[0] > origin_number and order[2] != 1:
+            return None
+        if (scope is not True or run.get("status") != "completed" or
+                run.get("conclusion") != "success" or not valid_sha(run.get("head_sha")) or
+                not sync_context(gh, run, main_sha) or not trusted_sync(gh, run, main_sha)):
+            return None
+        try:
+            artifact = dt.artifact_report(gh, run)
+        except (dt.Error, ValueError):
+            return None
+        if (not artifact or not artifact.get("scan_complete") or artifact.get("dry_run") or
+                artifact.get("kind") not in ("complete", "partial")):
+            return None
+        if int(issue_number) in {item["issue_number"] for item in artifact["holds"]}:
+            return False
+    return True
+
+
+def consume_sync_gap(state, run):
+    """Advance a related completed run without trusting its report."""
+    order = run_order(run)
+    prior = tuple(state["sync_cursor"]) if state["sync_cursor"] else None
+    if prior and order <= prior:
+        return
+    state["sync_cursor"] = list(order)
+    reset_sync_streaks(state)
 
 
 def reconcile_sync_runs(state, gh, runs, main_sha, mapping):
+    related = [r for r in runs if sync_scope(r, workflow_endpoint=True) is not False]
+    if related and not _sync_counter_tail_verified(gh, runs, run_order(max(related, key=run_order))):
+        raise dt.Error("Excluded sync run detail is unverified")
     cursor = tuple(state["sync_cursor"]) if state["sync_cursor"] else None
     observed = sorted((r for r in runs if (cursor is None or run_order(r) > cursor) and
-                       sync_context(gh, r, main_sha)), key=run_order)
+                       sync_scope(r, workflow_endpoint=True) is not False), key=run_order)
     if not observed:
         return
     latest = observed[-1]
-    # Startup observes only a current completed snapshot, not historical failures.
-    candidates = ([latest] if latest["status"] == "completed" else []) if state["sync_cursor"] is None else observed
+    latest_status = sync_run_status(latest)
+    # Startup observes one current candidate; an unknown status is consumed as
+    # a gap so a malformed list row cannot poison every later poll.
+    candidates = [latest] if cursor is None else observed
+    if cursor is None and any(sync_run_status(run) != "completed" for run in observed[:-1]):
+        # Do not move the cursor past a still-running earlier run. It may finish
+        # after a newer run and must be consumed in run-number order next poll.
+        reset_sync_streaks(state)
+        return
+    counter_numbers = set()
+    for candidate in runs:
+        if not isinstance(candidate, dict):
+            continue
+        try:
+            number = run_order(candidate)[0]
+        except (KeyError, TypeError, dt.Error):
+            continue
+        if sync_counter_bound(candidate):
+            scope = sync_scope(candidate, workflow_endpoint=True)
+            if scope is False:
+                # A same-workflow unrelated row fills a counter slot only if
+                # its exact detail response preserves that classification.
+                detail = verified_sync_run_detail(gh, candidate)
+                if detail is None or sync_scope(detail, workflow_endpoint=True) is not False:
+                    continue
+            elif scope is not True:
+                continue
+            counter_numbers.add(number)
     for run in candidates:
-        if run["status"] != "completed" or state["sync_cursor"] and run_order(run) <= tuple(state["sync_cursor"]):
+        order = run_order(run)
+        if state["sync_cursor"] and order <= tuple(state["sync_cursor"]):
+            continue
+        status = sync_run_status(run)
+        if status is None:
+            consume_sync_gap(state, run)
+            continue
+        if status != "completed":
+            # A related pending run is an observation gap. Reset only an
+            # unannounced streak, then stop before later run numbers so a late
+            # completion can still be replayed in order on the next poll.
+            reset_sync_streaks(state)
+            break
+        if run.get("conclusion") in FAILURES and sync_scope(run, workflow_endpoint=True) is True:
+            # A failed list row can create a durable incident and move the
+            # cursor, so bind its identity/status/conclusion before any state
+            # transition. On conflict, leave this candidate for the next poll.
+            detail = verified_sync_run_detail(gh, run)
+            if (detail is None or sync_scope(detail, workflow_endpoint=True) is not True or
+                    detail.get("status") != "completed" or detail.get("conclusion") not in FAILURES):
+                break
+        prior_cursor = tuple(state["sync_cursor"]) if state["sync_cursor"] else None
+        if prior_cursor and any(number not in counter_numbers
+                                for number in range(prior_cursor[0] + 1, order[0])):
+            reset_sync_streaks(state)
+        if sync_scope(run, workflow_endpoint=True) is not True or not valid_sha(run.get("head_sha")):
+            consume_sync_gap(state, run)
             continue
         report = None
         if trusted_sync(gh, run, main_sha):
@@ -709,7 +1684,7 @@ def reconcile_sync_runs(state, gh, runs, main_sha, mapping):
         # Every completed gap/failure is consumed, even while a newer run is pending.
         # Only the latest completed current snapshot can announce success/hold recovery.
         reconcile_sync(state, run, report, mapping,
-                       current_snapshot=run_order(run) == run_order(latest) and latest["status"] == "completed")
+                       current_snapshot=(order == run_order(latest) and latest_status == "completed"))
 
 
 def workflows_config(raw, gh):
@@ -779,6 +1754,9 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
         stage = "ledger_load"
         state = ledger.load()
         bootstrap = state is None
+        migration_needed = bool(state is not None and state.get("schema") == 1)
+        if state is not None:
+            upgrade_state(state)
         if bootstrap and not manual_guard(env):
             raise dt.Error("Initial baseline requires PM main dispatch")
         if env.get("DISCORD_RESOLVE_KEY"):
@@ -807,29 +1785,49 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
         ci_runs = []
         for workflow in workflows:
             ci_runs.extend(gh.pages(f"/actions/workflows/{workflow['id']}/runs", "workflow_runs"))
-        # List responses can race with a rerun. Re-read only each stream's latest candidate.
-        candidates = {}
-        for workflow in workflows:
-            for pull in [None] + pulls:
-                eligible = [r for r in ci_runs if ci_matches(r, pull, workflow, main_sha)]
-                if eligible:
-                    latest = max(eligible, key=run_order)
-                    candidates[latest["id"]] = latest
-        ci_runs = refresh_ci_runs(gh, ci_runs, candidates)
+        # Verify excluded counter tails before committing each stream's latest candidate.
+        ci_runs = refresh_ci_runs(gh, ci_runs, pulls, workflows, main_sha)
         refreshed = [gh.repo(f"/pulls/{p['number']}") for p in pulls]
         if main_sha != gh.repo("/git/ref/heads/main")["object"]["sha"]:
             raise dt.Error("Main changed during observation")
         reconcile_ci(state, ci_runs, refreshed, workflows, main_sha, mapping)
         stage = "sync_observe"
-        sync_runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
-        reconcile_sync_runs(state, gh, sync_runs, main_sha, mapping)
-        if state != before:
+        # Sync reconciliation can advance durable cursors even when an artifact
+        # is untrusted. Stage it separately until main is confirmed unchanged
+        # across list, detail, and artifact reads; this preserves unrelated CI
+        # and outbox mutations if the sync observation must be discarded.
+        try:
+            sync_main_before = gh.repo("/git/ref/heads/main")["object"]["sha"]
+            if not valid_sha(sync_main_before) or sync_main_before != main_sha:
+                raise dt.Error("Main changed during observation")
+            sync_runs = gh.pages(f"/actions/workflows/{SYNC_ID}/runs", "workflow_runs")
+            sync_candidate = copy.deepcopy(state)
+            reconcile_sync_runs(sync_candidate, gh, sync_runs, sync_main_before, mapping)
+            sync_main_after = gh.repo("/git/ref/heads/main")["object"]["sha"]
+            if not valid_sha(sync_main_after) or sync_main_after != sync_main_before:
+                raise dt.Error("Main changed during observation")
+            state = sync_candidate
+        except Exception:
+            print("::warning::동기화 실행 관측을 확인할 수 없어 다음 실행으로 미룹니다.")
+        clock_mark = observation_clock.mark_snapshot()
+        clock_reading = observation_clock.verify_snapshot(
+            clock_mark, lambda: observation_clock.fetch_fresh_date(gh))
+        reconcile_hold_delays(state, clock_reading, mapping)
+        if state != before or migration_needed:
             stage = "ledger_save"
             ledger.save(state)
         stage = "delivery"
+        def hold_recovery_check(key):
+            return current_hold_recovery(gh, key, main_sha)
+
+        def sync_check(key):
+            return current_sync_notice(gh, key, main_sha, state)
+
         return 1 if deliver(state, ledger, discord,
                             event_check=lambda key: current_pr_event(gh, key, mapping),
-                            ci_check=lambda key: current_ci_notice(gh, key, workflows)) else 0
+                            ci_check=lambda key: current_ci_notice(gh, key, workflows),
+                            hold_recovery_check=hold_recovery_check,
+                            sync_check=sync_check) else 0
     except Exception as error:
         # Fixed message only: no exception repr, API response, token or webhook URL.
         print("::error::Discord 알림 처리 실패: 설정·실행 기록·전송 보류 상태를 확인하세요. "
