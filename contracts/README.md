@@ -12,3 +12,10 @@ baseline 구현 전에 다음을 합의합니다.
 
 아직 확정된 API 명세는 없습니다.
 OpenAPI 등 실제 명세를 도입할 때 관리 원본과 생성 절차를 하나로 정해 중복 편집을 피합니다.
+
+## 초안
+
+- [백엔드↔AI baseline 호출 계약](baseline/README.md): #15 요청·응답·오류 규격,
+  대화 이력·처리 한도·타임아웃 책임과 합성 예제. 담당자 합의 전이며 API 구현은 포함하지 않습니다.
+- 구조 규격은 baseline의 JSON Schema를 원본으로 관리합니다.
+  검증: `python3 -m unittest discover -s contracts/tests -v`
