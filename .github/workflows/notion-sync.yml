@@ -23,7 +23,7 @@ on:
         type: string
         required: true
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '*/5 * * * *'
   issues:
     types: [opened, edited, closed, reopened, assigned, unassigned, labeled, unlabeled, deleted, transferred]
   pull_request_target:
@@ -50,7 +50,9 @@ jobs:
           format('{0}', github.run_attempt) == '1' &&
           inputs.approved_sha == github.sha &&
           (github.ref == 'refs/heads/main' ||
-           github.ref == 'refs/heads/fix/17-project-add-readback')
+           (inputs.dry_run && inputs.resolve_issue_numbers == '' &&
+            (github.ref == 'refs/heads/fix/17-project-add-readback' ||
+             github.ref == 'refs/heads/feat/32-bidirectional-sync')))
         ) ||
         (
           github.event_name != 'workflow_dispatch' &&
@@ -66,9 +68,17 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           SYNC_DISPATCH_REF: ${{ github.ref }}
+          SYNC_DISPATCH_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          SYNC_DISPATCH_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
         run: |
           case "$SYNC_DISPATCH_REF" in
-            refs/heads/main|refs/heads/fix/17-project-add-readback)
+            refs/heads/main)
+              ;;
+            refs/heads/fix/17-project-add-readback|refs/heads/feat/32-bidirectional-sync)
+              if [ "$SYNC_DISPATCH_DRY_RUN" != "true" ] || [ -n "$SYNC_DISPATCH_RESOLVE_ISSUES" ]; then
+                echo "Feature ref permits only a dry run without PM resume" >&2
+                exit 1
+              fi
               ;;
             *)
               echo "Manual workflow ref is not allowed" >&2
@@ -94,9 +104,11 @@ jobs:
           NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
           NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
           NOTION_SYNC_ENABLED: ${{ github.event_name == 'workflow_dispatch' && 'true' || vars.NOTION_SYNC_ENABLED }}
+          NOTION_BIDIRECTIONAL_ENABLED: ${{ vars.NOTION_BIDIRECTIONAL_ENABLED || 'false' }}
           SYNC_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
           SYNC_DIAGNOSE_DATE_READBACK: ${{ inputs.diagnose_date_readback && 'true' || 'false' }}
           SYNC_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
+          SYNC_APPROVED_SHA: ${{ inputs.approved_sha }}
         run: |
           python3 -B - <<'PY'
           import os

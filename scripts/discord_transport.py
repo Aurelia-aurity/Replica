@@ -6,6 +6,7 @@ import json
 import re
 import stat
 import time
+from datetime import datetime
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,6 +32,10 @@ class HTTPError(Error):
     def __init__(self, status, headers=None, body=b""):
         super().__init__("Remote request rejected")
         self.status, self.headers, self.body = status, headers or {}, body
+
+
+class RateLimitRejected(HTTPError):
+    """A confirmed Discord 429 whose retry timing cannot be trusted."""
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -63,7 +68,7 @@ def json_data(data):
 def validate_state(state):
     if (not isinstance(state, dict) or set(state) !=
             {"schema", "repository_id", "seen", "outbox", "incidents", "holds", "sync_cursor", "invalidated"} or
-            type(state["schema"]) is not int or state["schema"] != 1 or state["repository_id"] != REPO_ID):
+            type(state["schema"]) is not int or state["schema"] not in (1, 2) or state["repository_id"] != REPO_ID):
         raise Error("Invalid ledger schema")
     if (not isinstance(state["seen"], list) or len(state["seen"]) != len(set(state["seen"])) or
             any(not isinstance(k, str) or len(k) > 250 for k in state["seen"]) or
@@ -109,15 +114,65 @@ def validate_state(state):
         if not isinstance(item, dict) or set(item) != {"alert"} or item["alert"] not in state["outbox"]:
             raise Error("Invalid incident reference")
     for n, item in state["holds"].items():
+        allowed_target_keys = ({"reasons"} if state["schema"] == 1 else
+                               {"reasons", "recovery_alerts"})
         if (not re.fullmatch(r"[1-9][0-9]*", n) or not isinstance(item, dict) or
-                set(item) != {"reasons"} or not isinstance(item["reasons"], dict)):
+                set(item) not in (allowed_target_keys, {"reasons"}) or
+                not isinstance(item["reasons"], dict)):
             raise Error("Invalid hold ledger")
+        if "recovery_alerts" in item:
+            anchors = item["recovery_alerts"]
+            if (not isinstance(anchors, list) or
+                    any(not isinstance(key, str) or key not in state["outbox"] or
+                        not key.startswith((f"hold:{n}:", f"hold-delay:{n}:"))
+                        for key in anchors) or
+                    len(anchors) != len(set(anchors))):
+                raise Error("Invalid hold recovery anchors")
         for code, reason in item["reasons"].items():
+            expected = {"streak", "alert"} if state["schema"] == 1 else {"streak", "alert", "episode"}
             if (not re.fullmatch(r"[A-Z][A-Z0-9_]{0,79}", code) or not isinstance(reason, dict) or
-                    set(reason) != {"streak", "alert"} or type(reason["streak"]) is not int or
+                    set(reason) != expected or type(reason["streak"]) is not int or
                     not 0 <= reason["streak"] <= 2 or
                     reason["alert"] is not None and reason["alert"] not in state["outbox"]):
                 raise Error("Invalid hold reason ledger")
+            if state["schema"] == 2 and reason["episode"] is not None:
+                episode = reason["episode"]
+                fields = {"episode_id", "first_observed_run_id", "first_observed_attempt",
+                          "first_observed_at", "timer_origin_at", "timer_origin_run_id",
+                          "timer_origin_uncertainty_seconds", "last_valid_observed_at",
+                          "last_observation_run_id", "last_observation_attempt",
+                          "delay_alert_key", "delay_cancelled"}
+                def valid_time(value):
+                    if value is None:
+                        return True
+                    if not isinstance(value, str) or not value.endswith("Z"):
+                        return False
+                    try:
+                        return datetime.fromisoformat(value[:-1] + "+00:00").utcoffset().total_seconds() == 0
+                    except ValueError:
+                        return False
+                if (not isinstance(episode, dict) or set(episode) != fields or
+                        not isinstance(episode["episode_id"], str) or not episode["episode_id"] or
+                        any(v is not None and (type(v) is not int or v <= 0) for v in
+                            (episode["first_observed_run_id"], episode["first_observed_attempt"],
+                             episode["timer_origin_run_id"], episode["last_observation_run_id"],
+                             episode["last_observation_attempt"])) or
+                        any(not valid_time(episode[k]) for k in
+                            ("first_observed_at", "timer_origin_at", "last_valid_observed_at")) or
+                        (episode["timer_origin_at"] is None) != (episode["timer_origin_run_id"] is None) or
+                        (episode["timer_origin_at"] is None) !=
+                        (episode["timer_origin_uncertainty_seconds"] is None) or
+                        episode["timer_origin_uncertainty_seconds"] is not None and
+                        (type(episode["timer_origin_uncertainty_seconds"]) is not int or
+                         not 0 <= episode["timer_origin_uncertainty_seconds"] <= 60) or
+                        (episode["last_observation_run_id"] is None) !=
+                        (episode["last_observation_attempt"] is None) or
+                        type(episode["delay_cancelled"]) is not bool or
+                        episode["delay_alert_key"] is not None and
+                        episode["delay_alert_key"] != "cancelled" and
+                        (not isinstance(episode["delay_alert_key"], str) or
+                         episode["delay_alert_key"] not in state["outbox"])):
+                    raise Error("Invalid hold episode ledger")
     return state
 
 
@@ -282,12 +337,20 @@ class Discord:
             except HTTPError as exc:
                 if retry_rate_limit and exc.status == 429 and attempt < 2:
                     try:
-                        seconds = float(json_data(exc.body)["retry_after"])
+                        retry_after = json_data(exc.body)["retry_after"]
+                        if isinstance(retry_after, bool):
+                            raise ValueError
+                        seconds = float(retry_after)
                     except (KeyError, ValueError, TypeError, Error):
-                        raise Error("Discord rate limit outcome unresolved") from None
+                        raise RateLimitRejected(429, exc.headers, exc.body) from None
                     if not 0 <= seconds <= 10:
-                        raise Error("Discord rate limit retry bound exceeded")
+                        raise RateLimitRejected(429, exc.headers, exc.body)
                     time.sleep(seconds)
+                    retry_guard = getattr(self, "_before_rate_limit_retry", None)
+                    if retry_guard is not None and retry_guard() is not True:
+                        # This POST was definitively rejected; the caller will
+                        # preserve that fact and re-evaluate on reconciliation.
+                        raise exc
                     continue
                 if 400 <= exc.status < 500:
                     raise HTTPError(exc.status) from None
@@ -329,10 +392,50 @@ def report_zip(data):
         raise Error("Invalid notification artifact") from None
 
 
+def _artifact_run_binding(run):
+    """Return only run fields that authorize and bind a notification artifact."""
+    if not isinstance(run, dict):
+        raise Error("Invalid sync run identity")
+    repository = run.get("repository")
+    head_repository = run.get("head_repository")
+    actor = run.get("actor")
+    triggering_actor = run.get("triggering_actor")
+    actor_id = actor.get("id") if isinstance(actor, dict) else None
+    triggering_actor_id = triggering_actor.get("id") if isinstance(triggering_actor, dict) else None
+    event = run.get("event")
+    fields = (run.get("id"), run.get("run_number"), run.get("run_attempt"),
+              run.get("workflow_id"), run.get("path"),
+              repository.get("id") if isinstance(repository, dict) else None,
+              head_repository.get("id") if isinstance(head_repository, dict) else None,
+              run.get("head_sha"), run.get("status"), run.get("conclusion"),
+              run.get("head_branch"), event,
+              actor_id if event == "workflow_dispatch" else None,
+              triggering_actor_id if event == "workflow_dispatch" else None)
+    (rid, run_number, attempt, workflow_id, path, repo_id, head_repo_id, sha,
+     status, conclusion, branch, event, bound_actor_id, bound_triggering_actor_id) = fields
+    if (type(rid) is not int or rid <= 0 or type(run_number) is not int or run_number <= 0 or
+            type(attempt) is not int or attempt <= 0 or
+            type(workflow_id) is not int or workflow_id <= 0 or
+            not isinstance(path, str) or not path or
+            type(repo_id) is not int or repo_id <= 0 or
+            type(head_repo_id) is not int or head_repo_id <= 0 or
+            not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha) or
+            status != "completed" or not isinstance(conclusion, str) or not conclusion or
+            not isinstance(branch, str) or not branch or
+            not isinstance(event, str) or not event or
+            event == "workflow_dispatch" and
+            (attempt != 1 or type(bound_actor_id) is not int or bound_actor_id <= 0 or
+             type(bound_triggering_actor_id) is not int or bound_triggering_actor_id <= 0 or
+             bound_actor_id != bound_triggering_actor_id)):
+        raise Error("Incomplete sync run identity")
+    return fields
+
+
 def artifact_report(gh, run):
+    binding = _artifact_run_binding(run)
     rid, attempt = run["id"], run["run_attempt"]
     latest = gh.repo(f"/actions/runs/{rid}")
-    if latest.get("run_attempt") != attempt or latest.get("status") != "completed":
+    if _artifact_run_binding(latest) != binding:
         raise Error("Sync attempt changed")
     artifacts = gh.pages(f"/actions/runs/{rid}/artifacts", "artifacts")
     matches = [a for a in artifacts if a.get("name") == f"notion-notification-{rid}-{attempt}"]
@@ -362,6 +465,6 @@ def artifact_report(gh, run):
         _, _, data = request(location, limit=nr.MAX_BYTES)
     report = nr.validate(report_zip(data), run_id=rid, attempt=attempt, sha=run["head_sha"])
     again = gh.repo(f"/actions/runs/{rid}")
-    if any(again.get(k) != latest.get(k) for k in ("run_attempt", "status", "conclusion", "head_sha")):
+    if _artifact_run_binding(again) != binding:
         raise Error("Sync attempt changed during download")
     return report

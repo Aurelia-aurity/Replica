@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import discord_transport as dt
 import discord_notify as dn
 from test_discord_notify import SHA, run, report
@@ -95,6 +96,109 @@ class Transport(unittest.TestCase):
                 return [{"name": "notion-notification-1-1"}]
         with self.assertRaises(dt.Error): dt.artifact_report(GH(), r)
 
+    def test_artifact_list_detail_binding_conflicts_are_rejected_before_download(self):
+        listed = run(1)
+        cases = (
+            {"conclusion": "failure"},
+            {"head_sha": "b" * 40},
+            {"run_number": 2},
+            {"run_attempt": 2},
+            {"repository": {"id": dt.REPO_ID + 1}},
+            {"head_repository": {"id": dt.REPO_ID + 1}},
+            {"workflow_id": 101},
+            {"path": ".github/workflows/other.yml"},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes):
+                detail = copy.deepcopy(listed)
+                detail.update(changes)
+                class GH:
+                    token = "synthetic"
+                    def repo(inner, path): return detail
+                    def pages(inner, path, field):
+                        return [{"id": 99, "name": "notion-notification-1-1", "expired": False,
+                                 "size_in_bytes": 200, "workflow_run": {
+                                     "id": 1, "head_sha": SHA, "repository_id": dt.REPO_ID,
+                                     "head_repository_id": dt.REPO_ID}}]
+                with patch.object(dt, "request", side_effect=AssertionError("Mismatch must stop before download")):
+                    with self.assertRaises(dt.Error): dt.artifact_report(GH(), listed)
+
+    def test_artifact_download_rechecks_complete_binding_but_ignores_unbound_metadata(self):
+        listed = run(1)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr(dt.nr.FILE_NAME, json.dumps(report(1)))
+        artifact = {"id": 99, "name": "notion-notification-1-1", "expired": False,
+                    "size_in_bytes": 200, "workflow_run": {
+                        "id": 1, "head_sha": SHA, "repository_id": dt.REPO_ID,
+                        "head_repository_id": dt.REPO_ID}}
+
+        class GH:
+            token = "synthetic"
+            calls = 0
+            def repo(inner, path):
+                inner.calls += 1
+                if inner.calls == 1:
+                    # Irrelevant display metadata is intentionally not bound.
+                    return {**listed, "display_title": "changed"}
+                return {**listed, "run_number": 2}
+            def pages(inner, path, field): return [artifact]
+
+        with patch.object(dt, "request", return_value=(200, {}, buf.getvalue())):
+            with self.assertRaises(dt.Error): dt.artifact_report(GH(), listed)
+
+        class StableGH:
+            token = "synthetic"
+            calls = 0
+            def repo(inner, path):
+                inner.calls += 1
+                return {**listed, "display_title": f"unbound-{inner.calls}"}
+            def pages(inner, path, field): return [artifact]
+        with patch.object(dt, "request", return_value=(200, {}, buf.getvalue())):
+            accepted = dt.artifact_report(StableGH(), listed)
+        self.assertEqual(accepted["run_id"], 1)
+
+    def test_manual_actor_identity_is_bound_before_and_after_download(self):
+        listed = {**run(1), "workflow_id": dn.SYNC_ID, "path": dn.SYNC_PATH,
+                  "event": "workflow_dispatch", "actor": {"id": int(dn.PM_ID)},
+                  "triggering_actor": {"id": int(dn.PM_ID)}}
+        artifact = {"id": 99, "name": "notion-notification-1-1", "expired": False,
+                    "size_in_bytes": 200, "workflow_run": {
+                        "id": 1, "head_sha": SHA, "repository_id": dt.REPO_ID,
+                        "head_repository_id": dt.REPO_ID}}
+        class DetailGH:
+            token = "synthetic"
+            def repo(inner, path):
+                return {**listed, "actor": {"id": 22}, "triggering_actor": {"id": 22}}
+            def pages(inner, path, field): return [artifact]
+        with patch.object(dt, "request", side_effect=AssertionError("Actor conflict must stop before download")):
+            with self.assertRaises(dt.Error): dt.artifact_report(DetailGH(), listed)
+
+        class DownloadRaceGH:
+            token = "synthetic"
+            calls = 0
+            def repo(inner, path):
+                inner.calls += 1
+                if inner.calls == 1: return listed
+                return {**listed, "actor": {"id": 22}, "triggering_actor": {"id": 22}}
+            def pages(inner, path, field): return [artifact]
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr(dt.nr.FILE_NAME, json.dumps(report(1)))
+        with patch.object(dt, "request", return_value=(200, {}, buf.getvalue())):
+            with self.assertRaises(dt.Error): dt.artifact_report(DownloadRaceGH(), listed)
+
+        class NonManualGH:
+            token = "synthetic"
+            calls = 0
+            def repo(inner, path):
+                inner.calls += 1
+                return {**run(1), "actor": {"id": 22 + inner.calls}}
+            def pages(inner, path, field): return [artifact]
+        with patch.object(dt, "request", return_value=(200, {}, buf.getvalue())):
+            accepted = dt.artifact_report(NonManualGH(), run(1))
+        self.assertEqual(accepted["run_id"], 1)
+
     def test_artifact_race_after_download_rejected(self):
         r = run(1); buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as archive:
@@ -165,6 +269,20 @@ class DraftSinglePost(unittest.TestCase):
             self.assertEqual(self.client().send(payload), receipt["id"])
             self.assertEqual(request.call_count, 2)
             sleep.assert_called_once_with(0.0)
+
+    def test_untrusted_rate_limit_retry_time_is_definite_rejection_without_retry(self):
+        bodies = (b"{}", b'{"retry_after":"later"}', b'{"retry_after":11}',
+                  b'{"retry_after":true}')
+        for body in bodies:
+            with self.subTest(body=body), patch.object(dt, "request",
+                    side_effect=dt.HTTPError(429, body=body)) as request, \
+                    patch.object(dt.time, "sleep") as sleep:
+                with self.assertRaises(dt.RateLimitRejected) as raised:
+                    self.client().send({"content": "synthetic test"})
+                self.assertEqual(raised.exception.status, 429)
+                self.assertEqual(request.call_count, 1)
+                self.assertEqual(request.call_args.kwargs["method"], "POST")
+                sleep.assert_not_called()
 
 
 class ComparePathRegression(unittest.TestCase):

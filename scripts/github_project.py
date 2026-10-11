@@ -539,7 +539,7 @@ PROJECT_ITEMS_QUERY = """query($id: ID!, $after: String) {
                     ... on PullRequest { id databaseId number repository { id databaseId nameWithOwner } } }
           fieldValues(first: 100) {
             nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-              field { ... on ProjectV2SingleSelectField { id } } optionId name
+              id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
             } }
             pageInfo { hasNextPage endCursor }
           }
@@ -556,7 +556,7 @@ ITEM_FIELD_VALUES_QUERY = """query($id: ID!, $after: String) {
     ... on ProjectV2Item {
       id fieldValues(first: 100, after: $after) {
         nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-          field { ... on ProjectV2SingleSelectField { id } } optionId name
+          id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
         } }
         pageInfo { hasNextPage endCursor }
       }
@@ -713,6 +713,8 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
                 {"id": item["id"], "content_id": content["id"], "is_archived": True})
             continue
         value = None
+        value_id = None
+        value_updated_at = None
         status_count = 0
         for field_value in all_values:
             if field_value.get("field", {}).get("id") == status_field_id:
@@ -720,10 +722,22 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
                         "Project Status value 형식 오류")
                 status_count += 1
                 value = field_value.get("optionId")
-                require(value in status_options.values(), "Project에 미등록 Status option ID")
+                require(value is None or value in status_options.values(),
+                        "Project에 미등록 Status option ID")
+                value_id = field_value.get("id")
+                value_updated_at = field_value.get("updatedAt")
+                require(isinstance(value_id, str) and value_id and
+                        isinstance(value_updated_at, str),
+                        "Project Status value ID/updatedAt 누락")
+                parse_time(value_updated_at)
+                require(field_value.get("name") is None or isinstance(field_value.get("name"), str),
+                        "Project Status value name 형식 오류")
         require(status_count <= 1, "Project item Status 값이 중복 조회되었습니다")
         require(issue_id not in issue_items, "동일 Issue의 Project item이 중복됩니다")
         issue_items[issue_id] = {"id": item["id"], "status_option_id": value,
+                                 "status_value_id": value_id,
+                                 "status_updated_at": value_updated_at,
+                                 "status_field_id": status_field_id,
                                  "is_archived": False, "content_id": content["id"]}
     return {"project_id": project_id, "owner_id": owner_id, "status_field_id": status_field_id,
             "status_options": dict(status_options), "items": issue_items,
@@ -739,7 +753,7 @@ PROJECT_ITEM_QUERY = """query($id: ID!) {
       content { __typename ... on Issue { id databaseId repository { id databaseId nameWithOwner } } }
       fieldValues(first: 100) {
         nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-          field { ... on ProjectV2SingleSelectField { id } } optionId name
+          id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
         } }
         pageInfo { hasNextPage endCursor }
       }
@@ -748,9 +762,12 @@ PROJECT_ITEM_QUERY = """query($id: ID!) {
 }"""
 
 
-def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_archived=False):
+def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_archived=False,
+                       allow_missing=False):
     data, _ = client.request(PROJECT_ITEM_QUERY, {"id": item_id})
     item = data.get("node")
+    if item is None and allow_missing:
+        return None
     require(isinstance(item, dict) and item.get("id") == item_id and
             type(item.get("isArchived")) is bool and (allow_archived or not item["isArchived"]),
             "Project item readback ID/활성 상태 불일치")
@@ -768,12 +785,16 @@ def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_ar
             "Project item Issue 저장소 불일치")
     if item["isArchived"]:
         return {"id": item_id, "content_id": content["id"],
-                "status_option_id": None, "is_archived": True}
+                "status_option_id": None, "status_value_id": None,
+                "status_updated_at": None, "status_field_id": status_field_id,
+                "is_archived": True}
     connection = item.get("fieldValues")
     require(isinstance(connection, dict), "Project item fieldValues 연결 누락")
     all_values = _all_item_field_values(client, item_id, connection)
     status = None
     status_count = 0
+    status_value_id = None
+    status_updated_at = None
     for value in all_values:
         if value.get("field", {}).get("id") == status_field_id:
             require(value.get("__typename") == "ProjectV2ItemFieldSingleSelectValue",
@@ -782,9 +803,19 @@ def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_ar
             status = value.get("optionId")
             require(status is None or status in EXPECTED_STATUS_OPTIONS.values(),
                     "Project item Status option ID 미등록")
+            status_value_id = value.get("id")
+            status_updated_at = value.get("updatedAt")
+            require(isinstance(status_value_id, str) and status_value_id and
+                    isinstance(status_updated_at, str),
+                    "Project item Status value ID/updatedAt 누락")
+            parse_time(status_updated_at)
+            require(value.get("name") is None or isinstance(value.get("name"), str),
+                    "Project item Status value name 형식 오류")
     require(status_count <= 1, "Project item Status 값이 중복 조회되었습니다")
     return {"id": item["id"], "content_id": content["id"],
-            "status_option_id": status, "is_archived": False}
+            "status_option_id": status, "status_value_id": status_value_id,
+            "status_updated_at": status_updated_at,
+            "status_field_id": status_field_id, "is_archived": False}
 
 
 SET_STATUS_MUTATION = """mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
