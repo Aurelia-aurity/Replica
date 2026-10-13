@@ -15,6 +15,7 @@
 | [자료 안내](materials.md) | GitHub·Drive·Notion 보관 기준, 최종 수행계획서 |
 | [개발 환경](development-environment.md) | 합의한 도구·버전과 미확인 세부 값 |
 | [AI 활용](ai-usage.md) | 공통 기준, 개인 로컬 문서 관리, PR·이슈 활용·검증 기록 |
+| [학교 GPU 접속 확인 결과](architecture/school-gpu-access.md) | #14 학교 회신, 접속·Slurm 관측과 미확인 운영 조건 |
 | [프로젝트 일정](project-schedule.md) | 최종 계획과 최신 공지, 발표·보고서 일정 |
 | [10월 2일 멘토 미팅](meetings/2026-10-02-mentor-meeting.md) | 멘토의 조언과 후속 작업 |
 | [10월 7일 팀 미팅](meetings/2026-10-07-team-meeting.md) | 설계·연동·역할·발표 준비 |
