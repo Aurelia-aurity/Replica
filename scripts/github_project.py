@@ -17,7 +17,8 @@ EXPECTED_PROJECT_ID = "PVT_kwHOBda_2c4BmKKV"
 PROJECT_OWNER_LOGIN = "Just-Simple0"
 EXPECTED_PROJECT_OWNER_ID = "U_kgDOBda_2Q"
 EXPECTED_PM_USER_ID = 97959897
-STATUS_NAMES = ("백로그", "준비 중", "진행 중", "검토 중", "완료")
+STATUS_NAMES = ("백로그", "준비 중", "진행 중", "검토 중", "완료", "취소")
+LEGACY_STATUS_NAMES = STATUS_NAMES[:-1]
 EXPECTED_STATUS_OPTIONS = {
     "백로그": "f75ad846", "준비 중": "96beb7e0", "진행 중": "47fc9ee4",
     "검토 중": "ff336f39", "완료": "98236657",
@@ -592,12 +593,32 @@ def parse_status_options(raw):
     except (ValueError, TypeError):
         raise SyncError("PROJECT_STATUS_OPTIONS JSON 형식 오류") from None
     require(isinstance(value, dict) and set(value) == set(STATUS_NAMES),
-            "PROJECT_STATUS_OPTIONS는 5개 상태 이름만 포함해야 합니다")
-    require(value == EXPECTED_STATUS_OPTIONS, "PROJECT_STATUS_OPTIONS가 확인된 Replica option ID와 다릅니다")
+            "PROJECT_STATUS_OPTIONS는 6개 상태 이름을 포함해야 합니다")
+    require(all(value.get(name) == option for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
     require(all(isinstance(v, str) and v.strip() for v in value.values()),
             "Project Status option ID 누락")
     require(len(set(value.values())) == len(value), "Project Status option ID 중복")
+    require(value["취소"] not in EXPECTED_STATUS_OPTIONS.values(),
+            "Project 취소 option ID가 기존 상태 ID와 충돌합니다")
     return value
+
+
+def _validate_status_option_map(status_options):
+    require(isinstance(status_options, dict) and
+            set(status_options) in (set(LEGACY_STATUS_NAMES), set(STATUS_NAMES)),
+            "Project Status option 이름 설정 오류")
+    require(all(isinstance(value, str) and value.strip()
+                for value in status_options.values()),
+            "Project Status option ID 누락")
+    require(len(set(status_options.values())) == len(status_options),
+            "Project Status option ID 중복")
+    require(all(status_options.get(name) == option
+                for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
+    if "취소" in status_options:
+        require(status_options["취소"] not in EXPECTED_STATUS_OPTIONS.values(),
+                "Project 취소 option ID가 기존 상태 ID와 충돌합니다")
 
 
 def fetch_project(client, *, project_id, owner_id, status_field_id, status_options,
@@ -605,6 +626,7 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
                   add_target_issue_id=None, add_target_issue_node_id=None):
     require(project_id == EXPECTED_PROJECT_ID, "PROJECT_ID가 확인된 Replica Project와 다릅니다")
     require(owner_id == EXPECTED_PROJECT_OWNER_ID, "PROJECT_OWNER_ID가 확인된 PM 계정과 다릅니다")
+    _validate_status_option_map(status_options)
     add_readback_args = (add_readback_item_id, add_target_issue_id, add_target_issue_node_id)
     require(all(value is None for value in add_readback_args) or
             (isinstance(add_readback_item_id, str) and add_readback_item_id and
@@ -639,7 +661,22 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
     require(len(status_fields) == 1 and status_fields[0].get("__typename") == "ProjectV2SingleSelectField",
             "PROJECT_STATUS_FIELD_ID 타입/존재 검증 실패")
     require(status_fields[0].get("name") == "Status", "PROJECT_STATUS_FIELD_ID 이름이 Status가 아닙니다")
-    actual_options = {o.get("name"): o.get("id") for o in status_fields[0].get("options", [])}
+    raw_options = status_fields[0].get("options")
+    require(isinstance(raw_options, list) and len(raw_options) == len(status_options),
+            "Project Status option 목록 길이/형식 오류")
+    option_names, option_ids = [], []
+    for option in raw_options:
+        require(isinstance(option, dict) and
+                isinstance(option.get("name"), str) and option["name"].strip() and
+                isinstance(option.get("id"), str) and option["id"].strip(),
+                "Project Status option 이름/ID 형식 오류")
+        option_names.append(option["name"])
+        option_ids.append(option["id"])
+    require(len(set(option_names)) == len(option_names),
+            "Project Status option 이름 중복")
+    require(len(set(option_ids)) == len(option_ids),
+            "Project Status option ID 중복")
+    actual_options = dict(zip(option_names, option_ids))
     require(actual_options == status_options, "Project Status option 이름/ID 불일치")
 
     rows, cursor, seen = [], None, set()
@@ -762,8 +799,14 @@ PROJECT_ITEM_QUERY = """query($id: ID!) {
 }"""
 
 
-def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_archived=False,
-                       allow_missing=False):
+def fetch_project_item(client, project_id, item_id, status_field_id, *, status_options=None,
+                       allow_archived=False, allow_missing=False):
+    status_options = EXPECTED_STATUS_OPTIONS if status_options is None else status_options
+    require(isinstance(status_options, dict) and
+            set(status_options) in (set(LEGACY_STATUS_NAMES), set(STATUS_NAMES)),
+            "Project Status option map 형식 오류")
+    require(all(status_options.get(name) == option for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
     data, _ = client.request(PROJECT_ITEM_QUERY, {"id": item_id})
     item = data.get("node")
     if item is None and allow_missing:
@@ -801,7 +844,7 @@ def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_ar
                     "Project item Status value 타입 오류")
             status_count += 1
             status = value.get("optionId")
-            require(status is None or status in EXPECTED_STATUS_OPTIONS.values(),
+            require(status is None or status in status_options.values(),
                     "Project item Status option ID 미등록")
             status_value_id = value.get("id")
             status_updated_at = value.get("updatedAt")

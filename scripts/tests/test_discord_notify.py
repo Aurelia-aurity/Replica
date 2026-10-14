@@ -109,6 +109,7 @@ class Events(unittest.TestCase):
                     {"requested_reviewer": {"login": "owner"}, "requested_team": {"slug": "team"}}):
             with self.assertRaises(dt.Error): dn.source_events([p], {18: [event(1, "review_requested", **who)]}, MAPPING)
 
+
     def test_malicious_title_and_unknown_account(self):
         issue = obj(); issue["title"] = "@everyone <@111111111111111111> **bad**" * 200
         message = next(iter(dn.source_events([issue], {18: []}, MAPPING).values()))
@@ -190,6 +191,138 @@ class Events(unittest.TestCase):
                                     event_check=lambda key: dn.current_pr_event(GH(), key, MAPPING)), 0)
         self.assertEqual(len(webhook.calls), 1)
         self.assertEqual(state["outbox"][new_key]["status"], "delivered")
+
+
+class ProjectBacklog(unittest.TestCase):
+    def test_six_option_readback_uses_configured_backlog_and_preserves_five_ids(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        project = {"items": {1018: {"status_option_id": options["백로그"]}}}
+        objects = [obj(18), obj(19)]
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient") as graph, \
+             patch.object(gp, "fetch_project", return_value=project) as fetch:
+            result = dn.project_backlog("token", objects,
+                                        json.dumps(options, ensure_ascii=False))
+
+        self.assertEqual(result, {18})
+        self.assertEqual({name: options[name] for name in gp.EXPECTED_STATUS_OPTIONS},
+                         gp.EXPECTED_STATUS_OPTIONS)
+        self.assertEqual(fetch.call_args.kwargs["status_options"], options)
+        graph.assert_called_once_with("token")
+
+    def test_missing_or_mismatched_six_option_map_fails_closed(self):
+        import github_project as gp
+
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        cases = [None, json.dumps(gp.EXPECTED_STATUS_OPTIONS, ensure_ascii=False),
+                 json.dumps({**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id",
+                             "백로그": "wrong-id"}, ensure_ascii=False)]
+        for raw in cases:
+            with self.subTest(raw=raw), \
+                 patch.object(dn.dt, "GitHub", return_value=reader), \
+                 patch.object(gp, "GraphQLClient") as graph, \
+                 patch.object(gp, "fetch_project") as fetch:
+                self.assertEqual(dn.project_backlog("token", [obj(18)], raw), set())
+                fetch.assert_not_called()
+                graph.assert_not_called()
+
+    def test_project_backlog_keeps_read_project_only_scope_boundary(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "project, read:project"})
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient") as graph, \
+             patch.object(gp, "fetch_project") as fetch:
+            result = dn.project_backlog("token", [obj(18)],
+                                        json.dumps(options, ensure_ascii=False))
+        self.assertEqual(result, set())
+        graph.assert_not_called()
+        fetch.assert_not_called()
+
+    def test_duplicate_live_project_option_suppresses_only_annotation(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        raw_options = [{"id": value, "name": name} for name, value in options.items()]
+        raw_options.insert(-1, {"id": "bad-cancel-id", "name": "취소"})
+
+        class Graph:
+            def __init__(self):
+                self.queries = []
+
+            def request(self, query, variables=None, *, mutation=False):
+                self.queries.append(query)
+                status = {"__typename": "ProjectV2SingleSelectField",
+                          "id": "PVTSSF_lAHOBda_2c4BmKKVzhk0RA4",
+                          "name": "Status", "options": copy.deepcopy(raw_options)}
+                return {"node": {"id": gp.EXPECTED_PROJECT_ID, "number": gp.PROJECT_NUMBER,
+                    "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID, "login": "Just-Simple0"},
+                    "fields": {"nodes": [status], "pageInfo": {
+                        "hasNextPage": False, "endCursor": None}}}}, None
+
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        graph = Graph()
+        issue = obj(18)
+        pull = obj(19, pull=True)
+        pull["requested_reviewers"] = [{"login": "owner"}]
+        timeline = event(1, "review_requested", requested_reviewer={"login": "owner"})
+
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient", return_value=graph):
+            backlog = dn.project_backlog(
+                "token", [issue, pull], json.dumps(options, ensure_ascii=False))
+
+        self.assertEqual(backlog, set())
+        self.assertEqual(graph.queries, [gp.PROJECT_FIELDS_QUERY])
+        messages = dn.source_events([issue, pull], {18: [], 19: [timeline]}, MAPPING,
+                                    backlog=backlog)
+        issue_message = messages["issue:18:created:" + issue["created_at"]]
+        review_message = messages["pr:19:timeline:1"]
+        self.assertIn("Project 등록 미확인", issue_message["content"])
+        self.assertIn(dn.PROJECT_URL, issue_message["content"])
+        self.assertEqual(review_message["allowed_mentions"]["users"],
+                         [MAPPING["owner"]])
+
+        state = dn.new_state()
+        dn.reconcile_events(state, messages)
+
+        class Ledger:
+            def load(self):
+                return copy.deepcopy(state)
+
+            def save(self, value, **kwargs):
+                self.value = copy.deepcopy(value)
+
+        class Webhook:
+            def __init__(self):
+                self.posts = []
+
+            def send(self, message):
+                self.posts.append(copy.deepcopy(message))
+                return f"333333333333333{len(self.posts)}"
+
+        webhook = Webhook()
+        dn.deliver(state, Ledger(), webhook,
+                   event_check=lambda key: messages[key])
+        self.assertEqual(len(webhook.posts), sum(message is not None
+                                                for message in messages.values()))
+        self.assertTrue(any("Project 등록 미확인" in message["content"]
+                            for message in webhook.posts))
+        self.assertTrue(any(message["allowed_mentions"]["users"] == [MAPPING["owner"]]
+                            for message in webhook.posts))
+        self.assertTrue(all(item["status"] == "delivered"
+                            for item in state["outbox"].values()))
 
 
 class Incidents(unittest.TestCase):

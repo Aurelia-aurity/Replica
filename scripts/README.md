@@ -2,7 +2,7 @@
 
 ## GitHub Project ↔ Notion
 
-`notion_sync.py`는 이슈·PR 메타데이터와 Project 작업 상태를 Notion에 반영하고, 양방향 모드에서 Notion의 일반 3상태 이동을 요청으로 처리합니다. `NOTION_BIDIRECTIONAL_ENABLED`의 기본값은 false이며 확장 상태를 보존한 단방향 모드를 지원합니다. [운영 안내](../docs/architecture/notion-sync.md)에서 인증·사전검사·스키마 전환·보류 재개를 확인하세요.
+`notion_sync.py`는 이슈·PR 메타데이터와 Project 작업 상태를 Notion에 반영하고, 양방향 설정이 켜져 있으면 Notion의 일반 3상태 이동을 요청으로 처리합니다. 사용자 화면 상태는 6개이며 `취소`는 확인된 GitHub 종료 결과로만 표시합니다. Project의 여섯 번째 옵션 ID는 실제 읽기 결과에 바인딩되어야 합니다. `요청 상태`와 `요청 처리`는 각각 기존 다섯 선택지를 유지합니다. dry-run의 `full_effect_report`는 전체 원본과 양방향 요청·복구·관리행 처리의 잠재 효과 범위이며 정확한 write 목록이 아닙니다. [운영 안내](../docs/architecture/notion-sync.md)에서 schema rollout·설정 보존·보류 재개를 확인하세요.
 
 ```sh
 python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'

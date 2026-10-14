@@ -32,6 +32,8 @@ CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 
 
 새 Issue 알림은 지연하지 않는다. 읽기 전용 Project 조회로 실제 백로그 상태가 확인된 경우에만 등록 확인을 표시한다. 조회 권한이 없거나 확인에 실패하면 `Project 등록 미확인`과 링크를 표시한다. 추가적인 등록 완료 알림은 보내지 않는다.
 
+백로그 관측을 사용하려면 Actions Variable `PROJECT_STATUS_OPTIONS`에 sync workflow와 같은 6개 상태 이름→실제 옵션 ID JSON을 등록한다. 기존 5개 옵션 ID를 보존하고 `취소` ID는 실제 Project readback으로 검증한 값을 쓴다. 변수가 없거나 Project의 현재 mapping과 맞지 않으면 백로그 주석을 생략하며 다른 알림 흐름은 계속된다. 이 값은 읽기 전용 관측에만 쓰이고, 알림 작업에는 기존 Project read 권한 외 권한을 추가하지 않는다.
+
 ## Actions 설정
 
 서버 `Replica` → `개발-알림` → 채널 설정 → 연동에서 incoming Webhook을 준비하고 저장소 Actions Secret `DISCORD_WEBHOOK_URL`에 직접 등록한다. Webhook URL을 채팅·문서·코드·로그에 붙이지 않는다. 별도 Discord 봇은 필요 없다.
@@ -43,6 +45,7 @@ CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 
 | Variable | `DISCORD_USER_MAP` | GitHub login → Discord 숫자 사용자 ID의 JSON 객체. ID는 문자열로 입력 |
 | Variable | `DISCORD_NOTIFICATIONS_ENABLED` | 활성화하려면 `true`, 그 전에는 `false` 또는 미설정 |
 | 선택 Secret | `DISCORD_PROJECT_READ_TOKEN` | 검증 가능한 읽기 전용 Project 토큰. 없어도 알림 동작 |
+| Variable | `PROJECT_STATUS_OPTIONS` | 백로그 관측용 6개 상태 이름 → 실제 Project 옵션 ID JSON. 누락·불일치 시 백로그 주석 생략 |
 
 매핑 예: `{"github-login":"123456789012345678"}`. Discord 사용자 이름이나 표시 이름 대신 개발자 모드의 `사용자 ID 복사`로 얻은 숫자 ID를 쓴다. 팀원 ID 매핑은 Actions 변수에 보관한다.
 

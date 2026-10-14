@@ -966,8 +966,8 @@ def resolve(state, key, outcome, mid, discord):
         raise dt.Error("Delivery remains unknown")
 
 
-def project_backlog(token, objects):
-    if not token:
+def project_backlog(token, objects, status_options_raw=None):
+    if not token or not status_options_raw:
         return set()
     try:
         reader = dt.GitHub(token)
@@ -976,16 +976,17 @@ def project_backlog(token, objects):
         if "read:project" not in scopes or "project" in scopes:
             return set()
         import github_project as gp
+        status_options = gp.parse_status_options(status_options_raw)
         graph = gp.GraphQLClient(token)
         # Existing verifier binds owner/project/status IDs, using reads only.
         repository_node = reader.repo("")["node_id"]
         project = gp.fetch_project(graph, project_id=gp.EXPECTED_PROJECT_ID,
                                    owner_id=gp.EXPECTED_PROJECT_OWNER_ID,
                                    status_field_id="PVTSSF_lAHOBda_2c4BmKKVzhk0RA4",
-                                   status_options=gp.EXPECTED_STATUS_OPTIONS,
+                                   status_options=status_options,
                                    repository_node_id=repository_node)
         return {i["number"] for i in objects if "head" not in i and
-                (project["items"].get(i["id"]) or {}).get("status_option_id") == gp.EXPECTED_STATUS_OPTIONS["백로그"]}
+                (project["items"].get(i["id"]) or {}).get("status_option_id") == status_options["백로그"]}
     except Exception:
         return set()  # Optional observation must never claim unverified registration.
 
@@ -1767,7 +1768,8 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
             ledger.save(state)
         stage = "source_collect"
         objects, pulls, timelines = collect_objects(gh)
-        backlog = project_backlog(env.get("DISCORD_PROJECT_READ_TOKEN"), objects)
+        backlog = project_backlog(env.get("DISCORD_PROJECT_READ_TOKEN"), objects,
+                                  env.get("PROJECT_STATUS_OPTIONS"))
         events = source_events(objects, timelines, mapping, backlog)
         if bootstrap:
             state = new_state()
