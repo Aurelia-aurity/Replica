@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed baseline success",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "finish_reason": {
+      "enum": [
+        "stop",
+        "length"
+      ]
+    },
+    "ai_generated": {
+      "const": true
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "used_history_turns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "dropped_history_turns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "used_history_turns",
+        "dropped_history_turns"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "request_id",
+    "message",
+    "finish_reason",
+    "ai_generated",
+    "context"
+  ],
+  "additionalProperties": false
+}

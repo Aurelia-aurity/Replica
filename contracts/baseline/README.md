@@ -1,5 +1,7 @@
 # 백엔드↔AI baseline 호출 계약 초안
 
+> 고도화까지 포함한 후속 합의안은 [백엔드↔AI 통합 명세](../backend-ai/api-spec.md)와 [호출 흐름](../backend-ai/api-call-flow.md)을 확인하세요. 사용자 수동 재시도와 고도화 공유 운영의 동시 수락 정책은 통합 명세에서 개정안을 제안하며, 팀 합의 전입니다. 기존 baseline 스키마는 유지합니다.
+
 상태: **담당자 합의 전 초안**, 2026-10-10, [이슈 #15](https://github.com/Aurelia-aurity/Replica/issues/15).
 이 문서는 앞으로 백엔드가 AI에 보낼 값과 받을 결과를 제안합니다.
 현재 CLI에 HTTP API·대화 이력 처리가 구현되어 있다는 뜻은 아닙니다.
