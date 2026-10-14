@@ -17,3 +17,11 @@
 
 첫 실측 결과: [2026-10-10 Qwen2.5-7B-Instruct 평가](results/2026-10-10-qwen2.5-7b-baseline/README.md).
 학교 GPU 본 평가 60회와 사용자 채점 20문항을 완료했으며, 사용자 점수와 보조 분석을 구분해 기록했습니다.
+
+## 평가 지표 확장 (#36)
+
+실행·채점 안내: [evaluation/README.md](evaluation/README.md).
+사람의 의미 판단, JSON QA·지시 준수의 기계 채점, KoBEST와 운영 지표를 구분합니다.
+확정한 합성 문항을 사용하며 기존 #33 결과를 보존합니다.
+실측 결과: [2026-10-13 Qwen2.5-7B-Instruct 평가](results/2026-10-13-qwen2.5-7b-evaluation/README.md).
+학교 GPU 생성 180회와 KoBEST 4,561문항을 완료했습니다. 사용자 전체 점수, AI가 작성하고 사용자 결정을 반영한 의미 판정, 기계 점수를 별도로 기록했습니다.

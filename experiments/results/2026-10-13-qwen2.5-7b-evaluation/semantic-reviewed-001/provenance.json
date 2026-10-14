@@ -1,0 +1,11 @@
+{
+  "semantic_assessor": "assistant",
+  "user_confirmation_scope": [
+    "case12_error_type",
+    "case13_plural_expression"
+  ],
+  "not_independent_human_review": true,
+  "user_overall_scores_preserved": true,
+  "source_draft_sha256": "dd1bcaa7eff4975afff4ffed9d92227ed404be307e24fdbc4fd3a02409bc5a54",
+  "confirmed_date": "2026-10-14"
+}

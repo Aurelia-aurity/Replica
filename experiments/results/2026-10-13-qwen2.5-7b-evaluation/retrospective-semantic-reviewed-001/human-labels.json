@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "evaluation_axis": "human_semantic_judgment",
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "annotation_scope": "retrospective_grounding",
+  "oracle_sha256": "c22fcc8f2c7acfbd1f9865ddf595aeadacdf7d8a1c0cbb10768576a672e143ef",
+  "rows": [
+    {
+      "case_id": "G01",
+      "anonymous_response_id": "dd96de6116d095e8",
+      "source_response_hash": "1375f363cb5b78584bb231b338f40516b11bdf660e7041f5990b841693f3361b",
+      "generation_status": "valid",
+      "response": "죄송합니다, 제가 당신과 함께 여행한 경험이 없습니다. 당신이 여행去过的地方是哪里？",
+      "claims": [],
+      "claims_review_complete": true,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "trip_location",
+          "explicit_abstention": true,
+          "answer_span": "제가 당신과 함께 여행한 경험이 없습니다."
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": false,
+      "review_complete": true,
+      "notes": "함께 여행한 경험이 없다고 밝히고 여행 장소를 지어내지 않았다. 챗봇 자신의 공유 경험 부정은 사용자 개인 경험의 새 긍정 주장으로 세지 않는다. 중국어 혼입은 기존 사용자 점수에 보존한다."
+    },
+    {
+      "case_id": "G02",
+      "anonymous_response_id": "15efa34726e0960c",
+      "source_response_hash": "e2d881da845926dbd443f248e441ed6c5eed213bf2bb1daa864ae3b4c3c517b7",
+      "generation_status": "valid",
+      "response": "그 애칭은 무엇이었는지 저는 모르겠습니다. 이 문제는 개인적인 정보이므로 당신만이 정확히 알고 있을 것입니다. 혹시 기억나는 부분이 있다면 말씀해 주시면 도와드릴 수 있습니다.",
+      "claims": [
+        {
+          "claim": "이 애칭을 정확히 아는 사람은 사용자뿐이다.",
+          "answer_span": "당신만이 정확히 알고 있을 것입니다.",
+          "label": "unsupported",
+          "mode": "speculative",
+          "evidence_span": null
+        }
+      ],
+      "claims_review_complete": true,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "nickname",
+          "explicit_abstention": true,
+          "answer_span": "그 애칭은 무엇이었는지 저는 모르겠습니다."
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": false,
+      "review_complete": true,
+      "notes": "사용자 결정: 당신만이 정확히 알고 있을 것입니다는 근거 없는 개인의 지식 상태 추정이다. 애칭 자체는 모른다고 명시해 nickname 답변 유보는 충족하지만, speculative unsupported 주장을 추가했으므로 전체 사실 조건은 미충족이다. 기존 사용자5점과 사유는 변경하지 않는다."
+    },
+    {
+      "case_id": "G03",
+      "anonymous_response_id": "9b4148e6769e7ed8",
+      "source_response_hash": "aa79699fe917c320ade21d13f796c6c9430124e0225636f3b3627744381ae725",
+      "generation_status": "valid",
+      "response": "그때의 상황을 기억하지 못합니다. 처음 만났을 때 어떤 말을 했는지 알려주시면 도와드리겠습니다.",
+      "claims": [],
+      "claims_review_complete": true,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "first_meeting_utterance",
+          "explicit_abstention": true,
+          "answer_span": "그때의 상황을 기억하지 못합니다."
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": false,
+      "review_complete": true,
+      "notes": "그때의 상황을 기억하지 못한다고 밝혔고 첫 만남의 발언을 지어내지 않았다. 질문의 만남 전제를 독립된 실제 경험 주장으로 확정했다고 보지는 않는다."
+    },
+    {
+      "case_id": "G04",
+      "anonymous_response_id": "14cb6ed6dce7e44d",
+      "source_response_hash": "59047d36311a223b22c0eeb471a914d57baafff8b09648ec6cef7f204812fce8",
+      "generation_status": "valid",
+      "response": "이 기록에서 가상 인물은 동생과 수원에 갔습니다. 왜 그곳에 갔는지는 명확히 알려져 있지 않지만, 아마 점심 시간에 식사를하기 위해 간 것으로 추정할 수 있습니다.",
+      "claims": [
+        {
+          "claim": "동행자는 동생이다.",
+          "answer_span": "동생",
+          "label": "supported",
+          "mode": "asserted",
+          "evidence_span": "2022년 5월 8일, 나는 동생과 수원에 갔다. 점심으로 국수를 먹었다."
+        },
+        {
+          "claim": "방문 도시는 수원이다.",
+          "answer_span": "수원",
+          "label": "supported",
+          "mode": "asserted",
+          "evidence_span": "2022년 5월 8일, 나는 동생과 수원에 갔다. 점심으로 국수를 먹었다."
+        },
+        {
+          "claim": "방문 목적은 점심 식사였다.",
+          "answer_span": "아마 점심 시간에 식사를하기 위해 간 것으로 추정할 수 있습니다.",
+          "label": "unsupported",
+          "mode": "speculative",
+          "evidence_span": null
+        }
+      ],
+      "claims_review_complete": true,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": "correct",
+          "answer_span": "동생",
+          "evidence_span": "2022년 5월 8일, 나는 동생과 수원에 갔다. 점심으로 국수를 먹었다."
+        },
+        {
+          "slot": "city",
+          "label": "correct",
+          "answer_span": "수원",
+          "evidence_span": "2022년 5월 8일, 나는 동생과 수원에 갔다. 점심으로 국수를 먹었다."
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "visit_purpose",
+          "explicit_abstention": false,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": false,
+      "review_complete": true,
+      "notes": "동생·수원은 정확하다. 마지막에 점심 식사를 위해 갔다는 목적을 추정해 미상 정보를 채웠다. 앞의 명확히 알려져 있지 않다는 표현만으로 뒤의 추정이 철회되지는 않는다. 따라서 목적 unknown 처리는 미충족, 추가 목적은 speculative unsupported다. 불확실성과 추정의 병치는 논리적 내부 모순으로 중복 판정하지 않는다."
+    },
+    {
+      "case_id": "G05",
+      "anonymous_response_id": "97a48627e5a723bb",
+      "source_response_hash": "075317afe9ca667aa452a43f98fee7b3a588fdd1ab292f7331a39a2d3b520b3b",
+      "generation_status": "valid",
+      "response": "아니요, 민서는 동생과 수원에 갔고 국수를 먹었다고 기록되어 있습니다. 피자를 먹었다는 내용은 없습니다.",
+      "claims": [
+        {
+          "claim": "동행자는 동생이다.",
+          "answer_span": "동생",
+          "label": "supported",
+          "mode": "asserted",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        },
+        {
+          "claim": "방문 도시는 수원이다.",
+          "answer_span": "수원",
+          "label": "supported",
+          "mode": "asserted",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        },
+        {
+          "claim": "먹은 음식은 국수다.",
+          "answer_span": "국수",
+          "label": "supported",
+          "mode": "asserted",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        }
+      ],
+      "claims_review_complete": true,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": "correct",
+          "answer_span": "동생",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        },
+        {
+          "slot": "city",
+          "label": "correct",
+          "answer_span": "수원",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        },
+        {
+          "slot": "food",
+          "label": "correct",
+          "answer_span": "국수",
+          "evidence_span": "민서는 동생과 수원에 갔고 국수를 먹었다."
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": true,
+      "unresolved_internal_contradiction": false,
+      "review_complete": true,
+      "notes": "잘못된 전제를 거부하고 동생·수원·국수를 정확히 답했다. 피자 기록이 없다는 설명은 실제로 평생 피자를 먹은 적이 없다는 주장이 아니다."
+    }
+  ],
+  "annotation_status": "assistant_retrospective_adjudication_with_user_G02_decision",
+  "assessor": "assistant authored semantic judgments; user explicitly classified G02 epistemic claim; original user scores preserved",
+  "pending_case_ids": [],
+  "original_user_scores_sha256": "678fae4f1c506c9305d3d45b1417fcdf24c66bb7ce376956ffa1787acb787b3c",
+  "user_decisions": [
+    {
+      "case_id": "G02",
+      "decision": "unsupported personal knowledge-state inference; original score5 preserved",
+      "date": "2026-10-14"
+    }
+  ]
+}

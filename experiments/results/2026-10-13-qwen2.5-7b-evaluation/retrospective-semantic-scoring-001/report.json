@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "suite": "retrospective_grounding",
+  "execution_kind": "school_gpu_user_run",
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "config": {
+    "schema_version": 1,
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "baseline_reference_commit": "705f2c2c9f9c0f426ac3376f9b9132021fb67139"
+  },
+  "raw_artifact_sha256": {
+    "metadata.json": "bab111e76e8bd7c52d8495c756c7a1c01feb9d0c23c24e78e0b1aee9357cd4a7",
+    "cases.json": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+    "events.jsonl": "6d984c16f197ccd70c2e47c026fcfc32af2806e80e376693cd25827d5b0a2791"
+  },
+  "counts": {
+    "warmup": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "w1",
+        "w2",
+        "w3"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "baseline": {
+      "expected": 60,
+      "started": 60,
+      "success": [
+        "r1-N01",
+        "r1-N02",
+        "r1-N03",
+        "r1-N04",
+        "r1-N05",
+        "r1-I01",
+        "r1-I02",
+        "r1-I03",
+        "r1-I04",
+        "r1-I05",
+        "r1-U01",
+        "r1-U02",
+        "r1-U03",
+        "r1-U04",
+        "r1-U05",
+        "r1-G01",
+        "r1-G02",
+        "r1-G03",
+        "r1-G04",
+        "r1-G05",
+        "r2-N01",
+        "r2-N02",
+        "r2-N03",
+        "r2-N04",
+        "r2-N05",
+        "r2-I01",
+        "r2-I02",
+        "r2-I03",
+        "r2-I04",
+        "r2-I05",
+        "r2-U01",
+        "r2-U02",
+        "r2-U03",
+        "r2-U04",
+        "r2-U05",
+        "r2-G01",
+        "r2-G02",
+        "r2-G03",
+        "r2-G04",
+        "r2-G05",
+        "r3-N01",
+        "r3-N02",
+        "r3-N03",
+        "r3-N04",
+        "r3-N05",
+        "r3-I01",
+        "r3-I02",
+        "r3-I03",
+        "r3-I04",
+        "r3-I05",
+        "r3-U01",
+        "r3-U02",
+        "r3-U03",
+        "r3-U04",
+        "r3-U05",
+        "r3-G01",
+        "r3-G02",
+        "r3-G03",
+        "r3-G04",
+        "r3-G05"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "supplement": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "s-r1-U02",
+        "s-r2-U02",
+        "s-r3-U02"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    }
+  },
+  "schedule_complete": true,
+  "journal_damaged": false,
+  "operational": {
+    "scope": "successful_main_attempts_only_including_empty",
+    "successful_attempts": 60,
+    "mean_generation_ms": 1532.7176693666668,
+    "mean_tokens_per_second": 31.930309770355933,
+    "input_tokens": 3993,
+    "generated_tokens_including_terminal_eos": 2949,
+    "max_peak_allocated_bytes": 15265941504,
+    "max_peak_reserved_bytes": 15296626688,
+    "load": {
+      "environment": {
+        "attention": "eager",
+        "cache_policy": "generation_default_fresh_per_call",
+        "device": "cuda:0",
+        "driver_version": null,
+        "dtype": "bfloat16",
+        "gpu_capability": [
+          8,
+          6
+        ],
+        "gpu_name": "NVIDIA RTX A6000",
+        "gpu_total_memory_bytes": 51041271808,
+        "model_revision": null,
+        "model_revision_status": "unverified",
+        "packages": {
+          "accelerate": "1.15.0",
+          "safetensors": "0.8.0",
+          "torch": "2.7.1+cu118",
+          "transformers": "4.57.1"
+        },
+        "python": "3.12.7",
+        "resident_allocated_bytes": 15234903552,
+        "resident_reserved_bytes": 15256780800,
+        "torch_cuda_build": "11.8"
+      },
+      "load_ms": 3460.467551,
+      "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+      "seq": 2,
+      "status": "success",
+      "time": "2026-10-10T13:03:41.872764+00:00",
+      "type": "load_result"
+    },
+    "cache_recovery_occurred": false,
+    "not_measured": [
+      "TTFT",
+      "end_to_end_latency",
+      "whole_gpu_VRAM"
+    ]
+  },
+  "evaluation_axis": "human_semantic_judgment",
+  "human": {
+    "evaluation_axis": "human_semantic_judgment",
+    "complete": true,
+    "planned": 5,
+    "valid_reviewed": 5,
+    "failed_or_empty": 0,
+    "pending": 0,
+    "metrics": {
+      "personal_fact_accuracy": {
+        "score": 0.5555555555555556,
+        "eligible_cases": 3
+      },
+      "required_information_coverage": {
+        "score": 1,
+        "eligible_cases": 2
+      },
+      "unsupported_response_rate": {
+        "score": 0.4,
+        "eligible_cases": 5
+      },
+      "record_contradiction_rate": {
+        "score": 0,
+        "eligible_cases": 5
+      },
+      "justified_abstention": {
+        "score": 0.75,
+        "eligible_cases": 4
+      },
+      "over_abstention": {
+        "score": 0,
+        "eligible_cases": 2
+      }
+    },
+    "whole_success": {
+      "score": 0.6,
+      "pending": 0,
+      "by_case": {
+        "G01": true,
+        "G02": false,
+        "G03": true,
+        "G04": false,
+        "G05": true
+      }
+    },
+    "pairs": {}
+  },
+  "labels_sha256": "a73e03bab8a203569e84912bf2464d9d4da022b0d879f1e8f4743c4ae8b025d0"
+}

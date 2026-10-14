@@ -1,0 +1,11 @@
+{
+  "semantic_assessor": "assistant",
+  "user_confirmation_scope": [
+    "G02_unsupported_personal_knowledge_state"
+  ],
+  "original_scores_preserved": true,
+  "already_known_outputs_not_blind": true,
+  "new_inference_run": false,
+  "source_draft_sha256": "9614131cb916af78cda548e08100d719746f6078f1529c9545790f6590c9e4ea",
+  "date": "2026-10-14"
+}
