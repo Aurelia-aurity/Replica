@@ -1,0 +1,6 @@
+# Observed on DIS02, Python 3.12.7, 2026-10-09; transitive lock pending.
+# Download cu118 wheels on login node; install with --no-index on GPU node.
+torch==2.7.1+cu118
+transformers==4.57.1
+accelerate==1.15.0
+safetensors==0.8.0
