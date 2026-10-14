@@ -46,8 +46,8 @@ class Journal:
     def close(self):
         self.handle.close()
 
-def execute(model_path, output, runtime_factory=None):
-    raw, dataset, release, config = inputs()
+def execute(model_path, output, runtime_factory=None, input_provider=inputs):
+    raw, dataset, release, config = input_provider()
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     run_id = str(uuid.uuid4())

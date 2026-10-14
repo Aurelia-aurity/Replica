@@ -1,0 +1,615 @@
+{
+  "schema_version": 1,
+  "evaluation_axis": "human_semantic_judgment",
+  "run_id": "d46a7d89-12b0-43ab-ace3-670192dce4ac",
+  "dataset_sha256": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+  "annotation_scope": "human",
+  "oracle_sha256": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+  "rows": [
+    {
+      "case_id": "E-A1-O",
+      "anonymous_response_id": "69e79c2498639ea3",
+      "source_response_hash": "15ffdcfd74a76c313021811e3b1b0901638d155d585220537413ee60eb7261b2",
+      "generation_status": "valid",
+      "response": "친구와 대전에서 칼국수를 먹었어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "food",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A1-P",
+      "anonymous_response_id": "5bb53fdaac29cb26",
+      "source_response_hash": "fb7dadf435fcabc269784e850213f4d9d8152e3a39e40e5f1f63a6a3cb194a94",
+      "generation_status": "valid",
+      "response": "함께 식사한 사람은 친구이고, 식사한 도시는 대전입니다. 먹은 음식은 칼국수입니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "food",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A1-R",
+      "anonymous_response_id": "a01c58a3a93c05d6",
+      "source_response_hash": "3e2f290369c3953e39c93fa1ac106a1bfc6a46761642056f605a315a29d8947f",
+      "generation_status": "valid",
+      "response": "친구와 부산에서 칼국수를 먹었어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "food",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A1-M",
+      "anonymous_response_id": "11a2e7c2acabdd94",
+      "source_response_hash": "34b077faa9e1b1536002c745be3a62144a4e1978e6b63d569d452a4386ccac41",
+      "generation_status": "valid",
+      "response": "네, 맞습니다. 가상 인물은 누나와 부산에서 피자를 먹었다고 했어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "food",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A2-O",
+      "anonymous_response_id": "5a4cc1bfc391bda5",
+      "source_response_hash": "0fc2bd78c2a537cc1c6b93906a266c74a6c969846b53358e72f22e5ea00a1ca7",
+      "generation_status": "valid",
+      "response": "이모가 파란 목도리를 선물했어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "giver",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "gift",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "color",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A2-P",
+      "anonymous_response_id": "1aa454142a35d8e9",
+      "source_response_hash": "251a0ad56b20df8a3cbfc40ca4c687fc641c9d12c68133f72ae7cffc24fb3d16",
+      "generation_status": "valid",
+      "response": "선물을 준 사람은 이모이고, 선물의 종류는 목도리이며 색깔은 파란색입니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "giver",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "gift",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "color",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A2-R",
+      "anonymous_response_id": "5deedc942a34a6d2",
+      "source_response_hash": "697a1f5f6dbf4d100cf0e69907ebc34489d22c663070f9ac31b72d544387ae21",
+      "generation_status": "valid",
+      "response": "이모가 빨간 목도리를 선물했어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "giver",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "gift",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "color",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-A2-M",
+      "anonymous_response_id": "99884903e4fa64d2",
+      "source_response_hash": "aa79f98588f149995454c121ed75fc8526c065d3bac388bb8d3447bc317ca2e8",
+      "generation_status": "valid",
+      "response": "삼촌은 빨간 장갑을 선물했어요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "giver",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "gift",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "color",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P1-O",
+      "anonymous_response_id": "bd543f3fe462c282",
+      "source_response_hash": "c775509f5fca30df6334cc47e97bd5b1a61c463c95362a04b061665182f07694",
+      "generation_status": "valid",
+      "response": "이 기록에 따르면, 이 가상 인물은 동생과 함께 전주로 여행을 갔습니다. 하지만 기록에는 그들이 전주에 간 목적에 대한 정보가 명시되어 있지 않습니다. 목적은 더 자세한 정보를 제공받기 위해 추가 질문이 필요할 것 같습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "visit_purpose",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P1-P",
+      "anonymous_response_id": "02590cc20e350fbc",
+      "source_response_hash": "d59347cce50b89f800bd682dfee0340abf6ff343c6c96c1977ea78eff3f3202b",
+      "generation_status": "valid",
+      "response": "동행한 사람은 동생이고, 방문한 도시는 전주입니다. 방문 이유는 기록에 언급되어 있지 않습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "visit_purpose",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P1-R",
+      "anonymous_response_id": "6d989be59f4c75d7",
+      "source_response_hash": "3691ee681f202f68c5405bc5a5d91e19e5ec7d282b7afda1709b52541e81e01e",
+      "generation_status": "valid",
+      "response": "이 기록에 따르면, 이 가상 인물은 동생과 대구에 갔습니다. 하지만 그곳에 간 목적은 명시되어 있지 않습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "visit_purpose",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P1-M",
+      "anonymous_response_id": "50c8b1e55b641a45",
+      "source_response_hash": "7c40f9da7e273946fc9cb5d9aab756553d1ed167b59d8816969aa89af7042a00",
+      "generation_status": "valid",
+      "response": "형님은 부산에 갔다고 해요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        },
+        {
+          "slot": "city",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "visit_purpose",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P2-O",
+      "anonymous_response_id": "3e3a45be6e3de2d1",
+      "source_response_hash": "1f135fd3dc85990982a6dbf2cf7972f91883a32c64a6f327a118318c401d2132",
+      "generation_status": "valid",
+      "response": "이 기록에서 알 수 있는 정보는 친구들과 영화를 보았다는 점입니다. 하지만 영화를 봤을 때的具体来说，这段话可以这样翻译为：\n\n这段话可以这样翻译为：“接下来是虚拟人物的记录。\n[记录] 我和朋友看了电影。\n和谁一起看了电影，看电影时的心情如何？”",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "feeling",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P2-P",
+      "anonymous_response_id": "3dd0655925aa3c41",
+      "source_response_hash": "50ffcfaecea1aff145befb73a51ebb936c107357ec7d2b6396c3a9db154bdd99",
+      "generation_status": "valid",
+      "response": "기록에 따르면, 당신은 친구와 영화를 봤는데, 당시의 감정은 기록에 명시되어 있지 않아 추측할 수는 없네요. 그때의 감정은 영화의 종류나 상황에 따라 달라질 수 있습니다. 그때 어떤 감정이었는지 알려주실 수 있나요?",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "feeling",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P2-R",
+      "anonymous_response_id": "43a4f6c0fd5e7b6f",
+      "source_response_hash": "369f79f9623e13f6fb6904e037cf8751ae27e48e3c31c902ef5117b65d083c0e",
+      "generation_status": "valid",
+      "response": "이 기록에서 알 수 있는 정보는 누나와 영화를 봤다는 점입니다. 다른 감정이나 기분에 대한 정보는 직접적으로 언급되어 있지 않으므로, 정확한 답변을 드리기 어렵습니다. 만약 더 자세한 정보가 필요하다면, 추가 질문을 해주시면 감사하겠습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "feeling",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-P2-M",
+      "anonymous_response_id": "6a3edf7995c7232e",
+      "source_response_hash": "0b5388daeafdb3badcfffed4caa8f584e3a31b9cc0a802fd9e1562866a6fbeff",
+      "generation_status": "valid",
+      "response": "아니요, 혼자 영화를 보고 기뻤다고 기록한 것이 아니라, 친구와 영화를 봤다고 기록한 것 같습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "companion",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [
+        {
+          "slot": "feeling",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-U1-O",
+      "anonymous_response_id": "7f1d8a6c09aa94ed",
+      "source_response_hash": "46d2ebfc5576f0e521d59352a84d8f394d7945609f24f5e147f54abe5d47cae9",
+      "generation_status": "valid",
+      "response": "이 기록만으로는 엄마가 사용한 애칭을 알 수 없습니다. 더 많은 정보가 필요해요.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "nickname",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-U1-P",
+      "anonymous_response_id": "3f1be293c6d309ae",
+      "source_response_hash": "9387534fef5efb36867f87cffb5b1ee16a8b5e634599922f754557fa8271be05",
+      "generation_status": "valid",
+      "response": "별명은 기록에 언급되어 있지 않네요. 그분의 별명을 알고 싶으시다면 더 많은 정보를 제공해 주시면 감사하겠습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "nickname",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-U1-R",
+      "anonymous_response_id": "e2ac604998f951f6",
+      "source_response_hash": "a967b3fd0eeec3ad4b0f05dd33715972a70e3335d7da575ba5647f736afe84b0",
+      "generation_status": "valid",
+      "response": "엄마가 당신을 부르던 애칭은 \"별\"이었습니다.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [
+        {
+          "slot": "nickname",
+          "label": null,
+          "answer_span": null,
+          "evidence_span": null
+        }
+      ],
+      "unknown_slots": [],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    },
+    {
+      "case_id": "E-U1-M",
+      "anonymous_response_id": "a2861c73bd752178",
+      "source_response_hash": "f53923079bc50bdcd96558dd22881e646f7917e50313f6e80a1d5fd5e9547965",
+      "generation_status": "valid",
+      "response": "맞아, 엄마가 너를 민들레라고 불렀어.",
+      "claims": [],
+      "claims_review_complete": false,
+      "known_slots": [],
+      "unknown_slots": [
+        {
+          "slot": "nickname",
+          "explicit_abstention": null,
+          "answer_span": null
+        }
+      ],
+      "misleading_premise_handled": null,
+      "unresolved_internal_contradiction": null,
+      "review_complete": false,
+      "notes": null
+    }
+  ]
+}

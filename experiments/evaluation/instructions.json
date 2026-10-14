@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "dataset_id": "replica-issue36-instructions",
+  "version": 1,
+  "status": "user_confirmed",
+  "synthetic_only": true,
+  "suite": "instructions",
+  "warmup_prompt": "가볍게 할 일을 한 가지 추천해줘.",
+  "category_rubrics": {},
+  "cases": [
+    {
+      "id": "I36-01",
+      "kind": "single",
+      "prompt": "가벼운 야외 활동을 추천하세요. 답변에 문자열 \"산책\"을 포함하세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "산책"
+        }
+      ],
+      "passing_example_not_required_answer": "가볍게 산책을 해보세요."
+    },
+    {
+      "id": "I36-02",
+      "kind": "single",
+      "prompt": "잠들기 전 할 일을 추천하세요. 답변에 문자열 \"독서\"를 포함하세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "독서"
+        }
+      ],
+      "passing_example_not_required_answer": "잠들기 전 독서를 해보세요."
+    },
+    {
+      "id": "I36-03",
+      "kind": "single",
+      "prompt": "정리를 시작하는 방법을 제안하세요. 답변에 문자열 \"책상\"을 포함하세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "책상"
+        }
+      ],
+      "passing_example_not_required_answer": "책상 위 물건 하나부터 정리해보세요."
+    },
+    {
+      "id": "I36-04",
+      "kind": "single",
+      "prompt": "집에서 할 활동을 추천하세요. 답변에 문자열 \"게임\"을 사용하지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "게임"
+        }
+      ],
+      "passing_example_not_required_answer": "가볍게 스트레칭을 해보세요."
+    },
+    {
+      "id": "I36-05",
+      "kind": "single",
+      "prompt": "쉬는 시간에 할 활동을 추천하세요. 답변에 문자열 \"휴식\"을 사용하지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "휴식"
+        }
+      ],
+      "passing_example_not_required_answer": "창밖을 잠깐 바라보세요."
+    },
+    {
+      "id": "I36-06",
+      "kind": "single",
+      "prompt": "주말에 할 일을 추천하세요. 답변에 문자열 \"영화\"를 사용하지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "영화"
+        }
+      ],
+      "passing_example_not_required_answer": "동네 공원을 걸어보세요."
+    },
+    {
+      "id": "I36-07",
+      "kind": "single",
+      "prompt": "오늘 할 일을 정확히 두 줄로 답하세요. 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "lines",
+          "value": 2
+        }
+      ],
+      "passing_example_not_required_answer": "책상 정리하기\n가볍게 걷기"
+    },
+    {
+      "id": "I36-08",
+      "kind": "single",
+      "prompt": "간단한 아침 준비를 정확히 세 줄로 답하세요. 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "lines",
+          "value": 3
+        }
+      ],
+      "passing_example_not_required_answer": "물 마시기\n세수하기\n옷 고르기"
+    },
+    {
+      "id": "I36-09",
+      "kind": "single",
+      "prompt": "가벼운 운동을 정확히 한 줄로 추천하세요. 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "lines",
+          "value": 1
+        }
+      ],
+      "passing_example_not_required_answer": "어깨를 천천히 돌려보세요."
+    },
+    {
+      "id": "I36-10",
+      "kind": "single",
+      "prompt": "답변 전체를 정확히 \"오늘은 \"으로 시작해 할 일을 제안하세요.",
+      "rules": [
+        {
+          "type": "prefix",
+          "value": "오늘은 "
+        }
+      ],
+      "passing_example_not_required_answer": "오늘은 책상부터 정리해보세요."
+    },
+    {
+      "id": "I36-11",
+      "kind": "single",
+      "prompt": "답변 전체를 정확히 \"추천: \"으로 시작해 집에서 할 활동을 제안하세요.",
+      "rules": [
+        {
+          "type": "prefix",
+          "value": "추천: "
+        }
+      ],
+      "passing_example_not_required_answer": "추천: 책을 읽어보세요."
+    },
+    {
+      "id": "I36-12",
+      "kind": "single",
+      "prompt": "답변 전체를 정확히 \"먼저 \"로 시작해 준비 방법을 제안하세요.",
+      "rules": [
+        {
+          "type": "prefix",
+          "value": "먼저 "
+        }
+      ],
+      "passing_example_not_required_answer": "먼저 필요한 물건을 모아보세요."
+    },
+    {
+      "id": "I36-13",
+      "kind": "compound",
+      "prompt": "야외 활동을 정확히 두 줄로 답하세요. 문자열 \"산책\"을 포함하고 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "산책"
+        },
+        {
+          "type": "lines",
+          "value": 2
+        }
+      ],
+      "passing_example_not_required_answer": "공원에서 산책을 해보세요.\n주변 풍경을 살펴보세요."
+    },
+    {
+      "id": "I36-14",
+      "kind": "compound",
+      "prompt": "집에서 할 활동을 제안하세요. 답변 전체를 정확히 \"추천: \"으로 시작하고 문자열 \"독서\"를 포함하세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "독서"
+        },
+        {
+          "type": "prefix",
+          "value": "추천: "
+        }
+      ],
+      "passing_example_not_required_answer": "추천: 짧은 독서를 해보세요."
+    },
+    {
+      "id": "I36-15",
+      "kind": "compound",
+      "prompt": "정리 방법을 제안하세요. 문자열 \"책상\"을 포함하고 문자열 \"청소\"는 사용하지 마세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "책상"
+        },
+        {
+          "type": "absent",
+          "value": "청소"
+        }
+      ],
+      "passing_example_not_required_answer": "책상 위 물건을 하나씩 정리해보세요."
+    },
+    {
+      "id": "I36-16",
+      "kind": "compound",
+      "prompt": "주말 활동을 정확히 두 줄로 제안하세요. 문자열 \"영화\"를 사용하지 말고 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "영화"
+        },
+        {
+          "type": "lines",
+          "value": 2
+        }
+      ],
+      "passing_example_not_required_answer": "동네 공원을 걸어보세요.\n좋아하는 책을 읽어보세요."
+    },
+    {
+      "id": "I36-17",
+      "kind": "compound",
+      "prompt": "답변 전체를 정확히 \"오늘은 \"으로 시작해 할 일을 제안하세요. 문자열 \"휴식\"은 사용하지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "휴식"
+        },
+        {
+          "type": "prefix",
+          "value": "오늘은 "
+        }
+      ],
+      "passing_example_not_required_answer": "오늘은 창가에서 책을 읽어보세요."
+    },
+    {
+      "id": "I36-18",
+      "kind": "compound",
+      "prompt": "준비 방법을 정확히 두 줄로 답하세요. 답변 전체를 정확히 \"먼저 \"로 시작하고 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "lines",
+          "value": 2
+        },
+        {
+          "type": "prefix",
+          "value": "먼저 "
+        }
+      ],
+      "passing_example_not_required_answer": "먼저 필요한 물건을 모으세요.\n사용할 순서대로 놓으세요."
+    },
+    {
+      "id": "I36-19",
+      "kind": "compound",
+      "prompt": "야외 활동을 정확히 두 줄로 제안하세요. 답변 전체를 정확히 \"추천: \"으로 시작하고 문자열 \"산책\"을 포함하세요. 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "contains",
+          "value": "산책"
+        },
+        {
+          "type": "lines",
+          "value": 2
+        },
+        {
+          "type": "prefix",
+          "value": "추천: "
+        }
+      ],
+      "passing_example_not_required_answer": "추천: 공원에서 산책을 해보세요.\n주변 풍경을 살펴보세요."
+    },
+    {
+      "id": "I36-20",
+      "kind": "compound",
+      "prompt": "집에서 할 일을 정확히 두 줄로 제안하세요. 답변 전체를 정확히 \"오늘은 \"으로 시작하고 문자열 \"게임\"은 사용하지 마세요. 빈 줄과 제목은 넣지 마세요.",
+      "rules": [
+        {
+          "type": "absent",
+          "value": "게임"
+        },
+        {
+          "type": "lines",
+          "value": 2
+        },
+        {
+          "type": "prefix",
+          "value": "오늘은 "
+        }
+      ],
+      "passing_example_not_required_answer": "오늘은 책을 읽어보세요.\n책상 위 물건을 정리해보세요."
+    }
+  ]
+}

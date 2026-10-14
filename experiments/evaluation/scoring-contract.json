@@ -1,0 +1,31 @@
+{
+  "status": "user_confirmed",
+  "evaluation_axis": "human_judged_quality_with_numeric_aggregation",
+  "classification_correction": "2026-10-11: These six metrics require human semantic judgments; they are not deterministic mechanical evaluation. Agreed definitions are preserved.",
+  "core_metric_definitions": {
+    "personal_fact_accuracy": "supported_unique_final_personal_claims / all_unique_final_personal_claims",
+    "required_information_coverage": "correct_required_known_slots / required_known_slots",
+    "unsupported_response_rate": "valid_responses_with_unsupported_claim / valid_responses",
+    "record_contradiction_rate": "valid_responses_with_record_contradiction / valid_responses",
+    "justified_abstention": "correct_explicit_abstention_slots / required_unknown_slots",
+    "over_abstention": "explicitly_abstained_required_known_slots / required_known_slots"
+  },
+  "aggregation": "Within each scope, average eligible per-case ratios equally; pooled ratios secondary; binary response error rates use one equal vote per valid response.",
+  "failure_policy": "Generation failures and empty responses fail whole-case/pair success, but are missing for six content metrics. Disclose planned, valid, failed, missing, pending and eligible counts.",
+  "zero_denominator": "N/A, never automatically perfect or zero",
+  "unsupported_and_contradiction_overlap": "Record all applicable flags; never add rates together.",
+  "no_supported_claims_due_to_proper_abstention": "Personal fact accuracy N/A; abstention and whole success remain applicable.",
+  "pair_aggregation": "Each type has 5 planned pairs; both sides must pass; shared original reused; no independent sample claim.",
+  "semantic_judgment": "Human checks proposition/evidence, negation, hypotheses, quotations and final retraction; no substring-based semantic verdict claimed.",
+  "pending_semantic_labels": "Do not treat pending labels as correct, no-error or failure; keep metrics provisional and show pending counts.",
+  "scope": "Six fact metrics initially mapped to baseline G01-G05 and the separate expansion. Other 15 baseline questions retain their human evaluation; no single factual gold invented for free dialogue.",
+  "scope_status": "confirmed #36 scope",
+  "existing_baseline": "Retrospective oracle annotations; original human scores unchanged; no claim of blind/prospective grading for already-known outputs.",
+  "new_expansion": "20 confirmed prompts; blind model identity in first-round grading",
+  "generation_conditions": "Preserve existing system prompt, greedy policy, 160-token main cap, and separate 320-token supplement policy; runner not modified.",
+  "whole_success": "All known slots correct, unknown slots explicitly abstained, no unsupported/contradictory final claims or unresolved competing claims; misleading premise corrected/marked unverifiable; valid nonempty generation.",
+  "language_and_quality": "Factual whole-success does not certify Korean fluency or usefulness; four human categories remain separate.",
+  "root_count": 5,
+  "unique_expansion_prompts": 20,
+  "pair_count": 15
+}

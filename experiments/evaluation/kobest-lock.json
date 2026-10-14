@@ -1,0 +1,48 @@
+{
+  "harness_revision": "d6de81643928d653435c431bae19945d41d32520",
+  "harness_task_sha256": {
+    "kobest_boolq.yaml": "4775f1ea1db3c8f740bb62c029bc54c1845644651b5d0dc3298e22a6cee7bda4",
+    "kobest_copa.yaml": "4e2c9ad09cd75b96d4fdf3ed13f355cd6bf5a09ccdcfc0072bfa7f3e6bede206",
+    "kobest_hellaswag.yaml": "54d725c25f8f04016fc0b5f51618a226532bf741b6725d081ec02aff692137f3",
+    "kobest_sentineg.yaml": "99c0225508688c786ec5e7c84402cf187843044f55fb7033ac9119a6ca4a5bc1",
+    "kobest_wic.yaml": "36ce762501b813b9911bcc8403bd8a91604a65a62bf41d69e473a849eb7595c8",
+    "utils.py": "d4d9c2afaef727c9d7ac97db311879be3aa04feb7d10fd3ab140844b793ad4a7"
+  },
+  "dataset_id": "skt/kobest_v1",
+  "dataset_revision": "a5ea15e3ac77ed694b79f6204eb31889a2ba989f",
+  "tasks": [
+    "kobest_boolq",
+    "kobest_copa",
+    "kobest_hellaswag",
+    "kobest_sentineg",
+    "kobest_wic"
+  ],
+  "num_fewshot": 0,
+  "apply_chat_template": false,
+  "system_instruction": null,
+  "batch_size": 1,
+  "model_dtype": "bfloat16",
+  "full_test_required": true,
+  "test_files": {
+    "boolq": {
+      "sha256": "e6fb1bceab2e3e132119e7ce23d98c38e7700ce38bd0d00ec4f26c9a07d6b583",
+      "test_count": 1404
+    },
+    "copa": {
+      "sha256": "2912f4055e3fb170b94d0c25fef09a2015b5c61d99a1b6355d276d1099bd9f79",
+      "test_count": 1000
+    },
+    "hellaswag": {
+      "sha256": "4e4a21822a18c8fa181a158ba1aaca8a28d6085b2b91861577d633a099997346",
+      "test_count": 500
+    },
+    "sentineg": {
+      "sha256": "0fe36f1348039878945a276ce84f87949b9d8ca6f21b375b94e156fbab1753fc",
+      "test_count": 397
+    },
+    "wic": {
+      "sha256": "4cfe0308d434cf9935d29768de0a5ce6ff811b4095fecc26a95c01b5cb5ca0ec",
+      "test_count": 1260
+    }
+  }
+}
