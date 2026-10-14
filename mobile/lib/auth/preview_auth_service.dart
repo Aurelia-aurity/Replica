@@ -11,14 +11,25 @@ class PreviewAuthService extends AuthService {
   @override
   Future<void> signIn(String email, String password) async {
     if (!emails.contains(email) || password != PreviewAuthService.password) {
-      throw const AuthFailure('미리보기 계정과 비밀번호를 확인해 주세요.');
+      throw const AuthFailure(
+        '이메일 또는 비밀번호가 맞지 않아요',
+        kind: AuthFailureKind.invalidCredentials,
+      );
     }
     notice = null;
     updateIdentity(AuthIdentity(id: email, email: email));
   }
 
   @override
-  Future<bool> signUp(String email, String password) async => false;
+  Future<bool> signUp(String email, String password) async {
+    if (emails.contains(email)) {
+      throw const AuthFailure(
+        '이미 가입된 이메일이에요. 로그인해 주세요.',
+        kind: AuthFailureKind.emailAlreadyRegistered,
+      );
+    }
+    return false;
+  }
 
   @override
   Future<void> signOut() async => updateIdentity(null);

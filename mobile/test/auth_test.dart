@@ -34,6 +34,7 @@ Future<void> login(
     PreviewAuthService.password,
   );
   await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('auth-submit')));
   await tester.pumpAndSettle();
 }
@@ -116,10 +117,15 @@ void main() {
     final auth = PreviewAuthService();
     addTearDown(auth.dispose);
     await tester.pumpWidget(ReplicaApp(authService: auth));
-    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('auth-submit')))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), 'invalid');
     await tester.pumpAndSettle();
     expect(find.text('올바른 이메일을 입력해 주세요.'), findsOneWidget);
-    expect(find.text('비밀번호를 입력해 주세요.'), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('auth-email')),
       'wrong@example.com',
@@ -128,9 +134,11 @@ void main() {
       find.byKey(const ValueKey('auth-password')),
       'wrong',
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('auth-submit')));
     await tester.pumpAndSettle();
-    expect(find.text('미리보기 계정과 비밀번호를 확인해 주세요.'), findsOneWidget);
+    expect(find.text('이메일 또는 비밀번호가 맞지 않아요'), findsOneWidget);
     expect(auth.identity, isNull);
   });
 
@@ -140,7 +148,7 @@ void main() {
       final auth = ConfirmationAuth();
       addTearDown(auth.dispose);
       await tester.pumpWidget(ReplicaApp(authService: auth));
-      await tester.tap(find.text('이메일로 회원가입'));
+      await tester.tap(find.byKey(const ValueKey('auth-switch')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('auth-email')),
@@ -154,6 +162,10 @@ void main() {
         find.byKey(const ValueKey('auth-confirmation')),
         'different',
       );
+      await tester.ensureVisible(find.byKey(const ValueKey('auth-consent')));
+      await tester.tap(find.byKey(const ValueKey('auth-consent')));
+      await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('auth-submit')));
       await tester.pumpAndSettle();
       expect(find.text('비밀번호는 8자 이상 입력해 주세요.'), findsOneWidget);
@@ -166,6 +178,8 @@ void main() {
         find.byKey(const ValueKey('auth-confirmation')),
         'Example123!',
       );
+      await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('auth-submit')));
       await tester.pump();
       expect(

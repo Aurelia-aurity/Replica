@@ -2,9 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+enum AuthFailureKind {
+  generic,
+  invalidCredentials,
+  network,
+  emailAlreadyRegistered,
+}
+
 class AuthFailure implements Exception {
-  const AuthFailure(this.message);
+  const AuthFailure(this.message, {this.kind = AuthFailureKind.generic});
   final String message;
+  final AuthFailureKind kind;
 }
 
 class AuthIdentity {
@@ -30,6 +38,19 @@ abstract class AuthService extends ChangeNotifier {
 
   /// False means email confirmation is required before signing in.
   Future<bool> signUp(String email, String password);
+
+  /// Integration point for registration and consent. No record storage here.
+  Future<bool> register({
+    required String email,
+    required String password,
+    required bool personalRecordsConsent,
+  }) {
+    if (!personalRecordsConsent) {
+      throw const AuthFailure('개인 기록 처리 동의가 필요합니다.');
+    }
+    return signUp(email, password);
+  }
+
   Future<void> signOut();
 
   /// Future backend clients must call this for each request, not cache tokens.

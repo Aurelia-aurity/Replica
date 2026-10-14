@@ -5,7 +5,7 @@
 ## PR #24와 브랜치 관계
 
 - #4의 [PR #24](https://github.com/Aurelia-aurity/Replica/pull/24)는 미병합 초안입니다.
-- 로컬 작업 브랜치: `codex/8-email-auth-session`.
+- 로컬 작업 브랜치: `feat/8-email-auth-session`.
 - 시작 커밋: PR #24의 `2b60ebaf4b98e0dbc3019700f7bd0152d3f8216d`.
 - #8 변경만 확인: `git diff feat/4-flutter-chat-scaffold -- mobile/`.
 - PR #24 브랜치에는 #8 변경을 커밋하거나 푸시하지 않습니다. #24 병합 전 main과 비교하면 #4 변경도 함께 보입니다. 추후 PR은 #24 브랜치를 비교 기준으로 삼거나, #24 병합 후 main 위로 #8 변경을 재배치합니다.
@@ -22,29 +22,22 @@ flutter run -d chrome --dart-define-from-file=config/dev.local.json
 flutter run -d <기기ID> --dart-define-from-file=config/dev.android.json
 ```
 
-개발 설정은 `AUTH_MODE=preview`입니다. staging/prod에서는 preview를 거부합니다. 미리보기는 실제 인증·회원 생성·메일 발송·서버 통신을 하지 않습니다.
+2026-10-13 SC-01 반영 이후 앱 시작점은 설정과 관계없이 더미 `PreviewAuthService`만 주입합니다. 실제 인증·회원 생성·메일 발송·서버 통신을 하지 않습니다. 이전 `AuthConfig`와 SDK 어댑터는 앱 실행 경로에 연결하지 않습니다. 화면 동작과 기획서 대응은 [SC01.md](SC01.md)를 참고하세요.
 
 | 합성 시험 계정 이메일 | 비밀번호 |
 | --- | --- |
 | preview.a@example.com | Replica123! |
 | preview.b@example.com | Replica123! |
 
-가입 화면에서는 입력 검사와 완료 안내만 확인하며 계정을 생성하지 않습니다. 홈의 계정 버튼에서 로그아웃 또는 ‘세션 만료 확인 (미리보기)’를 누르면 로그인 화면으로 돌아갑니다. 대화 도중 만료와 늦게 도착한 응답은 자동 테스트로 검사합니다.
+가입 화면에서는 이메일·비밀번호·비밀번호 확인·필수 개인 기록 처리 동의를 검사하고 완료 안내만 표시합니다. 계정을 생성하거나 동의를 저장하지 않습니다. 홈의 계정 버튼에서 로그아웃 또는 ‘세션 만료 확인 (미리보기)’를 누르면 로그인 화면으로 돌아갑니다. 대화 도중 만료와 늦게 도착한 응답은 자동 테스트로 검사합니다.
 
-## 추후 Supabase 연결
+## 추후 실제 인증 연결
 
-`config/auth.example.json`의 URL과 **publishable key**를 개발 프로젝트 값으로 교체한 `config/auth.local.json`을 사용합니다. 예시 그대로 실행하면 설정 검증이 거부합니다. 서비스 키·secret key·계정 비밀번호를 앱 설정에 넣지 않습니다.
+현재 실행은 더미 인증만 제공합니다. `config/auth.example.json`, `AuthConfig`, 기존 SDK 어댑터는 이전 준비 코드이며 현재 앱 시작점에서는 사용하지 않습니다. 설정 파일을 바꾸어도 실제 인증으로 전환되지 않습니다.
 
-```powershell
-flutter run -d <기기ID> --dart-define-from-file=config/auth.local.json
-```
+백엔드 담당과 인증 및 오류 계약을 합의한 뒤 `ReplicaApp`에 실제 `AuthService`를 주입하는 방식으로 교체합니다. SC-01은 가입 시 `register` 계약에 이메일·비밀번호·개인 기록 처리 동의를 전달하며 화면에서 저장하거나 통신하지 않습니다.
 
-`AuthService`는 화면용 추상 인터페이스이고 `SupabaseAuthService`는 고정 버전 `supabase_flutter 2.18.0` SDK 어댑터입니다. 로그인·가입·로그아웃·갱신 이벤트·만료 타이머·안전한 오류 안내를 연결했습니다. Android 인터넷 권한을 추가했으며 HTTPS 인증 주소를 사용합니다.
-
-이메일 확인이 필요한 가입은 세션이 없으면 홈을 열지 않습니다. 인증 링크를 외부 브라우저에서 확인한 뒤 앱으로 돌아와 비밀번호로 로그인합니다. 프로젝트 Site URL은 유효한 확인 완료 페이지로 설정해야 합니다. 자동 앱 복귀/deep link, 비밀번호 재설정, MFA, CAPTCHA는 이번 범위에 없습니다.
-
-현재 세션은 메모리에만 보관하고 SDK 자동 갱신을 사용합니다. 앱 재시작 후에는 다시 로그인합니다. 기기 보안 저장소를 통한 영구 세션 복원은 후속 작업입니다. 인증 설정이 없으면 로그인 버튼을 비활성화하고 홈을 열지 않습니다.
-
+실제 세션 영구 저장, 인증 메일과 앱 복귀, 계정별 서버 권한 검사·RLS는 해당 담당자의 구현과 통합 검증에서 처리합니다.
 ## 계정 데이터와 백엔드 연결 지점
 
 로그아웃·만료·사용자 변경 시 사용자별 Navigator와 ScaffoldMessenger를 폐기합니다. 대화·입력 초안·AI 안내 시트와 이전 화면으로 돌아가는 경로가 함께 제거됩니다. 폐기된 대화 화면에 늦게 도착한 응답은 기존 mounted 검사로 무시합니다. 같은 사용자에 대한 정상 토큰 갱신은 대화 화면을 유지합니다.
