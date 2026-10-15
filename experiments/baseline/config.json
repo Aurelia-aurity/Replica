@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+  "do_sample": false,
+  "warmups": 3,
+  "rounds": 3,
+  "max_new_tokens": 160,
+  "supplement_max_new_tokens": 320,
+  "baseline_reference_commit": "705f2c2c9f9c0f426ac3376f9b9132021fb67139"
+}

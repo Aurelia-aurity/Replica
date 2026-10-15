@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "suite": "human",
+  "execution_kind": "school_gpu_user_run",
+  "run_id": "d46a7d89-12b0-43ab-ace3-670192dce4ac",
+  "dataset_sha256": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+  "config": {
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "suite": "human",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "0ab0953bb006bada00adc5ae46ea58bc1552ad48d991920e64d067f883028951",
+      "evaluation/collect.py": "b31c459c7bc0167abaec772bb22db12e341dd607381669c20db663304343689a",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "3aaa2e66f632d547b8b33b1a23e8e9ad7b2d67a380e5054c0956d06dce354880",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "25299cff34f53b658c5b7ae5f61b94399e57256a39dcc47f94d9ebdeb15be704",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "8d39411a679483fbefec8e4fb35c9518d2f594bdb0412e8eb567d7efe5c1caf7"
+    },
+    "model_artifacts_sha256": {
+      "config.json": "7463bb0ea78315365e6c6b74de4e73bbcc8359dfb0c5a737584e077d42c0b03c",
+      "generation_config.json": "3a8f9087e486054c8a4a08dae2e5a3ba62e23da212b5b8c08bc42cb983c3459f",
+      "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+      "model-00001-of-00004.safetensors": "a1333e6293854747c481288ea83b348226af178dd565c49b6f9495ba1966aba7",
+      "model-00002-of-00004.safetensors": "f5d25a2772cb825164a2a2c0fb6d51a87e282abf21e4dd75bc5cfb3cd0ea6185",
+      "model-00003-of-00004.safetensors": "8efdec4c1bc12317ae1a38dc42b595ce777738a64deea3fcb8a0a91381bcdfd5",
+      "model-00004-of-00004.safetensors": "1a72d403cdf0c1ec3cb7f289f17b394a01e64394c2e9b3c0f94dbce3faf879bd",
+      "model.safetensors.index.json": "624bf7c47cd12468fdc16e38a47cf4f19e0415b859a223ba3c027eed2f0e1028",
+      "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+      "tokenizer_config.json": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  },
+  "raw_artifact_sha256": {
+    "metadata.json": "23053c99298e769404442400a4663675e6b3c8227f771d03fad8a410bff69dae",
+    "cases.json": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+    "events.jsonl": "a9ddb9ddfe616f97ec71f89fd011b636a6c0d128103d9df0bb5717db80e95e69"
+  },
+  "counts": {
+    "warmup": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "w1",
+        "w2",
+        "w3"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "baseline": {
+      "expected": 60,
+      "started": 60,
+      "success": [
+        "r1-E-A1-O",
+        "r1-E-A1-P",
+        "r1-E-A1-R",
+        "r1-E-A1-M",
+        "r1-E-A2-O",
+        "r1-E-A2-P",
+        "r1-E-A2-R",
+        "r1-E-A2-M",
+        "r1-E-P1-O",
+        "r1-E-P1-P",
+        "r1-E-P1-R",
+        "r1-E-P1-M",
+        "r1-E-P2-O",
+        "r1-E-P2-P",
+        "r1-E-P2-R",
+        "r1-E-P2-M",
+        "r1-E-U1-O",
+        "r1-E-U1-P",
+        "r1-E-U1-R",
+        "r1-E-U1-M",
+        "r2-E-A1-O",
+        "r2-E-A1-P",
+        "r2-E-A1-R",
+        "r2-E-A1-M",
+        "r2-E-A2-O",
+        "r2-E-A2-P",
+        "r2-E-A2-R",
+        "r2-E-A2-M",
+        "r2-E-P1-O",
+        "r2-E-P1-P",
+        "r2-E-P1-R",
+        "r2-E-P1-M",
+        "r2-E-P2-O",
+        "r2-E-P2-P",
+        "r2-E-P2-R",
+        "r2-E-P2-M",
+        "r2-E-U1-O",
+        "r2-E-U1-P",
+        "r2-E-U1-R",
+        "r2-E-U1-M",
+        "r3-E-A1-O",
+        "r3-E-A1-P",
+        "r3-E-A1-R",
+        "r3-E-A1-M",
+        "r3-E-A2-O",
+        "r3-E-A2-P",
+        "r3-E-A2-R",
+        "r3-E-A2-M",
+        "r3-E-P1-O",
+        "r3-E-P1-P",
+        "r3-E-P1-R",
+        "r3-E-P1-M",
+        "r3-E-P2-O",
+        "r3-E-P2-P",
+        "r3-E-P2-R",
+        "r3-E-P2-M",
+        "r3-E-U1-O",
+        "r3-E-U1-P",
+        "r3-E-U1-R",
+        "r3-E-U1-M"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "supplement": {
+      "expected": 0,
+      "started": 0,
+      "success": [],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    }
+  },
+  "schedule_complete": true,
+  "journal_damaged": false,
+  "operational": {
+    "scope": "successful_main_attempts_only_including_empty",
+    "successful_attempts": 60,
+    "mean_generation_ms": 1066.6682371833333,
+    "mean_tokens_per_second": 32.70237066397994,
+    "input_tokens": 4683,
+    "generated_tokens_including_terminal_eos": 2109,
+    "max_peak_allocated_bytes": 15261286912,
+    "max_peak_reserved_bytes": 15290335232,
+    "load": {
+      "environment": {
+        "attention": "eager",
+        "cache_policy": "generation_default_fresh_per_call",
+        "device": "cuda:0",
+        "driver_version": null,
+        "dtype": "bfloat16",
+        "gpu_capability": [
+          8,
+          6
+        ],
+        "gpu_name": "NVIDIA RTX A6000",
+        "gpu_total_memory_bytes": 51041271808,
+        "model_revision": null,
+        "model_revision_status": "unverified",
+        "packages": {
+          "accelerate": "1.15.0",
+          "safetensors": "0.8.0",
+          "torch": "2.7.1+cu118",
+          "transformers": "4.57.1"
+        },
+        "python": "3.12.7",
+        "resident_allocated_bytes": 15234903552,
+        "resident_reserved_bytes": 15256780800,
+        "torch_cuda_build": "11.8"
+      },
+      "load_ms": 4741.775368,
+      "run_id": "d46a7d89-12b0-43ab-ace3-670192dce4ac",
+      "seq": 2,
+      "status": "success",
+      "time": "2026-10-13T11:29:26.816725+00:00",
+      "type": "load_result"
+    },
+    "cache_recovery_occurred": false,
+    "not_measured": [
+      "TTFT",
+      "end_to_end_latency",
+      "whole_gpu_VRAM"
+    ]
+  },
+  "evaluation_axis": "human_semantic_judgment",
+  "human": {
+    "evaluation_axis": "human_semantic_judgment",
+    "complete": true,
+    "planned": 20,
+    "valid_reviewed": 20,
+    "failed_or_empty": 0,
+    "pending": 0,
+    "metrics": {
+      "personal_fact_accuracy": {
+        "score": 0.7592592592592593,
+        "eligible_cases": 18
+      },
+      "required_information_coverage": {
+        "score": 0.8235294117647058,
+        "eligible_cases": 17
+      },
+      "unsupported_response_rate": {
+        "score": 0.25,
+        "eligible_cases": 20
+      },
+      "record_contradiction_rate": {
+        "score": 0.1,
+        "eligible_cases": 20
+      },
+      "justified_abstention": {
+        "score": 0.7272727272727273,
+        "eligible_cases": 11
+      },
+      "over_abstention": {
+        "score": 0,
+        "eligible_cases": 17
+      }
+    },
+    "whole_success": {
+      "score": 0.7,
+      "pending": 0,
+      "by_case": {
+        "E-A1-O": true,
+        "E-A1-P": true,
+        "E-A1-R": true,
+        "E-A1-M": false,
+        "E-A2-O": true,
+        "E-A2-P": true,
+        "E-A2-R": true,
+        "E-A2-M": false,
+        "E-P1-O": false,
+        "E-P1-P": true,
+        "E-P1-R": true,
+        "E-P1-M": false,
+        "E-P2-O": false,
+        "E-P2-P": true,
+        "E-P2-R": true,
+        "E-P2-M": true,
+        "E-U1-O": true,
+        "E-U1-P": true,
+        "E-U1-R": true,
+        "E-U1-M": false
+      }
+    },
+    "pairs": {
+      "paraphrase": {
+        "planned": 5,
+        "pending": 0,
+        "success_rate": 0.6
+      },
+      "record_change": {
+        "planned": 5,
+        "pending": 0,
+        "success_rate": 0.6
+      },
+      "misleading": {
+        "planned": 5,
+        "pending": 0,
+        "success_rate": 0
+      }
+    }
+  },
+  "labels_sha256": "a2cd2681b1b89fe9c771721d3bc190234a4d598675133c1eb02ebd3c050ddcd0"
+}

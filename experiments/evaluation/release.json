@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "dataset_id": "replica-issue36-v1",
+  "confirmation_status": "user_confirmed",
+  "confirmed_at": "2026-10-13",
+  "files": {
+    "record_qa.json": "0958c27c1b22e7a3bb5753c21e30caa9ab67557da250f75cd4297cadbcf7696a",
+    "instructions.json": "e5dcc15082af5035ad9a3967e77ea027fc3b104ba297c841b0e81881a5fed686",
+    "human.json": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+    "scoring-contract.json": "c1ca94542afc6944b55fefa691620dd6abaf0adce27e69ca0031e6effb67a0fc",
+    "baseline-grounding-oracles.json": "c22fcc8f2c7acfbd1f9865ddf595aeadacdf7d8a1c0cbb10768576a672e143ef"
+  }
+}

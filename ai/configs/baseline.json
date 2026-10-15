@@ -1,0 +1,5 @@
+{
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+  "max_new_tokens": 160
+}

@@ -56,3 +56,8 @@ experiments/artifacts/
 # Local agent / browser records
 .insane-review/
 bridge/
+
+# Common filenames for personal AI documents; other paths belong in local excludes
+AGENT.md
+CLAUDE.md
+handoff.md

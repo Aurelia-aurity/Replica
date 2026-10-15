@@ -1,0 +1,1295 @@
+{
+  "schema_version": 1,
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "execution_kind": "school_gpu_user_run",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "config_sha256": "893b526e6d8398b05d4b567d534015dd72531d444f12df5828738b8c57c1fbff",
+  "code_sha256": {
+    "common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+    "report.py": "d7b6e4776cfe2405195b6fcd500ff70216efc163e316a1313444db5078adbdb3",
+    "run.py": "9d3be40a837321e04e0ed67cd39428979bf77499be9f3006e46b794d4e6ecb62",
+    "runtime.py": "8d39411a679483fbefec8e4fb35c9518d2f594bdb0412e8eb567d7efe5c1caf7"
+  },
+  "rubric_sha256": "f71be011988574ed7443bf45c5a6721ef275dbd6c9fc722e1d002345c903af9e",
+  "raw_artifact_sha256": {
+    "metadata.json": "bab111e76e8bd7c52d8495c756c7a1c01feb9d0c23c24e78e0b1aee9357cd4a7",
+    "cases.json": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+    "events.jsonl": "6d984c16f197ccd70c2e47c026fcfc32af2806e80e376693cd25827d5b0a2791"
+  },
+  "schedule_complete": true,
+  "run_success": true,
+  "journal_damaged": false,
+  "cache_recovery_occurred": false,
+  "counts": {
+    "warmup": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "w1",
+        "w2",
+        "w3"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "baseline": {
+      "expected": 60,
+      "started": 60,
+      "success": [
+        "r1-N01",
+        "r1-N02",
+        "r1-N03",
+        "r1-N04",
+        "r1-N05",
+        "r1-I01",
+        "r1-I02",
+        "r1-I03",
+        "r1-I04",
+        "r1-I05",
+        "r1-U01",
+        "r1-U02",
+        "r1-U03",
+        "r1-U04",
+        "r1-U05",
+        "r1-G01",
+        "r1-G02",
+        "r1-G03",
+        "r1-G04",
+        "r1-G05",
+        "r2-N01",
+        "r2-N02",
+        "r2-N03",
+        "r2-N04",
+        "r2-N05",
+        "r2-I01",
+        "r2-I02",
+        "r2-I03",
+        "r2-I04",
+        "r2-I05",
+        "r2-U01",
+        "r2-U02",
+        "r2-U03",
+        "r2-U04",
+        "r2-U05",
+        "r2-G01",
+        "r2-G02",
+        "r2-G03",
+        "r2-G04",
+        "r2-G05",
+        "r3-N01",
+        "r3-N02",
+        "r3-N03",
+        "r3-N04",
+        "r3-N05",
+        "r3-I01",
+        "r3-I02",
+        "r3-I03",
+        "r3-I04",
+        "r3-I05",
+        "r3-U01",
+        "r3-U02",
+        "r3-U03",
+        "r3-U04",
+        "r3-U05",
+        "r3-G01",
+        "r3-G02",
+        "r3-G03",
+        "r3-G04",
+        "r3-G05"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "supplement": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "s-r1-U02",
+        "s-r2-U02",
+        "s-r3-U02"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    }
+  },
+  "baseline_metrics": {
+    "generation_ms": {
+      "n": 60,
+      "median": 1265.1193435,
+      "min": 288.847875,
+      "max": 4976.952382
+    },
+    "generated_token_count": {
+      "n": 60,
+      "median": 40.5,
+      "min": 9,
+      "max": 160
+    },
+    "tokens_per_second": {
+      "n": 60,
+      "median": 32.08658765042585,
+      "min": 30.39637107677711,
+      "max": 32.46935774881842
+    },
+    "peak_allocated_bytes": {
+      "n": 60,
+      "median": 15256590080.0,
+      "min": 15253471232,
+      "max": 15265941504
+    },
+    "peak_reserved_bytes": {
+      "n": 60,
+      "median": 15296626688.0,
+      "min": 15288238080,
+      "max": 15296626688
+    },
+    "incremental_allocated_bytes": {
+      "n": 60,
+      "median": 13165824.0,
+      "min": 10046976,
+      "max": 22516224
+    }
+  },
+  "truncated_baseline_metrics": {
+    "generation_ms": {
+      "n": 3,
+      "median": 4941.374056,
+      "min": 4927.72297,
+      "max": 4976.952382
+    },
+    "generated_token_count": {
+      "n": 3,
+      "median": 160,
+      "min": 160,
+      "max": 160
+    },
+    "tokens_per_second": {
+      "n": 3,
+      "median": 32.37965759862321,
+      "min": 32.14818783050193,
+      "max": 32.46935774881842
+    },
+    "peak_allocated_bytes": {
+      "n": 3,
+      "median": 15261012992,
+      "min": 15261012992,
+      "max": 15261012992
+    },
+    "peak_reserved_bytes": {
+      "n": 3,
+      "median": 15296626688,
+      "min": 15296626688,
+      "max": 15296626688
+    },
+    "incremental_allocated_bytes": {
+      "n": 3,
+      "median": 17588736,
+      "min": 17588736,
+      "max": 17588736
+    }
+  },
+  "warmup_metrics": {
+    "generation_ms": {
+      "n": 3,
+      "median": 1836.168506,
+      "min": 1821.123295,
+      "max": 2916.878522
+    },
+    "generated_token_count": {
+      "n": 3,
+      "median": 59,
+      "min": 59,
+      "max": 59
+    },
+    "tokens_per_second": {
+      "n": 3,
+      "median": 32.13212720249108,
+      "min": 20.2271022104636,
+      "max": 32.39758678722519
+    },
+    "peak_allocated_bytes": {
+      "n": 3,
+      "median": 15254309888,
+      "min": 15254309888,
+      "max": 15254309888
+    },
+    "peak_reserved_bytes": {
+      "n": 3,
+      "median": 15288238080,
+      "min": 15288238080,
+      "max": 15288238080
+    },
+    "incremental_allocated_bytes": {
+      "n": 3,
+      "median": 10885632,
+      "min": 10885632,
+      "max": 19405312
+    }
+  },
+  "supplement_metrics": {
+    "generation_ms": {
+      "n": 3,
+      "median": 5081.666545,
+      "min": 5065.187094,
+      "max": 5097.528571
+    },
+    "generated_token_count": {
+      "n": 3,
+      "median": 164,
+      "min": 164,
+      "max": 164
+    },
+    "tokens_per_second": {
+      "n": 3,
+      "median": 32.27287712558873,
+      "min": 32.172453320419066,
+      "max": 32.377876069823216
+    },
+    "peak_allocated_bytes": {
+      "n": 3,
+      "median": 15261272064,
+      "min": 15261272064,
+      "max": 15261272064
+    },
+    "peak_reserved_bytes": {
+      "n": 3,
+      "median": 15296626688,
+      "min": 15296626688,
+      "max": 15296626688
+    },
+    "incremental_allocated_bytes": {
+      "n": 3,
+      "median": 17847808,
+      "min": 17847808,
+      "max": 17847808
+    }
+  },
+  "quality": {
+    "naturalness": {
+      "total": 5,
+      "eligible": 5,
+      "graded": 5,
+      "mean": 3
+    },
+    "instructions": {
+      "total": 5,
+      "eligible": 5,
+      "graded": 5,
+      "mean": 3.2
+    },
+    "usefulness": {
+      "total": 5,
+      "eligible": 5,
+      "graded": 5,
+      "mean": 4.6
+    },
+    "grounding": {
+      "total": 5,
+      "eligible": 5,
+      "graded": 5,
+      "mean": 4.2
+    }
+  },
+  "overall_equal_category_mean": 3.75,
+  "quality_complete": true,
+  "scores_file_sha256": "678fae4f1c506c9305d3d45b1417fcdf24c66bb7ce376956ffa1787acb787b3c",
+  "limits": [
+    "Generation latency excludes tokenization, decoding, file I/O and loading.",
+    "EOS counts toward throughput; allocator bytes exclude some driver/library memory.",
+    "Reserved cache reflects fixed ordering; three repeats do not establish significance.",
+    "Artifact hashes bind content; they do not authenticate execution or grader identity."
+  ],
+  "executed_at": "2026-10-10T13:02:58.003082+00:00",
+  "execution_source": "사용자가 학교 Slurm GPU 셸에서 실행하고 전달한 원본을 로컬에서 검증",
+  "config": {
+    "schema_version": 1,
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "baseline_reference_commit": "705f2c2c9f9c0f426ac3376f9b9132021fb67139"
+  },
+  "dataset_version": "1.0",
+  "git_commit": null,
+  "load_ms": 3460.467551,
+  "environment": {
+    "attention": "eager",
+    "cache_policy": "generation_default_fresh_per_call",
+    "device": "cuda:0",
+    "driver_version": null,
+    "dtype": "bfloat16",
+    "gpu_capability": [
+      8,
+      6
+    ],
+    "gpu_name": "NVIDIA RTX A6000",
+    "gpu_total_memory_bytes": 51041271808,
+    "model_revision": null,
+    "model_revision_status": "unverified",
+    "packages": {
+      "accelerate": "1.15.0",
+      "safetensors": "0.8.0",
+      "torch": "2.7.1+cu118",
+      "transformers": "4.57.1"
+    },
+    "python": "3.12.7",
+    "resident_allocated_bytes": 15234903552,
+    "resident_reserved_bytes": 15256780800,
+    "torch_cuda_build": "11.8"
+  },
+  "per_case": {
+    "N01": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1187.366751,
+          "min": 1172.864413,
+          "max": 1188.609434
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 38,
+          "min": 38,
+          "max": 38
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.00359111285238,
+          "min": 31.970131578141253,
+          "max": 32.39931195695679
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15254983168,
+          "min": 15254983168,
+          "max": 15254983168
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15288238080,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 11558912,
+          "min": 11558912,
+          "max": 11558912
+        }
+      },
+      "literal_checks": {
+        "r1-N01": {},
+        "r2-N01": {},
+        "r3-N01": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "N02": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1027.067662,
+          "min": 1022.050565,
+          "max": 1038.011182
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 33,
+          "min": 33,
+          "max": 33
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.13030769145178,
+          "min": 31.791565035375505,
+          "max": 32.28803068075208
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15255996928,
+          "min": 15255996928,
+          "max": 15255996928
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15288238080,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 12572672,
+          "min": 12572672,
+          "max": 12572672
+        }
+      },
+      "literal_checks": {
+        "r1-N02": {},
+        "r2-N02": {},
+        "r3-N02": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "N03": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 2502.210007,
+          "min": 2499.779119,
+          "max": 2664.791787
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 81,
+          "min": 81,
+          "max": 81
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.371383606252195,
+          "min": 30.39637107677711,
+          "max": 32.4028628707015
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15256335872,
+          "min": 15256335872,
+          "max": 15256335872
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 12911616,
+          "min": 12911616,
+          "max": 12911616
+        }
+      },
+      "literal_checks": {
+        "r1-N03": {},
+        "r2-N03": {},
+        "r3-N03": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "N04": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1565.046417,
+          "min": 1548.718547,
+          "max": 1569.600756
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 50,
+          "min": 50,
+          "max": 50
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.94793423178068,
+          "min": 31.855234402040512,
+          "max": 32.28475574006282
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15255490048,
+          "min": 15255490048,
+          "max": 15255490048
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 12065792,
+          "min": 12065792,
+          "max": 12065792
+        }
+      },
+      "literal_checks": {
+        "r1-N04": {},
+        "r2-N04": {},
+        "r3-N04": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "N05": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 966.120884,
+          "min": 965.550472,
+          "max": 966.870144
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 31,
+          "min": 31,
+          "max": 31
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.08708197223899,
+          "min": 32.0622166196498,
+          "max": 32.10603784987845
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15254983168,
+          "min": 15254983168,
+          "max": 15254983168
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 11558912,
+          "min": 11558912,
+          "max": 11558912
+        }
+      },
+      "literal_checks": {
+        "r1-N05": {},
+        "r2-N05": {},
+        "r3-N05": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "I01": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 2153.332884,
+          "min": 2144.843716,
+          "max": 2158.080936
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 69,
+          "min": 69,
+          "max": 69
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.04335033969602,
+          "min": 31.972850901454795,
+          "max": 32.170176076362665
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15257017344,
+          "min": 15257017344,
+          "max": 15257017344
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 13592064,
+          "min": 13592064,
+          "max": 13592064
+        }
+      },
+      "literal_checks": {
+        "r1-I01": {},
+        "r2-I01": {},
+        "r3-I01": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "I02": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 547.630269,
+          "min": 534.656336,
+          "max": 554.325576
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 17,
+          "min": 17,
+          "max": 17
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.042842155242518,
+          "min": 30.667897596700467,
+          "max": 31.796125577009903
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15258980352,
+          "min": 15258980352,
+          "max": 15258980352
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 15555072,
+          "min": 15555072,
+          "max": 15555072
+        }
+      },
+      "literal_checks": {
+        "r1-I02": {
+          "exactly_two_lines_starting_dash_space": true
+        },
+        "r2-I02": {
+          "exactly_two_lines_starting_dash_space": true
+        },
+        "r3-I02": {
+          "exactly_two_lines_starting_dash_space": true
+        }
+      },
+      "unique_decoded_outputs": 1
+    },
+    "I03": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 291.677559,
+          "min": 288.847875,
+          "max": 295.389687
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 9,
+          "min": 9,
+          "max": 9
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 30.855990535768303,
+          "min": 30.46822687482654,
+          "max": 31.15826972935148
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15258354176,
+          "min": 15258354176,
+          "max": 15258354176
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 14928896,
+          "min": 14928896,
+          "max": 14928896
+        }
+      },
+      "literal_checks": {
+        "r1-I03": {
+          "contains_both_requested_words": false
+        },
+        "r2-I03": {
+          "contains_both_requested_words": false
+        },
+        "r3-I03": {
+          "contains_both_requested_words": false
+        }
+      },
+      "unique_decoded_outputs": 1
+    },
+    "I04": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1026.147132,
+          "min": 1023.447992,
+          "max": 1027.803448
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 33,
+          "min": 33,
+          "max": 33
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.15913095784007,
+          "min": 32.10730618214467,
+          "max": 32.24394425310475
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15259608576,
+          "min": 15259608576,
+          "max": 15259608576
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 16183296,
+          "min": 16183296,
+          "max": 16183296
+        }
+      },
+      "literal_checks": {
+        "r1-I04": {
+          "two_numbered_lines": true
+        },
+        "r2-I04": {
+          "two_numbered_lines": true
+        },
+        "r3-I04": {
+          "two_numbered_lines": true
+        }
+      },
+      "unique_decoded_outputs": 1
+    },
+    "I05": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1290.468911,
+          "min": 1277.390302,
+          "max": 1313.824039
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 41,
+          "min": 41,
+          "max": 41
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.771396932165228,
+          "min": 31.20661426716367,
+          "max": 32.09668958329073
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15262550528,
+          "min": 15262550528,
+          "max": 15262550528
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 19125248,
+          "min": 19125248,
+          "max": 19125248
+        }
+      },
+      "literal_checks": {
+        "r1-I05": {
+          "starts_with_requested_word": true,
+          "forbidden_word_absent": false
+        },
+        "r2-I05": {
+          "starts_with_requested_word": true,
+          "forbidden_word_absent": false
+        },
+        "r3-I05": {
+          "starts_with_requested_word": true,
+          "forbidden_word_absent": false
+        }
+      },
+      "unique_decoded_outputs": 1
+    },
+    "U01": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 2112.927547,
+          "min": 2099.195209,
+          "max": 2122.719568
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 68,
+          "min": 68,
+          "max": 68
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.18283565688209,
+          "min": 32.03437751509907,
+          "max": 32.393366614243256
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15255827968,
+          "min": 15255827968,
+          "max": 15255827968
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15290335232,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 12403712,
+          "min": 12403712,
+          "max": 12403712
+        }
+      },
+      "literal_checks": {
+        "r1-U01": {},
+        "r2-U01": {},
+        "r3-U01": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "U02": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 4941.374056,
+          "min": 4927.72297,
+          "max": 4976.952382
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 160,
+          "min": 160,
+          "max": 160
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.37965759862321,
+          "min": 32.14818783050193,
+          "max": 32.46935774881842
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15261012992,
+          "min": 15261012992,
+          "max": 15261012992
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 17588736,
+          "min": 17588736,
+          "max": 17588736
+        }
+      },
+      "literal_checks": {
+        "r1-U02": {},
+        "r2-U02": {},
+        "r3-U02": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "U03": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 507.532883,
+          "min": 499.451034,
+          "max": 511.455342
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 16,
+          "min": 16,
+          "max": 16
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.525050959111944,
+          "min": 31.283278687506602,
+          "max": 32.035172440948436
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15256505856,
+          "min": 15256505856,
+          "max": 15256505856
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 13081600,
+          "min": 13081600,
+          "max": 13081600
+        }
+      },
+      "literal_checks": {
+        "r1-U03": {},
+        "r2-U03": {},
+        "r3-U03": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "U04": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 2501.094541,
+          "min": 2496.228289,
+          "max": 2504.234037
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 81,
+          "min": 81,
+          "max": 81
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.3858209564578,
+          "min": 32.34521965727918,
+          "max": 32.448955232555655
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15257527808,
+          "min": 15257527808,
+          "max": 15257527808
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 14102528,
+          "min": 14102528,
+          "max": 14102528
+        }
+      },
+      "literal_checks": {
+        "r1-U04": {},
+        "r2-U04": {},
+        "r3-U04": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "U05": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1462.815734,
+          "min": 1458.853176,
+          "max": 1474.45032
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 47,
+          "min": 47,
+          "max": 47
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.12981574342295,
+          "min": 31.876285936850014,
+          "max": 32.21708721152347
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15256674304,
+          "min": 15256674304,
+          "max": 15256674304
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 13250048,
+          "min": 13250048,
+          "max": 13250048
+        }
+      },
+      "literal_checks": {
+        "r1-U05": {},
+        "r2-U05": {},
+        "r3-U05": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "G01": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 754.77859,
+          "min": 750.499168,
+          "max": 763.43683
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 24,
+          "min": 24,
+          "max": 24
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.797404322239718,
+          "min": 31.4367856735442,
+          "max": 31.978716330835425
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15253471232,
+          "min": 15253471232,
+          "max": 15253471232
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 10046976,
+          "min": 10046976,
+          "max": 10046976
+        }
+      },
+      "literal_checks": {
+        "r1-G01": {},
+        "r2-G01": {},
+        "r3-G01": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "G02": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1671.228474,
+          "min": 1663.656381,
+          "max": 1678.485434
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 54,
+          "min": 54,
+          "max": 54
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.31156053172895,
+          "min": 32.17186095640554,
+          "max": 32.45862584167854
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15253471232,
+          "min": 15253471232,
+          "max": 15253471232
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 10046976,
+          "min": 10046976,
+          "max": 10046976
+        }
+      },
+      "literal_checks": {
+        "r1-G02": {},
+        "r2-G02": {},
+        "r3-G02": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "G03": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1037.569119,
+          "min": 1027.536361,
+          "max": 1047.490402
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 33,
+          "min": 33,
+          "max": 33
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 31.80511003624039,
+          "min": 31.503868614922165,
+          "max": 32.1156518177949
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15254478848,
+          "min": 15254478848,
+          "max": 15254478848
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 11054592,
+          "min": 11054592,
+          "max": 11054592
+        }
+      },
+      "literal_checks": {
+        "r1-G03": {},
+        "r2-G03": {},
+        "r3-G03": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "G04": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1803.324345,
+          "min": 1802.069164,
+          "max": 1805.749974
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 58,
+          "min": 58,
+          "max": 58
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.162822046302495,
+          "min": 32.11961834977714,
+          "max": 32.18522416268369
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15265941504,
+          "min": 15265941504,
+          "max": 15265941504
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 22516224,
+          "min": 22516224,
+          "max": 22516224
+        }
+      },
+      "literal_checks": {
+        "r1-G04": {},
+        "r2-G04": {},
+        "r3-G04": {}
+      },
+      "unique_decoded_outputs": 1
+    },
+    "G05": {
+      "metrics": {
+        "generation_ms": {
+          "n": 3,
+          "median": 1248.209642,
+          "min": 1246.646003,
+          "max": 1252.848385
+        },
+        "generated_token_count": {
+          "n": 3,
+          "median": 40,
+          "min": 40,
+          "max": 40
+        },
+        "tokens_per_second": {
+          "n": 3,
+          "median": 32.04589890517766,
+          "min": 31.927247126554743,
+          "max": 32.086093328612705
+        },
+        "peak_allocated_bytes": {
+          "n": 3,
+          "median": 15261917696,
+          "min": 15261917696,
+          "max": 15261917696
+        },
+        "peak_reserved_bytes": {
+          "n": 3,
+          "median": 15296626688,
+          "min": 15296626688,
+          "max": 15296626688
+        },
+        "incremental_allocated_bytes": {
+          "n": 3,
+          "median": 18492416,
+          "min": 18492416,
+          "max": 18492416
+        }
+      },
+      "literal_checks": {
+        "r1-G05": {},
+        "r2-G05": {},
+        "r3-G05": {}
+      },
+      "unique_decoded_outputs": 1
+    }
+  }
+}

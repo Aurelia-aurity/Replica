@@ -1,4 +1,4 @@
-name: 버그
+name: 버그 제보
 description: 재현 방법과 기대 결과를 포함해 동작 오류를 등록합니다.
 title: "[버그] "
 body:

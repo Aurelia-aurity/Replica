@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "created_at": "2026-10-10T13:02:58.003082+00:00",
+  "execution_kind": "school_gpu_user_run",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "rubric_sha256": "f71be011988574ed7443bf45c5a6721ef275dbd6c9fc722e1d002345c903af9e",
+  "config": {
+    "schema_version": 1,
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "baseline_reference_commit": "705f2c2c9f9c0f426ac3376f9b9132021fb67139"
+  },
+  "config_sha256": "893b526e6d8398b05d4b567d534015dd72531d444f12df5828738b8c57c1fbff",
+  "release": {
+    "dataset_id": "replica-baseline-20",
+    "version": "1.0",
+    "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+    "rubric_sha256": "f71be011988574ed7443bf45c5a6721ef275dbd6c9fc722e1d002345c903af9e",
+    "decision": "User explicitly confirmed current twenty questions and rubric and authorized proceeding on 2026-10-10",
+    "confirmation_status": "user_confirmed"
+  },
+  "git_commit": null,
+  "code_sha256": {
+    "common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+    "report.py": "d7b6e4776cfe2405195b6fcd500ff70216efc163e316a1313444db5078adbdb3",
+    "run.py": "9d3be40a837321e04e0ed67cd39428979bf77499be9f3006e46b794d4e6ecb62",
+    "runtime.py": "8d39411a679483fbefec8e4fb35c9518d2f594bdb0412e8eb567d7efe5c1caf7"
+  }
+}
