@@ -12,16 +12,16 @@ def require(condition):
     if not condition:
         raise EvaluationError('JOURNAL')
 
-def load_run(path):
+def load_run(path, release_validator=validate_release, config_validator=validate_config):
     path = Path(path)
     snapshot = {name: (path / name).read_bytes() for name in ('metadata.json', 'cases.json', 'events.jsonl')}
     meta = json.loads(snapshot['metadata.json'])
     raw = snapshot['cases.json']
-    dataset = validate_release(raw, meta['release'])
+    dataset = release_validator(raw, meta['release'])
     require(meta['dataset_sha256'] == digest(raw))
     require(meta['rubric_sha256'] == meta['release']['rubric_sha256'])
     require(meta['config_sha256'] == digest(canonical(meta['config'])))
-    validate_config(meta['config'], dataset)
+    config_validator(meta['config'], dataset)
     require(meta['execution_kind'] in ('mock', 'school_gpu_user_run'))
     data = snapshot['events.jsonl']
     damage = bool(data and not data.endswith(b'\n'))

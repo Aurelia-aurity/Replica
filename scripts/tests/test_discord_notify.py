@@ -109,6 +109,7 @@ class Events(unittest.TestCase):
                     {"requested_reviewer": {"login": "owner"}, "requested_team": {"slug": "team"}}):
             with self.assertRaises(dt.Error): dn.source_events([p], {18: [event(1, "review_requested", **who)]}, MAPPING)
 
+
     def test_malicious_title_and_unknown_account(self):
         issue = obj(); issue["title"] = "@everyone <@111111111111111111> **bad**" * 200
         message = next(iter(dn.source_events([issue], {18: []}, MAPPING).values()))
@@ -190,6 +191,138 @@ class Events(unittest.TestCase):
                                     event_check=lambda key: dn.current_pr_event(GH(), key, MAPPING)), 0)
         self.assertEqual(len(webhook.calls), 1)
         self.assertEqual(state["outbox"][new_key]["status"], "delivered")
+
+
+class ProjectBacklog(unittest.TestCase):
+    def test_six_option_readback_uses_configured_backlog_and_preserves_five_ids(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        project = {"items": {1018: {"status_option_id": options["백로그"]}}}
+        objects = [obj(18), obj(19)]
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient") as graph, \
+             patch.object(gp, "fetch_project", return_value=project) as fetch:
+            result = dn.project_backlog("token", objects,
+                                        json.dumps(options, ensure_ascii=False))
+
+        self.assertEqual(result, {18})
+        self.assertEqual({name: options[name] for name in gp.EXPECTED_STATUS_OPTIONS},
+                         gp.EXPECTED_STATUS_OPTIONS)
+        self.assertEqual(fetch.call_args.kwargs["status_options"], options)
+        graph.assert_called_once_with("token")
+
+    def test_missing_or_mismatched_six_option_map_fails_closed(self):
+        import github_project as gp
+
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        cases = [None, json.dumps(gp.EXPECTED_STATUS_OPTIONS, ensure_ascii=False),
+                 json.dumps({**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id",
+                             "백로그": "wrong-id"}, ensure_ascii=False)]
+        for raw in cases:
+            with self.subTest(raw=raw), \
+                 patch.object(dn.dt, "GitHub", return_value=reader), \
+                 patch.object(gp, "GraphQLClient") as graph, \
+                 patch.object(gp, "fetch_project") as fetch:
+                self.assertEqual(dn.project_backlog("token", [obj(18)], raw), set())
+                fetch.assert_not_called()
+                graph.assert_not_called()
+
+    def test_project_backlog_keeps_read_project_only_scope_boundary(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "project, read:project"})
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient") as graph, \
+             patch.object(gp, "fetch_project") as fetch:
+            result = dn.project_backlog("token", [obj(18)],
+                                        json.dumps(options, ensure_ascii=False))
+        self.assertEqual(result, set())
+        graph.assert_not_called()
+        fetch.assert_not_called()
+
+    def test_duplicate_live_project_option_suppresses_only_annotation(self):
+        import github_project as gp
+
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        raw_options = [{"id": value, "name": name} for name, value in options.items()]
+        raw_options.insert(-1, {"id": "bad-cancel-id", "name": "취소"})
+
+        class Graph:
+            def __init__(self):
+                self.queries = []
+
+            def request(self, query, variables=None, *, mutation=False):
+                self.queries.append(query)
+                status = {"__typename": "ProjectV2SingleSelectField",
+                          "id": "PVTSSF_lAHOBda_2c4BmKKVzhk0RA4",
+                          "name": "Status", "options": copy.deepcopy(raw_options)}
+                return {"node": {"id": gp.EXPECTED_PROJECT_ID, "number": gp.PROJECT_NUMBER,
+                    "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID, "login": "Just-Simple0"},
+                    "fields": {"nodes": [status], "pageInfo": {
+                        "hasNextPage": False, "endCursor": None}}}}, None
+
+        reader = unittest.mock.Mock()
+        reader.call.return_value = (None, {"X-OAuth-Scopes": "read:project"})
+        reader.repo.return_value = {"node_id": "R_fixture"}
+        graph = Graph()
+        issue = obj(18)
+        pull = obj(19, pull=True)
+        pull["requested_reviewers"] = [{"login": "owner"}]
+        timeline = event(1, "review_requested", requested_reviewer={"login": "owner"})
+
+        with patch.object(dn.dt, "GitHub", return_value=reader), \
+             patch.object(gp, "GraphQLClient", return_value=graph):
+            backlog = dn.project_backlog(
+                "token", [issue, pull], json.dumps(options, ensure_ascii=False))
+
+        self.assertEqual(backlog, set())
+        self.assertEqual(graph.queries, [gp.PROJECT_FIELDS_QUERY])
+        messages = dn.source_events([issue, pull], {18: [], 19: [timeline]}, MAPPING,
+                                    backlog=backlog)
+        issue_message = messages["issue:18:created:" + issue["created_at"]]
+        review_message = messages["pr:19:timeline:1"]
+        self.assertIn("Project 등록 미확인", issue_message["content"])
+        self.assertIn(dn.PROJECT_URL, issue_message["content"])
+        self.assertEqual(review_message["allowed_mentions"]["users"],
+                         [MAPPING["owner"]])
+
+        state = dn.new_state()
+        dn.reconcile_events(state, messages)
+
+        class Ledger:
+            def load(self):
+                return copy.deepcopy(state)
+
+            def save(self, value, **kwargs):
+                self.value = copy.deepcopy(value)
+
+        class Webhook:
+            def __init__(self):
+                self.posts = []
+
+            def send(self, message):
+                self.posts.append(copy.deepcopy(message))
+                return f"333333333333333{len(self.posts)}"
+
+        webhook = Webhook()
+        dn.deliver(state, Ledger(), webhook,
+                   event_check=lambda key: messages[key])
+        self.assertEqual(len(webhook.posts), sum(message is not None
+                                                for message in messages.values()))
+        self.assertTrue(any("Project 등록 미확인" in message["content"]
+                            for message in webhook.posts))
+        self.assertTrue(any(message["allowed_mentions"]["users"] == [MAPPING["owner"]]
+                            for message in webhook.posts))
+        self.assertTrue(all(item["status"] == "delivered"
+                            for item in state["outbox"].values()))
 
 
 class Incidents(unittest.TestCase):
@@ -3286,6 +3419,92 @@ class DiagnosticTests(unittest.TestCase):
             self.assertEqual(dn.main([], env={"DISCORD_NOTIFICATIONS_ENABLED": "true"}), 1)
         self.assertIn("stage=configuration; reason=unclassified", output.getvalue())
         self.assertNotIn("private credential", output.getvalue())
+
+    def test_ledger_failure_log_emits_only_allowlisted_metadata(self):
+        secret = "private-message webhook-token response-header"
+        failure = dt.LedgerFailure("readback_mismatch", purpose="pending", operation="immutable_check",
+                                   intended_blob_sha=secret, observed_blob_sha="b" * 40,
+                                   put_blob_sha="c" * 40, commit_sha="d" * 40,
+                                   expected_digest="e" * 64, immutable_check="different")
+        failure.args = (secret,)
+        failure.headers = {"X-Synthetic-Private": secret}
+        failure.body = (secret + " invalid metadata").encode()
+        config = json.dumps({"repository_id": dn.REPO_ID, "sync_workflow_id": dn.SYNC_ID,
+                             "ci_workflows": []}).encode()
+        output = io.StringIO()
+        error_output = io.StringIO()
+
+        def fail_factory(*_args):
+            raise failure
+
+        with patch.object(dn.Path, "read_bytes", return_value=config), patch("sys.stdout", output), \
+             patch("sys.stderr", error_output):
+            result = dn.main(["--config", "synthetic-config"],
+                             env={"DISCORD_NOTIFICATIONS_ENABLED": "true"},
+                             discord_factory=fail_factory)
+        self.assertEqual(result, 1)
+        text = output.getvalue()
+        self.assertIn("reason=readback_mismatch", text)
+        self.assertIn("ledger_purpose=pending", text)
+        self.assertNotIn("intended_blob_sha=", text)
+        self.assertIn("observed_blob_sha=" + "b" * 40, text)
+        self.assertNotIn(secret, text)
+        self.assertNotIn(secret, error_output.getvalue())
+
+    def test_compatibility_helper_keeps_single_argument_bootstrap_api(self):
+        state = dn.new_state()
+
+        class MemoryLedger:
+            def __init__(self): self.calls = []
+            def save(self, value): self.calls.append(value)
+
+        memory = MemoryLedger()
+        dn._save_ledger(memory, state, "reconcile")
+        self.assertEqual(memory.calls, [state])
+
+        class LegacyBootstrapLedger:
+            def __init__(self): self.calls = []
+            def save(self, value, *, bootstrap=False): self.calls.append((value, bootstrap))
+
+        legacy = LegacyBootstrapLedger()
+        dn._save_ledger(legacy, state, "bootstrap", bootstrap=True)
+        self.assertEqual(legacy.calls, [(state, True)])
+
+        production = dt.Ledger.__new__(dt.Ledger)
+        with patch.object(dt.Ledger, "save") as save:
+            dn._save_ledger(production, state, "bootstrap", bootstrap=True)
+        save.assert_called_once_with(state, purpose="bootstrap", bootstrap=True)
+
+    def test_delivered_save_failure_keeps_durable_pending_without_duplicate_post(self):
+        state = dn.new_state()
+        key = "incident:synthetic"
+        dn.queue(state, key, dn.payload("title", "body", dn.object_url(18), MAPPING))
+        durable = {}
+        post_count = []
+
+        class Ledger:
+            def __init__(self): self.calls = 0
+            def save(self, value):
+                self.calls += 1
+                if self.calls == 1:
+                    durable["state"] = copy.deepcopy(value)
+                    return
+                raise dt.LedgerFailure("readback_mismatch", purpose="delivered", operation="immutable_check",
+                                       immutable_check="unavailable")
+
+        class Webhook:
+            def send(self, payload):
+                post_count.append(payload)
+                return "333333333333333333"
+
+        with self.assertRaises(dt.LedgerFailure):
+            dn.deliver(state, Ledger(), Webhook())
+        self.assertEqual(len(post_count), 1)
+        self.assertEqual(durable["state"]["outbox"][key]["status"], "pending")
+
+        retry_state = durable["state"]
+        self.assertEqual(dn.deliver(retry_state, Delivery.Ledger(), Webhook()), 1)
+        self.assertEqual(len(post_count), 1)
 
 
 if __name__ == "__main__": unittest.main()

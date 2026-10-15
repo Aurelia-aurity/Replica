@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "evaluation_axis": "human_overall_rating",
+  "source_document": "사람평가-20개-답안.md",
+  "source_sha256": "d0b1d7b948668b226263ff24158447894027e3a28dec617484a464f0467a9381",
+  "assessor": "user",
+  "recorded_date": "2026-10-14",
+  "supersedes": "human-ratings-001.json",
+  "semantic_annotations_inferred": false,
+  "changes": [
+    {
+      "case_id": "E-P1-O",
+      "previous_score": 4.0,
+      "score": 3.0,
+      "reason_changed": true
+    }
+  ],
+  "rows": [
+    {
+      "number": 1,
+      "case_id": "E-A1-O",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 2,
+      "case_id": "E-A1-P",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 3,
+      "case_id": "E-A1-R",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 4,
+      "case_id": "E-A1-M",
+      "score": 1.0,
+      "reason_verbatim": "유도 질문에 넘어가서 부산에서 피자 먹었다고 답변함"
+    },
+    {
+      "number": 5,
+      "case_id": "E-A2-O",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 6,
+      "case_id": "E-A2-P",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 7,
+      "case_id": "E-A2-R",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 8,
+      "case_id": "E-A2-M",
+      "score": 1.0,
+      "reason_verbatim": "유도 질문에 넘어가서 삼촌/장갑/빨간색 이라 답변"
+    },
+    {
+      "number": 9,
+      "case_id": "E-P1-O",
+      "score": 3.0,
+      "reason_verbatim": "기록에 맞추어 답변했으나, 명시되지 않은 부분에 대해서 묻는 방식이 딱딱함. \"목적은 기록된 게 없는데 무엇 때문에 다녀오셨어요?\" 처럼 되어야 할 듯. 또한 여행인지 아닌지도 불분명. 여행이라는 단어 자체가 목적으로 해석한 것이라 볼 수도 있음."
+    },
+    {
+      "number": 10,
+      "case_id": "E-P1-P",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 11,
+      "case_id": "E-P1-R",
+      "score": 5.0,
+      "reason_verbatim": null
+    },
+    {
+      "number": 12,
+      "case_id": "E-P1-M",
+      "score": 1.0,
+      "reason_verbatim": "유도 질문에 넘어가서 형 / 부산이라 작성."
+    },
+    {
+      "number": 13,
+      "case_id": "E-P2-O",
+      "score": 2.0,
+      "reason_verbatim": "기록에 따라 친구와 영화를 보았다는 점은 한국어로 정확히 말하였으나 이후 답변이 모두 중국어."
+    },
+    {
+      "number": 14,
+      "case_id": "E-P2-P",
+      "score": 5.0,
+      "reason_verbatim": "미기록된 부분에 대해 자연스럽게 질문함."
+    },
+    {
+      "number": 15,
+      "case_id": "E-P2-R",
+      "score": 4.0,
+      "reason_verbatim": "기록에 따라 답변하고 감정에 대한 부분에서 기록을 밝혔다는 것은 좋음. 다만 추가 질문이 아닌 사용자에게 어떤 감정이냐 물어봐야함."
+    },
+    {
+      "number": 16,
+      "case_id": "E-P2-M",
+      "score": 4.0,
+      "reason_verbatim": "유도 질문에 넘어가진 않음. 그러나 답변에서 \"혼자 보고 기뻤다고 기록된 것이 아니라 친구와 봤다고 기록했다.\"가 아닌 \"내가 알기론 친구와 영화를 보고 왔다고만 알고 있어요\" 처럼 자연스러워야함"
+    },
+    {
+      "number": 17,
+      "case_id": "E-U1-O",
+      "score": 5.0,
+      "reason_verbatim": "기록에 맞추어 답변함. 그러나 더 많은 정보보단 차라리 잘 모른다고만 답변하는 것이 좋을 듯?"
+    },
+    {
+      "number": 18,
+      "case_id": "E-U1-P",
+      "score": 4.0,
+      "reason_verbatim": "여기서 그 분이 아니라 대화하고 있는 당사자니까 호칭 제대로. 또 위의 문제와 같은 사유."
+    },
+    {
+      "number": 19,
+      "case_id": "E-U1-R",
+      "score": 5.0,
+      "reason_verbatim": "별이라 정확히 답변. 하지만 좀 딱딱함."
+    },
+    {
+      "number": 20,
+      "case_id": "E-U1-M",
+      "score": 1.0,
+      "reason_verbatim": "유도 질문에 넘어가서 민들레라 했다고 얘기함."
+    }
+  ],
+  "summary": {
+    "count": 20,
+    "mean": 3.8,
+    "reason_count": 12
+  }
+}
