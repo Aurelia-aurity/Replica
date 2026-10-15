@@ -28,6 +28,35 @@ class Error(Exception):
     """Only fixed diagnostics; never include credential-bearing URLs/responses."""
 
 
+class LedgerFailure(Error):
+    """Allowlisted ledger failure with bounded, secret-free evidence."""
+
+    CODES = frozenset({"load_rejected", "load_invalid", "load_unknown", "state_invalid",
+                       "put_rejected", "put_unknown", "put_response_invalid",
+                       "readback_invalid", "readback_mismatch"})
+    PURPOSES = frozenset({"pending", "delivered", "reconcile", "recovery", "bootstrap"})
+    OPERATIONS = frozenset({"validate", "put", "readback", "immutable_check"})
+
+    def __init__(self, code, *, purpose=None, operation, intended_blob_sha=None,
+                 observed_blob_sha=None, put_blob_sha=None, commit_sha=None,
+                 expected_digest=None, immutable_check=None, status=None):
+        self.code = code if code in self.CODES else "load_unknown"
+        self.purpose = purpose if purpose in self.PURPOSES else None
+        self.operation = operation if operation in self.OPERATIONS else "validate"
+        self.intended_blob_sha = (intended_blob_sha if isinstance(intended_blob_sha, str) and
+                                  re.fullmatch(r"[0-9a-f]{40}", intended_blob_sha) else None)
+        self.observed_blob_sha = (observed_blob_sha if isinstance(observed_blob_sha, str) and
+                                  re.fullmatch(r"[0-9a-f]{40}", observed_blob_sha) else None)
+        self.put_blob_sha = (put_blob_sha if isinstance(put_blob_sha, str) and
+                             re.fullmatch(r"[0-9a-f]{40}", put_blob_sha) else None)
+        self.commit_sha = commit_sha if isinstance(commit_sha, str) and re.fullmatch(r"[0-9a-f]{40}", commit_sha) else None
+        self.expected_digest = (expected_digest if isinstance(expected_digest, str) and
+                                re.fullmatch(r"[0-9a-f]{64}", expected_digest) else None)
+        self.immutable_check = immutable_check if immutable_check in {"expected", "different", "unavailable", "not_attempted"} else "unavailable"
+        self.status = status if type(status) is int and 100 <= status <= 599 else None
+        super().__init__("Ledger operation failed")
+
+
 class HTTPError(Error):
     def __init__(self, status, headers=None, body=b""):
         super().__init__("Remote request rejected")
@@ -257,11 +286,15 @@ class Ledger:
         if info.get("id") != REPO_ID or info.get("full_name") != REPO:
             raise Error("Repository identity mismatch")
 
-    def load(self):
+    def load(self, *, purpose=None, _purpose=None):
+        diagnostic_purpose = _purpose or purpose
         try:
             value = self.gh.repo(f"/contents/{STATE_FILE}?ref={BRANCH}")
         except HTTPError as exc:
             if exc.status != 404:
+                if diagnostic_purpose is not None:
+                    raise LedgerFailure("load_rejected", purpose=diagnostic_purpose, operation="readback",
+                                        status=exc.status) from None
                 raise
             # Missing file on an existing branch is corruption, never bootstrap.
             try:
@@ -269,48 +302,178 @@ class Ledger:
             except HTTPError as missing:
                 if missing.status == 404:
                     return None
+                if diagnostic_purpose is not None:
+                    raise LedgerFailure("load_rejected", purpose=diagnostic_purpose,
+                                        operation="readback", status=missing.status) from None
                 raise
+            except Error:
+                if diagnostic_purpose is not None:
+                    raise LedgerFailure("load_unknown", purpose=diagnostic_purpose,
+                                        operation="readback") from None
+                raise
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose,
+                                    operation="readback") from None
             raise Error("Activated ledger file missing") from None
-        if value.get("type") != "file" or value.get("path") != STATE_FILE or value.get("encoding") != "base64":
+        except Error as exc:
+            if diagnostic_purpose is not None:
+                code = "load_invalid" if str(exc) == "Invalid JSON data" else "load_unknown"
+                raise LedgerFailure(code, purpose=diagnostic_purpose, operation="readback") from None
+            raise
+        if not isinstance(value, dict):
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose, operation="readback") from None
+            raise Error("Invalid ledger file")
+        observed_sha = value.get("sha")
+        safe_observed_sha = (observed_sha if isinstance(observed_sha, str) and
+                             re.fullmatch(r"[0-9a-f]{40}", observed_sha) else None)
+        if (value.get("type") != "file" or
+                value.get("path") != STATE_FILE or value.get("encoding") != "base64"):
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose, operation="readback",
+                                    observed_blob_sha=safe_observed_sha) from None
             raise Error("Invalid ledger file")
         try:
             data = base64.b64decode(value["content"], validate=False)
-        except (ValueError, KeyError):
+        except (ValueError, TypeError, KeyError):
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose, operation="readback",
+                                    observed_blob_sha=safe_observed_sha) from None
             raise Error("Invalid ledger encoding") from None
-        if len(data) > MAX_STATE or not re.fullmatch(r"[0-9a-f]{40}", value.get("sha", "")):
+        if (len(data) > MAX_STATE or not isinstance(observed_sha, str) or
+                not re.fullmatch(r"[0-9a-f]{40}", observed_sha)):
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose, operation="readback",
+                                    observed_blob_sha=safe_observed_sha) from None
             raise Error("Invalid ledger size or SHA")
-        self.sha = value["sha"]
-        state = json_data(data)
-        return validate_state(state)
+        self.sha = observed_sha
+        try:
+            state = json_data(data)
+            return validate_state(state)
+        except Error:
+            if diagnostic_purpose is not None:
+                raise LedgerFailure("load_invalid", purpose=diagnostic_purpose, operation="readback",
+                                    observed_blob_sha=safe_observed_sha) from None
+            raise
 
-    def save(self, state, *, bootstrap=False):
-        validate_state(state)
+    def _immutable_check(self, commit_sha, expected):
+        if not commit_sha:
+            return "unavailable"
+        try:
+            value = self.gh.repo(f"/contents/{STATE_FILE}?ref={commit_sha}")
+            if (value.get("type") != "file" or value.get("path") != STATE_FILE or
+                    value.get("encoding") != "base64" or
+                    not re.fullmatch(r"[0-9a-f]{40}", value.get("sha", ""))):
+                return "unavailable"
+            encoded = value["content"]
+            if not isinstance(encoded, str):
+                return "unavailable"
+            encoded = re.sub(r"[ \t\r\n]", "", encoded)
+            data = base64.b64decode(encoded, validate=True)
+            blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+            if blob_sha != value["sha"]:
+                return "unavailable"
+            return "expected" if data == expected else "different"
+        except Exception:
+            return "unavailable"
+
+    def save(self, state, *, bootstrap=False, purpose=None):
+        if purpose not in LedgerFailure.PURPOSES:
+            purpose = "bootstrap" if bootstrap else "reconcile"
+        try:
+            validate_state(state)
+        except Error:
+            raise LedgerFailure("state_invalid", purpose=purpose, operation="validate") from None
         data = canonical(state)
         if len(data) > MAX_STATE:
-            raise Error("Ledger size limit exceeded")
+            raise LedgerFailure("state_invalid", purpose=purpose, operation="validate") from None
+        response = None
+        bootstrap_commit_sha = None
+        intended_blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
         if self.sha is None:
             if not bootstrap:
-                raise Error("Ledger bootstrap requires explicit dispatch")
-            blob = self.gh.repo("/git/blobs", method="POST",
-                                payload={"content": base64.b64encode(data).decode(), "encoding": "base64"})
-            tree = self.gh.repo("/git/trees", method="POST", payload={"tree": [
-                {"path": STATE_FILE, "mode": "100644", "type": "blob", "sha": blob["sha"]}]})
-            commit = self.gh.repo("/git/commits", method="POST", payload={
-                "message": "Initialize Discord notification state", "tree": tree["sha"],
-                "parents": [], "author": BOT, "committer": BOT})
+                raise LedgerFailure("put_unknown", purpose=purpose, operation="put") from None
             try:
-                self.gh.repo("/git/refs", method="POST", payload={"ref": "refs/heads/" + BRANCH,
-                                                               "sha": commit["sha"]})
-            except Error:
-                # Ref POST response loss may have committed; verify exact intended state.
-                pass
+                blob = self.gh.repo("/git/blobs", method="POST",
+                                    payload={"content": base64.b64encode(data).decode(), "encoding": "base64"})
+                tree = self.gh.repo("/git/trees", method="POST", payload={"tree": [
+                    {"path": STATE_FILE, "mode": "100644", "type": "blob", "sha": blob["sha"]}]})
+                commit = self.gh.repo("/git/commits", method="POST", payload={
+                    "message": "Initialize Discord notification state", "tree": tree["sha"],
+                    "parents": [], "author": BOT, "committer": BOT})
+                commit_sha_for_ref = commit["sha"]
+                bootstrap_commit_sha = commit_sha_for_ref
+                if not isinstance(bootstrap_commit_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", bootstrap_commit_sha):
+                    bootstrap_commit_sha = None
+                try:
+                    response = self.gh.repo("/git/refs", method="POST", payload={"ref": "refs/heads/" + BRANCH,
+                                                                                   "sha": commit_sha_for_ref})
+                except Error:
+                    # Ref POST response loss may have committed; verify exact intended state.
+                    pass
+            except HTTPError as exc:
+                raise LedgerFailure("put_rejected", purpose=purpose, operation="put",
+                                    expected_digest=hashlib.sha256(data).hexdigest(),
+                                    status=exc.status) from None
+            except Exception:
+                raise LedgerFailure("put_unknown", purpose=purpose, operation="put",
+                                    expected_digest=hashlib.sha256(data).hexdigest()) from None
         else:
-            self.gh.repo("/contents/" + STATE_FILE, method="PUT", payload={
-                "message": "Update Discord notification state", "branch": BRANCH,
-                "content": base64.b64encode(data).decode(), "sha": self.sha,
-                "author": BOT, "committer": BOT})
-        if canonical(self.load()) != data:
-            raise Error("Ledger readback mismatch")
+            try:
+                response = self.gh.repo("/contents/" + STATE_FILE, method="PUT", payload={
+                    "message": "Update Discord notification state", "branch": BRANCH,
+                    "content": base64.b64encode(data).decode(), "sha": self.sha,
+                    "author": BOT, "committer": BOT})
+            except HTTPError as exc:
+                raise LedgerFailure("put_rejected", purpose=purpose, operation="put",
+                                    intended_blob_sha=intended_blob_sha, observed_blob_sha=self.sha,
+                                    expected_digest=hashlib.sha256(data).hexdigest(),
+                                    status=exc.status) from None
+            except Error as exc:
+                code = ("put_response_invalid" if str(exc) == "Invalid JSON data" else "put_unknown")
+                raise LedgerFailure(code, purpose=purpose, operation="put",
+                                    intended_blob_sha=intended_blob_sha, observed_blob_sha=self.sha,
+                                    expected_digest=hashlib.sha256(data).hexdigest()) from None
+            except Exception:
+                raise LedgerFailure("put_unknown", purpose=purpose, operation="put",
+                                    intended_blob_sha=intended_blob_sha, observed_blob_sha=self.sha,
+                                    expected_digest=hashlib.sha256(data).hexdigest()) from None
+        content = response.get("content") if isinstance(response, dict) else None
+        content_sha = content.get("sha") if isinstance(content, dict) else None
+        commit = response.get("commit") if isinstance(response, dict) else None
+        commit_sha = commit.get("sha") if isinstance(commit, dict) else None
+        if not isinstance(content_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", content_sha):
+            content_sha = None
+        if not isinstance(commit_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
+            commit_sha = bootstrap_commit_sha
+        expected_digest = hashlib.sha256(data).hexdigest()
+        try:
+            readback = self.load(_purpose=purpose)
+            matches = canonical(readback) == data
+        except LedgerFailure as exc:
+            raise LedgerFailure(exc.code, purpose=purpose, operation=exc.operation,
+                                intended_blob_sha=intended_blob_sha,
+                                observed_blob_sha=exc.observed_blob_sha,
+                                put_blob_sha=content_sha, commit_sha=commit_sha,
+                                expected_digest=expected_digest, status=exc.status) from None
+        except Error as exc:
+            code = "load_invalid" if str(exc) == "Invalid JSON data" else "load_unknown"
+            raise LedgerFailure(code, purpose=purpose, operation="readback",
+                                intended_blob_sha=intended_blob_sha,
+                                put_blob_sha=content_sha, commit_sha=commit_sha,
+                                expected_digest=expected_digest) from None
+        except Exception:
+            raise LedgerFailure("load_unknown", purpose=purpose, operation="readback",
+                                intended_blob_sha=intended_blob_sha,
+                                put_blob_sha=content_sha, commit_sha=commit_sha,
+                                expected_digest=expected_digest) from None
+        if not matches:
+            immutable = self._immutable_check(commit_sha, data)
+            raise LedgerFailure("readback_mismatch", purpose=purpose,
+                                operation="immutable_check" if commit_sha else "readback",
+                                intended_blob_sha=intended_blob_sha, observed_blob_sha=self.sha,
+                                put_blob_sha=content_sha, commit_sha=commit_sha,
+                                expected_digest=expected_digest, immutable_check=immutable) from None
 
 
 class Discord:

@@ -3420,5 +3420,91 @@ class DiagnosticTests(unittest.TestCase):
         self.assertIn("stage=configuration; reason=unclassified", output.getvalue())
         self.assertNotIn("private credential", output.getvalue())
 
+    def test_ledger_failure_log_emits_only_allowlisted_metadata(self):
+        secret = "private-message webhook-token response-header"
+        failure = dt.LedgerFailure("readback_mismatch", purpose="pending", operation="immutable_check",
+                                   intended_blob_sha=secret, observed_blob_sha="b" * 40,
+                                   put_blob_sha="c" * 40, commit_sha="d" * 40,
+                                   expected_digest="e" * 64, immutable_check="different")
+        failure.args = (secret,)
+        failure.headers = {"X-Synthetic-Private": secret}
+        failure.body = (secret + " invalid metadata").encode()
+        config = json.dumps({"repository_id": dn.REPO_ID, "sync_workflow_id": dn.SYNC_ID,
+                             "ci_workflows": []}).encode()
+        output = io.StringIO()
+        error_output = io.StringIO()
+
+        def fail_factory(*_args):
+            raise failure
+
+        with patch.object(dn.Path, "read_bytes", return_value=config), patch("sys.stdout", output), \
+             patch("sys.stderr", error_output):
+            result = dn.main(["--config", "synthetic-config"],
+                             env={"DISCORD_NOTIFICATIONS_ENABLED": "true"},
+                             discord_factory=fail_factory)
+        self.assertEqual(result, 1)
+        text = output.getvalue()
+        self.assertIn("reason=readback_mismatch", text)
+        self.assertIn("ledger_purpose=pending", text)
+        self.assertNotIn("intended_blob_sha=", text)
+        self.assertIn("observed_blob_sha=" + "b" * 40, text)
+        self.assertNotIn(secret, text)
+        self.assertNotIn(secret, error_output.getvalue())
+
+    def test_compatibility_helper_keeps_single_argument_bootstrap_api(self):
+        state = dn.new_state()
+
+        class MemoryLedger:
+            def __init__(self): self.calls = []
+            def save(self, value): self.calls.append(value)
+
+        memory = MemoryLedger()
+        dn._save_ledger(memory, state, "reconcile")
+        self.assertEqual(memory.calls, [state])
+
+        class LegacyBootstrapLedger:
+            def __init__(self): self.calls = []
+            def save(self, value, *, bootstrap=False): self.calls.append((value, bootstrap))
+
+        legacy = LegacyBootstrapLedger()
+        dn._save_ledger(legacy, state, "bootstrap", bootstrap=True)
+        self.assertEqual(legacy.calls, [(state, True)])
+
+        production = dt.Ledger.__new__(dt.Ledger)
+        with patch.object(dt.Ledger, "save") as save:
+            dn._save_ledger(production, state, "bootstrap", bootstrap=True)
+        save.assert_called_once_with(state, purpose="bootstrap", bootstrap=True)
+
+    def test_delivered_save_failure_keeps_durable_pending_without_duplicate_post(self):
+        state = dn.new_state()
+        key = "incident:synthetic"
+        dn.queue(state, key, dn.payload("title", "body", dn.object_url(18), MAPPING))
+        durable = {}
+        post_count = []
+
+        class Ledger:
+            def __init__(self): self.calls = 0
+            def save(self, value):
+                self.calls += 1
+                if self.calls == 1:
+                    durable["state"] = copy.deepcopy(value)
+                    return
+                raise dt.LedgerFailure("readback_mismatch", purpose="delivered", operation="immutable_check",
+                                       immutable_check="unavailable")
+
+        class Webhook:
+            def send(self, payload):
+                post_count.append(payload)
+                return "333333333333333333"
+
+        with self.assertRaises(dt.LedgerFailure):
+            dn.deliver(state, Ledger(), Webhook())
+        self.assertEqual(len(post_count), 1)
+        self.assertEqual(durable["state"]["outbox"][key]["status"], "pending")
+
+        retry_state = durable["state"]
+        self.assertEqual(dn.deliver(retry_state, Delivery.Ledger(), Webhook()), 1)
+        self.assertEqual(len(post_count), 1)
+
 
 if __name__ == "__main__": unittest.main()
