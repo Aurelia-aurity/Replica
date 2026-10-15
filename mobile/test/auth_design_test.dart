@@ -55,6 +55,44 @@ Future<void> submit(WidgetTester tester) async {
 }
 
 void main() {
+  for (final size in [
+    const Size(320, 568),
+    const Size(360, 640),
+    const Size(400, 860),
+  ]) {
+    testWidgets('login fits without scrolling at $size', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      final auth = PreviewAuthService();
+      addTearDown(auth.dispose);
+      await tester.pumpWidget(ReplicaApp(authService: auth));
+      await tester.pumpAndSettle();
+      expect(find.text('미리보기 계정 안내'), findsNothing);
+      expect(
+        tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position
+            .maxScrollExtent,
+        lessThanOrEqualTo(.5),
+      );
+      expect(
+        tester.getBottomRight(find.text('올린 기록과 대화는 내 계정에서만 볼 수 있어요.')).dy,
+        lessThanOrEqualTo(size.height - 24),
+      );
+      expect(tester.takeException(), isNull);
+      final upperGap =
+          tester.getTopLeft(find.text('이메일')).dy -
+          tester.getBottomRight(find.text('남겨둔 기록으로 다시 나누는 대화')).dy;
+      final lowerGap =
+          tester.getTopLeft(find.byKey(const ValueKey('auth-privacy'))).dy -
+          tester.getBottomRight(find.byType(Wrap)).dy;
+      expect(upperGap / lowerGap, closeTo(2 / 3, .015));
+    });
+  }
   testWidgets(
     'SC-01 header, privacy footer, button gating and password visibility',
     (tester) async {
