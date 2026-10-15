@@ -46,7 +46,7 @@ def validate_stamp(stamp: object) -> dict:
 def make_baseline(notion_status: str | None, project_stamp: dict,
                   project_item_id: str, facts_fingerprint: str,
                   observed_at: str | None) -> dict:
-    _require(notion_status is None or notion_status in ALL_STATES,
+    _require(notion_status is None or notion_status in ALL_STATES | {"취소"},
              "Notion status baseline is invalid")
     validate_stamp(project_stamp)
     _require(isinstance(project_item_id, str) and bool(project_item_id),
@@ -83,9 +83,9 @@ def decide(baseline: dict | None, notion_status: str | None, project_stamp: dict
            project_status: str | None, *, facts_override: bool = False,
            facts_verified: bool = False) -> dict:
     """Classify a snapshot; differing two-sided changes never guess their order."""
-    _require(notion_status is None or notion_status in ALL_STATES,
+    _require(notion_status is None or notion_status in ALL_STATES | {"취소"},
              "Notion task status is invalid")
-    _require(project_status is None or project_status in ALL_STATES,
+    _require(project_status is None or project_status in ALL_STATES | {"취소"},
              "Project status is invalid")
     validate_stamp(project_stamp)
     if baseline is None:
@@ -146,9 +146,10 @@ def request_record(request_id: str, target: str | None, *, observed_from: str | 
                    reason: str = "") -> dict:
     _require(isinstance(request_id, str) and request_id and len(request_id) <= 128,
              "Status request ID invalid")
-    _require(target is None or target in ALL_STATES, "Status request target invalid")
+    _require(target is None or target in ALL_STATES or
+             (target == "취소" and phase == "rejected"), "Status request target invalid")
     _require(phase in REQUEST_PHASES, "Status request phase invalid")
-    _require(prior_notion_status is None or prior_notion_status in ALL_STATES,
+    _require(prior_notion_status is None or prior_notion_status in ALL_STATES | {"취소"},
              "Status request prior value invalid")
     _require(project_option_id is None or isinstance(project_option_id, str),
              "Status request Project option invalid")

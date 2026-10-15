@@ -32,6 +32,8 @@ CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 
 
 새 Issue 알림은 지연하지 않는다. 읽기 전용 Project 조회로 실제 백로그 상태가 확인된 경우에만 등록 확인을 표시한다. 조회 권한이 없거나 확인에 실패하면 `Project 등록 미확인`과 링크를 표시한다. 추가적인 등록 완료 알림은 보내지 않는다.
 
+백로그 관측을 사용하려면 Actions Variable `PROJECT_STATUS_OPTIONS`에 sync workflow와 같은 6개 상태 이름→실제 옵션 ID JSON을 등록한다. 기존 5개 옵션 ID를 보존하고 `취소` ID는 실제 Project readback으로 검증한 값을 쓴다. 변수가 없거나 Project의 현재 mapping과 맞지 않으면 백로그 주석을 생략하며 다른 알림 흐름은 계속된다. 이 값은 읽기 전용 관측에만 쓰이고, 알림 작업에는 기존 Project read 권한 외 권한을 추가하지 않는다.
+
 ## Actions 설정
 
 서버 `Replica` → `개발-알림` → 채널 설정 → 연동에서 incoming Webhook을 준비하고 저장소 Actions Secret `DISCORD_WEBHOOK_URL`에 직접 등록한다. Webhook URL을 채팅·문서·코드·로그에 붙이지 않는다. 별도 Discord 봇은 필요 없다.
@@ -43,6 +45,7 @@ CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 
 | Variable | `DISCORD_USER_MAP` | GitHub login → Discord 숫자 사용자 ID의 JSON 객체. ID는 문자열로 입력 |
 | Variable | `DISCORD_NOTIFICATIONS_ENABLED` | 활성화하려면 `true`, 그 전에는 `false` 또는 미설정 |
 | 선택 Secret | `DISCORD_PROJECT_READ_TOKEN` | 검증 가능한 읽기 전용 Project 토큰. 없어도 알림 동작 |
+| Variable | `PROJECT_STATUS_OPTIONS` | 백로그 관측용 6개 상태 이름 → 실제 Project 옵션 ID JSON. 누락·불일치 시 백로그 주석 생략 |
 
 매핑 예: `{"github-login":"123456789012345678"}`. Discord 사용자 이름이나 표시 이름 대신 개발자 모드의 `사용자 ID 복사`로 얻은 숫자 ID를 쓴다. 팀원 ID 매핑은 Actions 변수에 보관한다.
 
@@ -101,6 +104,18 @@ Actions 경고에 표시된 짧은 키를 상태 파일의 알림 key 해시와 
 로컬 합성 검사: `python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'`. 실제 Webhook 전송·팀원 알림 수신은 활성화 후 별도로 확인한다.
 
 Draft 테스트 전송은 HTTP POST도 최대 한 번만 시도하며 429 응답에도 재시도하지 않는다. 운영 전송의 기존 제한된 429 재시도 정책은 유지한다.
+
+## 상태 ledger 읽기 진단
+
+현재 Discord 상태 브랜치의 읽기 응답 일관성을 조사할 때는 다음 도구를 사용한다.
+
+```sh
+python3 -B scripts/discord_ledger_diagnose.py --samples 3
+```
+
+도구는 기존 `gh` 인증을 통해 고정 저장소·브랜치·파일만 조회한다. 표본마다 ref 전후, 해당 commit, commit tree, 브랜치 Contents, commit 고정 Contents를 최대 6회 GET으로 대조한다. 최대 3개 표본, 실행 전체 최대 18개 `gh api` 프로세스이며 각 프로세스의 실행 대기 한도는 8초, 종료 후 cleanup 대기 한도는 1초, 출력 한도는 12,000,000바이트다(각 대기 한도의 합계는 각각 144초와 18초이며 시작·종료와 응답 검증 시간은 별도). 토큰을 별도로 추출하거나 출력하지 않고 POST·상태 쓰기·Discord 전송을 수행하지 않는다. 결과에는 상태, 원인 코드, 검증된 SHA만 포함하며 파일 본문은 출력하지 않는다.
+
+`stable`은 관측한 ref·commit·tree·Contents가 서로 일치했다는 뜻이며 최신 상태나 캐시 신선도를 증명하지 않는다. `inconsistent`는 같은 표본에서 tree 또는 브랜치 Contents와 commit 고정 Contents가 달랐다는 뜻이다. `raced`는 조회 중 브랜치 ref가 바뀐 경우다. `unavailable`은 조회·응답 검증을 마치지 못한 경우다. 이는 현재 읽기 관측이며 과거의 특정 실패 원인이나 Discord 미전달을 단독으로 확정하지 않는다.
 
 ## #32 보류 관측과 지연 안내
 
