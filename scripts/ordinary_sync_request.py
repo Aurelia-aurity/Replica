@@ -255,7 +255,7 @@ def main(argv=None):
         with open(nr.FILE_NAME, encoding="utf-8") as source:
             report = nr.validate(json.load(source), run_id=context.run_id, attempt=1, sha=context.sha)
         facts = gp.fetch_repository_facts(github, rest)
-        project = se._project_snapshot(project_client, config, facts)
+        project = se._project_snapshot(project_client, config, facts, refresh_status=True)
         entries = collect(observations, notion, facts, project, config)
         save_evidence(context, entries, report)
         deliver_evidence(relay, context, entries, report)

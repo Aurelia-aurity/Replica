@@ -951,6 +951,71 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID],
                                                 "작업 상태"), "백로그")
                 self.assertEqual(self.project.writes, [])
+    def test_flag_enabled_stale_project_list_uses_fresh_item_status_without_hold(self):
+        # The ProjectV2 items list can lag a just-written Status; the direct node read is current.
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+
+        result = self.run_sync(bidirectional_enabled=True)
+
+        state = self._read_bidirectional_state()
+        self.assertEqual(result["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "준비 중")
+        self.assertEqual(state["baseline"]["project"]["value_id"], "PVTSV_fresh_after_agent_write")
+        self.assertEqual(self.project.writes, [])
+
+    def test_flag_enabled_failed_fresh_status_read_keeps_list_value_and_holds(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+        self.project.fail_direct_readback_once = True
+
+        result = self.run_sync(bidirectional_enabled=True)
+
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(self._read_bidirectional_state()["hold"]["code"],
+                         "SOURCE_CHANGED_BEFORE_WRITE")
+        self.assertEqual(self.project.writes, [])
+
+    def test_flag_enabled_source_changed_hold_redisplay_keeps_task_status(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        state = self._read_bidirectional_state()
+        state["request"] = se.status_sync.request_record(
+            "r1", "진행 중", observed_from="2026-10-01T00:00:00Z",
+            observed_to="2026-10-01T00:01:00Z", prior_notion_status="준비 중",
+            project_option_id=TEST_STATUS_OPTIONS["준비 중"], phase="completed",
+            reason="Project 상태와 Notion 표시를 확인했습니다.")
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["동기화 내부 상태"] = (
+            se.text_property(se.canonical_json(state)))
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+        self.project.fail_direct_readback_once = True
+
+        first = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "진행 중")
+
+        second = self.run_sync(bidirectional_enabled=True)
+
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(self._read_bidirectional_state()["hold"]["code"],
+                         "SOURCE_CHANGED_BEFORE_WRITE")
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "진행 중")
+
     def test_flag_enabled_project_status_same_option_stamp_reset_blocks_late_write(self):
         self._configure_bidirectional_status(notion_status="진행 중")
         changed = False

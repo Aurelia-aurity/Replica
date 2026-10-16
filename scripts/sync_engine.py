@@ -47,6 +47,13 @@ RESUMABLE_HOLD_CODES = {
     "GITHUB_FACTS_CHANGED", "DEFERRED_REQUEST_PENDING", "ADD_READBACK_CONTRADICTION",
 }
 
+# Project-write holds whose first display keeps the Notion task status; a re-display must match it.
+TASK_STATUS_PRESERVING_HOLD_CODES = {
+    "MIGRATION_INPUT_CHANGED", "RESUME_CHECKPOINT_CHANGED", "PENDING_RESULT_UNCLEAR",
+    "PROJECT_STATUS_UNSET", "MIGRATION_UNSET", "STATUS_REQUEST_INVALID",
+    "SOURCE_CHANGED_BEFORE_WRITE", "PROJECTION_CHECKPOINT_CHANGED", "PROJECT_ITEM_ARCHIVED",
+}
+
 SCHEMA = {
     "제목": "title", "종류": "select", "번호": "number", "GitHub URL": "url",
     "GitHub 상태": "select", "작성자": "rich_text", "담당자": "rich_text",
@@ -1755,7 +1762,8 @@ def update_control_pending(notion, source_id, control, value):
     _patch_page(notion, source_id, control, {"Pending create": text_property(value)})
 
 
-def _project_snapshot(client, config, facts, *, add_readback_item_id=None, add_target_issue=None):
+def _project_snapshot(client, config, facts, *, add_readback_item_id=None, add_target_issue=None,
+                      refresh_status=False):
     project = gp.fetch_project(client, project_id=config["project_id"], owner_id=config["owner_id"],
                                status_field_id=config["status_field_id"],
                                status_options=config["status_options"],
@@ -1775,7 +1783,30 @@ def _project_snapshot(client, config, facts, *, add_readback_item_id=None, add_t
                 "보관 Project Issue가 source snapshot에서 확인되지 않습니다")
         require(all(item.get("content_id") == issue["id"] for item in archived_items),
                 "보관 Project item의 Issue content node ID 불일치")
+    if refresh_status:
+        for issue_id, item in list(project["items"].items()):
+            project["items"][issue_id] = _fresh_project_item(client, config, item)
     return project
+
+
+def _fresh_project_item(client, config, item):
+    # The ProjectV2 items list can lag a just-written Status; the direct node read is current.
+    # Best effort: on a read failure or any identity mismatch keep the list item, so the
+    # existing pre-write checks decide exactly as they would without this read.
+    try:
+        direct = gp.fetch_project_item(client, config["project_id"], item["id"],
+                                       config["status_field_id"],
+                                       status_options=config["status_options"],
+                                       allow_archived=True)
+    except gp.SyncError:
+        return item
+    if (direct.get("id") == item["id"] and
+            direct.get("content_id") == item.get("content_id") and
+            direct.get("status_field_id") == item.get("status_field_id") and
+            not direct.get("is_archived")):
+        return {**item, **{name: direct[name] for name in
+                           ("status_option_id", "status_value_id", "status_updated_at")}}
+    return item
 
 
 def _confirmed_add_item_matches(pending, item):
@@ -4898,9 +4929,7 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                           facts, config, status_observed_at)
             _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
                           preserve_task_status=state["hold"]["code"] in
-                          {"MIGRATION_INPUT_CHANGED", "RESUME_CHECKPOINT_CHANGED",
-                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET", "MIGRATION_UNSET",
-                           "STATUS_REQUEST_INVALID"})
+                          TASK_STATUS_PRESERVING_HOLD_CODES)
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
@@ -5113,6 +5142,13 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
             approved_resume = bool(state["hold"] and
                                    state["hold"]["code"] in RESUMABLE_HOLD_CODES)
 
+        if (config.get("bidirectional_enabled") and kind == "Issue" and item is not None and
+                issue_number not in resume_numbers and state.get("baseline") is not None and
+                state.get("pending") is None and state.get("projection") is None and
+                state.get("hold") is None and state.get("resume") is None and
+                state.get("deferred_request") is None and state.get("notion_write") is None and
+                (state.get("request") or {}).get("phase") in {None, "completed", "rejected"}):
+            item = project_by_issue[issue_id] = _fresh_project_item(project_client, config, item)
         plan_state = json.loads(json.dumps(state))
         plan = _plan_issue(row_data, item, row, plan_state, facts, cutoff, config["project_id"],
                            config["status_options"], approved_resume=approved_resume)
@@ -5249,9 +5285,7 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 continue
             _display_hold(notion, source_id, row, metadata, state, state["hold"], now,
                           preserve_task_status=state["hold"]["code"] in
-                          {"MIGRATION_INPUT_CHANGED", "RESUME_CHECKPOINT_CHANGED",
-                           "PENDING_RESULT_UNCLEAR", "PROJECT_STATUS_UNSET", "MIGRATION_UNSET",
-                           "STATUS_REQUEST_INVALID"})
+                          TASK_STATUS_PRESERVING_HOLD_CODES)
             counts["held"] += 1
             issue_rows_for_summary.append((row, state))
             continue
