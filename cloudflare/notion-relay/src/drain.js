@@ -1,10 +1,10 @@
 import {ProtocolError,requireValue,mode,canonical} from './protocol.js';
 import {readCurrentPage,matchesCheckpoint} from './notion-reader.js';
-import {GitHubApp} from './github-app.js';
+import {GitHubActions} from './github-actions.js';
 import {RunResults,validateRun} from './run-results.js';
 
 export class Drain {
-  constructor(env,{github=new GitHubApp(env),readPage=id=>readCurrentPage(id,env),
+  constructor(env,{github=new GitHubActions(env),readPage=id=>readCurrentPage(id,env),
     now=()=>Math.floor(Date.now()/1000),newID=()=>crypto.randomUUID()}={}){
     this.env=env;this.db=env.DB;this.github=github;this.readPage=readPage;
     this.now=now;this.newID=newID;this.results=new RunResults(this.db,env,github,now);

@@ -1,6 +1,6 @@
 import {Miniflare,convertV4MiniflareOptions,Response} from 'miniflare';
 import {readFile} from 'node:fs/promises';
-import {createHmac,createHash,randomUUID,generateKeyPairSync} from 'node:crypto';
+import {createHmac,createHash,randomUUID} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {canonical} from '../../src/protocol.js';
 import {fileURLToPath} from 'node:url';
@@ -12,32 +12,32 @@ const helper='synthetic-helper-only-key-not-real-000000';
 const workflow='synthetic-workflow-only-key-not-real-0000';
 const sha='a'.repeat(40);let id=randomUUID(),runID=123,generation=1;
 const binding={request_id:id,generation:1,run_id:123,sha,attempt:1};
-let terminal=false,apiReads=0,tokenRequests=0;
+let terminal=false,apiReads=0,identityReads=0;
 const run=()=>({id:runID,repository:{id:1392442366,full_name:'Aurelia-aurity/Replica'},
   head_repository:{id:1392442366},event:'workflow_dispatch',head_branch:'main',head_sha:sha,
   run_attempt:1,workflow_id:8,path:'.github/workflows/notion-sync-request.yml',
   display_title:`replica-sync-request:${id}:${generation}`,actor:{id:7},triggering_actor:{id:7},
   status:terminal?'completed':'in_progress',conclusion:terminal?'success':null});
-const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+const token='github_pat_synthetic_local_only_000000';
 const mf=new Miniflare(convertV4MiniflareOptions({name:'replica-results-local',host:'127.0.0.1',
   port:0,cf:false,telemetry:{enabled:false},compatibilityDate:'2026-10-01',
   modulesRoot:root,modules:[
     {type:'ESModule',path:`${root}/tests/runtime/entry.mjs`},
-    ...['worker','protocol','agent-journal','notion-receiver','notion-reader','run-results','github-app','drain']
+    ...['worker','protocol','agent-journal','notion-receiver','notion-reader','run-results','github-actions','drain']
       .map(name=>({type:'ESModule',path:`${root}/src/${name}.js`}))],
   resourcePersistencePath:state,d1Databases:{DB:'replica-results-local'},
   bindings:{RELAY_MODE:'ACTIVE',HELPER_REQUEST_KEY:helper,WORKFLOW_CALLBACK_KEY:workflow,
-    GITHUB_BOT_ACTOR_ID:'7',GITHUB_WORKFLOW_ID:'8',GITHUB_APP_CLIENT_ID:'synthetic-local',
-    GITHUB_INSTALLATION_ID:'99',GITHUB_APP_PRIVATE_KEY_PKCS8:privateKey.export({type:'pkcs8',format:'pem'})},
+    GITHUB_DISPATCH_ACTOR_ID:'7',GITHUB_ACTOR_ID:'999',GITHUB_WORKFLOW_ID:'8',GITHUB_DISPATCH_TOKEN:token},
   outboundService:async request=>{
     const url=new URL(request.url);
     assert.equal(url.origin,'https://api.github.com');
     let body,status=200;
-    if(url.pathname==='/app/installations/99/access_tokens'){
-      assert.equal(request.method,'POST');
-      assert.deepEqual(await request.json(),{repository_ids:[1392442366],permissions:{actions:'write',metadata:'read'}});
-      tokenRequests++;status=201;body={token:'synthetic-local-installation-token-0000',
-        expires_at:new Date(Date.now()+3500000).toISOString(),permissions:{actions:'write',metadata:'read'}};
+    if(url.pathname==='/user'){
+      assert.equal(request.method,'GET');assert.equal(request.headers.get('Authorization'),`Bearer ${token}`);
+      identityReads++;body={id:7,type:'User'};
+    }else if(url.pathname==='/repos/Aurelia-aurity/Replica'){
+      assert.equal(request.method,'GET');assert.equal(request.headers.get('Authorization'),`Bearer ${token}`);
+      body={id:1392442366,full_name:'Aurelia-aurity/Replica',default_branch:'main',private:false,permissions:{push:true}};
     }else if(url.pathname===`/repos/Aurelia-aurity/Replica/actions/runs/${runID}`){
       assert.equal(request.method,'GET');apiReads++;body=run();
     }else throw new Error('UNEXPECTED_SYNTHETIC_OUTBOUND');
@@ -116,7 +116,7 @@ try {
   console.log(JSON.stringify({scope:'candidate Worker callbacks + scheduler on LOCAL Miniflare/D1',
     separateKeyRejection:true,mainRequestFreshClaims:1,collisionRequestFreshClaims:1,
     completeObservations:23,partialSealRejected:true,
-    evidenceOnlyRetries:true,terminalRequired:true,actualD1RollbackConflict:true,apiReads,tokenRequests,statePath:state,
+    evidenceOnlyRetries:true,terminalRequired:true,actualD1RollbackConflict:true,apiReads,identityReads,statePath:state,
     upstream:'strict in-process synthetic GitHub service; no network/account/Project/Notion writes'}));
 }catch(error){console.error(JSON.stringify({code:'LOCAL_RESULTS_PROBE_FAILED',type:error.name,message:error.message}));process.exitCode=1;}
 finally{await mf.dispose();}

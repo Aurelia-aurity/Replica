@@ -1,12 +1,14 @@
 # Notion 변경 요청 relay
 
-Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경을 기존 전체 동기화로 연결합니다. Worker는 Project나 Notion을 수정하지 않습니다. GitHub App으로 고정된 일반 workflow를 요청하고, 실행과 readback 결과를 D1에 기록합니다. 기존 5분 동기화와 PM 재개 workflow는 계속 사용합니다.
+Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경을 기존 전체 동기화로 연결합니다. Worker는 Project나 Notion을 수정하지 않습니다. 지정 사용자의 개인 액세스 토큰(PAT)으로 고정된 일반 workflow를 요청하고, 실행과 readback 결과를 D1에 기록합니다. 기존 5분 동기화와 PM 재개 workflow는 계속 사용합니다.
 
-이 코드는 최종 검토 전 후보입니다. 실제 Cloudflare 계정, D1, GitHub App, Notion 연결, 비밀키, 웹훅은 아직 구성하지 않았습니다. `wrangler.jsonc`는 `STOPPED`이며 D1 ID는 자리표시자입니다. 별도 승인 없이 배포하거나 활성화하지 마세요.
+운영 전 후보입니다. 별도 시험 환경에서 Notion 웹훅의 실제 수신·서명 검증·D1 저장을 확인했지만, PAT을 이용한 Actions 실행과 실제 동기화 반영은 아직 확인하지 않았습니다. 저장소의 `wrangler.jsonc`는 `STOPPED`이며 D1 ID는 자리표시자입니다. 시험 환경 확인을 운영 활성화로 간주하지 마세요.
 
 ## 로컬 확인
 
 Node 26에서 확인했습니다. `npm ci --ignore-scripts` 후 이 디렉터리에서 실행합니다.
+
+웹훅의 `api_version`은 전달 메타데이터로만 취급하며 수신 중복 판정에는 사용하지 않습니다.
 
 ```sh
 npm test
@@ -61,10 +63,9 @@ python3 -B scripts/project_status_request.py \
 
 | 위치 | 설정 | 범위 |
 | --- | --- | --- |
-| GitHub App | Replica만 설치, Actions 쓰기·Metadata 읽기 | 단일 workflow로 권한을 줄일 수 없어 저장소 전체 Actions 권한 |
-| Worker secret | `GITHUB_APP_PRIVATE_KEY_PKCS8` | App 키를 로컬에서 PKCS8로 변환하여 숨김 입력으로 등록 |
-| Worker vars | `GITHUB_APP_CLIENT_ID`, `GITHUB_INSTALLATION_ID` | 실제 설치 식별자와 일치 |
-| Worker vars | `GITHUB_WORKFLOW_ID`, `GITHUB_BOT_ACTOR_ID` | main의 `notion-sync-request.yml`과 해당 App bot의 실제 ID |
+| GitHub 사용자 | Replica 쓰기 권한이 있는 지정 계정 | 실제 PAT 소유자의 numeric 사용자 ID를 확인 |
+| Worker secret | `GITHUB_DISPATCH_TOKEN` | 개인 PAT을 숨김 입력으로 등록, 코드·일반 변수·로그에 저장하지 않음 |
+| Worker vars | `GITHUB_WORKFLOW_ID`, `GITHUB_DISPATCH_ACTOR_ID` | main의 `notion-sync-request.yml`과 지정 사용자의 실제 numeric ID |
 | Worker secret | `NOTION_READ_TOKEN` | 대상 데이터 소스만 읽는 별도 Notion 연결 |
 | Worker vars | `NOTION_KIND_PROPERTY_ID`, `NOTION_KEY_PROPERTY_ID`, `NOTION_TASK_PROPERTY_ID`, `NOTION_STATE_PROPERTY_ID` | 기존 종류·동기화 키·작업 상태·내부 상태 속성의 실제 ID |
 | Worker vars | `NOTION_WORKSPACE_ID`, `NOTION_INTEGRATION_ID`, `NOTION_SUBSCRIPTION_ID` | 정확한 웹훅 결속 |
@@ -72,16 +73,18 @@ python3 -B scripts/project_status_request.py \
 | Worker secret / local helper | `HELPER_REQUEST_KEY` | 일반 예약·허가·결과 요청용, 결과 callback 키와 반드시 다름 |
 | Worker secret / GitHub secret | `WORKFLOW_CALLBACK_KEY` / `NOTION_RELAY_CALLBACK_KEY` | 실행 claim·chunk·seal용, Project/Notion 쓰기 권한 없음 |
 | GitHub vars | `NOTION_RELAY_URL`, `NOTION_RELAY_HOST` | query·path·port 없는 정확한 HTTPS `workers.dev` 호스트 |
-| GitHub vars | `NOTION_RELAY_WORKFLOW_ID`, `NOTION_RELAY_BOT_ACTOR_ID` | Worker 설정과 동일 |
+| GitHub vars | `NOTION_RELAY_WORKFLOW_ID`, `NOTION_RELAY_ACTOR_ID` | Worker 설정과 동일 |
 | GitHub vars | `NOTION_RELAY_ENABLED` | 모든 결속 확인 전 `false` |
 | GitHub ordinary workflow | 기존 `PROJECT_TOKEN`, `NOTION_TOKEN`과 기존 sync vars | 기존 동기화 권한을 사용하며 Worker에는 전달하지 않음 |
 
-고정 자원은 repository `1392442366` (`Aurelia-aurity/Replica`), Project `PVT_kwHOBda_2c4BmKKV`, Status field `PVTSSF_lAHOBda_2c4BmKKVzhk0RA4`, 데이터 소스 `398c7ff6-9c66-43de-ba4d-3f2670b25a87`입니다. 현재 공개 저장소의 main ref를 무인증 읽기로 확인하므로 App에 Contents 권한을 추가하지 않습니다. 비공개 저장소는 지원 범위 밖입니다.
+고정 자원은 repository `1392442366` (`Aurelia-aurity/Replica`), Project `PVT_kwHOBda_2c4BmKKV`, Status field `PVTSSF_lAHOBda_2c4BmKKVzhk0RA4`, 데이터 소스 `398c7ff6-9c66-43de-ba4d-3f2670b25a87`입니다. 공개 저장소의 main ref는 무인증으로 읽고, PAT으로 읽은 사용자 ID·저장소 ID·쓰기 권한을 검증합니다. 비공개 저장소는 지원 범위 밖입니다.
+
+다른 개인 계정이 소유한 저장소의 협업자 접근에는 fine-grained PAT 제한이 있으므로 현재 운영 후보는 classic PAT입니다. workflow 실행에 필요한 `repo` 범위와 만료일을 확인하고 별도 토큰을 사용합니다. classic PAT은 저장소 하나로 권한을 제한할 수 없으므로 Worker 코드의 고정 경로 검증이 토큰 자체의 권한을 줄여 주지는 않습니다. 기존 Project·Notion 토큰을 재사용하지 않습니다. PAT 교체 시 소유자 ID가 달라지면 Worker와 workflow의 지정 사용자 설정을 함께 갱신하고 다시 검증합니다.
 
 승인 후 순서는 다음과 같습니다.
 
-1. GitHub App·읽기 전용 Notion 연결·Cloudflare Free 계정을 정확한 대상으로 구성하고 ID와 권한을 확인합니다.
-2. main 반영은 별도 승인 후 진행합니다. 일반 workflow ID와 bot ID를 조회하되 `NOTION_RELAY_ENABLED=false`를 유지합니다.
+1. 지정 사용자의 PAT·읽기 전용 Notion 연결·Cloudflare Free 계정을 정확한 대상으로 구성하고 ID와 권한을 확인합니다. App 설치나 App 개인키는 사용하지 않습니다.
+2. main 반영은 별도 승인 후 진행합니다. 일반 workflow ID와 사용자 ID를 조회하되 `NOTION_RELAY_ENABLED=false`를 유지합니다. Draft에서 사용자·저장소·Actions 읽기를 먼저 확인할 수 있지만, main에 없는 새 workflow를 실행하거나 main 결속을 완화해서 시험하지 않습니다.
 3. 실제 D1을 새로 만들고 대상 ID를 확인한 뒤 migration을 적용합니다. 기존 운영 DB 삭제·초기화·기록 정리는 이 절차에 포함되지 않습니다.
 4. Worker는 `STOPPED`로 배포하고 숨김 입력으로 분리된 키를 등록합니다. 분당 cron은 신규 실행 요청을 허용하지 않습니다.
 5. 웹훅 초기 검증 때만 로컬 RSA-OAEP 공개키와 일회용 nonce, 15분 만료를 설정하고 `BOOTSTRAP_ENABLED=true`를 사용합니다. Worker는 후보 토큰의 암호문만 저장합니다. 운영자가 로컬에서 복호화하여 실제 Notion UI에서 확인하고, 검증된 토큰을 별도 secret으로 등록합니다. 첫 수신 후보를 자동 신뢰하지 않습니다.

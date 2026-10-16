@@ -3,28 +3,7 @@ import {WORKFLOW_PATH,runName,validateRun} from './run-results.js';
 
 const REPO='/repos/Aurelia-aurity/Replica';
 const API='https://api.github.com';
-function base64url(value){return btoa(String.fromCharCode(...value)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
-function encoded(value){return base64url(new TextEncoder().encode(JSON.stringify(value)));}
-function positive(value){requireValue(Number.isSafeInteger(Number(value))&&Number(value)>0,'APP_CONFIGURATION',503);}
-export async function appJWT(env,now){
-  requireValue(typeof env.GITHUB_APP_CLIENT_ID==='string'&&/^[A-Za-z0-9_.-]{1,64}$/.test(env.GITHUB_APP_CLIENT_ID),
-    'APP_CONFIGURATION',503);
-  const pem=env.GITHUB_APP_PRIVATE_KEY_PKCS8;
-  requireValue(typeof pem==='string'&&pem.length<=10000&&
-    /^-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----\s*$/.test(pem),'APP_KEY_CONFIGURATION',503);
-  let key;
-  try {
-    const raw=atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,''));
-    key=await crypto.subtle.importKey('pkcs8',Uint8Array.from(raw,c=>c.charCodeAt(0)),
-      {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
-  } catch {throw new ProtocolError('APP_KEY_CONFIGURATION',503);}
-  requireValue(key.algorithm.modulusLength>=2048,'APP_KEY_CONFIGURATION',503);
-  const header=encoded({alg:'RS256',typ:'JWT'});
-  const body=encoded({iat:now-60,exp:now+540,iss:env.GITHUB_APP_CLIENT_ID});
-  const content=`${header}.${body}`;
-  const signature=new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(content)));
-  return `${content}.${base64url(signature)}`;
-}
+function positive(value){requireValue(Number.isSafeInteger(Number(value))&&Number(value)>0,'GITHUB_CONFIGURATION',503);}
 async function json(response){
   const reader=response.body?.getReader();requireValue(reader,'GITHUB_RESPONSE_BODY',503);
   const parts=[];let length=0;
@@ -35,9 +14,9 @@ async function json(response){
   try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
   catch{throw new ProtocolError('GITHUB_RESPONSE_SHAPE',503);}
 }
-export class GitHubApp {
-  constructor(env,fetcher=(...args)=>fetch(...args),now=()=>Math.floor(Date.now()/1000)){
-    this.env=env;this.fetcher=fetcher;this.now=now;this.cached=null;
+export class GitHubActions {
+  constructor(env,fetcher=(...args)=>fetch(...args)){
+    this.env=env;this.fetcher=fetcher;this.cached=null;
   }
   async http(method,path,token,body){
     requireValue(path.startsWith('/')&&!path.includes('..'),'GITHUB_FIXED_PATH',503);
@@ -49,31 +28,32 @@ export class GitHubApp {
     catch{throw new ProtocolError('GITHUB_TRANSPORT_UNKNOWN',503);}
   }
   async token(){
-    if(this.cached&&this.cached.expires>this.now()+60)return this.cached.token;
-    positive(this.env.GITHUB_INSTALLATION_ID);
-    const response=await this.http('POST',`/app/installations/${this.env.GITHUB_INSTALLATION_ID}/access_tokens`,
-      await appJWT(this.env,this.now()),{repository_ids:[REPOSITORY_ID],permissions:{actions:'write',metadata:'read'}});
-    requireValue(response.status===201,'APP_TOKEN_UNAVAILABLE',503);
-    const value=await json(response);const expires=Date.parse(value.expires_at)/1000;
-    requireValue(typeof value.token==='string'&&value.token.length>=20&&
-      value.permissions?.actions==='write'&&value.permissions?.metadata==='read'&&
-      Object.keys(value.permissions).every(k=>['actions','metadata'].includes(k))&&
-      Number.isFinite(expires)&&expires>this.now()+60&&expires<=this.now()+3660,
-      'APP_TOKEN_BINDING',503);
-    if(value.repositories!==undefined)requireValue(Array.isArray(value.repositories)&&
-      value.repositories.length===1&&value.repositories[0].id===REPOSITORY_ID,'APP_TOKEN_REPOSITORY',503);
-    this.cached={token:value.token,expires};return value.token;
+    const token=this.env.GITHUB_DISPATCH_TOKEN,actor=this.env.GITHUB_DISPATCH_ACTOR_ID;
+    requireValue(typeof token==='string'&&/^[A-Za-z0-9_]{20,255}$/.test(token),
+      'DISPATCH_TOKEN_CONFIGURATION',503);
+    requireValue(/^[1-9][0-9]*$/.test(String(actor))&&Number.isSafeInteger(Number(actor)),
+      'DISPATCH_ACTOR_CONFIGURATION',503);
+    if(this.cached?.token===token&&this.cached.actor===Number(actor))return token;
+    const response=await this.http('GET','/user',token);
+    requireValue(response.status===200,'DISPATCH_IDENTITY_UNAVAILABLE',503);
+    const user=await json(response);
+    requireValue(user?.id===Number(actor)&&user.type==='User','DISPATCH_IDENTITY_BINDING',503);
+    this.cached={token,actor:user.id};return token;
   }
   async get(path){
     const response=await this.http('GET',path,await this.token());
     requireValue(response.status===200,'GITHUB_READ_UNAVAILABLE',503);return json(response);
   }
-  async mainSHA(){
+  async repository(){
     const repository=await this.get(REPO);
     requireValue(repository.id===REPOSITORY_ID&&repository.full_name==='Aurelia-aurity/Replica'&&
-      repository.default_branch==='main'&&repository.private===false,'REPOSITORY_BINDING',503);
-    // Public ref read deliberately carries no App token: the approved App has
-    // Metadata/Actions only. Private-repository support is outside this scope.
+      repository.default_branch==='main'&&repository.private===false&&
+      repository.permissions?.push===true,'REPOSITORY_BINDING',503);
+  }
+  async mainSHA(){
+    await this.repository();
+    // Public ref read deliberately carries no token.
+    // Private-repository support is outside this scope.
     const response=await this.http('GET',`${REPO}/git/ref/heads/main`,null);
     requireValue(response.status===200,'MAIN_READ_UNAVAILABLE',503);
     const ref=await json(response);
@@ -92,7 +72,10 @@ export class GitHubApp {
     requireValue(Number.isSafeInteger(request.generation)&&request.generation>0,'DISPATCH_GENERATION');
     // Callers persist POSTING before entering this method. Never retry this POST.
     let response;
-    try {response=await this.http('POST',`${REPO}/actions/workflows/notion-sync-request.yml/dispatches`,
+    try {
+      // User identity and repository push access do not prove Actions write scope.
+      await this.repository();
+      response=await this.http('POST',`${REPO}/actions/workflows/notion-sync-request.yml/dispatches`,
       await this.token(),{ref:'main',inputs:{request_id:request.request_id,generation:String(request.generation)}});}
     catch{return {state:'DISPATCH_UNKNOWN',run_id:null,reason:'TRANSPORT_UNKNOWN'};}
     if(response.status===204)return {state:'DISPATCH_UNKNOWN',run_id:null,reason:'ACK_WITHOUT_RUN'};

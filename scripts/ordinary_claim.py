@@ -33,7 +33,7 @@ class OrdinaryClaim:
                    env.get("GITHUB_SHA") == self.sha and
                    env.get("GITHUB_RUN_ID") == str(self.run_id) and
                    env.get("GITHUB_ACTOR_ID") == str(self.actor_id) and
-                   env.get("GITHUB_BOT_ACTOR_ID") == str(self.actor_id) and
+                   env.get("GITHUB_DISPATCH_ACTOR_ID") == str(self.actor_id) and
                    env.get("GITHUB_ACTOR") == env.get("GITHUB_TRIGGERING_ACTOR") and
                    bool(env.get("GITHUB_ACTOR")) and
                    env.get("GITHUB_WORKFLOW_REF") ==

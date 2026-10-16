@@ -11,7 +11,7 @@ const state=join(tmpdir(),`replica-helper-runtime-${randomUUID()}`);
 let pageReads=0;
 const mf=new Miniflare(convertV4MiniflareOptions({name:'replica-helper-runtime',host:'127.0.0.1',port:0,
   cf:false,telemetry:{enabled:false},modulesRoot:root,compatibilityDate:'2026-10-01',
-  modules:['worker','protocol','agent-journal','notion-receiver','notion-reader','run-results','github-app','drain']
+  modules:['worker','protocol','agent-journal','notion-receiver','notion-reader','run-results','github-actions','drain']
     .map(name=>({type:'ESModule',path:`${root}/src/${name}.js`})),
   resourcePersistencePath:state,d1Databases:{DB:'replica-helper-runtime'},bindings:{
     RELAY_MODE:'ACTIVE',HELPER_REQUEST_KEY:'synthetic-helper-key-not-a-real-key-0000',

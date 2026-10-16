@@ -8,7 +8,7 @@ const id='11111111-1111-4111-8111-111111111111';
 const sha='a'.repeat(40);
 const binding={request_id:id,generation:1,run_id:123,sha,attempt:1};
 async function setup(){
-  const {db,env}=await fixture();env.GITHUB_BOT_ACTOR_ID='7';env.GITHUB_WORKFLOW_ID='8';
+  const {db,env}=await fixture();env.GITHUB_DISPATCH_ACTOR_ID='7';env.GITHUB_ACTOR_ID='999';env.GITHUB_WORKFLOW_ID='8';
   await db.prepare(`INSERT INTO sync_requests(request_id,generation,receipt_ids,expected_sha,
     run_id,phase,created_at,updated_at) VALUES(?,1,?,?,NULL,'DISPATCH_UNKNOWN',1,1)`)
     .bind(id,JSON.stringify(['notion:synthetic']),sha).run();

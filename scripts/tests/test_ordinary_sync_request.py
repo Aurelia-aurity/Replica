@@ -27,8 +27,8 @@ def env():
         "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REPOSITORY": gp.REPOSITORY,
         "GITHUB_REPOSITORY_ID": str(gp.REPOSITORY_ID), "GITHUB_REF": "refs/heads/main",
         "GITHUB_RUN_ATTEMPT": "1", "GITHUB_RUN_ID": "123", "GITHUB_SHA": SHA,
-        "GITHUB_ACTOR_ID": "7", "GITHUB_BOT_ACTOR_ID": "7", "GITHUB_ACTOR": "synthetic[bot]",
-        "GITHUB_TRIGGERING_ACTOR": "synthetic[bot]", "RELAY_REQUEST_ID": ID, "RELAY_GENERATION": "1",
+        "GITHUB_ACTOR_ID": "7", "GITHUB_DISPATCH_ACTOR_ID": "7", "GITHUB_ACTOR": "synthetic-user",
+        "GITHUB_TRIGGERING_ACTOR": "synthetic-user", "RELAY_REQUEST_ID": ID, "RELAY_GENERATION": "1",
         "GITHUB_WORKFLOW_REF": f"{gp.REPOSITORY}/{ordinary.WORKFLOW_PATH}@refs/heads/main",
         "GITHUB_WORKFLOW_ID": "8"}
 
@@ -147,7 +147,8 @@ atexit.register(save)
 
     def test_forged_context_rerun_ref_and_pm_injection_rejected_before_claim(self):
         for key, value in {"GITHUB_RUN_ATTEMPT": "2", "GITHUB_REF": "refs/heads/feature",
-                "GITHUB_ACTOR_ID": "9", "NOTION_SYNC_ENABLED": "false",
+                "GITHUB_ACTOR_ID": "9", "GITHUB_DISPATCH_ACTOR_ID": "9",
+                "GITHUB_TRIGGERING_ACTOR": "different-user", "NOTION_SYNC_ENABLED": "false",
                 "NOTION_RELAY_ENABLED": "false", "SYNC_RESOLVE_ISSUES": "18",
                 "SYNC_APPROVED_SHA": SHA, "SYNC_DRY_RUN": "true"}.items():
             with self.subTest(key=key):

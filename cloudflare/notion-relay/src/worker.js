@@ -2,7 +2,7 @@ import {ProtocolError, boundedBody, verifyHelper, verifyWorkflow, parseJSON,
   prepareBody,requireValue,mode} from './protocol.js';
 import {AgentJournal} from './agent-journal.js';
 import {receiveNotion, bootstrap} from './notion-receiver.js';
-import {GitHubApp} from './github-app.js';
+import {GitHubActions} from './github-actions.js';
 import {RunResults} from './run-results.js';
 import {Drain} from './drain.js';
 import {readCurrentPage} from './notion-reader.js';
@@ -31,7 +31,7 @@ export default {
       if(Object.hasOwn(callbacks,path)){
         await verifyWorkflow(request,bytes,env);
         if(!env.DB)throw new ProtocolError('DATABASE_UNCONFIGURED',503);
-        const results=new RunResults(env.DB,env,new GitHubApp(env));
+        const results=new RunResults(env.DB,env,new GitHubActions(env));
         return response(await results[callbacks[path]](parseJSON(bytes)));
       }
       await verifyHelper(request, bytes, env.HELPER_REQUEST_KEY);

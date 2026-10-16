@@ -81,14 +81,14 @@ class PinnedRelay:
 def claim_context(env, rest, relay, checkout_sha):
     request_id = env.get("RELAY_REQUEST_ID", "")
     se.require(se.identifier(request_id) == request_id, "일반 요청 UUID 형식 오류")
-    for name in ("RELAY_GENERATION", "GITHUB_RUN_ID", "GITHUB_BOT_ACTOR_ID"):
+    for name in ("RELAY_GENERATION", "GITHUB_RUN_ID", "GITHUB_DISPATCH_ACTOR_ID"):
         se.require(re.fullmatch(r"[1-9][0-9]*", env.get(name, "")) is not None,
                    "일반 실행 번호 형식 오류")
     sha = env.get("GITHUB_SHA", "")
     se.require(re.fullmatch(r"[0-9a-f]{40}", sha) is not None and checkout_sha == sha,
                "일반 실행 checkout SHA 불일치")
     context = OrdinaryClaim(request_id, int(env["RELAY_GENERATION"]), int(env["GITHUB_RUN_ID"]),
-                            sha, int(env["GITHUB_BOT_ACTOR_ID"]))
+                            sha, int(env["GITHUB_DISPATCH_ACTOR_ID"]))
     context.validate(env)
     run = rest.request(f"/repos/{gp.REPOSITORY}/actions/runs/{context.run_id}")
     se.require(run.get("id") == context.run_id and run.get("repository", {}).get("id") == gp.REPOSITORY_ID and

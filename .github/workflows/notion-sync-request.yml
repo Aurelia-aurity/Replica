@@ -29,7 +29,7 @@ jobs:
       github.repository == 'Aurelia-aurity/Replica' &&
       github.ref == 'refs/heads/main' &&
       github.event_name == 'workflow_dispatch' &&
-      format('{0}', github.actor_id) == vars.NOTION_RELAY_BOT_ACTOR_ID &&
+      format('{0}', github.actor_id) == vars.NOTION_RELAY_ACTOR_ID &&
       github.actor == github.triggering_actor &&
       format('{0}', github.run_attempt) == '1' &&
       vars.NOTION_RELAY_ENABLED == 'true' &&
@@ -62,7 +62,7 @@ jobs:
           NOTION_RELAY_URL: ${{ vars.NOTION_RELAY_URL }}
           NOTION_RELAY_HOST: ${{ vars.NOTION_RELAY_HOST }}
           WORKFLOW_CALLBACK_KEY: ${{ secrets.NOTION_RELAY_CALLBACK_KEY }}
-          GITHUB_BOT_ACTOR_ID: ${{ vars.NOTION_RELAY_BOT_ACTOR_ID }}
+          GITHUB_DISPATCH_ACTOR_ID: ${{ vars.NOTION_RELAY_ACTOR_ID }}
           GITHUB_WORKFLOW_ID: ${{ vars.NOTION_RELAY_WORKFLOW_ID }}
           RELAY_REQUEST_ID: ${{ inputs.request_id }}
           RELAY_GENERATION: ${{ inputs.generation }}

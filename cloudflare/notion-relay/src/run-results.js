@@ -11,15 +11,15 @@ function binding(value){
   requireValue(typeof value.sha==='string'&&/^[0-9a-f]{40}$/.test(value.sha),'RUN_SHA');
 }
 export function validateRun(run,request,env,runID){
-  positive(Number(env.GITHUB_BOT_ACTOR_ID));positive(Number(env.GITHUB_WORKFLOW_ID));
+  positive(Number(env.GITHUB_DISPATCH_ACTOR_ID));positive(Number(env.GITHUB_WORKFLOW_ID));
   requireValue(run?.id===runID&&run.repository?.id===REPOSITORY_ID&&
     run.repository.full_name==='Aurelia-aurity/Replica'&&run.head_repository?.id===REPOSITORY_ID&&
     run.event==='workflow_dispatch'&&run.head_branch==='main'&&
     run.head_sha===request.expected_sha&&run.run_attempt===1&&
     run.workflow_id===Number(env.GITHUB_WORKFLOW_ID)&&run.path===WORKFLOW_PATH&&
     run.display_title===runName(request.request_id,request.generation)&&
-    run.actor?.id===Number(env.GITHUB_BOT_ACTOR_ID)&&
-    run.triggering_actor?.id===Number(env.GITHUB_BOT_ACTOR_ID), 'RUN_BINDING');
+    run.actor?.id===Number(env.GITHUB_DISPATCH_ACTOR_ID)&&
+    run.triggering_actor?.id===Number(env.GITHUB_DISPATCH_ACTOR_ID), 'RUN_BINDING');
   return run;
 }
 function observation(entry){
