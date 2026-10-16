@@ -1,8 +1,8 @@
 # Notion 변경 요청 relay
 
-Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경을 기존 전체 동기화로 연결합니다. Worker는 Project나 Notion을 수정하지 않습니다. 지정 사용자의 개인 액세스 토큰(PAT)으로 고정된 일반 workflow를 요청하고, 실행과 readback 결과를 D1에 기록합니다. 기존 5분 동기화와 PM 재개 workflow는 계속 사용합니다.
+Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경을 기존 전체 동기화로 연결합니다. Worker는 Project나 Notion을 수정하지 않습니다. 지정 사용자의 개인 액세스 토큰(PAT)으로 고정된 일반 workflow를 요청하고, 실행과 readback 결과를 D1에 기록합니다. 예약 전체 동기화는 누락된 이벤트를 복구하는 용도로, PM 재개 workflow는 기존대로 계속 사용합니다.
 
-운영 전 후보입니다. 별도 시험 환경에서 Notion 웹훅의 실제 수신·서명 검증·D1 저장을 확인했지만, PAT을 이용한 Actions 실행과 실제 동기화 반영은 아직 확인하지 않았습니다. 저장소의 `wrangler.jsonc`는 `STOPPED`이며 D1 ID는 자리표시자입니다. 시험 환경 확인을 운영 활성화로 간주하지 마세요.
+2026-10-16(UTC) 기준 운영 중입니다. Worker는 `ACTIVE`로 배포돼 분당 cron으로 동작하고, 저장소 변수 `NOTION_RELAY_ENABLED`는 `true`이며 Notion 웹훅 구독도 활성 상태입니다. 저장소의 `wrangler.jsonc`는 계속 `STOPPED` 템플릿이고 D1 ID는 자리표시자입니다. 실제 운영 설정은 운영자가 저장소 밖에서 관리하므로 이 저장소에 실제 ID나 URL을 넣지 않습니다. 초기 검증용 값은 설정 후 제거했고 `BOOTSTRAP_ENABLED`는 `false`입니다.
 
 ## 로컬 확인
 
@@ -42,7 +42,7 @@ python3 -B scripts/ordinary_sync_request.py --deliver-evidence /absolute/path/no
 
 ## 에이전트의 일반 상태 변경
 
-이 절차는 운영자가 relay와 일반 workflow를 확인하고 활성화한 뒤 사용합니다. 현재 후보는 배포 전입니다. 에이전트는 사용자가 변경을 허용한 기존 Issue와 연결된 Notion 페이지를 확인하고, `백로그`·`준비 중`·`진행 중` 중 하나만 요청합니다. 완료·종료·PM 보류 재개는 이 명령의 대상이 아닙니다.
+이 절차는 relay가 활성 상태일 때 사용합니다. 에이전트는 사용자가 변경을 허용한 기존 Issue와 연결된 Notion 페이지를 확인하고, `백로그`·`준비 중`·`진행 중` 중 하나만 요청합니다. 완료·종료·PM 보류 재개는 이 명령의 대상이 아닙니다.
 
 로컬 환경에는 기존 `GITHUB_TOKEN`·`PROJECT_TOKEN`, `PROJECT_ID`·`PROJECT_OWNER_ID`·`PROJECT_STATUS_FIELD_ID`·`PROJECT_STATUS_OPTIONS`·`NOTION_DATA_SOURCE_ID`, 승인된 `NOTION_RELAY_URL`·`NOTION_RELAY_HOST`·`HELPER_REQUEST_KEY`가 필요합니다. 별도의 Notion 쓰기 토큰이나 실행 결과용 키를 helper에 전달하지 않습니다. 비밀값은 명령 인자·채팅·저장소에 넣지 않습니다.
 
@@ -59,9 +59,33 @@ python3 -B scripts/project_status_request.py \
 
 변경 전 `PREPARED` 예약만 같은 인자에 `--abort`를 더해 안전 취소할 수 있습니다. `UNKNOWN_FENCED`·`REJECTED_FENCED`는 운영자 확인 대상입니다. relay 장애 중에는 기존 5분 동기화가 현재 상태를 대조하지만, helper의 미확정 변경을 자동 재시도하거나 예약을 해제하지 않습니다. Windows는 현재 helper 지원 범위 밖입니다.
 
-## 배포 전에 확인할 구성
+## 실제 환경 확인
 
-이 표는 필요한 설정안입니다. 실제 설치·키 등록·배포·활성화 승인과 값 확인은 최종 검토 후 별도로 받습니다. 비밀값은 채팅이나 저장소에 넣지 않습니다.
+2026-10-16(UTC)에 Issue #38로 양방향을 한 번씩 확인했습니다. 이 확인은 위의 로컬·fault-injection 검사와 별개로 실제 서비스에서 수행한 것입니다.
+
+- Notion 카드를 `진행 중`에서 `준비 중`으로 11:42:01에 옮기자 relay가 실행을 요청하고 claim했습니다. 동기화 run 38895592497(held 0, project_changes 1)이 Project를 11:48:01에 `준비 중`으로 바꿨고 약 6분이 걸렸습니다. 수신 기록은 반영 완료(STRICT_REFLECTION)로 표시됐고, 이 동기화가 Notion에 쓴 변경은 `ignored_echo`(HANDLED_ECHO)로 분류됐습니다.
+- 에이전트 helper(`scripts/project_status_request.py`)로 Project를 11:52:11에 `준비 중`에서 `진행 중`으로 바꾸자 결과가 `CONFIRMED`였습니다. relay run 38897047001(held 0, project_changes 0)이 Notion을 12:01:14에 `진행 중`으로 바꿨고 약 9분이 걸렸으며 보류는 없었습니다.
+
+앞선 실제 시험에서 찾은 문제는 PR #49(User-Agent), #50(작업 상태 외 속성만 바뀐 이벤트를 `200`/`ignored`로 처리, main 조회에 PAT 사용, 오류 코드 로그), #51(Project 상태를 새로 조회, 보류 재표시 때 작업 상태 유지), #52(Notion 페이지를 새로 조회, 완료된 요청과의 경쟁 제거)에서 고쳤습니다.
+
+동기화 엔진이 작업을 보류하면 relay는 `ENGINE_HELD`로 보고하며, 기존 PM 재개(`resolve_issue_numbers`)가 여전히 필요합니다. 보류된 상태에서 카드를 다시 옮긴 요청은 PM 재개가 두 번 필요할 수 있습니다. 먼저 `DEFERRED_REQUEST_PENDING`을 처리하고, 이어서 현재 Project 값을 승인합니다.
+
+알려진 한계와 후속 과제는 다음과 같습니다.
+
+- 정상 상태의 Issue마다 동기화 실행당 Project 직접 조회 1회와 Notion 페이지 조회 1회가 추가됩니다.
+- Discord 알림 job이 자체 상태 commit 직후 ledger `readback_mismatch`로 실패할 수 있습니다. relay와는 별도로 #18 범위에서 다룰 후속 과제입니다.
+
+## 운영
+
+멈출 때는 `RELAY_MODE`를 `STOPPED`로 두고 cron을 제거한 설정으로 다시 배포합니다. 이어서 저장소 변수 `NOTION_RELAY_ENABLED`를 `false`로 바꾸고 Notion 구독을 일시 중지합니다. 다시 시작할 때는 먼저 `ACTIVE`와 cron을 넣은 설정으로 배포하고, `NOTION_RELAY_ENABLED`를 `true`로 바꾼 뒤 Notion 구독을 재개합니다. cron을 새로 붙이면 첫 실행까지 몇 분 걸릴 수 있습니다.
+
+상태는 D1의 receipts와 requests 단계에서 확인합니다. Worker 로그에는 `ProtocolError` 코드만 남으므로 원인 추적은 이 코드와 D1 기록을 함께 봅니다.
+
+PAT은 classic PAT이며 `repo` 범위이고 2026-12-30에 만료됩니다. 교체하면 Worker secret `GITHUB_DISPATCH_TOKEN`을 갱신하고 소유자 ID·저장소 권한·main 조회를 다시 검증합니다.
+
+## 구성
+
+이 표는 필요한 설정 항목입니다. 실제 값은 운영자가 관리하며 이 저장소에는 두지 않습니다. 비밀값은 채팅이나 저장소에 넣지 않습니다.
 
 | 위치 | 설정 | 범위 |
 | --- | --- | --- |
@@ -81,9 +105,9 @@ python3 -B scripts/project_status_request.py \
 
 고정 자원은 repository `1392442366` (`Aurelia-aurity/Replica`), Project `PVT_kwHOBda_2c4BmKKV`, Status field `PVTSSF_lAHOBda_2c4BmKKVzhk0RA4`, 데이터 소스 `398c7ff6-9c66-43de-ba4d-3f2670b25a87`입니다. PAT으로 사용자 ID·저장소 ID·쓰기 권한을 먼저 검증한 뒤, 같은 PAT으로 main ref를 읽습니다. Cloudflare 공용 IP에서 무인증 조회 한도에 걸리는 것을 피하기 위해서입니다. 비공개 저장소는 지원 범위 밖입니다.
 
-다른 개인 계정이 소유한 저장소의 협업자 접근에는 fine-grained PAT 제한이 있으므로 현재 운영 후보는 classic PAT입니다. workflow 실행에 필요한 `repo` 범위와 만료일을 확인하고 별도 토큰을 사용합니다. classic PAT은 저장소 하나로 권한을 제한할 수 없으므로 Worker 코드의 고정 경로 검증이 토큰 자체의 권한을 줄여 주지는 않습니다. 기존 Project·Notion 토큰을 재사용하지 않습니다. PAT 교체 시 소유자 ID가 달라지면 Worker와 workflow의 지정 사용자 설정을 함께 갱신하고 다시 검증합니다.
+다른 개인 계정이 소유한 저장소의 협업자 접근에는 fine-grained PAT 제한이 있으므로 현재 운영은 classic PAT을 사용합니다. workflow 실행에 필요한 `repo` 범위와 만료일을 확인하고 별도 토큰을 사용합니다. classic PAT은 저장소 하나로 권한을 제한할 수 없으므로 Worker 코드의 고정 경로 검증이 토큰 자체의 권한을 줄여 주지는 않습니다. 기존 Project·Notion 토큰을 재사용하지 않습니다. PAT 교체 시 소유자 ID가 달라지면 Worker와 workflow의 지정 사용자 설정을 함께 갱신하고 다시 검증합니다.
 
-승인 후 순서는 다음과 같습니다.
+처음 설치할 때의 순서는 다음과 같습니다.
 
 1. 지정 사용자의 PAT·읽기 전용 Notion 연결·Cloudflare Free 계정을 정확한 대상으로 구성하고 ID와 권한을 확인합니다. App 설치나 App 개인키는 사용하지 않습니다.
 2. main 반영은 별도 승인 후 진행합니다. 일반 workflow ID와 사용자 ID를 조회하되 `NOTION_RELAY_ENABLED=false`를 유지합니다. Draft에서 사용자·저장소·Actions 읽기를 먼저 확인할 수 있지만, main에 없는 새 workflow를 실행하거나 main 결속을 완화해서 시험하지 않습니다.
@@ -99,4 +123,4 @@ python3 -B scripts/project_status_request.py \
 
 유료 플랜·도메인·자동 업그레이드는 사용하지 않습니다. 신규 helper 기록 1,000개, Notion 수신 19,000개, 실행 요청 1,000개, 한 실행 관측 20,000행을 상한으로 둡니다. 한 번의 drain은 최대 3개 최신 페이지를 조회합니다. 불확실 기록을 삭제해 공간을 만들지 않습니다. 상한이나 API 오류 때문에 relay가 막히면 기존 5분 동기화를 사용하되 relay의 불확실 기록은 그대로 남깁니다.
 
-로컬 검사는 운영 Free 한도 충족을 증명하지 않습니다. 실제 배포 전에 RSA 서명·초기 암호화·chunk/seal·SQL의 CPU와 subrequest 수, D1 읽기·쓰기·저장 용량을 확인해야 합니다. 분당 cron도 요청과 D1 사용량에 포함합니다. 서비스별 현재 한도는 [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)와 [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)에서 확인합니다. 무료 상한을 맞추지 못하면 비활성 상태와 기존 동기화를 유지합니다.
+로컬 검사는 운영 Free 한도 충족을 증명하지 않으며, 운영 환경에서도 무료 한도 사용량은 아직 측정하지 않았습니다. RSA 서명·초기 암호화·chunk/seal·SQL의 CPU와 subrequest 수, D1 읽기·쓰기·저장 용량은 앞으로 확인해야 합니다. 분당 cron도 요청과 D1 사용량에 포함합니다. 서비스별 현재 한도는 [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)와 [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)에서 확인합니다. 무료 상한을 맞추지 못하면 비활성 상태와 기존 동기화를 유지합니다.
