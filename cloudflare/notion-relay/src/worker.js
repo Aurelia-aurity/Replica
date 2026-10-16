@@ -52,6 +52,7 @@ export default {
       return response(await journal[endpoints[path]](value));
     } catch (error) {
       // Never emit exception messages, request bodies/URLs, signatures or API payloads.
+      console.error(error instanceof ProtocolError ? error.code : 'JOURNAL_UNAVAILABLE');
       return response({error:error instanceof ProtocolError ? error.code : 'JOURNAL_UNAVAILABLE'},
         error instanceof ProtocolError ? error.status : 503);
     }

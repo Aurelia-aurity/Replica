@@ -52,9 +52,9 @@ export class GitHubActions {
   }
   async mainSHA(){
     await this.repository();
-    // Public ref read deliberately carries no token.
+    // The already verified PAT avoids the shared-IP unauthenticated rate limit.
     // Private-repository support is outside this scope.
-    const response=await this.http('GET',`${REPO}/git/ref/heads/main`,null);
+    const response=await this.http('GET',`${REPO}/git/ref/heads/main`,await this.token());
     requireValue(response.status===200,'MAIN_READ_UNAVAILABLE',503);
     const ref=await json(response);
     requireValue(ref.ref==='refs/heads/main'&&ref.object?.type==='commit'&&
