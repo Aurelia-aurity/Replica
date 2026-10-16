@@ -96,7 +96,7 @@ class SnapshotReader:
         matches = [issue for issue in facts["issues"].values() if issue["number"] == issue_number]
         se.require(len(matches) == 1, "helper Issue가 고정 저장소에서 확인되지 않습니다")
         issue = matches[0]
-        project = se._project_snapshot(self.project_client, self.config, facts)
+        project = se._project_snapshot(self.project_client, self.config, facts, refresh_status=True)
         item = project["items"].get(issue["databaseId"])
         se.require(issue["state"] == "OPEN" and item is not None and
                    not project.get("archived_items", {}).get(issue["databaseId"]) and
