@@ -46,7 +46,14 @@ export function semanticEvent(event, env) {
 }
 export async function receiveNotion(request, bytes, env, now = Math.floor(Date.now()/1000)) {
   await verifyNotion(request, bytes, env.NOTION_VERIFICATION_TOKEN);
-  const event = semanticEvent(parseJSON(bytes), env);
+  let event;
+  try { event = semanticEvent(parseJSON(bytes), env); }
+  catch (error) {
+    // Bound, authenticated sync-metadata edits are expected traffic. A non-2xx
+    // reply would make Notion retry and eventually pause the subscription.
+    if (error instanceof ProtocolError && error.code === 'PROPERTY_NOT_SELECTED') return {ignored:true};
+    throw error;
+  }
   const semanticDigest = await sha256(canonical(event));
   const id = `notion:${event.id}`;
   const db = env.DB;

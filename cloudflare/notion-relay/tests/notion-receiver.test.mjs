@@ -70,8 +70,19 @@ test('configured event/property/UUID bindings reject untrusted signals without w
   for(const altered of [{...body,workspace_id:randomUUID()}, {...body,integration_id:randomUUID()},
     {...body,subscription_id:randomUUID()}, {...body,type:'page.content_updated'},
     {...body,entity:{...body.entity,type:'block'}}, {...body,entity:{id:'unbound',type:'page'}},
-    {...body,data:{updated_properties:['other']}}, {...body,unexpected:'anything'}])
+    {...body,unexpected:'anything'}])
     assert.equal((await send(env,altered)).status,400);
+  assert.equal(count(db),0);assert.equal(generation(db),0);
+});
+test('authenticated non-task property updates are acknowledged and ignored without writes',async()=>{
+  // Notion retries non-2xx deliveries; sync metadata writes must not look like failures.
+  const {db,env}=await fixture();const body={...event(),data:{...event().data,updated_properties:['other']}};
+  for(const relayMode of ['ACTIVE','STOPPED']) {
+    env.RELAY_MODE=relayMode;const result=await send(env,body);
+    assert.equal(result.status,200);assert.deepEqual(await result.json(),{ignored:true});
+  }
+  assert.equal((await send(env,body,{signature:'sha256='+'0'.repeat(64)})).status,401);
+  assert.equal((await send(env,{...body,subscription_id:randomUUID()})).status,400);
   assert.equal(count(db),0);assert.equal(generation(db),0);
 });
 test('stopped/draining preserve existing receipt replay but reject new ingress',async()=>{

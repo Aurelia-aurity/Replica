@@ -17,8 +17,7 @@ function transport(dispatchResponse,{identity={id:7,type:'User'},repository={},c
   const fetcher=async(url,options)=>{
     calls.push({url,method:options.method,body:options.body});assert.equal(options.redirect,'manual');
     assert.ok(options.signal instanceof AbortSignal);
-    assert.equal(options.headers.Authorization,url.endsWith('/git/ref/heads/main')?
-      undefined:`Bearer ${config.GITHUB_DISPATCH_TOKEN}`);
+    assert.equal(options.headers.Authorization,`Bearer ${config.GITHUB_DISPATCH_TOKEN}`);
     if(url.endsWith('/user')){
       assert.equal(options.method,'GET');assert.equal(options.body,undefined);
       return response(identity);}
@@ -29,7 +28,6 @@ function transport(dispatchResponse,{identity={id:7,type:'User'},repository={},c
     if(url.endsWith('/Replica'))return response({id:REPOSITORY_ID,full_name:'Aurelia-aurity/Replica',
       default_branch:'main',private:false,permissions:{push:true},...repository});
     if(url.endsWith('/git/ref/heads/main')){
-      assert.equal(options.headers.Authorization,undefined);
       return response({ref:'refs/heads/main',object:{type:'commit',sha:request.expected_sha}});}
     if(url.endsWith('/notion-sync-request.yml'))return response({id:8,path:WORKFLOW_PATH,state:'active'});
     if(url.includes('/runs?'))return response({workflow_runs:[run()]});

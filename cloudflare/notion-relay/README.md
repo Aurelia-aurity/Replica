@@ -9,6 +9,7 @@ Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경�
 Node 26에서 확인했습니다. `npm ci --ignore-scripts` 후 이 디렉터리에서 실행합니다.
 
 웹훅의 `api_version`은 전달 메타데이터로만 취급하며 수신 중복 판정에는 사용하지 않습니다.
+서명과 구독 결속은 맞지만 작업 상태가 아닌 속성만 바뀐 이벤트는 기록하지 않고 `200`(`ignored`)으로 응답합니다. 기존 동기화가 내부 상태를 갱신할 때마다 이런 이벤트가 생기는데, 오류 응답을 주면 Notion이 재전송을 반복하다 구독을 멈출 수 있습니다. 거절할 때는 오류 코드만 로그에 남깁니다.
 페이지 조회는 Notion API `2026-03-11`을 사용하며 `in_trash`가 `false`인지 확인합니다. 이 버전에서 삭제된 `archived` 필드는 요구하지 않습니다.
 
 ```sh
@@ -78,7 +79,7 @@ python3 -B scripts/project_status_request.py \
 | GitHub vars | `NOTION_RELAY_ENABLED` | 모든 결속 확인 전 `false` |
 | GitHub ordinary workflow | 기존 `PROJECT_TOKEN`, `NOTION_TOKEN`과 기존 sync vars | 기존 동기화 권한을 사용하며 Worker에는 전달하지 않음 |
 
-고정 자원은 repository `1392442366` (`Aurelia-aurity/Replica`), Project `PVT_kwHOBda_2c4BmKKV`, Status field `PVTSSF_lAHOBda_2c4BmKKVzhk0RA4`, 데이터 소스 `398c7ff6-9c66-43de-ba4d-3f2670b25a87`입니다. 공개 저장소의 main ref는 무인증으로 읽고, PAT으로 읽은 사용자 ID·저장소 ID·쓰기 권한을 검증합니다. 비공개 저장소는 지원 범위 밖입니다.
+고정 자원은 repository `1392442366` (`Aurelia-aurity/Replica`), Project `PVT_kwHOBda_2c4BmKKV`, Status field `PVTSSF_lAHOBda_2c4BmKKVzhk0RA4`, 데이터 소스 `398c7ff6-9c66-43de-ba4d-3f2670b25a87`입니다. PAT으로 사용자 ID·저장소 ID·쓰기 권한을 먼저 검증한 뒤, 같은 PAT으로 main ref를 읽습니다. Cloudflare 공용 IP에서 무인증 조회 한도에 걸리는 것을 피하기 위해서입니다. 비공개 저장소는 지원 범위 밖입니다.
 
 다른 개인 계정이 소유한 저장소의 협업자 접근에는 fine-grained PAT 제한이 있으므로 현재 운영 후보는 classic PAT입니다. workflow 실행에 필요한 `repo` 범위와 만료일을 확인하고 별도 토큰을 사용합니다. classic PAT은 저장소 하나로 권한을 제한할 수 없으므로 Worker 코드의 고정 경로 검증이 토큰 자체의 권한을 줄여 주지는 않습니다. 기존 Project·Notion 토큰을 재사용하지 않습니다. PAT 교체 시 소유자 ID가 달라지면 Worker와 workflow의 지정 사용자 설정을 함께 갱신하고 다시 검증합니다.
 
