@@ -9,6 +9,7 @@ Notion의 작업 상태 변경과 로컬 agent의 일반 Project 상태 변경�
 Node 26에서 확인했습니다. `npm ci --ignore-scripts` 후 이 디렉터리에서 실행합니다.
 
 웹훅의 `api_version`은 전달 메타데이터로만 취급하며 수신 중복 판정에는 사용하지 않습니다.
+페이지 조회는 Notion API `2026-03-11`을 사용하며 `in_trash`가 `false`인지 확인합니다. 이 버전에서 삭제된 `archived` 필드는 요구하지 않습니다.
 
 ```sh
 npm test

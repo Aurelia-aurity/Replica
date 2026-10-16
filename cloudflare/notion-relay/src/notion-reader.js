@@ -27,7 +27,7 @@ export async function currentPage(page, pageID, env) {
   requireValue(page?.object === 'page' && uuid(page.id) === uuid(pageID), 'PAGE_IDENTITY');
   requireValue(page.parent?.type === 'data_source_id' &&
     page.parent.data_source_id === SOURCE_ID, 'PAGE_SOURCE');
-  requireValue(page.archived === false && page.in_trash === false, 'PAGE_ARCHIVED');
+  requireValue(page.in_trash === false, 'PAGE_ARCHIVED');
   const names = {'종류':'NOTION_KIND_PROPERTY_ID','동기화 키':'NOTION_KEY_PROPERTY_ID',
     '작업 상태':'NOTION_TASK_PROPERTY_ID','동기화 내부 상태':'NOTION_STATE_PROPERTY_ID'};
   requireValue(page.properties && typeof page.properties === 'object', 'PAGE_PROPERTIES');

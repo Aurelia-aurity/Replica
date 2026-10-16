@@ -24,7 +24,7 @@ const mf=new Miniflare(convertV4MiniflareOptions({name:'replica-helper-runtime',
     assert.ok(n>=1&&n<=7);pageReads++;
     const rich=(id,raw)=>({id,type:'rich_text',rich_text:[{type:'text',text:{content:raw}}]});
     return new Response(JSON.stringify({object:'page',id,parent:{type:'data_source_id',
-      data_source_id:'398c7ff6-9c66-43de-ba4d-3f2670b25a87'},archived:false,in_trash:false,
+      data_source_id:'398c7ff6-9c66-43de-ba4d-3f2670b25a87'},in_trash:false,
       properties:{'종류':{id:'kind',type:'select',select:{name:'Issue'}},
         '작업 상태':{id:'task',type:'select',select:{name:'백로그'}},
         '동기화 키':rich('key',`gh:1392442366:issue:${555+n}`),

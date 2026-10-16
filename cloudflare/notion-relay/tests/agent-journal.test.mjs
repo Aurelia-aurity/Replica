@@ -163,7 +163,7 @@ test('new authenticated helper binds fresh Notion page before reservation; exist
     NOTION_KEY_PROPERTY_ID:'key',NOTION_TASK_PROPERTY_ID:'task',NOTION_STATE_PROPERTY_ID:'state'});
   const rich=(id,raw)=>({id,type:'rich_text',rich_text:[{type:'text',text:{content:raw}}]});
   const page={object:'page',id:body.page_id,parent:{type:'data_source_id',
-    data_source_id:'398c7ff6-9c66-43de-ba4d-3f2670b25a87'},archived:false,in_trash:false,
+    data_source_id:'398c7ff6-9c66-43de-ba4d-3f2670b25a87'},in_trash:false,
     properties:{'종류':{id:'kind',type:'select',select:{name:'Issue'}},
       '작업 상태':{id:'task',type:'select',select:{name:'준비 중'}},
       '동기화 키':rich('key',body.sync_key),'동기화 내부 상태':rich('state','synthetic')}};

@@ -9,7 +9,7 @@ const env={NOTION_READ_TOKEN:'synthetic-read-only-token-000',NOTION_KIND_PROPERT
 const rich=(id,raw)=>({id,type:'rich_text',rich_text:[{type:'text',text:{content:raw},plain_text:raw}]});
 const select=(id,name)=>({id,type:'select',select:name===null?null:{name}});
 function page(){return {object:'page',id,parent:{type:'data_source_id',data_source_id:SOURCE_ID},
-  archived:false,in_trash:false,properties:{'종류':select('kind','Issue'),
+  in_trash:false,properties:{'종류':select('kind','Issue'),
     '동기화 키':rich('key','gh:1392442366:issue:555'),'작업 상태':select('t:sk','진행 중'),
     '동기화 내부 상태':rich('state','synthetic exact state text'),'메모':rich('memo','private-note')}};}
 test('fixed current binding and exact stored-text digest without content leakage',async()=>{
@@ -28,7 +28,8 @@ test('latest arbitrary state cannot create a checkpoint',async()=>{
 });
 test('source, identity, archive, kind, key, property and shape failures stay untrusted',async()=>{
   const changes=[p=>p.parent.data_source_id='22222222-2222-4222-8222-222222222222',
-    p=>p.id='22222222-2222-4222-8222-222222222222',p=>p.archived=true,p=>p.in_trash=true,
+    p=>p.id='22222222-2222-4222-8222-222222222222',p=>delete p.in_trash,p=>p.in_trash=true,
+    p=>p.in_trash='false',
     p=>p.properties['종류'].select.name='PR',p=>p.properties['동기화 키']=rich('key','gh:1:issue:555'),
     p=>p.properties['작업 상태'].id='other',p=>p.properties['작업 상태'].select.name='unknown',
     p=>p.properties['동기화 내부 상태'].rich_text[0].type='mention',
