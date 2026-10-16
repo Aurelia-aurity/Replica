@@ -20,7 +20,7 @@ export async function verifyNotion(request, bytes, secret) {
 export function semanticEvent(event, env) {
   requireValue(event !== null && typeof event === 'object' && !Array.isArray(event), 'INVALID_EVENT');
   const allowed = ['id','timestamp','workspace_id','workspace_name','integration_id','subscription_id',
-    'type','authors','accessible_by','attempt_number','entity','data'];
+    'type','authors','accessible_by','attempt_number','api_version','entity','data'];
   requireValue(Object.keys(event).every(k => allowed.includes(k)), 'EVENT_FIELDS');
   uuid(event.id); uuid(event.workspace_id); uuid(event.integration_id); uuid(event.subscription_id);
   requireValue(event.workspace_id === uuid(env.NOTION_WORKSPACE_ID) &&

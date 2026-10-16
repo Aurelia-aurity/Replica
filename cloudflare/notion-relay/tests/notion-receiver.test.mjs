@@ -44,6 +44,14 @@ test('legitimate retry delivery metadata/author changes are not semantic contrad
   const result=await send(env,retry);assert.equal(result.status,200);
   assert.equal((await result.json()).duplicate,true);assert.equal(count(db),1);assert.equal(generation(db),1);
 });
+test('webhook API version metadata is accepted without changing receipt identity',async()=>{
+  const {db,env}=await fixture();const body=event();
+  const first=await send(env,{...body,api_version:'2026-03-11'});
+  assert.equal(first.status,200);
+  const retry=await send(env,body);
+  assert.equal(retry.status,200);assert.equal((await retry.json()).duplicate,true);
+  assert.equal(count(db),1);assert.equal(generation(db),1);
+});
 test('stable event binding contradiction is fenced, never another receipt/generation',async()=>{
   const {db,env}=await fixture();const body=event();await send(env,body);
   const result=await send(env,{...body,timestamp:'2026-10-01T00:01:00Z'});
