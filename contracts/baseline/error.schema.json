@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed baseline error",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_REQUEST",
+            "SERVICE_UNAUTHENTICATED",
+            "SERVICE_FORBIDDEN",
+            "PAYLOAD_TOO_LARGE",
+            "CONTEXT_LIMIT_EXCEEDED",
+            "MODEL_NOT_READY",
+            "REQUEST_IN_PROGRESS",
+            "AI_BUSY",
+            "INFERENCE_DEADLINE_EXCEEDED",
+            "INFERENCE_FAILED"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "request_id",
+    "error"
+  ],
+  "additionalProperties": false
+}

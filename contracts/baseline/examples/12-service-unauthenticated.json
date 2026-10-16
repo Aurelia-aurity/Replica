@@ -1,0 +1,22 @@
+{
+  "description": "12-service-unauthenticated",
+  "request": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": true,
+  "conditions": {
+    "service_auth": "unauthenticated"
+  },
+  "http_status": 401,
+  "response": {
+    "request_id": null,
+    "error": {
+      "code": "SERVICE_UNAUTHENTICATED",
+      "message": "서비스 인증이 필요합니다."
+    }
+  },
+  "transport_outcome": "received"
+}

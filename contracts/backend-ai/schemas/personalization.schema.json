@@ -1,0 +1,606 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16000,
+      "pattern": "\\S"
+    },
+    "profileContent": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "speech_style": {
+          "type": "object",
+          "properties": {
+            "tone": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "address_terms": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "sentence_endings": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "frequent_expressions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "tone",
+            "address_terms",
+            "sentence_endings",
+            "frequent_expressions"
+          ],
+          "additionalProperties": false
+        },
+        "conversation_habits": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "\\S"
+          },
+          "minItems": 0,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "schema_version",
+        "speech_style",
+        "conversation_habits",
+        "limitations"
+      ],
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "used_history_turns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "dropped_history_turns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "used_history_turns",
+        "dropped_history_turns"
+      ],
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000,
+            "pattern": "\\S"
+          },
+          "assistant": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "user",
+          "assistant"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 20
+    },
+    "profileRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "source_revision"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "text_version_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "target_utterances": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000,
+            "pattern": "\\S"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "record_id",
+        "text_version_id",
+        "target_utterances"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceItem": {
+      "type": "object",
+      "properties": {
+        "chunk_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "record_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "text_version_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "record_id",
+        "text_version_id",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "styleProfile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content": {
+          "$ref": "#/$defs/profileContent"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "source_revision",
+        "content",
+        "source_snapshot_id"
+      ],
+      "additionalProperties": false
+    },
+    "analyzeRequest": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "persona_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "node_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "request_id",
+        "persona_id",
+        "source_revision",
+        "sources",
+        "source_snapshot_id",
+        "node_id"
+      ],
+      "additionalProperties": false
+    },
+    "analyzeSuccess": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "persona_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_text_version_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "minLength": 36,
+            "maxLength": 36
+          },
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true
+        },
+        "profile_content": {
+          "$ref": "#/$defs/profileContent"
+        },
+        "model_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "node_id": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "required": [
+        "request_id",
+        "persona_id",
+        "source_revision",
+        "source_text_version_ids",
+        "profile_content",
+        "model_name",
+        "source_snapshot_id",
+        "node_id"
+      ],
+      "additionalProperties": false
+    },
+    "personaRequest": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "persona_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000,
+          "pattern": "\\S"
+        },
+        "history": {
+          "$ref": "#/$defs/history"
+        },
+        "max_new_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "style_profile": {
+          "$ref": "#/$defs/styleProfile"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceItem"
+          },
+          "minItems": 0,
+          "maxItems": 10
+        }
+      },
+      "required": [
+        "request_id",
+        "persona_id",
+        "source_revision",
+        "message",
+        "history",
+        "max_new_tokens",
+        "style_profile",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "personaSuccess": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000,
+          "pattern": "\\S"
+        },
+        "finish_reason": {
+          "enum": [
+            "stop",
+            "length"
+          ]
+        },
+        "ai_generated": {
+          "const": true
+        },
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "applied_profile": {
+          "$ref": "#/$defs/profileRef"
+        },
+        "evidence_used": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "minLength": 36,
+            "maxLength": 36
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "model_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "request_id",
+        "message",
+        "finish_reason",
+        "ai_generated",
+        "context",
+        "applied_profile",
+        "evidence_used",
+        "model_name"
+      ],
+      "additionalProperties": false
+    },
+    "mergeInput": {
+      "type": "object",
+      "properties": {
+        "node_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "profile_content": {
+          "$ref": "#/$defs/profileContent"
+        }
+      },
+      "required": [
+        "node_id",
+        "profile_content"
+      ],
+      "additionalProperties": false
+    },
+    "mergeRequest": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "persona_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "node_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mergeInput"
+          },
+          "minItems": 2,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "request_id",
+        "persona_id",
+        "source_snapshot_id",
+        "node_id",
+        "source_revision",
+        "inputs"
+      ],
+      "additionalProperties": false
+    },
+    "mergeSuccess": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "persona_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "node_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profile_content": {
+          "$ref": "#/$defs/profileContent"
+        },
+        "model_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "request_id",
+        "persona_id",
+        "source_snapshot_id",
+        "node_id",
+        "source_revision",
+        "profile_content",
+        "model_name"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

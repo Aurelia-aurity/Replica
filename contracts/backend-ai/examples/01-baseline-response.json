@@ -1,0 +1,10 @@
+{
+  "request_id": "00000001-0001-4001-8001-000000000001",
+  "message": "작은 목표 하나부터 정하고 시작해 봐.",
+  "finish_reason": "stop",
+  "ai_generated": true,
+  "context": {
+    "used_history_turns": 0,
+    "dropped_history_turns": 0
+  }
+}
