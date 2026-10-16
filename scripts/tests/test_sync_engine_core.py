@@ -8034,6 +8034,62 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(current["deferred_request"]["phase"], "held")
         self.assertEqual(self.project.writes, [])
 
+    def _complete_first_card_request_then_move_card_back(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="준비 중",
+            project_status="준비 중", baseline_project_status="준비 중")
+        first = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(first["held"], 0)
+        old_request = copy.deepcopy(self._read_bidirectional_state()["request"])
+        self.assertEqual(old_request["phase"], "completed")
+        self.assertEqual(len(self.project.writes), 1)
+        page = self.notion.pages[ISSUE_PAGE_ID]
+        page["properties"]["작업 상태"] = {"select": {"name": "준비 중"}}
+
+        def stale_query(response, payload):
+            for row in response["results"]:
+                if row["id"] == ISSUE_PAGE_ID:
+                    row["properties"]["작업 상태"] = {"select": {"name": "진행 중"}}
+            return response
+
+        # The list snapshot still shows the old card while the page read is current.
+        self.notion.query_response_transform = stale_query
+        return page, old_request
+
+    def test_stale_list_card_after_completed_request_still_starts_new_request(self):
+        page, old_request = self._complete_first_card_request_then_move_card_back()
+        second = self.run_sync(bidirectional_enabled=True)
+        state = self._read_bidirectional_state()
+        self.assertEqual(second["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertIsNone(state["projection"])
+        self.assertEqual(len(self.project.writes), 2)
+        self.assertEqual(state["request"]["target"], "준비 중")
+        self.assertEqual(state["request"]["phase"], "completed")
+        self.assertNotEqual(state["request"]["id"], old_request["id"])
+        self.assertEqual(se.read_select(page, "작업 상태"), "준비 중")
+
+    def test_failed_fresh_page_read_keeps_stale_row_and_does_not_race_completed_request(self):
+        page, old_request = self._complete_first_card_request_then_move_card_back()
+        original_request = self.notion.request
+        page_path = f"/pages/{ISSUE_PAGE_ID}"
+        fail_next = {"armed": True}
+
+        def failing_first_page_get(method, path, payload=None, **kwargs):
+            if method == "GET" and path == page_path and fail_next["armed"]:
+                fail_next["armed"] = False
+                raise se.SyncError("synthetic fresh page read failure")
+            return original_request(method, path, payload, **kwargs)
+
+        self.notion.request = failing_first_page_get
+        raced = self.run_sync(bidirectional_enabled=True)
+        state = self._read_bidirectional_state()
+        self.assertEqual(raced["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertIsNone(state["projection"])
+        self.assertEqual(state["request"], old_request)
+        self.assertEqual(len(self.project.writes), 1)
+
     def test_add_readback_contradiction_can_resume_only_after_exact_relation_repair(self):
         self._configure_post_cutoff_project_add()
         self.project.add_item_transform = lambda item: (
