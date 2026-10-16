@@ -1809,6 +1809,22 @@ def _fresh_project_item(client, config, item):
     return item
 
 
+def _fresh_notion_row(notion, source_id, config, row, state, issue_id):
+    # The Notion data-source query can lag a just-moved card; the direct page read is current.
+    # Best effort: on a read failure or any identity/state mismatch keep the list row.
+    try:
+        page = notion.request("GET", f"/pages/{identifier(row.get('id'))}")
+        bound_page(page, source_id)
+        fresh_state = decode_internal(
+            read_text(page, "동기화 내부 상태"), kind="issue",
+            project_id=config["project_id"], object_id=issue_id)
+    except SyncError:
+        return row
+    if identifier(page.get("id")) == identifier(row.get("id")) and fresh_state == state:
+        return page
+    return row
+
+
 def _confirmed_add_item_matches(pending, item):
     if not pending["confirmed"]:
         return True
@@ -5149,6 +5165,7 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 state.get("deferred_request") is None and state.get("notion_write") is None and
                 (state.get("request") or {}).get("phase") in {None, "completed", "rejected"}):
             item = project_by_issue[issue_id] = _fresh_project_item(project_client, config, item)
+            row = _fresh_notion_row(notion, source_id, config, row, state, issue_id)
         plan_state = json.loads(json.dumps(state))
         plan = _plan_issue(row_data, item, row, plan_state, facts, cutoff, config["project_id"],
                            config["status_options"], approved_resume=approved_resume)
@@ -5830,6 +5847,21 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                 issue_rows_for_summary.append((latest_page, state))
                 continue
             card_matches_older_operation = latest_task in older_result_card_values
+            if (not card_matches_older_operation and latest_state is not None and
+                    old_option == target_option and state.get("hold") is None and
+                    not approving_older_result and
+                    (state.get("request") or {}).get("phase") == "completed" and
+                    (state.get("request") or {}).get("id") ==
+                    expected_projection.get("request_id") and
+                    (latest_state.get("request") or {}).get("id") ==
+                    expected_projection.get("request_id")):
+                # No Project write happened and the request is already terminal, so a
+                # card move seen only now is a new request, not a race against A. Drop
+                # the no-op projection; the next run classifies the move normally.
+                state["projection"] = None
+                _verify_issue_state_write(notion, source_id, latest_page, state)
+                issue_rows_for_summary.append((latest_page, state))
+                continue
             if (not card_matches_older_operation or latest_state is None or
                     (latest_state.get("request") or {}).get("id") !=
                     expected_projection.get("request_id")):
