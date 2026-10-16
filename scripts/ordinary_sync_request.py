@@ -65,7 +65,8 @@ class PinnedRelay:
             hashlib.sha256).hexdigest()
         request = urllib.request.Request(self.base + path, data=raw, method="POST", headers={
             "Content-Type": "application/json", "X-Replica-Timestamp": stamp,
-            "X-Replica-Signature": signature})
+            # workers.dev rejects the default Python-urllib agent (Cloudflare error 1010).
+            "User-Agent": "replica-sync-client", "X-Replica-Signature": signature})
         try:
             with self.opener.open(request, timeout=30) as response:
                 se.require(response.status == 200, "일반 실행 결과 수신 실패")
