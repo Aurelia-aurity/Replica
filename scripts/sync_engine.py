@@ -3918,12 +3918,24 @@ def _full_effect_report(source, index, project, facts, config, notion_state,
 
 def sync(github, rest, project_client, notion, config, *, dry_run=False,
          diagnose_date_readback=False, resolve_issue_numbers="", env=None, now=None,
-         notification_result=None):
+         notification_result=None, run_observations=None, ordinary_claim=None):
     """Run one complete local/API sync; all global reads finish before the first write."""
     require(not diagnose_date_readback or dry_run,
             "--diagnose-date-readback requires --dry-run")
     env = os.environ if env is None else env
+    if env.get("SYNC_ORDINARY_REQUEST") == "true" or ordinary_claim is not None:
+        from ordinary_claim import OrdinaryClaim
+        require(isinstance(ordinary_claim, OrdinaryClaim) and run_observations is not None and
+                not dry_run and not diagnose_date_readback and not resolve_issue_numbers,
+                "일반 실행에는 확인된 claim과 전체 실행 관측이 필요합니다")
+        ordinary_claim.validate(env)
     source_id, control_id = identifier(config["notion_source_id"]), identifier(config["notion_control_id"])
+    if run_observations is not None:
+        require(not dry_run and not resolve_issue_numbers,
+                "Run observations require an ordinary live sync")
+        require(run_observations.source_id == source_id and
+                run_observations.project_id == config["project_id"],
+                "Run observations binding mismatch")
     facts = gp.fetch_repository_facts(github, rest)
     project = _project_snapshot(project_client, config, facts)
     notion_state = preflight_notion(notion, source_id, control_id, config["project_id"],
@@ -3935,6 +3947,9 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
         cutoff = _iso(timestamp(cutoff))
     cutoff_time = timestamp(cutoff)
     index = notion_state["index"]
+    if run_observations is not None:
+        from observed_notion import ObservedNotion
+        notion = ObservedNotion(notion, run_observations, index)
     for key in notion_state["archived_keys"]:
         if key == CONTROL_KEY or key in index:
             raise SyncError("활성/보관 Notion 동기화 키 충돌")
@@ -5849,6 +5864,8 @@ def sync(github, rest, project_client, notion, config, *, dry_run=False,
                                    observation_uncertainty_seconds=report_uncertainty)
         if holds or counts.get("failed", 0) or awaiting_add_readback:
             notification_result["partial"] = True
+    if run_observations is not None:
+        notion.record_untouched(issue_rows_for_summary)
     return counts
 
 

@@ -20,6 +20,8 @@ venv/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
+node_modules/
+.wrangler/
 
 # Flutter / Dart
 .dart_tool/
@@ -56,6 +58,9 @@ experiments/artifacts/
 # Local agent / browser records
 .insane-review/
 bridge/
+.replica-status-requests/
+notion-relay-evidence.json
+notion-relay-evidence.json.tmp
 
 # Common filenames for personal AI documents; other paths belong in local excludes
 AGENT.md

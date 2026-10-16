@@ -1,0 +1,79 @@
+name: Notion ordinary request
+run-name: 'replica-sync-request:${{ inputs.request_id }}:${{ inputs.generation }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: 'relay에서 기록한 일반 요청 UUID'
+        type: string
+        required: true
+      generation:
+        description: 'relay에서 기록한 수신 generation'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: replica-notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: >-
+      github.repository == 'Aurelia-aurity/Replica' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      format('{0}', github.actor_id) == vars.NOTION_RELAY_ACTOR_ID &&
+      github.actor == github.triggering_actor &&
+      format('{0}', github.run_attempt) == '1' &&
+      vars.NOTION_RELAY_ENABLED == 'true' &&
+      vars.NOTION_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify sync implementation
+        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Claim and sync current state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          PROJECT_OWNER_ID: ${{ vars.PROJECT_OWNER_ID }}
+          PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
+          PROJECT_STATUS_OPTIONS: ${{ vars.PROJECT_STATUS_OPTIONS }}
+          PM_GITHUB_USER_ID: ${{ vars.PM_GITHUB_USER_ID }}
+          NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
+          NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
+          NOTION_SYNC_ENABLED: ${{ vars.NOTION_SYNC_ENABLED }}
+          NOTION_BIDIRECTIONAL_ENABLED: ${{ vars.NOTION_BIDIRECTIONAL_ENABLED || 'false' }}
+          SYNC_ORDINARY_REQUEST: 'true'
+          NOTION_RELAY_ENABLED: ${{ vars.NOTION_RELAY_ENABLED }}
+          NOTION_RELAY_URL: ${{ vars.NOTION_RELAY_URL }}
+          NOTION_RELAY_HOST: ${{ vars.NOTION_RELAY_HOST }}
+          WORKFLOW_CALLBACK_KEY: ${{ secrets.NOTION_RELAY_CALLBACK_KEY }}
+          GITHUB_DISPATCH_ACTOR_ID: ${{ vars.NOTION_RELAY_ACTOR_ID }}
+          GITHUB_WORKFLOW_ID: ${{ vars.NOTION_RELAY_WORKFLOW_ID }}
+          RELAY_REQUEST_ID: ${{ inputs.request_id }}
+          RELAY_GENERATION: ${{ inputs.generation }}
+        run: python3 -B scripts/ordinary_sync_request.py
+      - name: Preserve notification report and evidence-only retry data
+        if: always() && (hashFiles('notion-notification-report.json') != '' || hashFiles('notion-relay-evidence.json') != '')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notion-notification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            notion-notification-report.json
+            notion-relay-evidence.json
+          if-no-files-found: error
+          retention-days: 30
