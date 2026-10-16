@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
@@ -246,6 +246,17 @@ atexit.register(save)
         client = ordinary.PinnedRelay(config, opener=Mock())
         with self.assertRaises(se.SyncError): client.post("/claim", {"text": "x" * 65536})
         client.opener.open.assert_not_called()
+
+    def test_callback_sends_explicit_user_agent(self):
+        # Cloudflare rejects the default Python-urllib agent before the Worker runs (error 1010).
+        config = {"NOTION_RELAY_URL": "https://replica.account.workers.dev", "NOTION_RELAY_HOST": "replica.account.workers.dev",
+                  "WORKFLOW_CALLBACK_KEY": "synthetic-workflow-only-key-00000000"}
+        response = MagicMock(); response.status = 200; response.read.return_value = b"{}"
+        opener = Mock(); opener.open.return_value.__enter__ = Mock(return_value=response)
+        opener.open.return_value.__exit__ = Mock(return_value=False)
+        ordinary.PinnedRelay(config, opener=opener).post("/claim", {})
+        agent = opener.open.call_args.args[0].get_header("User-agent")
+        self.assertTrue(agent and not agent.startswith("Python-urllib"))
 
 
 if __name__ == "__main__":
