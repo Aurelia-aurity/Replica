@@ -1,0 +1,73 @@
+{
+  "complete_full_test": true,
+  "execution_kind": "school_gpu_full_test",
+  "tasks": {
+    "kobest_boolq": {
+      "accuracy": 0.9259259259259259,
+      "computed": 1404,
+      "expected": 1404,
+      "additional_metrics": {
+        "name": "kobest_boolq",
+        "alias": "kobest_boolq",
+        "sample_len": 1404,
+        "acc,none": 0.9259259259259259,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_copa": {
+      "accuracy": 0.828,
+      "computed": 1000,
+      "expected": 1000,
+      "additional_metrics": {
+        "name": "kobest_copa",
+        "alias": "kobest_copa",
+        "sample_len": 1000,
+        "acc,none": 0.828,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_hellaswag": {
+      "accuracy": 0.516,
+      "computed": 500,
+      "expected": 500,
+      "additional_metrics": {
+        "name": "kobest_hellaswag",
+        "alias": "kobest_hellaswag",
+        "sample_len": 500,
+        "acc,none": 0.516,
+        "acc_stderr,none": "N/A",
+        "acc_norm,none": 0.594,
+        "acc_norm_stderr,none": "N/A"
+      }
+    },
+    "kobest_sentineg": {
+      "accuracy": 0.9496221662468514,
+      "computed": 397,
+      "expected": 397,
+      "additional_metrics": {
+        "name": "kobest_sentineg",
+        "alias": "kobest_sentineg",
+        "sample_len": 397,
+        "acc,none": 0.9496221662468514,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_wic": {
+      "accuracy": 0.5984126984126984,
+      "computed": 1260,
+      "expected": 1260,
+      "additional_metrics": {
+        "name": "kobest_wic",
+        "alias": "kobest_wic",
+        "sample_len": 1260,
+        "acc,none": 0.5984126984126984,
+        "acc_stderr,none": "N/A"
+      }
+    }
+  },
+  "project_equal_task_mean": 0.7635921581170951,
+  "aggregate_is_official": false,
+  "result_file": "result-e2ada9c8-601f-483c-849b-61485794cfe7.json",
+  "result_sha256": "4be0c744e12fecd98d3ab60993d90c96e4236a22a76b0960313c841dc505ff13",
+  "identity_sha256": "b9ed804b7bbba1cbcfacf8a4d026c23a70f8028c44fcd4f852f341090cf3b16b"
+}

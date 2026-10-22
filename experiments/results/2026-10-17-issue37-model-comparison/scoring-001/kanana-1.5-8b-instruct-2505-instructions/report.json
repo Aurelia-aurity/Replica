@@ -1,0 +1,877 @@
+{
+  "schema_version": 1,
+  "suite": "instructions",
+  "execution_kind": "school_gpu_user_run",
+  "run_id": "13395803-32f6-4070-9666-ac68a5afbf34",
+  "dataset_sha256": "e5dcc15082af5035ad9a3967e77ea027fc3b104ba297c841b0e81881a5fed686",
+  "config": {
+    "model_id": "kakaocorp/kanana-1.5-8b-instruct-2505",
+    "suite": "instructions",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+      "evaluation/collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+    },
+    "model_profile": "kanana-1.5-8b-instruct-2505",
+    "model_revision": "c963a5f4f6496c749f94064a20b33028b0db9f19",
+    "chat_template_kwargs": {},
+    "model_artifacts_sha256": {
+      "config.json": "9ee93dd19c07fbdf814478f42f013a0a28305792974b0c58134ea437ff6a7225",
+      "generation_config.json": "fe1560fb79f03c0355a2c5a56ff6f5fd845c233a89e06e1f32155e5b3a05b127",
+      "model-00001-of-00004.safetensors": "636be023406874bc59c62167c4d3b93ffe761a4c454f2062f0f8adb627d767aa",
+      "model-00002-of-00004.safetensors": "a45e6a3b5faa72d4f03ba65735e5b924bd832e211d13de13475e8a5c0c0ac593",
+      "model-00003-of-00004.safetensors": "242db2de2a9afea6d5848f4477a4eca067aae352f239907d1f1ec73bcf68904d",
+      "model-00004-of-00004.safetensors": "f936ffa1c2fa3918c3ce1233628453c24f2c8d53fb41aaf3b657a1e66f978150",
+      "model.safetensors.index.json": "d791e1e07fb157364752da8a03d1204e49b11a376e132a62de8a9ca6399b86e9",
+      "special_tokens_map.json": "7a6d7fa83a01e8192333cd7b848541159709c4b206739071980432612f807807",
+      "tokenizer.json": "31d17e500c82ff116fc14d4dd0106a08e49bd3512d8a81473047121ef8ea09f9",
+      "tokenizer_config.json": "b91085d61a2d8df5b774c8e607afce6bc7e01b1139fa95769f118be5bf2c7db6"
+    }
+  },
+  "raw_artifact_sha256": {
+    "metadata.json": "1c4c449a65dc70ddef57504bab449a7f3e57544b0604a8fe3d8f70862f29f322",
+    "cases.json": "e5dcc15082af5035ad9a3967e77ea027fc3b104ba297c841b0e81881a5fed686",
+    "events.jsonl": "1fdfa5a0dd60dd7a6cf4a6713178ff578f8c4cd5d998e24742dac8b3e860597e"
+  },
+  "counts": {
+    "warmup": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "w1",
+        "w2",
+        "w3"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "baseline": {
+      "expected": 60,
+      "started": 60,
+      "success": [
+        "r1-I36-01",
+        "r1-I36-02",
+        "r1-I36-03",
+        "r1-I36-04",
+        "r1-I36-05",
+        "r1-I36-06",
+        "r1-I36-07",
+        "r1-I36-08",
+        "r1-I36-09",
+        "r1-I36-10",
+        "r1-I36-11",
+        "r1-I36-12",
+        "r1-I36-13",
+        "r1-I36-14",
+        "r1-I36-15",
+        "r1-I36-16",
+        "r1-I36-17",
+        "r1-I36-18",
+        "r1-I36-19",
+        "r1-I36-20",
+        "r2-I36-01",
+        "r2-I36-02",
+        "r2-I36-03",
+        "r2-I36-04",
+        "r2-I36-05",
+        "r2-I36-06",
+        "r2-I36-07",
+        "r2-I36-08",
+        "r2-I36-09",
+        "r2-I36-10",
+        "r2-I36-11",
+        "r2-I36-12",
+        "r2-I36-13",
+        "r2-I36-14",
+        "r2-I36-15",
+        "r2-I36-16",
+        "r2-I36-17",
+        "r2-I36-18",
+        "r2-I36-19",
+        "r2-I36-20",
+        "r3-I36-01",
+        "r3-I36-02",
+        "r3-I36-03",
+        "r3-I36-04",
+        "r3-I36-05",
+        "r3-I36-06",
+        "r3-I36-07",
+        "r3-I36-08",
+        "r3-I36-09",
+        "r3-I36-10",
+        "r3-I36-11",
+        "r3-I36-12",
+        "r3-I36-13",
+        "r3-I36-14",
+        "r3-I36-15",
+        "r3-I36-16",
+        "r3-I36-17",
+        "r3-I36-18",
+        "r3-I36-19",
+        "r3-I36-20"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "supplement": {
+      "expected": 0,
+      "started": 0,
+      "success": [],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    }
+  },
+  "schedule_complete": true,
+  "journal_damaged": false,
+  "operational": {
+    "scope": "successful_main_attempts_only_including_empty",
+    "successful_attempts": 60,
+    "mean_generation_ms": 1758.5603667333332,
+    "mean_tokens_per_second": 33.26610984957838,
+    "input_tokens": 3627,
+    "generated_tokens_including_terminal_eos": 3516,
+    "max_peak_allocated_bytes": 16092110336,
+    "max_peak_reserved_bytes": 16120807424,
+    "load": {
+      "environment": {
+        "attention": "eager",
+        "cache_policy": "generation_default_fresh_per_call",
+        "device": "cuda:0",
+        "driver_version": null,
+        "dtype": "bfloat16",
+        "gpu_capability": [
+          8,
+          6
+        ],
+        "gpu_name": "NVIDIA RTX A6000",
+        "gpu_total_memory_bytes": 51041271808,
+        "model_revision": "c963a5f4f6496c749f94064a20b33028b0db9f19",
+        "model_revision_status": "declared_by_profile",
+        "packages": {
+          "accelerate": "1.15.0",
+          "safetensors": "0.8.0",
+          "torch": "2.7.1+cu118",
+          "transformers": "4.57.1"
+        },
+        "python": "3.12.7",
+        "resident_allocated_bytes": 16060572160,
+        "resident_reserved_bytes": 16074670080,
+        "torch_cuda_build": "11.8"
+      },
+      "load_ms": 4676.046557,
+      "run_id": "13395803-32f6-4070-9666-ac68a5afbf34",
+      "seq": 2,
+      "status": "success",
+      "time": "2026-10-17T10:18:36.208757+00:00",
+      "type": "load_result"
+    },
+    "cache_recovery_occurred": false,
+    "not_measured": [
+      "TTFT",
+      "end_to_end_latency",
+      "whole_gpu_VRAM"
+    ]
+  },
+  "evaluation_axis": "deterministic_mechanical",
+  "rounds": [
+    {
+      "round": 1,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.65,
+        "rule_accuracy": 0.7666666666666667,
+        "single_accuracy": 0.75,
+        "compound_accuracy": 0.5
+      },
+      "rows": [
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-01",
+          "attempt_id": "r1-I36-01"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-02",
+          "attempt_id": "r1-I36-02"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-03",
+          "attempt_id": "r1-I36-03"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-04",
+          "attempt_id": "r1-I36-04"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-05",
+          "attempt_id": "r1-I36-05"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-06",
+          "attempt_id": "r1-I36-06"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-07",
+          "attempt_id": "r1-I36-07"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-08",
+          "attempt_id": "r1-I36-08"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-09",
+          "attempt_id": "r1-I36-09"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-10",
+          "attempt_id": "r1-I36-10"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-11",
+          "attempt_id": "r1-I36-11"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-12",
+          "attempt_id": "r1-I36-12"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-13",
+          "attempt_id": "r1-I36-13"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-14",
+          "attempt_id": "r1-I36-14"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-15",
+          "attempt_id": "r1-I36-15"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-16",
+          "attempt_id": "r1-I36-16"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-17",
+          "attempt_id": "r1-I36-17"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-18",
+          "attempt_id": "r1-I36-18"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-19",
+          "attempt_id": "r1-I36-19"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-20",
+          "attempt_id": "r1-I36-20"
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.65,
+        "rule_accuracy": 0.7666666666666667,
+        "single_accuracy": 0.75,
+        "compound_accuracy": 0.5
+      },
+      "rows": [
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-01",
+          "attempt_id": "r2-I36-01"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-02",
+          "attempt_id": "r2-I36-02"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-03",
+          "attempt_id": "r2-I36-03"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-04",
+          "attempt_id": "r2-I36-04"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-05",
+          "attempt_id": "r2-I36-05"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-06",
+          "attempt_id": "r2-I36-06"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-07",
+          "attempt_id": "r2-I36-07"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-08",
+          "attempt_id": "r2-I36-08"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-09",
+          "attempt_id": "r2-I36-09"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-10",
+          "attempt_id": "r2-I36-10"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-11",
+          "attempt_id": "r2-I36-11"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-12",
+          "attempt_id": "r2-I36-12"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-13",
+          "attempt_id": "r2-I36-13"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-14",
+          "attempt_id": "r2-I36-14"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-15",
+          "attempt_id": "r2-I36-15"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-16",
+          "attempt_id": "r2-I36-16"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-17",
+          "attempt_id": "r2-I36-17"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-18",
+          "attempt_id": "r2-I36-18"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-19",
+          "attempt_id": "r2-I36-19"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-20",
+          "attempt_id": "r2-I36-20"
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.65,
+        "rule_accuracy": 0.7666666666666667,
+        "single_accuracy": 0.75,
+        "compound_accuracy": 0.5
+      },
+      "rows": [
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-01",
+          "attempt_id": "r3-I36-01"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-02",
+          "attempt_id": "r3-I36-02"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-03",
+          "attempt_id": "r3-I36-03"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-04",
+          "attempt_id": "r3-I36-04"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-05",
+          "attempt_id": "r3-I36-05"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-06",
+          "attempt_id": "r3-I36-06"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-07",
+          "attempt_id": "r3-I36-07"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-08",
+          "attempt_id": "r3-I36-08"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-09",
+          "attempt_id": "r3-I36-09"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-10",
+          "attempt_id": "r3-I36-10"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true
+          ],
+          "kind": "single",
+          "state": "correct",
+          "case_id": "I36-11",
+          "attempt_id": "r3-I36-11"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            false
+          ],
+          "kind": "single",
+          "state": "content_wrong",
+          "case_id": "I36-12",
+          "attempt_id": "r3-I36-12"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-13",
+          "attempt_id": "r3-I36-13"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-14",
+          "attempt_id": "r3-I36-14"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-15",
+          "attempt_id": "r3-I36-15"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-16",
+          "attempt_id": "r3-I36-16"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-17",
+          "attempt_id": "r3-I36-17"
+        },
+        {
+          "whole_success": true,
+          "rules_passed": [
+            true,
+            true
+          ],
+          "kind": "compound",
+          "state": "correct",
+          "case_id": "I36-18",
+          "attempt_id": "r3-I36-18"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-19",
+          "attempt_id": "r3-I36-19"
+        },
+        {
+          "whole_success": false,
+          "rules_passed": [
+            true,
+            false,
+            true
+          ],
+          "kind": "compound",
+          "state": "content_wrong",
+          "case_id": "I36-20",
+          "attempt_id": "r3-I36-20"
+        }
+      ]
+    }
+  ],
+  "three_round_mean": {
+    "whole_accuracy": 0.65,
+    "rule_accuracy": 0.7666666666666667,
+    "single_accuracy": 0.75,
+    "compound_accuracy": 0.5
+  },
+  "main_complete": true
+}
