@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "qwen2.5-7b-instruct": {
+      "model_id": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "chat_template_kwargs": {},
+      "kobest_add_bos_token": false
+    },
+    "ax-4.0-light": {
+      "model_id": "skt/A.X-4.0-Light",
+      "revision": "ba21c20ea1b31ded1ec3e2fb432335077dc4be98",
+      "chat_template_kwargs": {},
+      "kobest_add_bos_token": false
+    },
+    "ax-3.1-light": {
+      "model_id": "skt/A.X-3.1-Light",
+      "revision": "9b41bb2406472634d8812c0b8931fa40fa9a6c3a",
+      "chat_template_kwargs": {},
+      "kobest_add_bos_token": false
+    },
+    "qwen3-8b": {
+      "model_id": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "chat_template_kwargs": {"enable_thinking": false},
+      "kobest_add_bos_token": false
+    },
+    "qwen3-4b-instruct-2507": {
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "chat_template_kwargs": {},
+      "kobest_add_bos_token": false
+    },
+    "kanana-1.5-8b-instruct-2505": {
+      "model_id": "kakaocorp/kanana-1.5-8b-instruct-2505",
+      "revision": "c963a5f4f6496c749f94064a20b33028b0db9f19",
+      "chat_template_kwargs": {},
+      "kobest_add_bos_token": true
+    }
+  }
+}

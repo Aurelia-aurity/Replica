@@ -9,7 +9,7 @@ import sys
 import urllib.request
 import uuid
 from pathlib import Path
-from assets import ROOT, EvaluationError, canonical, digest, read_json, require, write_json
+from assets import ROOT, EvaluationError, canonical, digest, profile_settings, read_json, require, write_json
 from common import now
 
 
@@ -116,7 +116,17 @@ def validate_result(result, lock, smoke=False):
             'aggregate_is_official': False}
 
 
-def execute(model_path, harness, data_dir, output, resume=False, smoke=False):
+def profile_identity(profile):
+    # Without a profile the #36 identity and BOS policy stay byte-identical.
+    if profile is None:
+        return False, {}
+    p = profile_settings(profile)
+    return p['kobest_add_bos_token'], {'model_profile': profile, 'model_id': p['model_id'],
+                                       'model_revision': p['revision'],
+                                       'add_bos_token': p['kobest_add_bos_token']}
+
+
+def execute(model_path, harness, data_dir, output, resume=False, smoke=False, profile=None):
     harness, data_dir, model_path, output = map(lambda p: Path(p).resolve(), (harness, data_dir, model_path, output))
     lock = verify_source(harness, data_dir)
     require(sys.version_info[:2] == (3, 12) and sys.prefix != sys.base_prefix and bool(os.environ.get('SLURM_JOB_ID')))
@@ -135,6 +145,8 @@ def execute(model_path, harness, data_dir, output, resume=False, smoke=False):
                 'evaluator_code_sha256': {p.name: digest(p.read_bytes()) for p in sorted(ROOT.glob('*.py'))},
                 'batch_size': 1, 'dtype': 'bfloat16', 'num_fewshot': 0,
                 'apply_chat_template': False, 'system_instruction': None}
+    add_bos_token, extra = profile_identity(profile)
+    identity.update(extra)
     if resume:
         require(read_json(output / 'identity.json') == identity and not (output / 'report.json').exists())
     else:
@@ -164,7 +176,7 @@ def execute(model_path, harness, data_dir, output, resume=False, smoke=False):
         model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True, trust_remote_code=False,
                      use_safetensors=True, torch_dtype=torch.bfloat16, device_map={'': 0}, attn_implementation='eager')
         lm = HFLM(pretrained=model, tokenizer=tokenizer, device='cuda:0', batch_size=1,
-                  dtype='bfloat16', add_bos_token=False)
+                  dtype='bfloat16', add_bos_token=add_bos_token)
         # The official cache records individual likelihood requests. It can
         # survive an OOM/interruption, but cached requests alone are never scores.
         result = simple_evaluate(model=lm, tasks=ts, num_fewshot=0, batch_size=1,
@@ -198,12 +210,14 @@ def main():
         run.add_argument('--' + name, type=Path, required=True)
     run.add_argument('--resume', action='store_true')
     run.add_argument('--smoke', action='store_true')
+    run.add_argument('--profile', help='model-profiles.json entry (#37); omit for the #36 baseline')
     args = parser.parse_args()
     try:
         if args.command == 'prepare':
             prepare(args.data_dir)
             return 0
-        return execute(args.model_path, args.harness, args.data_dir, args.output, args.resume, args.smoke)
+        return execute(args.model_path, args.harness, args.data_dir, args.output, args.resume, args.smoke,
+                       args.profile)
     except (EvaluationError, OSError, ValueError, KeyError, subprocess.SubprocessError):
         print('KoBEST 준비·실행 실패. revision·환경·새 출력 경로를 확인하세요.')
         return 1

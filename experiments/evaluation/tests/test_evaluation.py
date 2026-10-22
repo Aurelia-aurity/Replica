@@ -209,6 +209,33 @@ class Tests(unittest.TestCase):
             with self.assertRaises(assets.EvaluationError):
                 collector.collect(paths)
 
+    def test_model_profiles_recorded_and_default_unchanged(self):
+        config = assets.inputs('human')[3]
+        self.assertEqual(config['model_id'], 'Qwen/Qwen2.5-7B-Instruct')
+        self.assertFalse({'model_profile', 'model_revision', 'chat_template_kwargs'} & set(config))
+        config = assets.inputs('human', 'qwen3-8b')[3]
+        self.assertEqual((config['model_id'], config['chat_template_kwargs']),
+                         ('Qwen/Qwen3-8B', {'enable_thinking': False}))
+        data = assets.inputs('human')[1]
+        for broken in (dict(config, model_revision='0' * 40), dict(config, model_profile='unknown'),
+                       dict(config, chat_template_kwargs={})):
+            with self.assertRaises(assets.EvaluationError):
+                assets.validate_config(broken, data)
+        self.assertEqual(benchmark.profile_identity(None), (False, {}))
+        self.assertTrue(benchmark.profile_identity('kanana-1.5-8b-instruct-2505')[0])
+        self.assertFalse(benchmark.profile_identity('qwen3-8b')[0])
+        with tempfile.TemporaryDirectory() as t:
+            paths = {s: Path(t) / s for s in ('human', 'record_qa', 'instructions')}
+            for s, p in paths.items():
+                runner.execute(s, 'unused', p, Fake, profile='qwen3-8b')
+            self.assertEqual(collector.collect(paths)['kobest']['state'], 'pending')
+            meta = json.loads((paths['human'] / 'metadata.json').read_text())
+            self.assertEqual(meta['config']['model_revision'], 'b968826d9c46dd6066d109eabc6255188de91218')
+            mixed = Path(t) / 'default-qa'
+            runner.execute('record_qa', 'unused', mixed, Fake)
+            with self.assertRaises(assets.EvaluationError):
+                collector.collect(dict(paths, record_qa=mixed))
+
     def test_human_overlap_ratios_failure_and_pending(self):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / 'run'

@@ -173,6 +173,50 @@ overlays and priority, rather than overwriting duplicate package names. Collecte
 results validate every expected choice likelihood and binary sample metric;
 HellaSwag acc_norm is required and checked against its sample mean.
 
+## Model comparison profiles (#37)
+
+`model-profiles.json` pins each compared model's repo id and revision, chat
+template arguments and the KoBEST BOS policy. Baseline profile path:
+`/abr/coss40/replica-models/Qwen2.5-7B-Instruct`. `--profile` records these in the
+run config/identity; collection rejects mixed profiles across suites/KoBEST.
+Without `--profile`, configs, identities and behavior equal the #36 baseline.
+The declared revision is not proof of the local weights; artifact hashes are.
+
+- `qwen3-8b`: `enable_thinking=False`; its template otherwise starts in thinking
+  mode and spends the 160-token budget on `<think>`.
+- `kanana-1.5-8b-instruct-2505`: Llama-family BOS. Generation templates already
+  emit `bos_token`; KoBEST uses `add_bos_token=True` (Qwen-family: `False`).
+- `ax-4.0-light`: generation `eos_token_id` 27 is `<|im_end|>`. Its config sets
+  `use_cache: false`; the runner's fresh `GenerationConfig` keeps the default
+  cache. Confirm throughput in the GPU smoke run.
+- All models: `generate(..., use_model_defaults=False)`. transformers 4.57.1
+  otherwise refills default-valued fields from a model's `generation_config`
+  when it was saved with >=4.50 (Qwen3: `do_sample=True`, temperature/top-p/top-k),
+  silently replacing greedy decoding. The #36 Qwen2.5 config predates 4.50, so
+  its behavior is unchanged.
+
+Download on ABRM02 (DIS02 has no DNS), then run each suite per profile:
+
+```bash
+cd /abr/coss40/replica-models
+# Baseline reuses the existing Qwen2.5-7B-Instruct folder (download metadata
+# revision a09a354...); its artifact hashes are recorded per run.
+huggingface-cli download skt/A.X-4.0-Light --revision ba21c20ea1b31ded1ec3e2fb432335077dc4be98 --local-dir A.X-4.0-Light
+huggingface-cli download skt/A.X-3.1-Light --revision 9b41bb2406472634d8812c0b8931fa40fa9a6c3a --local-dir A.X-3.1-Light
+huggingface-cli download Qwen/Qwen3-8B --revision b968826d9c46dd6066d109eabc6255188de91218 --local-dir Qwen3-8B
+huggingface-cli download Qwen/Qwen3-4B-Instruct-2507 --revision cdbee75f17c01a7cc42f958dc650907174af0554 --local-dir Qwen3-4B-Instruct-2507
+huggingface-cli download kakaocorp/kanana-1.5-8b-instruct-2505 --revision c963a5f4f6496c749f94064a20b33028b0db9f19 --local-dir kanana-1.5-8b-instruct-2505
+```
+
+```bash
+# Example for one profile; repeat with the matching profile/folder pair.
+P=qwen3-8b M=/abr/coss40/replica-models/Qwen3-8B
+for s in human record_qa instructions; do
+  python experiments/evaluation/run.py --suite $s --profile $P --model-path $M --output experiments/results/issue37-$P-$s-001
+done
+python experiments/evaluation/kobest.py run --profile $P --harness /abr/coss40/issue36-lm-eval --data-dir /abr/coss40/issue36-kobest-data-002 --model-path $M --output experiments/results/issue37-$P-kobest-001
+```
+
 ## Collection and local checks
 
 ```bash

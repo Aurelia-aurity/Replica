@@ -59,7 +59,8 @@ class Runtime:
                 'cache_policy': 'generation_default_fresh_per_call',
                 'resident_allocated_bytes': torch.cuda.memory_allocated(0),
                 'resident_reserved_bytes': torch.cuda.memory_reserved(0),
-                'model_revision': None, 'model_revision_status': 'unverified',
+                'model_revision': config.get('model_revision'),
+                'model_revision_status': 'declared_by_profile' if config.get('model_revision') else 'unverified',
                 'driver_version': None,
             }
         except EvaluationError:
@@ -89,7 +90,8 @@ class Runtime:
                 inputs = self.tokenizer.apply_chat_template(
                     [{'role': 'system', 'content': self.config['system_prompt']},
                      {'role': 'user', 'content': prompt}], tokenize=True,
-                    add_generation_prompt=True, return_dict=True, return_tensors='pt')
+                    add_generation_prompt=True, return_dict=True, return_tensors='pt',
+                    **self.config.get('chat_template_kwargs', {}))
                 input_count = inputs['input_ids'].shape[1]
                 if input_count + cap > self.model.config.max_position_embeddings:
                     raise EvaluationError('INPUT')
@@ -109,7 +111,11 @@ class Runtime:
                 torch.cuda.reset_peak_memory_stats(0)
                 start = time.perf_counter_ns()
                 with torch.inference_mode():
-                    outputs = self.model.generate(**inputs, generation_config=generation)
+                    # Models saved with transformers>=4.50 would otherwise refill "unset"
+                    # fields (do_sample, temperature, use_cache...) from their own
+                    # generation_config. Keep the fixed greedy protocol for every model.
+                    outputs = self.model.generate(**inputs, generation_config=generation,
+                                                  use_model_defaults=False)
                 torch.cuda.synchronize(0)
                 ms = (time.perf_counter_ns() - start) / 1e6
                 peak_alloc = torch.cuda.max_memory_allocated(0)
