@@ -1,0 +1,73 @@
+{
+  "complete_full_test": true,
+  "execution_kind": "school_gpu_full_test",
+  "tasks": {
+    "kobest_boolq": {
+      "accuracy": 0.9316239316239316,
+      "computed": 1404,
+      "expected": 1404,
+      "additional_metrics": {
+        "name": "kobest_boolq",
+        "alias": "kobest_boolq",
+        "sample_len": 1404,
+        "acc,none": 0.9316239316239316,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_copa": {
+      "accuracy": 0.821,
+      "computed": 1000,
+      "expected": 1000,
+      "additional_metrics": {
+        "name": "kobest_copa",
+        "alias": "kobest_copa",
+        "sample_len": 1000,
+        "acc,none": 0.821,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_hellaswag": {
+      "accuracy": 0.53,
+      "computed": 500,
+      "expected": 500,
+      "additional_metrics": {
+        "name": "kobest_hellaswag",
+        "alias": "kobest_hellaswag",
+        "sample_len": 500,
+        "acc,none": 0.53,
+        "acc_stderr,none": "N/A",
+        "acc_norm,none": 0.602,
+        "acc_norm_stderr,none": "N/A"
+      }
+    },
+    "kobest_sentineg": {
+      "accuracy": 0.8564231738035264,
+      "computed": 397,
+      "expected": 397,
+      "additional_metrics": {
+        "name": "kobest_sentineg",
+        "alias": "kobest_sentineg",
+        "sample_len": 397,
+        "acc,none": 0.8564231738035264,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_wic": {
+      "accuracy": 0.7007936507936507,
+      "computed": 1260,
+      "expected": 1260,
+      "additional_metrics": {
+        "name": "kobest_wic",
+        "alias": "kobest_wic",
+        "sample_len": 1260,
+        "acc,none": 0.7007936507936507,
+        "acc_stderr,none": "N/A"
+      }
+    }
+  },
+  "project_equal_task_mean": 0.7679681512442217,
+  "aggregate_is_official": false,
+  "result_file": "result-0af04e02-2e03-4217-953e-0f2ea7a5bdc0.json",
+  "result_sha256": "c4908e87fd17743dde7e4111104ea6b7e16f37f1a70a2b2331e4cd4ffa28a3c4",
+  "identity_sha256": "e14c4d0493b7eeb595a1bb48609b4fe5c8cbcf8ce2ee627aff023a05c1d8fa63"
+}

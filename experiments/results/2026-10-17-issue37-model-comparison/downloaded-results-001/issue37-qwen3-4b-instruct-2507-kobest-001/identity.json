@@ -1,0 +1,643 @@
+{
+  "lock": {
+    "harness_revision": "d6de81643928d653435c431bae19945d41d32520",
+    "harness_task_sha256": {
+      "kobest_boolq.yaml": "4775f1ea1db3c8f740bb62c029bc54c1845644651b5d0dc3298e22a6cee7bda4",
+      "kobest_copa.yaml": "4e2c9ad09cd75b96d4fdf3ed13f355cd6bf5a09ccdcfc0072bfa7f3e6bede206",
+      "kobest_hellaswag.yaml": "54d725c25f8f04016fc0b5f51618a226532bf741b6725d081ec02aff692137f3",
+      "kobest_sentineg.yaml": "99c0225508688c786ec5e7c84402cf187843044f55fb7033ac9119a6ca4a5bc1",
+      "kobest_wic.yaml": "36ce762501b813b9911bcc8403bd8a91604a65a62bf41d69e473a849eb7595c8",
+      "utils.py": "d4d9c2afaef727c9d7ac97db311879be3aa04feb7d10fd3ab140844b793ad4a7"
+    },
+    "dataset_id": "skt/kobest_v1",
+    "dataset_revision": "a5ea15e3ac77ed694b79f6204eb31889a2ba989f",
+    "tasks": [
+      "kobest_boolq",
+      "kobest_copa",
+      "kobest_hellaswag",
+      "kobest_sentineg",
+      "kobest_wic"
+    ],
+    "num_fewshot": 0,
+    "apply_chat_template": false,
+    "system_instruction": null,
+    "batch_size": 1,
+    "model_dtype": "bfloat16",
+    "full_test_required": true,
+    "test_files": {
+      "boolq": {
+        "sha256": "e6fb1bceab2e3e132119e7ce23d98c38e7700ce38bd0d00ec4f26c9a07d6b583",
+        "test_count": 1404
+      },
+      "copa": {
+        "sha256": "2912f4055e3fb170b94d0c25fef09a2015b5c61d99a1b6355d276d1099bd9f79",
+        "test_count": 1000
+      },
+      "hellaswag": {
+        "sha256": "4e4a21822a18c8fa181a158ba1aaca8a28d6085b2b91861577d633a099997346",
+        "test_count": 500
+      },
+      "sentineg": {
+        "sha256": "0fe36f1348039878945a276ce84f87949b9d8ca6f21b375b94e156fbab1753fc",
+        "test_count": 397
+      },
+      "wic": {
+        "sha256": "4cfe0308d434cf9935d29768de0a5ce6ff811b4095fecc26a95c01b5cb5ca0ec",
+        "test_count": 1260
+      }
+    }
+  },
+  "model_sha256": {
+    "config.json": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "generation_config.json": "835fffe355c9438e7a25be099b3fccaa98350b83451f9fd2d99512e74f1ade48",
+    "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+    "model-00001-of-00003.safetensors": "75311d91bb08cf0b882913da464a1e722a31fb44db35208663487efb7a3d8ed6",
+    "model-00002-of-00003.safetensors": "0b48adbb1f60e901153d91907ba11ce63bd4b8b584482e730f48808d055dfba1",
+    "model-00003-of-00003.safetensors": "7dd39ccca5e4de123c74c14af44c9bf2eb75df33b4614382af0134528e060d5d",
+    "model.safetensors.index.json": "d6c42883a895dfef5b0080ed2116a1bcd764f558406b98923d675978a1abf29c",
+    "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "tokenizer_config.json": "a62ff0a2472a0fa1b8eaabcb57c59b58afa42a22831dc141400b6e0cf2b65ce3",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+  },
+  "packages": [
+    {
+      "name": "aiohttp",
+      "version": "3.14.5",
+      "priority": 0,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "word2number",
+      "version": "1.1",
+      "priority": 1,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "sqlitedict",
+      "version": "2.1.0",
+      "priority": 2,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "multiprocess",
+      "version": "0.70.19",
+      "priority": 3,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "lm-eval",
+      "version": "0.4.14.dev0",
+      "priority": 4,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "rouge-score",
+      "version": "0.1.2",
+      "priority": 5,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "absl-py",
+      "version": "2.5.1",
+      "priority": 6,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "anyio",
+      "version": "4.15.1",
+      "priority": 7,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "tabulate",
+      "version": "0.10.0",
+      "priority": 8,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "priority": 9,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "priority": 10,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "colorama",
+      "version": "0.4.6",
+      "priority": 11,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "multidict",
+      "version": "7.1.0",
+      "priority": 12,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "chardet",
+      "version": "6.0.0.post1",
+      "priority": 13,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "portalocker",
+      "version": "4.4.0",
+      "priority": 14,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "priority": 15,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "dill",
+      "version": "0.4.1",
+      "priority": 16,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "tabledata",
+      "version": "1.3.5",
+      "priority": 17,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "priority": 18,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "priority": 19,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pathvalidate",
+      "version": "3.3.1",
+      "priority": 20,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.4",
+      "priority": 21,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "priority": 22,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "yarl",
+      "version": "1.25.1",
+      "priority": 23,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "sacrebleu",
+      "version": "2.6.0",
+      "priority": 24,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "scipy",
+      "version": "1.18.1",
+      "priority": 25,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "evaluate",
+      "version": "0.4.6",
+      "priority": 26,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "xxhash",
+      "version": "4.0.1",
+      "priority": 27,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "priority": 28,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "joblib",
+      "version": "1.6.0",
+      "priority": 29,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "priority": 30,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "typepy",
+      "version": "1.3.5",
+      "priority": 31,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "wheel",
+      "version": "0.48.0",
+      "priority": 32,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "priority": 33,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "priority": 34,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "nltk",
+      "version": "3.10.3",
+      "priority": 35,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pytablewriter",
+      "version": "1.2.1",
+      "priority": 36,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "scikit-learn",
+      "version": "1.9.1",
+      "priority": 37,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "click",
+      "version": "8.5.0",
+      "priority": 38,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "fsspec",
+      "version": "2026.6.0",
+      "priority": 39,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pip",
+      "version": "24.2",
+      "priority": 40,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "mbstrdecoder",
+      "version": "1.1.5",
+      "priority": 41,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pyarrow",
+      "version": "26.0.0",
+      "priority": 42,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "narwhals",
+      "version": "2.27.1",
+      "priority": 43,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "tcolorpy",
+      "version": "0.1.7",
+      "priority": 44,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "datasets",
+      "version": "5.0.1",
+      "priority": 45,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "lxml",
+      "version": "6.1.3",
+      "priority": 46,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pandas",
+      "version": "3.0.6",
+      "priority": 47,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "cloudpickle",
+      "version": "3.1.2",
+      "priority": 48,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "dataproperty",
+      "version": "1.1.1",
+      "priority": 49,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "threadpoolctl",
+      "version": "3.7.0",
+      "priority": 50,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "pytz",
+      "version": "2026.5",
+      "priority": 51,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "more-itertools",
+      "version": "11.1.0",
+      "priority": 52,
+      "location_sha256": "852b22938b94642a0c603b8897290629523b296575e98805e82f53e8d2ce18da"
+    },
+    {
+      "name": "huggingface-hub",
+      "version": "0.36.2",
+      "priority": 53,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.3",
+      "priority": 54,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "regex",
+      "version": "2026.9.29",
+      "priority": 55,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-nccl-cu11",
+      "version": "2.21.5",
+      "priority": 56,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "mpmath",
+      "version": "1.3.0",
+      "priority": 57,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "filelock",
+      "version": "3.32.3",
+      "priority": 58,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cusparse-cu11",
+      "version": "11.7.5.86",
+      "priority": 59,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-curand-cu11",
+      "version": "10.3.0.86",
+      "priority": 60,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cuda-runtime-cu11",
+      "version": "11.8.89",
+      "priority": 61,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cublas-cu11",
+      "version": "11.11.3.6",
+      "priority": 62,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "setuptools",
+      "version": "78.1.0",
+      "priority": 63,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cuda-nvrtc-cu11",
+      "version": "11.8.89",
+      "priority": 64,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "priority": 65,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "fsspec",
+      "version": "2026.7.0",
+      "priority": 66,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "priority": 67,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.1",
+      "priority": 68,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "priority": 69,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "triton",
+      "version": "3.3.1",
+      "priority": 70,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "jinja2",
+      "version": "3.1.6",
+      "priority": 71,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "networkx",
+      "version": "3.6.1",
+      "priority": 72,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cuda-cupti-cu11",
+      "version": "11.8.87",
+      "priority": 73,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3",
+      "priority": 74,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-nvtx-cu11",
+      "version": "11.8.86",
+      "priority": 75,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "accelerate",
+      "version": "1.15.0",
+      "priority": 76,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "markupsafe",
+      "version": "3.0.3",
+      "priority": 77,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "sympy",
+      "version": "1.14.0",
+      "priority": 78,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "priority": 79,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "pip",
+      "version": "24.2",
+      "priority": 80,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "torch",
+      "version": "2.7.1+cu118",
+      "priority": 81,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "priority": 82,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "tokenizers",
+      "version": "0.22.2",
+      "priority": 83,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cudnn-cu11",
+      "version": "9.1.0.70",
+      "priority": 84,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cusolver-cu11",
+      "version": "11.4.1.48",
+      "priority": 85,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "hf-xet",
+      "version": "1.7.0",
+      "priority": 86,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "transformers",
+      "version": "4.57.1",
+      "priority": 87,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "psutil",
+      "version": "7.2.2",
+      "priority": 88,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "safetensors",
+      "version": "0.8.0",
+      "priority": 89,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "priority": 90,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "nvidia-cufft-cu11",
+      "version": "10.9.0.58",
+      "priority": 91,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "priority": 92,
+      "location_sha256": "fc02d6b8259f86309daaf0cea9a55d4c6da0a64df9d151805b7c7913625b10a2"
+    }
+  ],
+  "python": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:27:36) [GCC 11.2.0]",
+  "smoke": false,
+  "wrapper_sha256": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+  "evaluator_code_sha256": {
+    "assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+    "collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+    "human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+    "kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+    "report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+    "run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+    "scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5"
+  },
+  "batch_size": 1,
+  "dtype": "bfloat16",
+  "num_fewshot": 0,
+  "apply_chat_template": false,
+  "system_instruction": null,
+  "model_profile": "qwen3-4b-instruct-2507",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "add_bos_token": false
+}

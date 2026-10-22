@@ -75,6 +75,12 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(adapter.tokenizer.messages[-1]['content'], '다른 질문')
         self.assertEqual(len(adapter.tokenizer.messages), 2)
         self.assertNotIn('empty_cache', log)
+    def test_profile_template_kwargs_forwarded(self):
+        adapter, _ = self.runtime()
+        adapter.config = dict(adapter.config, chat_template_kwargs={'enable_thinking': False})
+        adapter.generate('질문', 160)
+        self.assertIs(adapter.tokenizer.options['enable_thinking'], False)
+        self.assertIs(adapter.model.kwargs['use_model_defaults'], False)
     def test_empty_whitespace_eos_and_limit(self):
         for ids, text, termination in (([2], '', 'eos'), ([3], '  ', 'eos'),
                                        ([1] * 159 + [2], '답', 'eos'),

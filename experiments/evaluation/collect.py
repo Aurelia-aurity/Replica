@@ -5,20 +5,23 @@ from assets import ROOT, EvaluationError, baseline_module, digest, load_run, rea
 from report import report
 import json
 import human
-from kobest import hash_file, validate_result
+from kobest import hash_file, profile_identity, validate_result
 
 
 def collect(paths, labels=None, kobest_run=None, baseline_run=None):
     results = {}
     fingerprints = []
+    profiles = []
     execution_kinds = []
     for suite in ('human', 'record_qa', 'instructions'):
         run = load_run(paths[suite])
         require(run['dataset']['suite'] == suite)
         fingerprints.append(run['metadata']['config']['model_artifacts_sha256'])
+        profiles.append(run['metadata']['config'].get('model_profile'))
         execution_kinds.append(run['metadata']['execution_kind'])
         results[suite] = report(run, labels if suite == 'human' else None)
     require(all(f == fingerprints[0] for f in fingerprints) and len(set(execution_kinds)) == 1)
+    require(len(set(profiles)) == 1)
     benchmark = {'state': 'pending', 'report': None}
     if kobest_run:
         path = Path(kobest_run)
@@ -27,6 +30,9 @@ def collect(paths, labels=None, kobest_run=None, baseline_run=None):
         require(identity['lock'] == read_json(ROOT / 'kobest-lock.json'))
         require(identity['model_sha256'] == fingerprints[0])
         require(identity['smoke'] is False and identity['apply_chat_template'] is False and identity['num_fewshot'] == 0)
+        _, extra = profile_identity(profiles[0])
+        require({k: identity.get(k) for k in ('model_profile', 'model_id', 'model_revision', 'add_bos_token')} ==
+                {k: extra.get(k) for k in ('model_profile', 'model_id', 'model_revision', 'add_bos_token')})
         require(summary['identity_sha256'] == hash_file(path / 'identity.json'))
         name = summary['result_file']
         require(Path(name).name == name and name.startswith('result-') and name.endswith('.json'))
