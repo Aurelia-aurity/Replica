@@ -72,6 +72,8 @@ printf '%s\n' '발표 준비로 긴장하는 대학생에게 세 문장으로 �
 
 질문은 stdin으로 받습니다. 위 예시는 합성 질문이며 개인 원문을 shell history에 남기지 마세요. `REPLICA_MODEL_PATH`로 경로를 지정할 수도 있습니다. system prompt와 기본 출력 토큰 제한은 `configs/baseline.json`, 일회성 제한은 `--max-new-tokens`(1~1024)입니다. 설정의 model_id는 참고 정보이며 Hub 다운로드 경로로 사용하지 않습니다.
 
+현재 system prompt는 #55 프롬프트 실험의 개선안(`guarded`)이며 최종 프롬프트가 아닙니다. 기록에 없는 전제·감정을 받아들이지 않도록 지시를 더했고, 실험 결과와 알려진 부작용은 `experiments/results/2026-10-22-issue55-prompt-experiment/README.md`에 있습니다. #33·#36·#37 평가는 기존 프롬프트(`한국어로 간결하고 자연스럽게 답하세요.`)로 고정되어 있어 이 설정을 바꿔도 그 결과는 달라지지 않습니다.
+
 CLI는 Python 3.12 가상환경·Slurm 작업 환경 표시·CUDA 접근·네이티브 BF16을 확인합니다. 환경변수 표시는 스케줄러 권한의 인증 수단은 아니며 실제 할당은 Slurm이 관리합니다. CUDA의 논리 장치 0을 사용하고 CPU fallback/offload를 허용하지 않습니다. 모든 로더는 로컬 파일만 사용합니다. 입력+출력 길이가 모델 context를 넘으면 실패합니다.
 
 성공 시 응답만 stdout에 출력하며, 실패 시 고정 오류 코드와 안전한 안내를 stderr에 출력하고 1로 종료합니다. 원본 예외·traceback·질문·개인 경로를 오류에 출력하지 않습니다. API 공개와 AWS 연결은 #14의 학교 허용 조건 확인 후 별도 진행합니다.
