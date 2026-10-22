@@ -1,0 +1,35 @@
+{
+  "request_id": "00000011-0011-4011-8011-000000000011",
+  "persona_id": "00000002-0002-4002-8002-000000000002",
+  "source_revision": 3,
+  "source_text_version_ids": [
+    "00000004-0004-4004-8004-000000000004"
+  ],
+  "profile_content": {
+    "schema_version": 1,
+    "speech_style": {
+      "tone": [
+        "다정한 어조"
+      ],
+      "address_terms": [
+        "너"
+      ],
+      "sentence_endings": [
+        "~니?",
+        "~지."
+      ],
+      "frequent_expressions": [
+        "밥은 챙겨 먹었니?"
+      ]
+    },
+    "conversation_habits": [
+      "안부를 물으며 대화를 시작함"
+    ],
+    "limitations": [
+      "소량의 자료를 분석한 결과임"
+    ]
+  },
+  "model_name": "example-model",
+  "source_snapshot_id": "00000064-0000-4000-8000-000000000064",
+  "node_id": "00000065-0000-4000-8000-000000000065"
+}
