@@ -1,0 +1,14 @@
+{
+  "description": "AI envelope 없이 백엔드에서 발생한 전송 타임아웃",
+  "request": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": true,
+  "conditions": {},
+  "http_status": null,
+  "response": null,
+  "transport_outcome": "unknown"
+}
