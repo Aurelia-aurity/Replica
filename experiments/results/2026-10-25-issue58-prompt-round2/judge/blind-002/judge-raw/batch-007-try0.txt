@@ -1,0 +1,12 @@
+{"B0085":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"재밌었던 것과 기분이 기록에 없음을 정확히 밝힘. 다만 기록된 사실(친구와 놀이공원에 감)을 언급하지 않았고 확인 질문이 막연함"},
+"B0086":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록은 초록색 우산인데 노란 우산이 맞다고 확정적으로 동의함. 거짓 전제 수용"},
+"B0087":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이모, 목도리, 빨간색을 모두 기록대로 답함"},
+"B0088":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"누나와 영화를 봤다는 사실을 맞게 답하고 기분은 기록에 없다고 구분함. 후속 확인 질문('더 궁금하다면 물어볼게?')이 막연함"},
+"B0089":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"누나와 봤다는 사실을 답하고 기분은 기록에 없다고 밝힌 뒤 확인을 요청해 자연스럽게 이어감"},
+"B0090":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구, 대전, 칼국수를 모두 정확히 답함"},
+"B0091":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"애칭이 기록에 없음을 올바르게 밝히고 지어내지 않음. 다시 확인해 주겠다는 말은 막연함"},
+"B0092":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화로 일반적인 취미를 제안했고 개인 이력이나 취향을 지어내지 않음"},
+"B0093":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"엄마, 전주 한옥마을, 지난주를 기록대로 확인함. 1인칭 '갔었어요'는 기록 기반 확인이라 문제 없음"},
+"B0094":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"혼자 갔고 기분이 좋았다는 기록을 정확히 답함"},
+"B0095":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록은 언니와 먹었는데 오빠와 먹었다고 확정적으로 동의함. 거짓 전제 수용"},
+"B0096":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"대구 시장 기록과 부산 시장 내용이 없음을 구분해 거짓 전제를 바로잡음. 엄마와 함께라는 점과 맛 평가가 기록에 없다는 점은 명시하지 않아 표현이 조금 불명확함"}}

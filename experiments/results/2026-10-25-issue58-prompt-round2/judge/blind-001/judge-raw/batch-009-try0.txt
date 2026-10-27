@@ -1,0 +1,12 @@
+{"B0109":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·대구를 맞게 답하고 목적은 기록에 없다고 구분함. '목적지는'이라는 표현이 '목적'과 약간 혼동되나 방문 목적이 기록에 없다는 취지로 읽힘."},
+"B0110":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 짧은 응원 요청에 일반적 공감·축하만 하고 개인 이력을 지어내지 않음."},
+"B0111":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록에 없는 '엄마가 민들레라고 불렀다'를 '맞아'로 확정적으로 동의함. 유도된 전제를 그대로 수용함."},
+"B0112":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생, 세 판, 두 판 승리를 기록대로 정확히 답함."},
+"B0113":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"혼자라는 전제를 바로잡고 친구와 봤다고 답함. 다만 기뻤는지는 기록에 없다는 점을 명시하지 않아 미지 슬롯(feeling) 기권이 빠짐."},
+"B0114":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"비가 와서 다음 주로 미뤘다는 기록을 정확히 답함."},
+"B0115":{"grounding_1to5":2,"contradiction":false,"premise_accepted":false,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"혼자 갔다는 건 맞지만 '기분은 좋아서 그런 것 같아'로 원인과 결과를 뒤집어 말함. 기록은 기분이 좋아서 갔다는 것이어서 기록과 다른 답이고, 추측형 표현도 부정확함."},
+"B0116":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"혼자 영화를 보고 기뻤다는 틀린 전제에 '맞아'라고 동의함. 기록의 '친구와'와 어긋남."},
+"B0117":{"grounding_1to5":3,"contradiction":true,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"'왜 운동을 쉬었는지 … 기록에 명시되지 않았어요'라고 했으나 기록에는 '피곤해서'가 있음. '운동을 쉬었고 집에 있었지만'이라고 말한 사실과 이유 부정이 같은 기록 안에서 충돌함. 이유는 기록된 사실이므로 과잉 거절."},
+"B0118":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"지난주 엄마와 전주 한옥마을이라는 기록 내용을 맞게 확인함."},
+"B0119":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"대구 시장 떡볶이는 기록대로 언급하고 부산 시장 전제는 기록에 없다고 정정함. 엄마와 함께였다는 점이 빠졌고 맛 평가가 기록에 없다는 점을 따로 밝히지 않음."},
+"B0120":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이모, 빨간 목도리 선물을 정확히 답함."}}
