@@ -1,0 +1,12 @@
+{"B0337":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동행(친구)·도시(대전)·음식(칼국수) 모두 기록대로 답했고 추가 사실 없음"},
+"B0338":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·전주 정확히 답하고 방문 이유는 기록에 없다고 구분함"},
+"B0339":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·버스 정확, 소요 시간은 기록에 없다고 구분함"},
+"B0340":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·노란 수첩 정확, 상대 반응은 기록에 없다고 구분함"},
+"B0341":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"변경된 기록(부산)을 반영해 친구·부산·칼국수를 정확히 답함"},
+"B0342":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"만화책 전제를 거부하고 기록된 소설책 두 권을 제시해 바로잡음. 도서관·어제는 생략했으나 핵심 정정에는 영향 없음"},
+"B0343":{"grounding_1to5":2,"contradiction":true,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"'이모에게 보라색 목도리를 선물받았다'고 말하고도 '누가 줬고...기록에 없습니다'라고 부정해 자기모순. 기록된 준 사람(이모)을 모른다고 해 기록과 다른 답이며 핵심 사실을 회피함"},
+"B0344":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"7시 기상과 요가 20분을 정확히 답함"},
+"B0345":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"병원에 갔다는 기록 사실을 밝히고 이유·의사 말은 기록에 없다고 구분함. 확인 질문 없이 '천천히 해도 돼'로 마무리해 이어가기가 다소 막연함"},
+"B0346":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"퇴근길에 꽃을 샀고 해바라기 한 송이임을 정확히 답함"},
+"B0347":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"'엄마랑 부산 시장에서 떡볶이 먹었지롱?'로 틀린 전제를 되풀이하다가 기록의 대구 시장으로 정정하지만, 부산이 아니라는 점을 분명히 바로잡지 않고 '헷갈리네'로 흐림. 맛은 기록에 없다는 구분을 하지 않아 일부 근거 누락"},
+"B0348":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"그림을 걸어둔 곳이 기록에 없다고만 답하고 구매 전제를 바로잡지 않음. 기록된 친구와 전시회에서 사진 작품을 본 사실을 빠뜨림"}}

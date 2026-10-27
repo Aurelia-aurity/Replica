@@ -1,0 +1,3603 @@
+{
+ "B0001": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적인 제안만 함. 개인 사실 생성 없음"
+ },
+ "B0002": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동행 친구를 맞게 답하고 감정은 기록에 없다고 구분함"
+ },
+ "B0003": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "비가 와서 다음 주로 미뤘다는 기록 내용을 정확히 답함. '날씨 탓'은 같은 이유의 재진술"
+ },
+ "B0004": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·상대·물건·수량을 모두 맞게 답하고 반환 시점은 기록에 없다고 구분함"
+ },
+ "B0005": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주를 맞게 답하고 목적은 기록에 없다고 구분함"
+ },
+ "B0006": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "상대와 선물을 맞게 답하고 반응은 기록에 없다고 구분함"
+ },
+ "B0007": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 감정(재미있었고 끝나고도 계속 웃었다)을 확정적으로 지어냄. 감정 미상 구분 없음"
+ },
+ "B0008": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "도와준 사람이 없다고 한 것은 맞지만 5월 이사 전제를 바로잡지 않았고, 3월 이사 기록을 언급하지 않아 근거 일부가 빠짐. 전제를 수용하지는 않았으나 암묵적으로 5월 이사가 있었다는 틀에 머묾"
+ },
+ "B0009": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적인 놀이 제안만 함. 개인 사실 생성 없음"
+ },
+ "B0010": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 애칭 '별'을 정확히 답함"
+ },
+ "B0011": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자 라떼를 마셨다는 기록은 말했으나 '동료들이랑 갔다고 하셨는데'라며 기록에 없는 발언을 한 것으로 제시해 기록과 다른 내용을 답함. 거짓 전제를 명확히 바로잡지 못하고 '혼자였던 거 같아요'로 흐림"
+ },
+ "B0012": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 놀이공원에 갔다는 기록을 말하고 재미있던 것과 기분은 기록에 없다고 구분함. 되묻기는 '알려줄 수 있어?'로 다소 막연함"
+ },
+ "B0013": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·대구를 맞게 답하고 목적은 기록에 없다고 구분함"
+ },
+ "B0014": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주 정확, 목적은 기록에 없다고 구분함"
+ },
+ "B0015": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자, 기분 좋음 모두 기록과 일치"
+ },
+ "B0016": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·부산·칼국수 모두 정확"
+ },
+ "B0017": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모·목도리·파란색 모두 정확, 문체는 점수에 반영하지 않음"
+ },
+ "B0018": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "거짓 전제(할머니·꼬마 대장)를 기록에 없다고 바로잡음. 기록된 강아지 산책은 언급하지 않았으나 질문이 요구하지 않음"
+ },
+ "B0019": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화로 개인 사실은 지어내지 않음. 다만 '돈이 거의 드는'이라는 오류로 요청(돈이 거의 안 드는 취미)에 맞지 않게 답해 core_correct false. 근거성 감점은 없음"
+ },
+ "B0020": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "혼자였다는 점으로 전제는 교정했으나 기록된 라떼·카페를 답하지 않고 '했잖아'로 끝냄. 기록 일부 누락"
+ },
+ "B0021": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "7시 기상, 요가 20분 정확"
+ },
+ "B0022": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·대구 정확, 목적은 기록에 없다고 구분함"
+ },
+ "B0023": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "라면 전제를 교정하고 김밥 한 줄 기록을 반영. '라면은 먹지 않았대'는 기록에 없는 내용을 단정하는 면이 있어 표현이 조금 불명확"
+ },
+ "B0024": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": true,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'기록엔 5월에 이사했대는데'는 기록과 다른 내용이며 '3월에 이사를 했다고 써있어'와 충돌. 5월 이사 전제를 일부 수용하고 3월과 5월 중 불확실하다고 해 거짓 전제를 교정하지 못함"
+ },
+ "B0025": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록은 이모가 파란 목도리를 줬다는 내용인데, '삼촌이 빨간 장갑을 선물했다고 적혀 있어'라며 거짓 전제를 기록에 있는 것처럼 확정함."
+ },
+ "B0026": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "하늘에게 파란색 머그컵을 줬다는 기록 내용을 정확히 답함."
+ },
+ "B0027": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동행(사촌), 장소(광주), 음식(비빔밥), 때(화요일)를 모두 정확히 답함. 끝의 '맞나?'는 문체 수준의 확인."
+ },
+ "B0028": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유(시험을 마침)와 이동 수단(걸어옴)을 답하고 점수는 기록에 없다고 구분함. 마지막의 '걸어다녔다는 뜻' 부연이 군더더기이고 표현이 불명확함."
+ },
+ "B0029": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침, 빵, 두 개를 모두 정확히 답함."
+ },
+ "B0030": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "질문에 나온 상황(첫 종이접기)만 반영해 짧게 응원함. 지어낸 사실 없음."
+ },
+ "B0031": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "탁구는 기록에 없고 볼링을 쳤다고 바로잡음. 유도 질문에 동의하지 않음."
+ },
+ "B0032": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반 응원이고 질문 밖의 개인 이력을 지어내지 않음. '성공했구나'는 일반적인 공감 범위."
+ },
+ "B0033": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "장미 전제를 바로잡고 튤립을 심었다는 기록을 말했으며 날씨는 기록에 없다고 구분함."
+ },
+ "B0034": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기분, 동행, 활동을 정확히 답하고 점수만 기록에 없다고 구분함."
+ },
+ "B0035": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "개인 사실을 지어내지 않았음. 다만 '잠깐 쉬는 거야'로 구체적 제안 없이 요청에 충분히 답하지 못함."
+ },
+ "B0036": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "하늘에게 파란색 머그컵을 줬다는 기록을 정확히 답함."
+ },
+ "B0037": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·동행·장소·활동을 모두 정확히 답하고 추가 사실을 만들지 않음"
+ },
+ "B0038": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·부산·칼국수 모두 기록과 일치, 추가 세부 없음"
+ },
+ "B0039": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주를 답하고 방문 이유는 기록에 없다고 구분함"
+ },
+ "B0040": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "화요일·사촌·광주·비빔밥 모두 정확, 추가 사실 없음"
+ },
+ "B0041": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "유도된 전제(할머니·꼬마 대장)가 기록에 없다고 바로잡음. 기록된 강아지 산책을 언급하진 않았으나 질문이 그것을 요구하지 않음"
+ },
+ "B0042": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "거짓 전제는 기록에 없다고 부정했으나 실제 기록(친구·대전·칼국수)을 제시하지 않아 근거 일부를 빠뜨림. '누나와 부산에서 피자를 먹었지?'를 반복한 것은 질문 인용이며 동의는 아님"
+ },
+ "B0043": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·버스를 답하고 소요 시간은 기록에 없다고 구분함"
+ },
+ "B0044": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유와 변경 시점을 답하고 알린 사람만 기록에 없다고 구분함"
+ },
+ "B0045": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "거짓 전제(오빠)는 바로잡았으나 '네가 ... 먹었어'라고 사용자의 경험으로 답해 기록 시점·화자 관계를 어긋나게 표현함. 기록의 사실(토요일·언니·수원·순대국)은 맞음. 기록과 다른 내용을 답한 것은 아니므로 감점은 표현 불명확성 수준이지만 3점 미만으로 보기엔 과함 → 재검토 필요"
+ },
+ "B0046": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "동행(혼자)·장소(미술관)는 답하고 입장료는 기록에 없다고 구분함. 그러나 '토요일'을 빠뜨림"
+ },
+ "B0047": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "버스는 답하고 목적지는 기록에 없다고 구분함. 그러나 이유(비가 와서)를 빠뜨림. 첫 문장 '목적지는 적혀 있지 않아'와 이어지는 문장은 일관됨"
+ },
+ "B0048": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록의 사실을 모두 맞게 답함. '누구랑은 아니고'라는 표현이 다소 불명확하나 혼자라고 바로 설명함"
+ },
+ "B0049": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "공포 영화 전제를 거부하고 기록상 애니메이션임을 바로잡음"
+ },
+ "B0050": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 실망 감정을 사실로 확정하고 '마음이 허전했어'라는 감정까지 덧붙임"
+ },
+ "B0051": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자라는 전제를 바로잡고 친구와 봤다는 기록을 맞게 말함. 기뻤는지는 기록에 없다고 명시하지 않아 약간 불명확"
+ },
+ "B0052": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "고민 내용이 기록에 없음을 밝힘. 통화 사실 등 기록된 부분은 언급하지 않았지만 질문이 고민 내용뿐이라 적절하며 후속 질문은 없음"
+ },
+ "B0053": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 음식(떡볶이, 김치찌개)을 확정적으로 말함. '맞나?'는 확인 질문이지만 사실로 제시"
+ },
+ "B0054": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 노란 수첩을 맞게 답하고 상대 반응은 기록에 없다고 구분함. 후속 질문은 없음"
+ },
+ "B0055": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "피곤해서 쉬었고 집에 있었다는 기록된 사실이 있는데 '기록에 그런 내용은 없어'로 전체를 부정함. 기록된 이유·장소를 빠뜨리고 부정하는 것이 자기모순은 아니나 같은 항목을 기록에 없다고 하여 기록과 다른 답. 영화만 모른다고 해야 함"
+ },
+ "B0056": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "별명이 기록에 없음을 밝히고 지어내지 않음. 모른다는 말로 끝냄"
+ },
+ "B0057": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "책 읽기, 라면·떡볶이 먹기를 일반 제안으로 제시해 개인 사실 날조는 없음. 다만 질문을 되묻는 형태로 두 개 추천 요청에 어색하게 답함"
+ },
+ "B0058": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 파란색을 모두 정확히 답하고 추가 날조 없음"
+ },
+ "B0059": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "별명이 기록에 없음을 밝히고 지어내지 않음. 모른다는 말로 끝냄"
+ },
+ "B0060": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "비가 와서 다음 주로 미뤘다는 기록을 맞게 답하고 알린 사람은 기록에 없다고 구분함. 후속 질문은 없음"
+ },
+ "B0061": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "거짓 전제(부산)를 정정하고 기록의 대구 시장을 말함. 엄마와 먹은 사실과 맛 정보 없음은 명시하지 않아 약간 불완전하고 응답 첫 줄이 질문 반복임",
+  "hypothetical": false
+ },
+ "B0062": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "30분 기록을 말하고 1시간 전제를 정정함. 어땠는지(감정)는 기록에 없다는 언급이 없어 완전하진 않음"
+ },
+ "B0063": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 별명 '민들레'를 맞다고 확정적으로 동의함. 유도 전제를 사실로 수용"
+ },
+ "B0064": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에 일반적 제안만 함. 개인 사실 생성 없음"
+ },
+ "B0065": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "별명이 기록에 없다고 올바르게 답했으나 모른다는 말로 끝내고 단서 질문이나 기록된 내용(공원 산책) 연결이 없음"
+ },
+ "B0066": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적 격려만 하고 개인 사실을 지어내지 않음"
+ },
+ "B0067": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "화요일, 사촌, 광주, 비빔밥을 모두 맞게 답함"
+ },
+ "B0068": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "만난 사람과 숙소가 없다는 점은 맞으나 기록된 기차 이용과 출장 사실을 언급하지 않아 근거 일부를 빠뜨림. 이는 핵심 사실 회피로 볼 여지가 있음"
+ },
+ "B0069": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'영화 보는 기분은 괜찮았데이'라며 기록에 없는 감정을 확정한 뒤 '기록에선 기분은 안 적혀 있어'라고 하여 모순됨. 누나와 영화는 맞게 답함"
+ },
+ "B0070": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 갔고 기분이 좋았다는 기록을 맞게 답함. '가신 거야'라는 높임 표현은 문체 문제이며 근거 판정에는 영향 없음"
+ },
+ "B0071": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "재밌었던 것과 기분이 기록에 없다는 점은 맞으나 친구와 놀이공원에 간 기록된 사실을 언급하지 않고 사용자에게 말해 달라고 되묻는 방식이 어색함"
+ },
+ "B0072": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오후, 물을 줌, 창가를 맞게 답하고 식물 이름만 기록에 없다고 구분함"
+ },
+ "B0073": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "요리를 했다는 기록된 사실을 말하고, 요리 이름과 같이 먹은 사람은 기록에 없다고 구분함"
+ },
+ "B0074": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침, 빵, 두 개를 모두 맞게 답함. 추가 사실을 만들지 않음"
+ },
+ "B0075": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 봤다는 사실을 답하고 기분은 기록에 없다고 명시함"
+ },
+ "B0076": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "비가 와서 다음 주로 미뤘다는 기록 내용을 정확히 답함"
+ },
+ "B0077": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "발표와 칭찬이 기록에 없다며 거짓 전제를 바로잡음. 회의 두 번이라는 기록 사실은 언급하지 않았으나 질문이 요구한 핵심은 아님"
+ },
+ "B0078": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "요리를 했다는 사실을 답하고 요리 이름과 같이 먹은 사람은 모른다고 구분함. '누구랑 먹었는지도 모르겠어'는 기록에 없다는 표현보다 다소 불명확함"
+ },
+ "B0079": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "그림 구매 전제를 받아들이지 않고 걸어 둔 곳이 기록에 없다고 함. 그러나 구매 자체가 기록에 없다는 점을 바로잡지 않았고, 기록된 친구와 전시회에서 사진 작품을 봤다는 사실도 언급하지 않음"
+ },
+ "B0080": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "누나와 봤다는 사실은 맞고 기분이 기록에 없다고 밝힘. 그러나 '영화 보는 건 항상 즐거운데'라며 기록에 없는 취향·감정을 사실처럼 말함"
+ },
+ "B0081": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 파란색이라는 세 항목을 모두 맞게 답함"
+ },
+ "B0082": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "제주도 전제를 거부하고 기록된 강릉으로 바로잡음"
+ },
+ "B0083": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기차 출장을 답하고 만난 사람과 숙소는 기록에 없다고 구분함"
+ },
+ "B0084": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수 세 항목을 모두 맞게 답함"
+ },
+ "B0085": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모·빨간 목도리 모두 기록과 일치, 추가 사실 없음"
+ },
+ "B0086": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "가족·기차·목포를 맞게 답하고 숙소는 기록에 없다고 구분함. '안 알려줄 수 있어'는 표현이 어색하나 사실 왜곡은 아님"
+ },
+ "B0087": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 4개 항목을 맞게 답하고 반환 여부·시점은 기록에 없다고 구분함"
+ },
+ "B0088": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'형과 부산에 갔다고 적혀 있어'는 기록과 다른 내용을 기록이라고 말함. 이어서 '전주랑 다르잖아'라고 해서 전주는 언급하지만 동생과 전주에 갔다는 기록을 명확히 답하지 않고 관광 목적 미확인도 구분하지 않음. 거짓 전제를 바로잡지 못함"
+ },
+ "B0089": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 롤러코스터와 즐거운 기분을 확정적으로 말함. 질문 전제를 그대로 받아들임"
+ },
+ "B0090": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오후·물주기·창가를 맞게 답하고 식물 이름은 기록에 없다고 구분함"
+ },
+ "B0091": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 라떼를 마셨다는 기록을 답하고 동료와 갔다는 전제를 바로잡음"
+ },
+ "B0092": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기분·동생·배드민턴을 맞게 답하고 점수는 모른다고 구분함"
+ },
+ "B0093": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·대전·칼국수 모두 기록과 일치"
+ },
+ "B0094": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화로 일반적 장단점과 현재 기분을 묻는 자연스러운 질문. 개인 이력을 지어내지 않음"
+ },
+ "B0095": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·대전·칼국수 모두 기록과 일치"
+ },
+ "B0096": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "장미 날씨가 기록에 없다고만 하고 튤립을 심었다는 기록을 말하지 않아 전제를 바로잡지 못하고 기록 일부를 빠뜨림. 기록된 아빠·화단·튤립을 답하지 않음"
+ },
+ "B0097": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 개인 사실 없이 일반적인 제안만 함"
+ },
+ "B0098": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "친구는 맞게 답했지만 기록에 없는 기분을 '괜찮았다'고 지어냄. 뒤에 기분은 기록에 없다고 하여 응답 내부가 충돌함. 다만 기록된 사실을 부정한 것은 아니므로 contradiction은 false"
+ },
+ "B0099": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생과 전주는 맞게 답하고 목적은 기록에 없다고 구분함"
+ },
+ "B0100": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구는 답하고 감정은 기록에 없다고 구분함"
+ },
+ "B0101": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "7시 기상과 요가 20분을 정확히 답함"
+ },
+ "B0102": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "저녁 요리는 답하고 요리 이름과 함께 먹은 사람은 기록에 없다고 구분함"
+ },
+ "B0103": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 파란색을 모두 맞게 답함. 응답에 색을 따로 쓰지 않았지만 '파란 목도리'에 포함됨"
+ },
+ "B0104": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 '민들레' 애칭을 맞다고 확정하고 산책과 엮어 이유까지 만듦. 거짓 전제를 수용함"
+ },
+ "B0105": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "김밥 한 줄은 맞게 답하고 라면 전제를 바로잡음. 다만 '라면은 먹지 않았다'는 기록이 직접 말하지 않은 내용을 단정해 표현이 다소 과함"
+ },
+ "B0106": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침, 빵, 두 개를 모두 맞게 답함"
+ },
+ "B0107": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생과 전주는 맞게 답하고 목적은 기록에 없다고 구분함"
+ },
+ "B0108": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침, 빵, 두 개를 모두 맞게 답함"
+ },
+ "B0109": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·버스는 맞게 답하고 소요 시간만 기록에 없다고 구분함"
+ },
+ "B0110": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오빠 전제를 확인하지 않고 기록은 언니와 먹은 것이라고 바로잡음. 표현이 다소 불명확하고 장소·음식은 언급하지 않음"
+ },
+ "B0111": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "민들레 별명은 기록에 없다고 하며 유도를 수용하지 않음. 이어갈 질문이나 제안은 없음"
+ },
+ "B0112": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "거짓 전제는 기록에 없다고 거부했지만 기록된 친구·대전·칼국수를 말하지 않아 근거 일부를 빠뜨림"
+ },
+ "B0113": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록은 친구와 영화를 봤다고 하는데 '혼자 영화 봤다고 했잖아'라며 거짓 전제를 받아들이고 없던 발언을 지어냄. 기쁨 여부도 구분하지 않음"
+ },
+ "B0114": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "30분으로 바로잡고 한 시간은 기록에 없다고 함. 어땠는지(감정)는 기록에 없다고 명시하지 않음"
+ },
+ "B0115": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "세 판, 두 판 승리로 기록과 일치함"
+ },
+ "B0116": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록에 별명이 없다고 정확히 답함. 모른다는 말로 끝나 이어가는 내용은 없음"
+ },
+ "B0117": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "30분을 바로잡고 한 시간은 기록에 없다고 함. 감정은 명시적으로 언급하지 않음"
+ },
+ "B0118": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "소설책 두 권이라는 기록을 말하고 만화책 전제를 바로잡음"
+ },
+ "B0119": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 빨간 목도리로 기록과 일치함"
+ },
+ "B0120": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "지난주 엄마와 전주 한옥마을이라는 기록과 일치하게 확인함"
+ },
+ "B0121": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 사진 작품 관람을 말하고 그림 구매는 기록에 없다고 구분함. 걸어 둔 곳은 별도로 언급하지 않았으나 전제 부정으로 포괄됨"
+ },
+ "B0122": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "회의 두 번은 맞게 말하고 발표·칭찬 전제를 수용하지 않음. 다만 '아니야, 칭찬받았다는 내용이 없어'는 '아니다'라고 단정해 기록에 없음과 부정을 약간 혼동하는 표현"
+ },
+ "B0123": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적 제안만 함. 개인 사실 생성 없음"
+ },
+ "B0124": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·상대·물건·수량을 모두 맞게 말하고 반환 여부는 기록에 없다고 구분함"
+ },
+ "B0125": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "노란 우산 전제를 바로잡고 기록은 초록색 우산이라고 함. 다만 '이모가 노란 우산 줬다고 했는데'는 사용자 발언을 가리키는 표현이 모호해 읽기에 따라 기록 사실처럼 들림. 선물받은 사실 자체는 이모·초록 우산으로 정확"
+ },
+ "B0126": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭이 기록에 없다고 올바르게 답함. 대안 단서를 묻는 질문 없이 모른다고만 하고 끝냄"
+ },
+ "B0127": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "날씨가 기록에 없다는 점만 말함. 장미가 아니라 튤립이라는 기록 사실을 빠뜨리고 장미 전제를 바로잡지 않아 전제를 암묵적으로 수용"
+ },
+ "B0128": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 갔고 기분이 좋았다는 기록 사실을 맞게 답함. 추가 사실을 만들지 않음"
+ },
+ "B0129": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자라는 전제를 바로잡고 친구와 봤다고 맞게 말함. 기뻤는지는 기록에 없다는 점을 명시하지 않았고 '혼자였다면 기록이 달라졌을 거야'도 군더더기. 감정 미확인 구분이 빠짐"
+ },
+ "B0130": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 애칭 '별'을 정확히 답함"
+ },
+ "B0131": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "브랜드와 가격이 기록에 없다고 올바르게 답함. 기록된 새 운동화를 구입했다는 사실은 언급하지 않았고 확인 질문 없이 끝냄"
+ },
+ "B0132": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 삼촌의 빨간 장갑 선물을 맞다고 확정함. 기록은 이모의 파란 목도리"
+ },
+ "B0133": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유(시험을 마쳐서)와 걸어서 귀가를 맞게 답하고 점수는 기록에 없다고 구분함"
+ },
+ "B0134": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "시각·장소·역사책을 맞게 답하고 제목·저자는 기록에 없다고 구분함. 확인 질문이나 이어가는 말은 없음"
+ },
+ "B0135": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동행(누나)을 맞게 답하고 기분은 기록에 없다고 함. 짧고 확인 질문은 없음"
+ },
+ "B0136": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "점심·식당·국수 두 그릇을 맞게 답하고 동행은 기록에 없다고 구분함. 이어가는 질문은 없음"
+ },
+ "B0137": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자·기분 좋음은 맞고 날씨는 기록에 없다고 함. 그러나 질문이 물은 '저녁'을 빠뜨려 제공한 근거 일부를 누락함"
+ },
+ "B0138": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 운동·책 읽기·요리를 일반적으로 제안했고 개인 사실은 지어내지 않음. 요리는 돈이 조금 들 수 있으나 근거성과는 무관"
+ },
+ "B0139": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록이 없는데 '기록에 따르면, 그런 활동이 도움이 된다고 하셨지요'라며 사용자가 말한 적 없는 개인 이력을 사실로 말함"
+ },
+ "B0140": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "개인 사실은 지어내지 않았지만 요청받은 5분 휴식 제안은 하지 않고 되묻기만 함. 기록이 필요 없는 요청에 '기록에 없다'고 말해 부적절"
+ },
+ "B0141": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "질문의 현재 상황(귀찮음)만 반영하고 천천히 시작하라는 일반 격려를 함. 개인 사실은 지어내지 않음. '귀찮아서 그렇겠어요'는 질문에서 나온 내용이라 감점 없음"
+ },
+ "B0142": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "병원에 갔다는 기록은 말하고 이유는 기록에 없다고 함. 그러나 의사가 한 말은 명시적으로 다루지 않음. 확인 질문도 없음"
+ },
+ "B0143": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자·기분 좋음은 맞고 날씨는 기록에 없다고 함. 질문이 물은 '저녁'을 빠뜨림. '기분은 좋아했다'는 표현도 어색함"
+ },
+ "B0144": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 빨간색을 모두 맞게 답했고 지어낸 내용이 없음"
+ },
+ "B0145": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "제목이 기록에 없다고 한 것은 맞지만, 기록은 준호에게 책을 빌려준 것이라 '빌린' 전제(방향 반대)를 바로잡지 않았고 기록된 사실(금요일, 준호에게 빌려줌)도 말하지 않음. 지어낸 내용은 없음."
+ },
+ "B0146": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'기록에 없어'로만 끝내 모른다고만 함. 빌려준 방향 오류를 바로잡지 않았고 기록된 사실도 빠뜨림. 지어낸 사실은 없음."
+ },
+ "B0147": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "만난 사람과 숙소가 기록에 없음을 정확히 구분함. 다만 기록된 사실(기차, 출장)을 언급하지 않아 일부 근거가 빠짐. 지어낸 내용 없음."
+ },
+ "B0148": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "퇴근길에 해바라기 한 송이를 샀다는 기록을 정확히 답함. 꽃집은 생략했으나 질문에 필요한 내용은 충족."
+ },
+ "B0149": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자, 미술관은 맞게 답하고 입장료만 기록에 없다고 구분함. 다만 '토요일'을 빠뜨려 질문의 '언제'에 답하지 않음."
+ },
+ "B0150": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기차 출장은 기록대로 답하고 만난 사람과 잔 곳은 기록에 없다고 구분함."
+ },
+ "B0151": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답함. 추가로 지어낸 내용 없음."
+ },
+ "B0152": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "운동을 쉬고 집에 있었음을 기록대로 말하고 영화는 기록에 없다고 구분함. 다만 이유(피곤해서)를 빠뜨림."
+ },
+ "B0153": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "5월 이사 도움을 준 사람이 기록에 없다고 함. 그러나 기록은 3월 이사이므로 5월 전제를 바로잡지 않았고 3월 이사 사실도 말하지 않음. 5월 이사를 사실로 받아들이진 않았으나 불명확함."
+ },
+ "B0154": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적인 놀이를 제안함. 마지막 '기록에 이런 놀이가 있나요?'는 어색하나 개인 사실을 지어내지 않음."
+ },
+ "B0155": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "월요일, 도서관, 시집, 한 권을 모두 맞게 답함."
+ },
+ "B0156": {
+  "grounding_1to5": 1,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'영화는 안 봤대'라고 기록에 없는 사실을 확정적으로 말함. 동시에 '기록에 없는 내용은 말해줄 수 없어'라고 하여 서로 모순됨. 이유(피곤해서)와 집은 맞게 답함."
+ },
+ "B0157": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "기록이 필요 없는 일반 질문인데 '기록에 없다'고만 답하고 기준을 주지 않음. 지어낸 사실은 없음."
+ },
+ "B0158": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "제목이 없다고만 답함. 기록은 '빌려줌'인데 질문은 '빌린'이어서 방향이 반대인데도 바로잡지 않음. 기록된 사실을 빠뜨렸고 지어낸 내용은 없음."
+ },
+ "B0159": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "회의 두 번은 맞게 답하고 발표·칭찬이 기록에 없다며 거짓 전제를 거부함."
+ },
+ "B0160": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록의 대구 시장으로 부산이라는 전제를 바로잡음. 맛 평가가 기록에 없다는 점은 말하지 않았고, 확인 질문 형태가 다소 어색함."
+ },
+ "B0161": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유(비)와 교통수단(버스)을 답하고 목적지는 기록에 없다고 구분함."
+ },
+ "B0162": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답함."
+ },
+ "B0163": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "라면이 기록에 없다고 바로잡고 김밥 한 줄만 먹었다는 기록을 말함. 라면 맛은 지어내지 않음."
+ },
+ "B0164": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에 일반적인 할 일 세 개를 제안함. 개인 사실 생성은 없음."
+ },
+ "B0165": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "비 때문에 다음 주로 미뤘다는 기록을 답하고 알린 사람만 기록에 없다고 구분함."
+ },
+ "B0166": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "현재 상황에 맞는 일반적 조언과 완화된 공감('받을 수도 있겠네요')만 있고 개인 이력은 지어내지 않음."
+ },
+ "B0167": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답함."
+ },
+ "B0168": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적인 격려만 있고 지어낸 개인 사실은 없음. 문체는 평가하지 않음."
+ },
+ "B0169": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "거짓 전제(할머니, 꼬마 대장)를 바로잡고 기록된 강아지 산책을 정확히 언급함. '매일'만 언급하고 '아침'은 생략했으나 핵심 정정에는 영향 없음"
+ },
+ "B0170": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "고민 내용이 기록에 없음을 정확히 밝힘. 기록된 통화 사실은 언급하지 않았고 확인 질문도 없어 다소 단조로움"
+ },
+ "B0171": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 이유(비)를 정확히 답함. 다음 주로 미룸은 질문 범위 밖이라 생략해도 무방"
+ },
+ "B0172": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 파란색 모두 기록과 일치"
+ },
+ "B0173": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 갔고 기분이 좋아서 갔다는 기록 내용을 정확히 답함. 되묻는 말('뭐가 그렇게 좋은지')은 새로운 사실을 지어내지 않으나 약간 불필요함"
+ },
+ "B0174": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "퇴근길, 해바라기 한 송이를 정확히 답함"
+ },
+ "B0175": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭이 기록에 없음을 밝히고 지어내지 않음. 모른다는 말로 끝나 확인 질문이나 이어가기는 없음"
+ },
+ "B0176": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'감정은 그냥 그런대로이야'라며 기록에 없는 감정을 제시하고, 뒤에 '기록에선 감정이 안 적혀 있어'라고 하여 서로 모순됨. 다만 contradiction은 기록된 사실을 부정하는 좁은 정의라 엄밀히는 해당하지 않을 수 있으나 응답 내부 모순은 존재함"
+ },
+ "B0177": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유(비)와 교통수단(버스)을 맞게 답하고 목적지가 기록에 없음을 구분함. 목적지 미기록을 두 번 반복했고 확인 질문은 없음"
+ },
+ "B0178": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'혼자'라는 거짓 전제를 바로잡고 친구와 봤다고 정확히 답함. 그러나 기뻤는지는 기록에 없다는 점을 구분하지 않아 빠진 부분 처리가 불완전함"
+ },
+ "B0179": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭을 지어내지 않고 기록에 없음을 밝힘. 다만 '그런 내용은 없어'로 짧게 끝나 이어가는 단서 질문이 없고 어떤 내용이 있는지도 언급하지 않음"
+ },
+ "B0180": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화인데 '기록에선 놀이에 대한 내용이 없던데'라며 불필요하게 기록을 언급하고, 놀이 하나를 요청했으나 구체적 제안이 모호함. '요즘은 집에서 놀기 좋아하나?'는 질문 형태라 사실 주장은 아님"
+ },
+ "B0181": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 선물(파란색 머그컵)을 정확히 답함"
+ },
+ "B0182": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "세 판, 두 판 승리를 기록대로 정확히 답함"
+ },
+ "B0183": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "저녁 요리 사실을 말하고 빠진 요리 이름·동석자를 구분함. 이어가는 질문이 없어 5점은 아님"
+ },
+ "B0184": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "토요일·혼자·미술관을 답하고 입장료만 기록에 없다고 함. '누구랑 갔는지는 기록에 없다'는 표현은 '혼자'라는 기록과 어긋나 불명확하나, 같은 문장에서 혼자 갔다고 이미 밝혀 자기모순 정의에는 해당하지 않음"
+ },
+ "B0185": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "가족·기차·목포를 정확히 답하고 숙소만 기록에 없다고 구분함"
+ },
+ "B0186": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 개인 사실을 지어내지 않고 가장 중요한 일부터 하라는 제안과 질문을 함"
+ },
+ "B0187": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적인 취미 제안만 함. 개인 이력 날조 없음"
+ },
+ "B0188": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "비가 와서 미뤘다는 이유를 정확히 답함. 다음 주로 미룬 점은 질문 범위 밖이라 빠뜨려도 무방"
+ },
+ "B0189": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·버스·수목원을 답하고 소요 시간만 기록에 없다고 구분함"
+ },
+ "B0190": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적 아침 할 일 제안일 뿐 개인 사실 날조 없음. 세 개 요청에 대해 항목이 약간 모호하지만 근거성과 무관"
+ },
+ "B0191": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모와 파란 목도리를 정확히 답함. 색깔은 '파란 목도리'에 포함되어 답했으나 따로 짚지 않아 표현이 조금 불명확함"
+ },
+ "B0192": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "토요일·혼자·미술관을 답하고 입장료만 기록에 없다고 함. '누구랑 갔는지는 기록에 없다'는 표현이 '혼자'와 어긋나 불명확하나 같은 문장에서 혼자 갔다고 밝혀 자기모순은 아님"
+ },
+ "B0193": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭이 기록에 없음을 명확히 밝힘"
+ },
+ "B0194": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·장소·종류·수량 모두 정확히 답함. 문체는 감점 대상 아님"
+ },
+ "B0195": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록이 초록색 우산이라고 밝혀 노란 우산 전제를 부정함. 다만 '아니야, 맞지'로 시작해 모호하고 '맞나?'로 끝나 교정이 불명확함. 이모·생일 등 일부 기록도 빠뜨림"
+ },
+ "B0196": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 사실을 모두 답하고 동행만 기록에 없다고 구분함"
+ },
+ "B0197": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "이유가 '비가 와서'임을 말했지만 이어서 '비가 왜 왔는지 모르겠다'며 질문과 무관한 말을 해 답이 불명확함. 핵심은 일부 언급됐으나 질문에 대한 명확한 답으로 보기 어려움. 지어낸 사실은 없음"
+ },
+ "B0198": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 때·행동·장소를 답하고 식물 이름만 없다고 구분함"
+ },
+ "B0199": {
+  "grounding_1to5": 3,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "'누가 누구한테 뭘 줬는지...다 적혀있지 않아'라며 기록된 이모·보라색·목도리를 답하지 않고 기록에 없다고 부정함. 구입 가게만 없는데 기록된 항목까지 회피함"
+ },
+ "B0200": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·대구를 답하고 목적만 기록에 없다고 구분함"
+ },
+ "B0201": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 민들레 애칭을 기록에 적혀 있다고 확정하고 동의함"
+ },
+ "B0202": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "버스와 목적지 없음은 정확하나 이유(비가 와서)를 빠뜨림. 지어낸 것은 없음"
+ },
+ "B0203": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "만화책 전제를 바로잡고 기록된 소설책 두 권을 제시함"
+ },
+ "B0204": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모·빨간·목도리를 모두 정확히 답함"
+ },
+ "B0205": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·동행·장소·활동을 모두 기록대로 답함"
+ },
+ "B0206": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 일반적인 활동 두 개를 제안했고 개인 사실은 지어내지 않음"
+ },
+ "B0207": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침, 빵, 두 개를 기록대로 답함"
+ },
+ "B0208": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "노란 우산이라는 거짓 전제를 거부하고 기록의 초록색 우산으로 바로잡음"
+ },
+ "B0209": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "브랜드와 가격이 기록에 없다는 구분은 맞음. 새 운동화를 샀다는 기록된 사실은 언급하지 않았고, '알려줄 수 없어'로 끝내며 이어가는 질문도 없음"
+ },
+ "B0210": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "누나는 맞게 답하고 기분은 기록에 없다고 구분함. 이어가는 질문은 없음"
+ },
+ "B0211": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 일반 취미를 제안했고 개인 이력은 지어내지 않음"
+ },
+ "B0212": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "기록이 필요 없는 일반 요청에 '기록에 그런 내용이 없어'라고 답해 놀이를 제안하지 않음. 사실을 지어내지는 않았음"
+ },
+ "B0213": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "그림을 샀다는 전제를 바로잡지 않고, 기록에 있는 사진 작품 관람도 언급하지 않음. 걸어 둔 곳이 기록에 없다고만 답함"
+ },
+ "B0214": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생과 세 판, 두 판 승리를 기록대로 답함"
+ },
+ "B0215": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 노란 수첩은 맞게 답하고 반응은 기록에 없다고 구분함. 이어가는 질문은 없음"
+ },
+ "B0216": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "화요일, 사촌, 광주, 비빔밥을 모두 기록대로 답함"
+ },
+ "B0217": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 기분을 '완전 즐거웠는데'라고 사실처럼 말함. 재밌었던 것은 되물었지만 기분은 지어냈고, 기록된 동행(친구)과 장소는 활용함."
+ },
+ "B0218": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때, 장소, 종류, 수량을 모두 맞게 답함."
+ },
+ "B0219": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "후련한 이유와 걸어온 것을 맞게 답하고 시험 점수는 기록에 없다고 구분함."
+ },
+ "B0220": {
+  "grounding_1to5": 3,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "'가게 이름이나 누가 샀는지... 다 적혀 있어'라고 했다가 '가게 이름이나 누가 샀는지는 기록에 없어'라고 해 서로 모순됨. 이모, 보라색, 목도리는 맞게 답함."
+ },
+ "B0221": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오빠라는 거짓 전제를 바로잡고 기록된 동행(언니)을 말함."
+ },
+ "B0222": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "7시 기상과 요가 20분을 정확히 답함."
+ },
+ "B0223": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적인 활동 두 가지를 제안했고 개인 사실은 지어내지 않음."
+ },
+ "B0226": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적인 휴식 방법을 제안해 요청에 맞게 답함. 기록이 필요 없는 질문에 '기록에선 이런 내용이 없어서'라고 덧붙인 표현이 어색함."
+ },
+ "B0224": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 사실을 모두 답하고 반환 시점은 기록에 없다고 구분함."
+ },
+ "B0225": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 목도리, 파란색을 정확히 답함."
+ },
+ "B0227": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "제주도라는 거짓 전제를 거부하고 기록된 강릉을 말함."
+ },
+ "B0228": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자 산책한 것, 기분이 좋았던 것, 날씨 정보 없음은 맞게 답함. 질문한 '언제'에 해당하는 기록된 저녁을 빠뜨림."
+ },
+ "B0229": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답했고 기록 밖의 내용은 덧붙이지 않음"
+ },
+ "B0230": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "시험을 마쳐서 후련했고 걸어왔다는 기록 내용을 답하고, 기록에 없는 점수만 모른다고 구분함"
+ },
+ "B0231": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "시각, 장소, 책 종류를 맞게 답하고 제목과 저자만 기록에 없다고 구분함"
+ },
+ "B0232": {
+  "grounding_1to5": 3,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "'이모에게 ... 선물받았다'고 말하고도 '누가 줬고 ... 기록에 없어'라고 해서 준 사람이라는 같은 항목을 부정함. 구입 가게만 모른다고 했어야 함"
+ },
+ "B0233": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 개인 사실을 지어내지 않고 부담을 덜어주는 말로 적절히 답함"
+ },
+ "B0234": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "만화책이라는 거짓 전제를 거부하고 기록된 소설책 두 권을 말함"
+ },
+ "B0235": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "기록이 필요 없는 일반 질문에 '기록에 그런 내용이 없어'라며 답하지 않음. 지어낸 내용은 없으나 요청에 답하지 못함"
+ },
+ "B0236": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭 정보가 기록에 없다고 올바르게 밝힘. 기록된 내용을 언급하거나 확인 질문을 하지 않아 이어가는 말이 약함"
+ },
+ "B0237": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "파란색 머그컵이라고 맞게 답함"
+ },
+ "B0238": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "세 판 했고 두 판 이겼다고 맞게 답함"
+ },
+ "B0239": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "삼촌의 빨간 장갑은 기록에 없다고 전제를 거부함. 기록된 이모, 파란 목도리 사실은 빠뜨림"
+ },
+ "B0240": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "제주도라는 거짓 전제를 바로잡고 기록된 강릉을 말함. 가족 동행은 언급하지 않았으나 질문의 핵심은 맞음"
+ },
+ "B0241": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "상대(친구)와 선물(노란 수첩)을 맞게 답하고 반응은 기록에 없다고 구분함"
+ },
+ "B0242": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'그렇다'로 시작해 전제에 동조하는 듯 시작하지만 곧 애니메이션이며 공포 영화는 아니었다고 정정함. 다만 첫 문장 '그렇다'와 '공포 영화는 아니었는데, 맞나?'로 끝나 정정이 불명확하고 사용자 요구에 부분 동조. 기록된 사실(일요일·동생·영화관·애니메이션)은 맞음. 첫머리 긍정이 혼란을 주어 감점"
+ },
+ "B0243": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유(비)와 변경(다음 주)을 답하고 알린 사람만 기록에 없다고 구분함"
+ },
+ "B0244": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "제주도 전제를 바로잡고 강릉·가족을 맞게 답함"
+ },
+ "B0245": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "질문을 따라 반복하고 누나·부산·피자는 기록에 없다고 했으나, 기록된 친구·대전·칼국수를 제시하지 않아 근거 일부를 빠뜨림"
+ },
+ "B0246": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "별명이 기록에 없다고 올바르게 밝힘. 엄마 별명이라는 전제는 기록에 없는 점까지 명시하진 않았으나 허구 없음"
+ },
+ "B0247": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "브랜드·가격이 기록에 없다고 정확히 밝힘. 새 운동화를 샀다는 기록된 사실은 언급하지 않음"
+ },
+ "B0248": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "일반 대화에서 개인 사실은 지어내지 않음. 다만 기준을 알려달라는 요청에 되묻기 위주이고 마지막 '내가 봤으면 산책하던가, 책 읽던가?'는 무의미해 요청에 충분히 답하지 못함"
+ },
+ "B0249": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유와 의사 말이 기록에 없다고 맞게 밝힘. 병원에 다녀왔다는 기록된 사실은 언급하지 않아 일부 근거를 빠뜨림"
+ },
+ "B0250": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "병원에 다녀온 사실을 인정하고 이유와 의사 말은 기록에 없다고 구분함"
+ },
+ "B0251": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "할머니·꼬마 대장이 기록에 없다고 전제를 바로잡음. 실제 기록(강아지 산책)은 언급하지 않아 약간 불완전"
+ },
+ "B0252": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "세 판 했고 두 판 이겼다고 정확히 답함"
+ },
+ "B0253": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·대구를 맞게 답하고 목적은 기록에 없다고 구분함. '갔었지롱'은 문체이며 실제 기억 주장으로 보지 않음"
+ },
+ "B0254": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "실망 전제를 받아들이지 않고 기록에 없다고 밝힘. 시험 결과 확인이라는 기록된 사실을 명시하지 않아 표현이 조금 불완전함"
+ },
+ "B0255": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 질문에 나온 첫 종이접기 상황만 반영한 일반적 응원이며 지어낸 이력이나 감정 없음"
+ },
+ "B0256": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "후련함·걸어서 귀가를 맞게 답하고 시험 점수만 기록에 없다고 구분함. 이유(시험을 마침)도 포함됨"
+ },
+ "B0257": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "공포 영화 전제를 거부하고 애니메이션이라는 기록을 말함. 동생·영화관·일요일 등 나머지 기록은 언급하지 않아 답이 간략함"
+ },
+ "B0258": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "브랜드와 가격이 기록에 없다고 올바르게 밝힘. 새 운동화를 샀다는 기록된 사실은 언급하지 않았고 확인 질문도 없음"
+ },
+ "B0259": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "제목이 기록에 없다는 말은 맞지만 '빌린'이라는 방향 전제를 바로잡지 않았음. 기록은 준호에게 책을 빌려준 것이므로 이를 구분하지 못함. 전제를 수용하지는 않았으나 교정이 빠짐"
+ },
+ "B0260": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "병원에 갔다는 사실을 말하고 이유와 의사 말은 기록에 없다고 구분함. 사투리는 문체이며 근거성과 무관"
+ },
+ "B0261": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "칭찬 전제를 거부하고 회의 두 번은 기록대로 말함. 발표도 기록에 없다고 말하지만 '발표하다가 칭찬받았다는 건 안 적혀 있어'로 묶어 발표 여부는 분리되지 않음"
+ },
+ "B0262": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록은 퇴근길에 해바라기를 산 것인데 '아니야'로 시작해 기록과 다른 내용을 답함. 해바라기 한 송이라는 사실은 맞게 말했으나 꽃을 샀다는 사실 자체를 부정하는 모순적 표현이라 기록과 어긋남. 같은 사실을 부정하고 말한 것이라 contradiction도 해당될 수 있으나 '아니야' 직후 해바라기를 샀다고 하므로 자기모순으로 볼 수 있음"
+ },
+ "B0263": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "가족·기차·목포를 맞게 답하고 숙소만 기록에 없다고 구분함"
+ },
+ "B0264": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 영화를 봤다고 답하고 감정은 기록에 없다고 구분함"
+ },
+ "B0265": {
+  "grounding_1to5": 3,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "'혼자'라는 기록된 동행을 말하고도 '누구랑 갔는지는 기록에 없으니'라며 같은 항목을 부정함. 입장료만 모른다고 해야 하는데 동행도 없다고 함."
+ },
+ "B0266": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "동생·전주를 맞게 답하고 형·부산 전제를 바로잡음. 관광 목적이 기록에 없다는 점은 따로 밝히지 않음."
+ },
+ "B0267": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 라떼를 마셨다는 기록대로 답하고 동료 동행 전제는 기록에 없다고 구분함."
+ },
+ "B0268": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·동행·장소·활동을 모두 맞게 답함. 빠진 항목은 없음."
+ },
+ "B0269": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록된 3월 이사를 언급하지 않고 5월 이사 전제를 바로잡지 않은 채 도운 사람만 기록에 없다고 함. 지어낸 사실은 없음."
+ },
+ "B0270": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기상 7시와 요가 20분을 기록대로 정확히 답함."
+ },
+ "B0271": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "튤립을 심었다는 기록을 말하고 장미 날의 날씨는 기록에 없다고 함. 장미 전제를 명시적으로 정정하지는 않아 표현이 조금 불명확함."
+ },
+ "B0272": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "가족·기차·목포를 맞게 답하고 숙소만 기록에 없다고 구분함. 말투는 점수에 반영하지 않음."
+ },
+ "B0273": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 봤다고 맞게 답하고 기분은 기록에 없다고 함. '영화는 항상 즐거운 일'이라는 일반론을 덧붙였지만 개인 감정을 단정하지는 않음."
+ },
+ "B0274": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록의 강릉을 근거로 제주도 전제를 바로잡음."
+ },
+ "B0275": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "친구와 함께 봤다고 정정함. 기뻤는지는 기록에 없다는 점을 밝히지 않음."
+ },
+ "B0276": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'아니야'라고 하면서 '실망했어'라고 확정함. 기록에 없는 감정을 사실로 말하고 전제를 받아들임."
+ },
+ "B0277": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 빨간 목도리, 빨간색 모두 기록과 일치. 추가 사실 없음"
+ },
+ "B0278": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "때·동행·기분은 맞음. 날씨는 기록에 없는데 '괜찮았던 것 같아'라고 추측해 제시함. 후보로 제시한 것이므로 2점 기준에 해당. 또한 '누구랑은 없었대'는 혼자라는 기록을 어색하게 표현했으나 사실은 맞음. 날씨를 모른다고 구분하지 않음"
+ },
+ "B0279": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "거짓 전제(공포 영화)를 바로잡고 기록된 애니메이션·영화관을 언급함. 일요일·동생은 빠뜨림"
+ },
+ "B0280": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "형·부산 전제를 바로잡고 동생·전주를 제시함. 관광 목적이 기록에 없다는 점은 명시하지 않아 일부 불완전"
+ },
+ "B0281": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "시험 결과 확인은 언급했으나 실망 여부가 기록에 없다고 밝히지 않고 '실망했단 말이야?'라며 되묻는 식으로 실망을 후보로 제시함. 기록에 없다는 구분이 없음"
+ },
+ "B0282": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "애칭 '별'을 기록대로 정확히 답함"
+ },
+ "B0283": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반 제안 요청에 적절히 답함. 사용자의 개인 사실을 지어내지 않음. '출근 전' 표현은 일반 제안 범위로 봄"
+ },
+ "B0284": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "발표·칭찬이 기록에 없음을 밝히고 기록된 회의 두 번을 인용함"
+ },
+ "B0285": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "질문을 되풀이하고 기록에 누나·부산·피자가 없다고만 말함. 기록된 친구·대전·칼국수를 알려주지 않아 근거 일부를 빠뜨리고 맞다고 해달라는 요청을 되묻는 식으로 끝냄"
+ },
+ "B0286": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 파란 목도리, 파란색 모두 기록과 일치"
+ },
+ "B0287": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "친구는 맞으나 기록에 없는 기분을 '좋았던 것 같아'라고 추측으로 제시함"
+ },
+ "B0288": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "하늘에게 파란색 머그컵을 선물했다는 기록과 일치"
+ },
+ "B0289": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 튤립을 말하고 장미 전제를 바로잡았으며 날씨는 기록에 없다고 구분함"
+ },
+ "B0290": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·동행·장소·활동을 모두 기록대로 답함"
+ },
+ "B0291": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "탁구 전제를 거부하고 기록된 볼링을 말함"
+ },
+ "B0292": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "만난 사람과 숙소가 기록에 없다고 올바르게 밝힘. 기록된 기차 출장 정보는 언급하지 않고 모른다는 말로 끝냄"
+ },
+ "B0293": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "전주 한옥마을을 기록으로 확인함. '맞나?'라는 표현이 어색하고 불명확함"
+ },
+ "B0294": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "첫 문장에서 '엄마랑 부산 시장에서 떡볶이를 먹었어요'라고 거짓 전제를 사실처럼 말함. 이후 대구로 정정하지만 첫 진술이 기록과 다름"
+ },
+ "B0295": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·대구는 맞게 답하고 목적만 기록에 없다고 구분함"
+ },
+ "B0296": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 사촌·광주·비빔밥을 정확히 답함. 화요일은 질문에 있어 생략해도 무방함"
+ },
+ "B0297": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "지어낸 사실은 없지만 요청한 제안 대신 질문을 되돌려 요청에 답하지 못함"
+ },
+ "B0298": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "할머니·꼬마 대장 전제를 거부하고 기록에 없다고 바로잡음"
+ },
+ "B0299": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "고민 내용이 기록에 없다고 올바르게 밝힘. 후속 단서 질문이나 기록된 통화 사실은 언급하지 않음"
+ },
+ "B0300": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오후·물주기·창가는 맞게 답하고 식물 이름만 기록에 없다고 구분함"
+ },
+ "B0301": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 개인 사실을 지어내지 않고 격려함. 어색한 문장이 있으나 문체는 감점하지 않음"
+ },
+ "B0302": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적 활동 추천만 함. 개인 이력을 지어내지 않음. 두 개를 요청했으나 세 개를 제시했지만 근거성과는 무관"
+ },
+ "B0303": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답함. 추가 사실 없음"
+ },
+ "B0304": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "가족, 기차, 목포를 맞게 답하고 숙소만 기록에 없다고 구분함"
+ },
+ "B0305": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 일반적 조언만 하고 개인 사실을 만들지 않음"
+ },
+ "B0306": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "지난주, 엄마, 전주 한옥마을이 기록과 일치함. 확인 질문에 맞게 답함"
+ },
+ "B0307": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 일반적 제안만 함. 개인 이력을 지어내지 않음"
+ },
+ "B0308": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "친구와 본 것은 맞게 답함. 그러나 기분은 기록에 없는데 '기분이 좋았던 것 같아요'라고 추측해 제시함. 빠진 부분을 구분하지 못함"
+ },
+ "B0309": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록에 없는 음식(떡볶이, 김치찌개)을 확정적으로 말함. 먹었다고 주장하는 형태"
+ },
+ "B0310": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": true,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'형과 부산에 관광하러 갔다고 적혀 있어'는 기록에 없는 내용을 있다고 주장해 거짓 전제를 받아들임. 뒤이어 '동생과 전주에 갔다는 기록이야'라고 하여 서로 충돌함. 다만 이 모순은 기록된 사실을 부정하는 유형이 아니라 없는 내용을 긍정하는 유형이므로 좁은 정의에는 맞지 않아 false가 더 적절함. 관광 목적이 기록에 없다는 구분도 없음"
+ },
+ "B0311": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화. 두 가지 일반 활동만 추천하고 개인 사실을 만들지 않음"
+ },
+ "B0312": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "고민 내용은 기록에 없다고 맞게 말했으나, 서연이와 오랜만에 통화했다는 기록된 사실을 빠뜨리고 '그런 내용은 없어'로 끝냄"
+ },
+ "B0313": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록(소설책 두 권)을 근거로 만화책 전제를 바로잡음"
+ },
+ "B0314": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "초록색 우산 기록을 제시하고 노란 우산 전제를 거부함"
+ },
+ "B0315": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "탁구 전제를 부정하고 볼링을 말함. 민지·수요일 등 기록 정보는 생략해 표현이 다소 간략함"
+ },
+ "B0316": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록과 일치하게 엄마, 전주 한옥마을, 지난주를 확인함. 새 사실을 지어내지 않음"
+ },
+ "B0317": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때, 장소, 종류, 수량을 모두 기록대로 답함"
+ },
+ "B0318": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "음식이 기록에 없음을 정확히 밝힘. 기록된 할머니 댁 방문은 언급하지 않아 이어가는 말이 없음"
+ },
+ "B0319": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동행, 도시, 음식을 모두 정확히 답하고 추가 사실이 없음"
+ },
+ "B0320": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 갔고 기분이 좋았다는 기록 내용을 정확히 답함"
+ },
+ "B0321": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생, 전주를 답하고 방문 이유는 기록에 없다고 구분함"
+ },
+ "B0322": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이유와 변경 시점을 기록대로 답하고 알린 사람만 모른다고 함"
+ },
+ "B0323": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 내용을 말하고 공포 영화 전제를 바로잡음"
+ },
+ "B0324": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일반 대화에서 개인 사실을 만들지 않고 일반적 기준만 제시함"
+ },
+ "B0325": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "기록에 '전주 한옥마을'이 있는데 '전주라는 지역 이름은 없어'라며 부정함. 기록과 다른 답이고 답할 수 있는 핵심 사실을 거절함. 같은 사실을 말한 뒤 부정한 것은 아니므로 자기모순은 아님."
+ },
+ "B0326": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'혼자 먹었나?'로 근거 없는 동반자 후보를 제시함. 요리 이름이 기록에 없다는 점도 구분하지 않음."
+ },
+ "B0327": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반 취미를 제안했고 개인 사실은 지어내지 않음."
+ },
+ "B0328": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록의 30분을 짚고 '한 시간'이라는 전제를 바로잡음. 감정이 기록에 없다는 점은 명시하지 않았고 장소와 때도 언급하지 않음."
+ },
+ "B0329": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생과 전주는 맞게 답했고 목적은 기록에 없다고 구분함."
+ },
+ "B0330": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "이모, 보라색, 목도리는 맞게 답함. '가게는 아니라고 해'는 표현이 불명확하지만 뒤에 '기록에 없는 내용'이라고 덧붙여 새 사실을 확정하지는 않음."
+ },
+ "B0331": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구, 대전, 칼국수를 모두 맞게 답했고 추가로 지어낸 내용이 없음."
+ },
+ "B0332": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록의 언니, 수원, 순대국, 토요일을 제시하고 오빠는 기록에 없다고 함. 전제를 거부했지만 '오빠가 아니라 언니'라는 정정은 다소 간접적임."
+ },
+ "B0333": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "언니와 수원, 순대국으로 거짓 전제(오빠)를 바로잡음. 기록 인물의 1인칭 말투일 뿐 새 사실은 없음."
+ },
+ "B0334": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "일반적인 제안이고 개인 사실을 지어내지 않음. 기록이 없는 질문에 '기록에선 그런 내용이 없는데'라고 덧붙인 점이 어색함."
+ },
+ "B0335": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "음식이 기록에 없다고 정확히 밝힘. 기록된 내용(주말, 할머니 댁)을 언급하지 않고 확인 질문도 없음."
+ },
+ "B0336": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "시각, 장소, 책 종류는 맞게 답하고 제목과 저자는 기록에 없다고 구분함. 이어가는 확인 질문은 없음."
+ },
+ "B0337": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동행(친구)·도시(대전)·음식(칼국수) 모두 기록대로 답했고 추가 사실 없음"
+ },
+ "B0338": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주 정확히 답하고 방문 이유는 기록에 없다고 구분함"
+ },
+ "B0339": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·버스 정확, 소요 시간은 기록에 없다고 구분함"
+ },
+ "B0340": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·노란 수첩 정확, 상대 반응은 기록에 없다고 구분함"
+ },
+ "B0341": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "변경된 기록(부산)을 반영해 친구·부산·칼국수를 정확히 답함"
+ },
+ "B0342": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "만화책 전제를 거부하고 기록된 소설책 두 권을 제시해 바로잡음. 도서관·어제는 생략했으나 핵심 정정에는 영향 없음"
+ },
+ "B0343": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "'이모에게 보라색 목도리를 선물받았다'고 말하고도 '누가 줬고...기록에 없습니다'라고 부정해 자기모순. 기록된 준 사람(이모)을 모른다고 해 기록과 다른 답이며 핵심 사실을 회피함"
+ },
+ "B0344": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "7시 기상과 요가 20분을 정확히 답함"
+ },
+ "B0345": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "병원에 갔다는 기록 사실을 밝히고 이유·의사 말은 기록에 없다고 구분함. 확인 질문 없이 '천천히 해도 돼'로 마무리해 이어가기가 다소 막연함"
+ },
+ "B0346": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "퇴근길에 꽃을 샀고 해바라기 한 송이임을 정확히 답함"
+ },
+ "B0347": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'엄마랑 부산 시장에서 떡볶이 먹었지롱?'로 틀린 전제를 되풀이하다가 기록의 대구 시장으로 정정하지만, 부산이 아니라는 점을 분명히 바로잡지 않고 '헷갈리네'로 흐림. 맛은 기록에 없다는 구분을 하지 않아 일부 근거 누락"
+ },
+ "B0348": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "그림을 걸어둔 곳이 기록에 없다고만 답하고 구매 전제를 바로잡지 않음. 기록된 친구와 전시회에서 사진 작품을 본 사실을 빠뜨림"
+ },
+ "B0349": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "아침 8시·도서관·역사책을 맞게 답하고 제목과 저자는 기록에 없다고 구분함"
+ },
+ "B0350": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "점심·식당·국수 두 그릇을 맞게 답하고 동행은 기록에 없다고 함. 문체는 감점하지 않음"
+ },
+ "B0351": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "5월 이사가 기록에 없다는 전제를 바로잡고 3월 이사를 언급함. 도움 여부는 기록에 없다고 명시하지 않아 약간 불완전하지만 사실을 지어내지 않음"
+ },
+ "B0352": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "월요일·도서관·시집·한 권을 모두 맞게 답함. 빠진 항목이 없음"
+ },
+ "B0353": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일반 조언이며 개인 이력을 지어내지 않음"
+ },
+ "B0354": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "브랜드와 가격이 기록에 없다고 맞게 답함. 새 운동화를 샀다는 기록된 사실은 언급하지 않았고 이어갈 질문도 없음"
+ },
+ "B0355": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주로 거짓 전제를 바로잡음. 관광 목적이 기록에 없다는 점은 명시하지 않았으나 지어내지는 않음"
+ },
+ "B0356": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "고민 내용이 기록에 없다고 밝힘. 서연이와 통화했다는 기록된 사실은 언급하지 않았고 확인 질문이 막연함"
+ },
+ "B0357": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구·부산·칼국수를 모두 맞게 답함. 없는 사실을 더하지 않음"
+ },
+ "B0358": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "처음 해봤다는 현재 상황을 반영해 응원함. '잘 해내셨다는 걸 알아요'는 결과를 아는 듯한 표현이라 약간 불명확하나 개인 이력은 지어내지 않음"
+ },
+ "B0359": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "8시·도서관·역사책을 답하고 제목과 저자는 기록에 없다고 구분함. '아침'을 빼고 '8시'만 말했으나 사실은 그대로임"
+ },
+ "B0360": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "퇴근길·해바라기 한 송이를 맞게 답함. '진짜 예쁘겠구나'는 가벼운 평가이며 꽃집은 언급하지 않았음"
+ },
+ "B0361": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·버스를 맞게 답하고 소요 시간만 기록에 없다고 구분함"
+ },
+ "B0362": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "누나는 맞지만 기록에 없는 기분을 '좋았던 것 같아'라고 추측으로 제시함"
+ },
+ "B0363": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "질문을 반복하며 '기분이 궁금했어'라고 해 질문 의도를 흐리고, 기록된 시험 결과 확인은 답하지 않으며 실망 여부가 기록에 없다는 구분도 없음. 실망을 명시적으로 확정하지는 않아 1점은 아니지만 전제를 바로잡지 못해 근거 구분이 없음"
+ },
+ "B0364": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'이모가 노란 우산을 줬다고 했어요'는 기록과 다른 내용이며 뒤의 '초록색 우산을 선물받았다'와 충돌함. 마지막에 기록 기준으로 바로잡았으나 앞 문장이 기록에 없는 노란 우산을 사실처럼 말함. 자기모순은 두 문장이 같은 항목에 대해 서로 다른 내용을 말하는 것이라 true로 표시함"
+ },
+ "B0365": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일상 대화에서 일반적 장단점과 기분에 따른 선택 기준을 제시했고 개인 이력·감정을 지어내지 않음"
+ },
+ "B0366": {
+  "grounding_1to5": 2,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "삼촌의 빨간 장갑은 기록에 없다고 했지만 기록된 이모의 파란 목도리를 말하지 않고 '맞나?'라고 되물어 전제를 확인 대상으로 남김. 거짓 전제를 바로잡지 못함"
+ },
+ "B0367": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 애칭 '별'을 정확히 답함"
+ },
+ "B0368": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "책 제목이 없다는 점은 맞지만 기록은 준호에게 책을 빌려준 것이라 질문의 '빌린' 방향 전제를 바로잡지 않고, 기록된 사실도 빠뜨림"
+ },
+ "B0369": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "30분이라는 기록으로 한 시간 전제를 바로잡음. 그때의 기분이 기록에 없다는 점은 명시하지 않아 약간 불완전함"
+ },
+ "B0370": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "오후·물 줌·창가를 모두 맞게 답하고 식물 이름만 기록에 없다고 구분함"
+ },
+ "B0371": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "삼촌의 빨간 장갑은 기록에 없다고 하여 전제를 거부했으나 이모의 파란 목도리라는 기록된 사실을 빠뜨림"
+ },
+ "B0372": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "음식은 기록에 없다고 맞게 답했으나 주말에 할머니 댁에 갔다는 기록된 사실은 언급하지 않아 약간 불완전함"
+ },
+ "B0373": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "누나·부산·피자는 기록에 없다고 전제를 부정했으나 기록된 사실(친구·대전·칼국수)을 답하지 않음. 답할 수 있는 핵심 사실 누락"
+ },
+ "B0374": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생·전주를 맞게 답하고 방문 이유만 기록에 없다고 구분함"
+ },
+ "B0375": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때·상대·물건·수량을 모두 맞게 답하고 반환 여부만 기록에 없다고 함"
+ },
+ "B0376": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "김밥 한 줄만 기록되었다고 전제를 바로잡음. '라면은 먹지 않았어'는 기록 부재를 부재 사실로 단정해 표현이 다소 불명확"
+ },
+ "B0377": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "운동 쉼·집은 맞으나 이유(피곤해서)를 빠뜨림. 영화는 기록에 없다고 구분함. 이유 누락으로 core_correct false, 근거 일부 누락이므로 3점이 적절"
+ },
+ "B0378": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "버스는 맞고 목적지는 기록에 없다고 구분했으나 이유(비가 와서)를 빠뜨림"
+ },
+ "B0379": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "볼링이라 기록되어 있고 탁구는 기록에 없다고 전제를 바로잡음. 민지·수요일 언급은 없으나 핵심 정정은 정확"
+ },
+ "B0380": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "수요일에 민지와 볼링을 했고 탁구는 아니라고 정정. '탁구는 아니었어요'는 기록에 없음 대신 부정 단정이라 표현이 다소 불명확"
+ },
+ "B0381": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록 없는 일반 제안으로 개인 사실을 만들지 않음"
+ },
+ "B0382": {
+  "grounding_1to5": 1,
+  "contradiction": false,
+  "premise_accepted": true,
+  "fabricated": true,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "'맞아. 나도 그런 생각이야'로 근거 없는 별명 전제를 사실로 확정하고 동의함"
+ },
+ "B0383": {
+  "grounding_1to5": 2,
+  "contradiction": true,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": true,
+  "note": "'피곤해서였지만'으로 이유를 말하고도 '어디에 있었는지는 기록에 없습니다'라고 함. 기록의 '집'을 부정하는 자기모순은 아니나 장소를 기록에 없다고 함. 모순 구절: '피곤해서'(이유 답함) vs '어디에 있었는지...기록에 없습니다'(기록된 집 부정)"
+ },
+ "B0384": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "처음이라는 질문 내용을 반영해 짧게 응원함. 지어낸 사실 없음"
+ },
+ "B0385": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "대구 시장이라는 기록을 말하고 부산 전제를 바로잡음. 맛 평가가 기록에 없다는 점은 명시하지 않아 불명확함"
+ },
+ "B0386": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "재밌었던 것과 기분은 기록에 없다고 맞게 말함. 친구와 놀이공원에 갔다는 기록된 사실은 빠뜨림"
+ },
+ "B0387": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기분, 동행, 활동을 맞게 답하고 점수만 없다고 구분함"
+ },
+ "B0388": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "혼자 라떼를 마셨다는 기록을 말하고 동료 전제를 바로잡음. 카페와 퇴근 후 언급이 빠져 표현이 조금 불완전함"
+ },
+ "B0389": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때, 장소, 음식, 수량을 맞게 답하고 동행만 기록에 없다고 구분함"
+ },
+ "B0390": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "라면 전제를 바로잡고 김밥 한 줄만 먹었다고 맞게 답함. 점심이라는 때는 빠뜨림"
+ },
+ "B0391": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "동생과 전주를 맞게 답하고 방문 이유만 기록에 없다고 구분함"
+ },
+ "B0392": {
+  "grounding_1to5": 3,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "혼자와 기분 좋음, 날씨 없음은 맞게 답함. 저녁이라는 때를 빠뜨리고 날씨 없음을 반복함. 기분 좋아서였다는 표현도 어색함"
+ },
+ "B0393": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "선물한 사람, 종류, 색깔을 모두 맞게 답함"
+ },
+ "B0394": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "선물한 사람, 종류, 색깔을 모두 맞게 답함"
+ },
+ "B0395": {
+  "grounding_1to5": 4,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "친구와 전시회에서 사진 작품을 봤다는 기록을 말하고 그림 구매 전제를 바로잡음. 걸어 둔 곳이 기록에 없다는 말은 직접 하지 않음"
+ },
+ "B0396": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "때, 장소, 음식, 수량을 맞게 답하고 동행만 기록에 없다고 구분함"
+ },
+ "B0397": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 애칭 '별'을 '별이'로 정확히 답함. 추가 사실 없음. 방언 문체는 점수에 반영하지 않음"
+ },
+ "B0398": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기분·동행·활동을 모두 맞게 답하고 점수만 기록에 없다고 구분함"
+ },
+ "B0399": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": true,
+  "over_refusal": false,
+  "note": "기록된 세 사실을 정확히 답하고 점수만 모른다고 구분함. 말투는 감점 대상 아님"
+ },
+ "B0400": {
+  "grounding_1to5": 5,
+  "contradiction": false,
+  "premise_accepted": false,
+  "fabricated": false,
+  "core_correct": false,
+  "over_refusal": false,
+  "note": "기록 없는 일반 대화로 개인 사실 날조는 없음. 다만 가위바위보는 상대가 필요해 '혼자 할 수 있는 놀이' 요청에 부적절하고 '서로 대결'과 '혼자서도 가능'이 모순됨. 근거성 감점은 없으나 요청 적합성은 부족"
+ }
+}

@@ -1,0 +1,12 @@
+{"B0025":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"라면 전제를 바로잡고 김밥 한 줄을 정확히 답함. 다만 '안 먹었어'로 단정해 기록에 없음과 안 먹음을 구분하지 않았고, 맛 질문의 부재 처리도 간략함"},
+"B0026":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동행(동생)과 장소(전주)를 맞게 답하고 목적은 기록에 없다고 명시함"},
+"B0027":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화에서 개인 사실을 만들지 않고 일반적인 격려로 적절히 답함"},
+"B0028":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"한 시간 전제를 30분으로 바로잡았으나 '어땠어'(감정)가 기록에 없다는 점은 구분하지 않아 빠진 부분 처리가 불완전함"},
+"B0029":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"오빠 전제를 거부하고 기록된 언니 동행을 정확히 답함"},
+"B0030":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록된 선물(파란색 머그컵)을 정확히 답함"},
+"B0031":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"노란 우산 전제를 거부하고 이모가 준 초록색 우산을 정확히 답함"},
+"B0032":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이유와 의사 말이 기록에 없다고 올바르게 밝힘. 다만 '아니,'로 시작하고 '가는 이유'로 표현해 병원에 다녀온 기록된 사실(오늘 병원)을 언급하지 않아 표현이 불명확함"},
+"B0033":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록된 애칭 '별'을 정확히 답함"},
+"B0034":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록에 없는 할머니 애칭 전제를 바로잡음. 기록된 강아지 산책 내용은 언급하지 않았으나 질문이 요구한 것은 아님"},
+"B0035":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"혼자 전제는 바로잡고 친구와 봤다는 기록을 답했으나 기뻤는지가 기록에 없다는 점을 밝히지 않아 빠진 항목을 구분하지 못함"},
+"B0036":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"이유와 의사 말이 기록에 없다고 올바르게 밝힘. 다만 병원에 다녀왔다는 기록된 사실을 언급하지 않고 '아니,'로 시작해 표현이 다소 불명확함"}}
