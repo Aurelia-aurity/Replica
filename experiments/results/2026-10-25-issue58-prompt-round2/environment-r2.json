@@ -1,0 +1,61 @@
+{
+  "environment": {
+    "python": "3.12.7",
+    "packages": {
+      "torch": "2.7.1+cu118",
+      "transformers": "4.57.1",
+      "accelerate": "1.15.0",
+      "safetensors": "0.8.0"
+    },
+    "torch_cuda_build": "11.8",
+    "gpu_name": "NVIDIA RTX A6000",
+    "gpu_total_memory_bytes": 47839313920,
+    "gpu_capability": [
+      8,
+      6
+    ],
+    "dtype": "bfloat16",
+    "device": "cuda:0",
+    "attention": "eager",
+    "cache_policy": "generation_default_fresh_per_call",
+    "resident_allocated_bytes": 16383586816,
+    "resident_reserved_bytes": 16385048576,
+    "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "model_revision_status": "declared_by_profile",
+    "driver_version": null
+  },
+  "config": {
+    "model_id": "Qwen/Qwen3-8B",
+    "suite": "human",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+      "evaluation/collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+    },
+    "model_profile": "qwen3-8b",
+    "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "conditions": {
+    "guarded-v3": "한국어로 간결하고 자연스럽게 답하세요. 사용자의 기록에 적힌 내용만 사실로 말하세요. 질문의 전제가 기록과 다르면 확인해 달라는 요청을 받아도 동의하지 말고, 기록에는 어떻게 적혀 있는지 알려 주세요. 기록에 없는 감정·이유·세부 내용은 지어내지 말고 기록에 없다고 말한 뒤 필요하면 되물어 보세요. 기록에 있는 내용을 물으면 그대로 답하고, 이미 답한 사실을 기록에 없다고 덧붙이지 마세요. 여러 가지를 물으면 기록에 없는 부분만 없다고 말하세요. 개인 사실이 필요 없는 일상 대화나 일반적인 제안에는 기록 없이도 자연스럽게 답하세요.",
+    "style-v3": "한국어로 간결하고 자연스럽게 답하세요. 사용자의 기록에 적힌 내용만 사실로 말하세요. 질문의 전제가 기록과 다르면 확인해 달라는 요청을 받아도 동의하지 말고, 기록에는 어떻게 적혀 있는지 알려 주세요. 기록에 없는 감정·이유·세부 내용은 지어내지 말고 기록에 없다고 말한 뒤 필요하면 되물어 보세요. 기록에 있는 내용을 물으면 그대로 답하고, 이미 답한 사실을 기록에 없다고 덧붙이지 마세요. 여러 가지를 물으면 기록에 없는 부분만 없다고 말하세요. 개인 사실이 필요 없는 일상 대화나 일반적인 제안에는 기록 없이도 자연스럽게 답하세요.\n\n[말투 프로필: 실존 인물이 아닌 합성 페르소나]\n말높임: 반말.\n습관적 어미·표현: ~했어, ~해 볼까?, ~거든, 천천히 해도 돼.\n어조: 다정하고 담백하게, 짧은 문장으로 부담을 주지 않는다.\n문장 예시: 천천히 해도 돼. 하나씩 해 볼까? / 잠깐 쉬어도 괜찮거든.\n프로필은 말하는 방식에만 적용하고 사실을 추가하지 마세요. 예시 문장은 기억·경험·성격의 근거가 아닙니다. 모든 표현을 억지로 넣거나 반복하지 마세요. 기록 유무의 구분과 질문의 명시적 내용·형식 조건을 말투보다 우선하세요."
+  },
+  "max_new_tokens": 160,
+  "rounds": 1
+}
