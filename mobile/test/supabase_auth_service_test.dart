@@ -91,7 +91,16 @@ void main() {
       auth.dispose();
       await client.dispose();
     });
-    expect(await auth.signUp('synthetic@example.com', 'Example123!'), false);
+    expect(
+      await auth.register(
+        const SignUpRequest(
+          email: 'synthetic@example.com',
+          password: 'Example123!',
+          personalRecordsConsent: true,
+        ),
+      ),
+      SignUpResult.emailVerificationRequired,
+    );
     expect(auth.identity, isNull);
   });
 
@@ -121,11 +130,17 @@ void main() {
       await expectLater(
         auth.signIn('synthetic@example.com', 'wrong'),
         throwsA(
-          isA<AuthFailure>().having(
-            (error) => error.message,
-            'message',
-            '이메일 또는 비밀번호를 확인해 주세요.',
-          ),
+          isA<AuthFailure>()
+              .having(
+                (error) => error.message,
+                'message',
+                '이메일 또는 비밀번호를 확인해 주세요.',
+              )
+              .having(
+                (error) => error.kind,
+                'kind',
+                AuthFailureKind.invalidCredentials,
+              ),
         ),
       );
       expect(auth.identity, isNull);
@@ -154,4 +169,38 @@ void main() {
     auth.dispose();
     await client.dispose();
   });
+
+  test(
+    'SDK refresh events cannot reopen a session invalidated by 401',
+    () async {
+      final client = SupabaseClient(
+        'https://synthetic.supabase.co',
+        'sb_publishable_synthetic',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode(sessionResponse()),
+            200,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      final auth = SupabaseAuthService(client);
+      addTearDown(() async {
+        auth.dispose();
+        await client.dispose();
+      });
+      await auth.signIn('synthetic@example.com', 'Example123!');
+      expect(auth.invalidateSession(requestGeneration: auth.generation), true);
+      await client.auth.refreshSession();
+      await Future<void>.delayed(Duration.zero);
+      expect(auth.identity, isNull);
+      await expectLater(
+        auth.authorizationHeaders(),
+        throwsA(isA<AuthFailure>()),
+      );
+      await auth.signIn('synthetic@example.com', 'Example123!');
+      expect(auth.identity!.id, userId);
+    },
+  );
 }

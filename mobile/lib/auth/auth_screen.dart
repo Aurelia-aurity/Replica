@@ -64,20 +64,28 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     try {
       if (_signUp) {
-        final signedIn = await widget.service.register(
-          email: _email.text.trim(),
-          password: _password.text,
-          personalRecordsConsent: _consent,
+        final result = await widget.service.register(
+          SignUpRequest(
+            email: _email.text.trim(),
+            password: _password.text,
+            personalRecordsConsent: _consent,
+          ),
         );
         if (!mounted) return;
-        if (!signedIn) {
+        if (result != SignUpResult.signedIn) {
           setState(() {
             _signUp = false;
             _consent = false;
             _obscure = true;
-            _message = widget.service.isPreview
-                ? '회원가입 화면 확인을 마쳤어요. 실제 계정 생성 없이 미리보기 계정으로 로그인해 주세요.'
-                : '회원가입 요청을 받았어요. 이메일의 인증 링크를 확인한 후 로그인해 주세요.';
+            _message = switch (result) {
+              SignUpResult.emailVerificationRequired =>
+                '회원가입 요청을 받았어요. 이메일의 인증 링크를 확인한 후 로그인해 주세요.',
+              SignUpResult.loginRequired =>
+                widget.service.isPreview
+                    ? '회원가입 화면 확인을 마쳤어요. 실제 계정 생성 없이 미리보기 계정으로 로그인해 주세요.'
+                    : '회원가입이 완료되었어요. 로그인해 주세요.',
+              SignUpResult.signedIn => null,
+            };
             _resetFormKeepingEmail();
           });
         }
@@ -96,6 +104,14 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() => _emailServerError = '이미 가입된 이메일이에요. 로그인해 주세요.');
         case AuthFailureKind.invalidCredentials:
           setState(() => _error = '이메일 또는 비밀번호가 맞지 않아요');
+        case AuthFailureKind.emailNotVerified:
+          setState(() => _error = '이메일 인증을 완료한 후 로그인해 주세요.');
+        case AuthFailureKind.weakPassword:
+          setState(() => _error = '비밀번호가 보안 정책을 충족하지 않습니다.');
+        case AuthFailureKind.rateLimited:
+          setState(() => _error = '요청이 많아요. 잠시 후 다시 시도해 주세요.');
+        case AuthFailureKind.consentRequired:
+          setState(() => _error = '개인 기록 처리 동의가 필요합니다.');
         case AuthFailureKind.generic:
           setState(() => _error = error.message);
       }

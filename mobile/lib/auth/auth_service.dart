@@ -7,6 +7,25 @@ enum AuthFailureKind {
   invalidCredentials,
   network,
   emailAlreadyRegistered,
+  emailNotVerified,
+  weakPassword,
+  rateLimited,
+  consentRequired,
+}
+
+enum SignUpResult { signedIn, emailVerificationRequired, loginRequired }
+
+/// Frontend-only request contract, independent of server JSON and SDK models.
+/// Do not log this object's credentials or persist them in the UI.
+class SignUpRequest {
+  const SignUpRequest({
+    required this.email,
+    required this.password,
+    required this.personalRecordsConsent,
+  });
+  final String email;
+  final String password;
+  final bool personalRecordsConsent;
 }
 
 class AuthFailure implements Exception {
@@ -36,25 +55,31 @@ abstract class AuthService extends ChangeNotifier {
 
   Future<void> signIn(String email, String password);
 
-  /// False means email confirmation is required before signing in.
-  Future<bool> signUp(String email, String password);
-
-  /// Integration point for registration and consent. No record storage here.
-  Future<bool> register({
-    required String email,
-    required String password,
-    required bool personalRecordsConsent,
-  }) {
-    if (!personalRecordsConsent) {
-      throw const AuthFailure('개인 기록 처리 동의가 필요합니다.');
+  Future<SignUpResult> register(SignUpRequest request) {
+    if (!request.personalRecordsConsent) {
+      throw const AuthFailure(
+        '개인 기록 처리 동의가 필요합니다.',
+        kind: AuthFailureKind.consentRequired,
+      );
     }
-    return signUp(email, password);
+    return performRegistration(request);
   }
+
+  @protected
+  Future<SignUpResult> performRegistration(SignUpRequest request);
 
   Future<void> signOut();
 
   /// Future backend clients must call this for each request, not cache tokens.
   Future<Map<String, String>> authorizationHeaders();
+
+  /// Ignores delayed 401s from a previous account/session and duplicate 401s.
+  bool invalidateSession({required int requestGeneration}) {
+    if (_identity == null || requestGeneration != _generation) return false;
+    notice = '로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.';
+    updateIdentity(null);
+    return true;
+  }
 
   void checkSessionExpiry() {
     if (_identity != null &&
@@ -97,7 +122,7 @@ class UnconfiguredAuthService extends AuthService {
   Future<void> signIn(String email, String password) async =>
       throw const AuthFailure('인증 환경 설정이 필요합니다.');
   @override
-  Future<bool> signUp(String email, String password) async =>
+  Future<SignUpResult> performRegistration(SignUpRequest request) async =>
       throw const AuthFailure('인증 환경 설정이 필요합니다.');
   @override
   Future<void> signOut() async => updateIdentity(null);

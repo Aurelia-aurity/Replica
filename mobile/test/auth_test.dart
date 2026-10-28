@@ -19,9 +19,10 @@ class PendingChat implements ChatService {
 class ConfirmationAuth extends PreviewAuthService {
   @override
   bool get isPreview => false;
-  final pending = Completer<bool>();
+  final pending = Completer<SignUpResult>();
   @override
-  Future<bool> signUp(String email, String password) => pending.future;
+  Future<SignUpResult> performRegistration(SignUpRequest request) =>
+      pending.future;
 }
 
 Future<void> login(
@@ -188,7 +189,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      auth.pending.complete(false);
+      auth.pending.complete(SignUpResult.emailVerificationRequired);
       await tester.pumpAndSettle();
       expect(find.textContaining('이메일의 인증 링크'), findsOneWidget);
       expect(find.text('텍스트로 대화'), findsNothing);

@@ -21,17 +21,9 @@ class NetworkAuth extends PreviewAuthService {
 class ConsentAuth extends PreviewAuthService {
   bool? receivedConsent;
   @override
-  Future<bool> register({
-    required String email,
-    required String password,
-    required bool personalRecordsConsent,
-  }) async {
-    receivedConsent = personalRecordsConsent;
-    return super.register(
-      email: email,
-      password: password,
-      personalRecordsConsent: personalRecordsConsent,
-    );
+  Future<SignUpResult> performRegistration(SignUpRequest request) async {
+    receivedConsent = request.personalRecordsConsent;
+    return super.performRegistration(request);
   }
 }
 

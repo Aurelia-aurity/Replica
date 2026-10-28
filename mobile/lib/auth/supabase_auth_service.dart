@@ -39,17 +39,41 @@ class SupabaseAuthService extends AuthService {
   }
 
   AuthFailure _failure(Object error) {
+    if (error is AuthRetryableFetchException || error is TimeoutException) {
+      return const AuthFailure(
+        '네트워크 연결을 확인하고 다시 시도해 주세요.',
+        kind: AuthFailureKind.network,
+      );
+    }
     if (error is AuthException) {
       switch (error.code) {
         case 'invalid_credentials':
-          return const AuthFailure('이메일 또는 비밀번호를 확인해 주세요.');
+          return const AuthFailure(
+            '이메일 또는 비밀번호를 확인해 주세요.',
+            kind: AuthFailureKind.invalidCredentials,
+          );
         case 'email_not_confirmed':
-          return const AuthFailure('이메일 인증을 완료한 후 로그인해 주세요.');
+          return const AuthFailure(
+            '이메일 인증을 완료한 후 로그인해 주세요.',
+            kind: AuthFailureKind.emailNotVerified,
+          );
         case 'weak_password':
-          return const AuthFailure('비밀번호가 서버 보안 정책을 충족하지 않습니다.');
+          return const AuthFailure(
+            '비밀번호가 서버 보안 정책을 충족하지 않습니다.',
+            kind: AuthFailureKind.weakPassword,
+          );
+        case 'user_already_exists':
+        case 'email_exists':
+          return const AuthFailure(
+            '이미 가입된 이메일이에요. 로그인해 주세요.',
+            kind: AuthFailureKind.emailAlreadyRegistered,
+          );
         case 'over_request_rate_limit':
         case 'over_email_send_rate_limit':
-          return const AuthFailure('요청이 많아요. 잠시 후 다시 시도해 주세요.');
+          return const AuthFailure(
+            '요청이 많아요. 잠시 후 다시 시도해 주세요.',
+            kind: AuthFailureKind.rateLimited,
+          );
       }
     }
     return const AuthFailure('인증 요청을 완료하지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
@@ -71,19 +95,30 @@ class SupabaseAuthService extends AuthService {
   }
 
   @override
-  Future<bool> signUp(String email, String password) async {
+  Future<SignUpResult> performRegistration(SignUpRequest request) async {
     try {
       _acceptSessions = true;
       notice = null;
       final response = await _client.auth.signUp(
-        email: email,
-        password: password,
+        email: request.email,
+        password: request.password,
       );
       _accept(response.session);
-      return response.session != null;
+      return response.session != null
+          ? SignUpResult.signedIn
+          : SignUpResult.emailVerificationRequired;
     } catch (error) {
       throw _failure(error);
     }
+  }
+
+  @override
+  bool invalidateSession({required int requestGeneration}) {
+    final invalidated = super.invalidateSession(
+      requestGeneration: requestGeneration,
+    );
+    if (invalidated) _acceptSessions = false;
+    return invalidated;
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../chat/chat_service.dart';
 import '../home/home_screen.dart';
+import '../services/backend_service.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
 import 'preview_auth_service.dart';
@@ -72,7 +73,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) => HomeScreen(
-              service: widget.chat,
+              service: SessionChatService(
+                backend: BackendService(widget.auth),
+                delegate: widget.chat,
+              ),
               accountEmail: widget.auth.identity!.email,
               onSignOut: () =>
                   unawaited(widget.auth.signOut().catchError((Object _) {})),
