@@ -6,6 +6,7 @@
 
 - 합의할 항목: 네 호출의 입출력·오류·담당 경계, 실제 URL·서비스 인증·수치 한도·시간 제한.
 - 연결 조건: 백엔드·DB의 불변 스냅샷, 분석 시도·전체 범위 검증과 원자적 게시, 프로필·스냅샷 영속 연결.
+- 2026-10-28 화자 역할(evidence[].speaker_role 및 혼합 화자 분할), 호칭 정보(persona.display_name·provider_address), 기록 민감정보 마스킹: PM 결정 후 추가, 교차 담당자 재확인 필요 (윤서준·임재성). 마스킹 탐지 방식·대상 목록과 history 적용 여부는 미정이다.
 - 오프라인 검사: `python3 contracts/backend-ai/verify_contract.py --baseline-dir contracts/baseline`. JSON Schema·예제 연결·본문 크기·명령 구문 90건을 확인하며 실제 API 호출은 하지 않는다. 검사 결과는 실행 위치의 `checks.json`에 저장한다.
 - 수락 시나리오 34개는 구현 때 확인할 요구다. GPU·tokenizer·동시성·DB·품질 검증 결과가 아니다.
 - 선택 보완: 개인화 응답의 ID·이력 합·적용 프로필·근거 부분집합을 검사기에서도 추가 확인하기. 현재 합성 응답 자체의 연결은 대조했다.
