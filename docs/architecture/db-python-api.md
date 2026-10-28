@@ -56,6 +56,8 @@ user_db = await db.for_user(access_token)
 | delete_session_rows | session_id: UUID | None, DB 대화방과 turn만 삭제. 파일·계정 삭제 아님 |
 | get_turn | turn_id: UUID | Row |
 | list_turns | session_id: UUID, *, after_turn_no: int=0, limit: int=50 | list[Row], turn_no 오름차순 커서 조회 |
+| get_recent_history | session_id: UUID, *, limit: int=20, before_turn_id: UUID 또는 None=None | list[dict], 최근 완결 N쌍을 오래된 순으로 반환. 각 쌍은 user/assistant 문자열. 현재 턴을 기준으로 이전 턴만 포함 |
+| record_turn_total_ms | turn_id: UUID, stage: stt/llm/tts, *, attempt: int, total_ms: int | Row, 최신 완료·실패 단계 및 시도 번호가 맞을 때 한 번 기록. 같은 값은 재사용, 다른 값·늦은 시도는 ConflictError |
 | reserve_record | persona_id: UUID, *, kind: text/audio, original_name: str, mime_type: str, size_bytes: int, consent_at: datetime, consent_version: str, record_id: UUID 또는 None=None | Row, uploading 예약 및 user_id/record_id/original 경로 생성. 파일 업로드는 별도 |
 | get_record | record_id: UUID | Row, deleting 제외 |
 | list_records | *, persona_id: UUID 또는 None=None, limit: int=50, offset: int=0 | list[Row] |
@@ -87,6 +89,8 @@ user_db = await db.for_user(access_token)
 | publish_style_profile | persona_id: UUID, *, source_revision: int, content: dict, model_name: str, source_ids: Sequence[UUID] | Row, 생성 당시 자료 개정 번호와 확정 출처 검증 |
 | search_record_chunks | persona_id: UUID, *, embedding_model: str, query_embedding: Sequence[float], limit: int=10, min_similarity: float=0.5 | list[Row], chunk_id/record_id/text_version_id/content/similarity |
 | request_record_deletion | record_id: UUID | Row, 삭제 job. 실제 파일 삭제 완료가 아님 |
+
+2026-10-28 통합 보완: `start_chat_stage`는 선택 인자 `request_id: UUID | None=None`를 추가로 받는다(LLM만). `finish_chat_stage`는 `total_ms: int | None=None`, `finish_reason: stop/length | None=None`, `request_id: UUID | None=None`를 추가로 받는다. 종료 사유는 LLM 성공에서만 가능하며 요청 ID는 시작한 시도와 일치해야 한다. 확장 인자가 있으면 v2 RPC를 사용한다. 기존 인자만 쓰는 호출과 SQL 8개는 유지한다. 신규 배포 SQL은 `infra/supabase/weekend_integration.sql`이며 이 SQL을 적용하기 전에는 확장 인자를 사용하지 않는다.
 
 호출 흐름:
 
@@ -204,7 +208,16 @@ job = await user_db.request_record_deletion(record["id"])
 - 오프라인 자동 테스트 34개 통과. Auth/REST는 가짜 응답이며 JSON·헤더·쿼리 인코딩과 리다이렉트 차단은 실제 로컬 HTTP 서버에서 확인했다. 공개된 사용자 함수 모두가 명세 표에 있는지도 검사한다.
 - 원격 Supabase의 함수명/인자/반환 타입을 조회해 8개 SQL 함수와 대조했다. 오프라인 테스트에서도 SQL 원본의 인자명과 RPC JSON 키를 비교한다.
 - 2026-10-09: 사용자가 설정한 로컬 `.env`를 검사 프로세스에만 주입해 실제 연결 검사 5개가 통과했다. 공개 키의 Auth 접근, 서버 키의 9개 테이블 조회, 읽기 전용 검색 RPC, 비로그인 공개 키의 테이블/RPC 접근 거부, 잘못된 사용자 토큰 거부를 확인했다. 키 값과 조회 데이터는 출력하지 않았다. 서비스의 `.env` 자동 로딩은 추가하지 않았다.
-- 총 40개 검사 중 39개 통과, 실제 로그인 사용자 검사 1개 skip. 실제 사용자 JWT가 없어 `Database.for_user()`의 정상 로그인 및 해당 사용자의 읽기·쓰기 흐름은 아직 확인하지 않았다. `REPLICA_DB_TEST_ACCESS_TOKEN`을 환경변수로 제공하면 선택적 읽기 전용 검사를 추가 실행할 수 있다. 실제 쓰기 및 사용자 간 격리의 원격 종단간 검증은 별도다.
+- 2026-10-09 당시: 총 40개 검사 중 39개 통과, 실제 로그인 사용자 검사 1개 skip. 당시 실제 사용자 JWT가 없어 정상 로그인·사용자 읽기/쓰기는 미검증이었다. 아래 2026-10-28 통합 검사에서 이 항목을 추가 검증했다.
 - 이번 Python 작업은 원격 스키마 및 기존 사용자/데이터를 변경하지 않았다. #25의 SQL 롤백 검증과 이번 Python 전송 계층 테스트는 서로 다른 검증이다.
 - 이번 저장 모듈과 별개인 기존 협업 스크립트 테스트 100개도 Python UTF-8 모드에서 확인했다. Windows 기본 cp949에서는 기존 테스트 한 개가 UTF-8 문서를 읽지 못하므로 `python -X utf8 -m unittest discover -s scripts/tests`로 실행한다.
-- 구현 공유 브랜치는 `jaesung_26-db-access`이다. PR/팀 리뷰, 정상 로그인 사용자의 통합 검증과 배포 환경 연결은 후속 확인 항목이다.
+- 초기 구현 공유 브랜치는 `jaesung_26-db-access`이다. PR/팀 리뷰와 배포 환경 연결은 후속 확인 항목이며, 정상 로그인 사용자 통합 검증은 아래 후속 작업에서 추가했다.
+
+### 2026-10-28 첫 통합 보완 결과
+
+- 후속 브랜치 `jaesung_41-db-integration`에서 서준 명세 30개 함수 인자 호환성을 자동 대조했다. 기존 30개 + 최근 이력/전체 시간 기록 2개를 실제 JWT 시험에서 호출했다.
+- 최종 검사 구성은 52개다(오프라인 45개, 임시 계정 통합 1개, 읽기 전용 서버 검사 5개, 외부 JWT 전용 읽기 검사 1개). 외부 JWT 전용 검사와 별개로 임시 계정 2명을 실제 생성·로그인해 사용자별 읽기/쓰기, 소유권·직접 접근 차단, 동시 claim, 재시도와 기록 확정·프로필·검색·삭제 요청을 검증했다. 기존 협업 검사 100개도 통과했다.
+- 최종 전체 실행: 51개 통과, 외부 JWT 전용 선택 검사 1개 skip. 임시 계정 JWT를 사용한 전체 함수 통합 시험은 통과했다.
+- 원격 추가 이력: `20261028053701 weekend_db_integration`. 기존 함수 서명은 유지한다. 실제 앱/HTTP/AI·음성 바이트·파일 삭제·계정 삭제 기능 검증은 아니다.
+- 시험 계정 0명, 시험 후 public 애플리케이션 9개 테이블 모두 0건, Storage 객체 0건, 기존 Auth 사용자 2명 유지 확인. 실제 키는 출력하거나 커밋하지 않았다.
+- 호출 예시·오류 변환·응답 투영과 남은 파트 경계는 [주말 통합 인계](db-weekend-integration.md)를 참고한다. PR #45의 상태나 다른 담당자의 승인을 자동 변경하지 않는다.

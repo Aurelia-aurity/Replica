@@ -15,9 +15,12 @@ HTTP API는 아직 이 브랜치에 구현하지 않았습니다. DB 저장·조
 - Python 3.11 이상. 검증 환경: Python 3.12.14.
 - 표준 라이브러리만 사용하므로 별도 패키지 설치나 의존성 lock 파일이 필요하지 않습니다.
 - [함수 인자·반환값·호출 예시](../docs/architecture/db-python-api.md)
+- [주말 첫 통합: 서준 초안 기준 호출·오류 변환·검증 인계](../docs/architecture/db-weekend-integration.md)
 - [구현 이슈 #26](https://github.com/Aurelia-aurity/Replica/issues/26), [DB 설계 이슈 #25](https://github.com/Aurelia-aurity/Replica/issues/25)
 
 서버 환경변수는 `.env.example`의 이름을 사용합니다. `.env` 파일을 자동으로 읽지는 않으므로 실행 환경/Docker/FastAPI 설정에서 환경변수로 주입하세요. 실제 키나 사용자 토큰을 Git·로그·채팅에 넣지 않습니다.
+
+로컬 파일을 명시적으로 읽는 선택지는 `Settings.from_env_file(path)`입니다. 자동 탐색·변수 치환·셸 실행은 하지 않으며 배포의 `Settings.from_env()` 동작은 그대로입니다. 2026-10-28 추가: 최근 완결 대화 조회, 요청 ID/종료 사유/전체 처리 시간 저장, `to_http_error` 및 `to_public_row`. 실제 쓰기 통합 시험은 별도 명시적 활성화가 필요하며 위 인계 문서의 절차를 따릅니다.
 
 `backend/`에서 호출 예시:
 

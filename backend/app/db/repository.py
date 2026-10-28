@@ -131,8 +131,8 @@ class Database:
         code = upstream_code if isinstance(upstream_code, str) and re.fullmatch(r"[A-Z0-9]{5}|PGRST[0-9]{3}", upstream_code) else None
         if response.status == 401 or path == "/auth/v1/user" and response.status in (400, 403, 422):
             raise AuthenticationError(code=code)
-        if response.status in (429, 502, 503, 504) or response.status >= 500:
-            raise DatabaseUnavailableError(code=code, outcome_unknown=method != "GET")
+        # PostgREST returns SQLSTATE 55000 as HTTP 500. Classify known database
+        # state/constraint errors first; they are not a network/service outage.
         if code == "P0002":
             raise NotFoundError(code=code)
         if code in ("55000", "23505", "23503", "40001", "40P01"):
@@ -141,6 +141,8 @@ class Database:
             raise ValidationError(code=code)
         if response.status == 403 or code == "42501":
             raise PermissionDeniedError(code=code)
+        if response.status in (429, 502, 503, 504) or response.status >= 500:
+            raise DatabaseUnavailableError(code=code, outcome_unknown=method != "GET")
         raise DatabaseError(code=code)
 
     async def for_user(self, access_token: str) -> UserDatabase:
@@ -245,6 +247,25 @@ class UserDatabase:
         await self.get_session(session_id)
         return await self._select("chat_turns", **filters)
 
+    async def get_recent_history(self, session_id: Identifier, *, limit: int = 20,
+                                 before_turn_id: Identifier | None = None) -> list[Row]:
+        """Latest complete pairs in chronological order; exclude the current/future turns."""
+        sid = _id(session_id)
+        _integer(limit, minimum=1, maximum=20)
+        await self.get_session(sid)
+        filters = {"session_id": "eq." + sid, "question_status": "eq.done", "answer_status": "eq.done",
+                   "order": "turn_no.desc", "limit": str(limit)}
+        if before_turn_id is not None:
+            current = await self.get_turn(before_turn_id)
+            if current.get("session_id") != sid:
+                raise NotFoundError()
+            filters["turn_no"] = "lt." + str(_integer(current["turn_no"], minimum=1, maximum=2**63 - 1))
+        rows = await self._select("chat_turns", **filters)
+        pairs = []
+        for row in reversed(rows):
+            pairs.append({"user": _text(row.get("question")), "assistant": _text(row.get("answer"))})
+        return pairs
+
     async def create_chat_turn(self, session_id: Identifier, turn_id: Identifier, *,
                                input_mode: Literal["text", "voice"], question: str | None = None,
                                audio_sha256: str | None = None) -> Row:
@@ -263,7 +284,8 @@ class UserDatabase:
             p_input_mode=input_mode, p_question=question, p_audio_sha256=audio_sha256))
 
     async def start_chat_stage(self, turn_id: Identifier, stage: Stage, *,
-                               model_name: str | None = None, with_audio: bool = False) -> Row:
+                               model_name: str | None = None, with_audio: bool = False,
+                               request_id: Identifier | None = None) -> Row:
         identifier = _id(turn_id)
         if stage not in ("stt", "llm", "tts") or type(with_audio) is not bool:
             raise ValidationError()
@@ -271,13 +293,20 @@ class UserDatabase:
             _text(model_name)
         elif model_name is not None:
             raise ValidationError()
+        extra = {}
+        if request_id is not None:
+            if stage != "llm":
+                raise ValidationError()
+            extra["p_request_id"] = _id(request_id)
         await self.get_turn(identifier)
-        return self._owned_one(await self._rpc("start_chat_stage", p_turn_id=identifier, p_stage=stage,
-            p_model_name=model_name, p_with_audio=with_audio))
+        return self._owned_one(await self._rpc("start_chat_stage_v2" if extra else "start_chat_stage",
+            p_turn_id=identifier, p_stage=stage, p_model_name=model_name, p_with_audio=with_audio, **extra))
 
     async def finish_chat_stage(self, turn_id: Identifier, stage: Stage, *, attempt: int,
                                 ok: bool, text: str | None = None, elapsed_ms: int | None = None,
-                                error_code: str | None = None) -> Row:
+                                error_code: str | None = None, total_ms: int | None = None,
+                                finish_reason: Literal["stop", "length"] | None = None,
+                                request_id: Identifier | None = None) -> Row:
         identifier = _id(turn_id)
         _integer(attempt, minimum=1)
         if stage not in ("stt", "llm", "tts") or type(ok) is not bool:
@@ -288,9 +317,27 @@ class UserDatabase:
             _text(text)
         if error_code is not None and (not isinstance(error_code, str) or not re.fullmatch(r"[a-zA-Z0-9_.-]{1,64}", error_code)):
             raise ValidationError()
+        if total_ms is not None:
+            _integer(total_ms)
+        if finish_reason is not None and (stage != "llm" or not ok or finish_reason not in ("stop", "length")):
+            raise ValidationError()
+        if request_id is not None and stage != "llm":
+            raise ValidationError()
+        extra = {}
+        if total_ms is not None or finish_reason is not None or request_id is not None:
+            extra = {"p_total_ms": total_ms, "p_finish_reason": finish_reason,
+                     "p_request_id": None if request_id is None else _id(request_id)}
         await self.get_turn(identifier)
-        return self._owned_one(await self._rpc("finish_chat_stage", p_turn_id=identifier, p_stage=stage,
-            p_attempt=attempt, p_ok=ok, p_text=text, p_ms=elapsed_ms, p_error_code=error_code))
+        return self._owned_one(await self._rpc("finish_chat_stage_v2" if extra else "finish_chat_stage",
+            p_turn_id=identifier, p_stage=stage, p_attempt=attempt, p_ok=ok, p_text=text,
+            p_ms=elapsed_ms, p_error_code=error_code, **extra))
+
+    async def record_turn_total_ms(self, turn_id: Identifier, stage: Stage, *, attempt: int, total_ms: int) -> Row:
+        """CAS write for a finished latest stage; stale retries cannot overwrite timing."""
+        if stage not in ("stt", "llm", "tts"):
+            raise ValidationError()
+        return self._owned_one(await self._rpc("record_turn_total_ms", p_turn_id=_id(turn_id), p_stage=stage,
+            p_attempt=_integer(attempt, minimum=1), p_total_ms=_integer(total_ms)))
 
     async def expire_chat_stages(self, *, started_before: datetime) -> int:
         result = await self._rpc("expire_chat_stages", p_started_before=_time(started_before, not_future=True))

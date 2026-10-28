@@ -7,6 +7,8 @@ import json
 import math
 import os
 import socket
+import re
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 from urllib.error import HTTPError, URLError
@@ -43,6 +45,43 @@ class Settings:
         if (isinstance(self.timeout_seconds, bool) or not isinstance(self.timeout_seconds, (float, int))
                 or not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= 120):
             raise ValidationError()
+
+    @classmethod
+    def from_env_file(cls, path: str | Path, *, override: Mapping[str, str] | None = None) -> Settings:
+        """Explicit local loader. No discovery, interpolation, shell execution or logging."""
+        try:
+            source = Path(path)
+            if source.stat().st_size > 65536:
+                raise ValidationError()
+            lines = source.read_text(encoding="utf-8-sig").splitlines()
+        except (OSError, UnicodeError, ValueError, TypeError):
+            raise ValidationError() from None
+        values: dict[str, str] = {}
+        allowed = {"SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY",
+                   "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_TIMEOUT_SECONDS"}
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            match = re.fullmatch(r"(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)", line)
+            if not match:
+                raise ValidationError()
+            name, value = match.groups()
+            if name not in allowed:
+                continue
+            if name in values:
+                raise ValidationError()
+            if value.startswith(('"', "'")):
+                quoted = re.fullmatch(r"(['\"])(.*?)\1\s*(?:#.*)?", value)
+                if quoted is None:
+                    raise ValidationError()
+                value = quoted[2]
+            else:
+                value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
+            values[name] = value
+        if override is not None:
+            values.update({k: v for k, v in override.items() if k in allowed})
+        return cls.from_env(values)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:

@@ -7,6 +7,7 @@
 - 대상: Supabase `Replica` 프로젝트 (`hfmrhmuhcbmskhjagpzg`).
 - 기존 이력: `20261008055335 baseline_chat_schema`.
 - 적용한 이력: `20261009073108 replica_db_redesign`.
+- 2026-10-28 추가 이력: `20261028053701 weekend_db_integration`. `weekend_integration.sql`은 요청 ID·종료 사유 컬럼과 v2 시작/완료·전체 시간 기록 RPC 3개의 추가 배포 보관본이다. 기존 RPC 8개는 유지한다. 상세·실제 사용자 검증은 [주말 통합 인계](../../docs/architecture/db-weekend-integration.md)를 참고한다.
 - `redesign.sql`은 실제 적용 SQL의 보관본이다. 기존 baseline이 있어야 하며 이미 적용된 DB에 다시 실행하지 않는다.
 - 애플리케이션 테이블 9개, 백엔드 전용 DB 함수 8개. Auth는 Supabase의 `auth.users`를 그대로 사용한다.
 - 기존 Auth 사용자 2명은 변경하지 않았다. 기존 애플리케이션 데이터는 0건이었다.
