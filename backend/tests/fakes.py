@@ -138,8 +138,8 @@ class FakeUserDB:
         if request_id is not None and stage != "llm":
             raise db.ValidationError()
         v2 = total_ms is not None or finish_reason is not None or request_id is not None
-        if v2 and stage == "llm" and request_id is None and row["llm_request_id"] is not None:
-            raise db.ConflictError(code="55000")  # v2 함수는 요청 ID가 기록된 값과 같아야 한다
+        if stage == "llm" and request_id is None and row["llm_request_id"] is not None:
+            raise db.ConflictError(code="55000")  # 연결된 시도는 기존 완료 경로도 거부한다
         if v2 and stage == "llm" and request_id is not None and str(request_id) != row["llm_request_id"]:
             raise db.ConflictError(code="55000")
         status_key, attempt_key, _, ms_key = STAGE_FIELDS[stage]

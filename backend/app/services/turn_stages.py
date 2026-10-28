@@ -73,10 +73,12 @@ def conflict() -> AppError:
 
 
 async def record_failure(
-    user_db: UserDatabase, turn_id: UUID | str, stage: str, attempt: int, error_code: str, ms: int
+    user_db: UserDatabase, turn_id: UUID | str, stage: str, attempt: int, error_code: str, ms: int,
+    *, request_id: UUID | str | None = None,
 ) -> None:
     try:
-        await user_db.finish_chat_stage(turn_id, stage, attempt=attempt, ok=False, elapsed_ms=ms, error_code=error_code)
+        await user_db.finish_chat_stage(turn_id, stage, attempt=attempt, ok=False, elapsed_ms=ms,
+                                       error_code=error_code, request_id=request_id)
     except db.DatabaseError as exc:
         # 이미 새 시도가 이어받았거나 DB가 불안정하다. 원래 오류를 앱에 돌려주는 일이 우선이다.
         logger.warning("실패 기록 저장 실패 stage=%s type=%s turn_id=%s", stage, type(exc).__name__, turn_id)
@@ -146,10 +148,12 @@ async def run_llm_stage(
     try:
         result = await llm.generate(question, history, None, request_id=str(request_id))
     except AppError as exc:
-        await record_failure(user_db, turn["id"], "llm", attempt, exc.db_error_code or "llm_failed", elapsed_ms(started))
+        await record_failure(user_db, turn["id"], "llm", attempt, exc.db_error_code or "llm_failed",
+                             elapsed_ms(started), request_id=request_id)
         raise
     except Exception:
-        await record_failure(user_db, turn["id"], "llm", attempt, "llm_failed", elapsed_ms(started))
+        await record_failure(user_db, turn["id"], "llm", attempt, "llm_failed", elapsed_ms(started),
+                             request_id=request_id)
         raise
     ms = elapsed_ms(started)
 

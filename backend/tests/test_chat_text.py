@@ -223,6 +223,27 @@ def test_unexpected_ai_failure_is_recorded_and_returns_internal_error(client, fa
     assert fake_db.turns[turn_id]["error_message"] == "llm_failed"
 
 
+@pytest.mark.parametrize("failure, expected_status", [(busy_error(), 429), (RuntimeError("synthetic failure"), 500)])
+def test_failed_generation_keeps_its_request_id_and_retry_gets_a_new_one(client, fake_db, failure, expected_status):
+    llm = use_llm(FakeLLM(failure, LLMResult("재시도 성공", "stop")))
+    session_id, turn_id = fake_db.add_session(), new_id()
+
+    first = send(client, session_id, turn_id)
+
+    assert first.status_code == expected_status
+    first_request_id = llm.calls[0]["request_id"]
+    assert fake_db.turns[turn_id]["answer_status"] == "failed"
+    assert fake_db.turns[turn_id]["llm_request_id"] == first_request_id
+    assert len(llm.calls) == 1
+
+    second = send(client, session_id, turn_id)
+
+    assert second.status_code == 200
+    assert fake_db.turns[turn_id]["llm_attempt"] == 2
+    assert llm.calls[1]["request_id"] != first_request_id
+    assert fake_db.turns[turn_id]["llm_request_id"] == llm.calls[1]["request_id"]
+
+
 # --- 입력 검증 / 인증 / 존재하지 않는 대화방 ---
 
 
