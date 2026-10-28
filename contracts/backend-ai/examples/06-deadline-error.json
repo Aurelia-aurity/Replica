@@ -1,0 +1,7 @@
+{
+  "request_id": "00000012-0012-4012-8012-000000000012",
+  "error": {
+    "code": "INFERENCE_DEADLINE_EXCEEDED",
+    "message": "추론 마감 시간을 초과했습니다."
+  }
+}

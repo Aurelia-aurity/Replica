@@ -1,0 +1,17 @@
+{
+  "description": "17-invalid-json",
+  "request": "{broken",
+  "request_valid": false,
+  "conditions": {
+    "malformed_json": true
+  },
+  "http_status": 400,
+  "response": {
+    "request_id": null,
+    "error": {
+      "code": "INVALID_REQUEST",
+      "message": "요청 형식이 올바르지 않습니다."
+    }
+  },
+  "transport_outcome": "received"
+}
