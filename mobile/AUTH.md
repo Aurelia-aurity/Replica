@@ -7,7 +7,7 @@
 ## PR #24와 브랜치 관계
 
 - #4의 [PR #24](https://github.com/Aurelia-aurity/Replica/pull/24)는 미병합 초안입니다.
-- 로컬 작업 브랜치: `feat/8-email-auth-session`.
+- 최초 작업 브랜치: `feat/8-email-auth-session`. PR 제출 브랜치: `feat/8-auth-ui-session-flow`.
 - 시작 커밋: PR #24의 `2b60ebaf4b98e0dbc3019700f7bd0152d3f8216d`.
 - #8 변경만 확인: `git diff feat/4-flutter-chat-scaffold -- mobile/`.
 - PR #24 브랜치에는 #8 변경을 커밋하거나 푸시하지 않습니다. #24 병합 전 main과 비교하면 #4 변경도 함께 보입니다. 추후 PR은 #24 브랜치를 비교 기준으로 삼거나, #24 병합 후 main 위로 #8 변경을 재배치합니다.
