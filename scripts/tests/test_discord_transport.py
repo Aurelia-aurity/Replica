@@ -2,6 +2,7 @@ import base64
 import copy
 import io
 import json
+import os
 import sys
 import unittest
 import zipfile
@@ -16,6 +17,710 @@ from test_discord_notify import SHA, run, report
 
 
 class Transport(unittest.TestCase):
+    def test_ledger_failure_readback_uses_only_immutable_get_as_corroboration(self):
+        intended = dn.new_state(); intended["seen"].append("new")
+        stale = dn.new_state(); stale["seen"].append("old")
+        data = dt.canonical(intended)
+        blob_sha = dt.hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        commit_sha = "c" * 40
+        calls = []
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                calls.append((path, kwargs))
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT":
+                    return {"content": {"sha": blob_sha}, "commit": {"sha": commit_sha}}
+                if path == f"/contents/{dt.STATE_FILE}?ref={dt.BRANCH}":
+                    return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64",
+                            "sha": "d" * 40, "content": base64.b64encode(dt.canonical(stale)).decode()[:48] + "\n" +
+                            base64.b64encode(dt.canonical(stale)).decode()[48:]}
+                if path == f"/contents/{dt.STATE_FILE}?ref={commit_sha}":
+                    return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64",
+                            "sha": blob_sha, "content": base64.b64encode(data).decode()[:48] + "\n" +
+                            base64.b64encode(data).decode()[48:]}
+                raise AssertionError("Unexpected ledger request")
+
+        ledger = dt.Ledger(GH())
+        self.assertEqual(ledger.load(), stale)
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(intended, purpose="pending")
+        error = caught.exception
+        self.assertEqual(error.code, "readback_mismatch")
+        self.assertEqual(error.purpose, "pending")
+        self.assertEqual(error.operation, "immutable_check")
+        self.assertEqual(error.immutable_check, "expected")
+        self.assertEqual(error.intended_blob_sha, blob_sha)
+        self.assertEqual(error.put_blob_sha, blob_sha)
+        self.assertNotEqual(error.observed_blob_sha, blob_sha)
+        self.assertEqual(error.observed_blob_sha, "d" * 40)
+        self.assertEqual(error.commit_sha, commit_sha)
+        self.assertEqual(error.expected_digest, dt.hashlib.sha256(data).hexdigest())
+        immutable_calls = [path for path, _ in calls if "?ref=" + commit_sha in path]
+        self.assertEqual(immutable_calls, [f"/contents/{dt.STATE_FILE}?ref={commit_sha}"])
+        self.assertEqual(sum(kwargs.get("method") == "PUT" for _, kwargs in calls), 1)
+
+    def test_ledger_save_missing_put_metadata_is_optional_when_readback_matches(self):
+        state = dn.new_state(); captured = []
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                captured.append((path, kwargs))
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT":
+                    return {"message": "updated"}
+                return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "a" * 40,
+                        "content": base64.b64encode(dt.canonical(state)).decode()}
+
+        ledger = dt.Ledger(GH()); ledger.load(); ledger.save(state, purpose="reconcile")
+        self.assertEqual(sum(kwargs.get("method") == "PUT" for _, kwargs in captured), 1)
+        self.assertFalse(any("?ref=" in path and "automation%" in path for path, _ in captured))
+
+    def test_ledger_readback_mismatch_without_commit_metadata_does_not_guess(self):
+        intended = dn.new_state(); intended["seen"].append("intended")
+        stale = dn.new_state(); stale["seen"].append("observed")
+        calls = []
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                calls.append((path, kwargs))
+                if not path: return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT": return {"message": "accepted"}
+                return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "d" * 40,
+                        "content": base64.b64encode(dt.canonical(stale)).decode()}
+
+        ledger = dt.Ledger(GH()); ledger.load()
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(intended, purpose="reconcile")
+        self.assertEqual(caught.exception.code, "readback_mismatch")
+        self.assertEqual(caught.exception.immutable_check, "unavailable")
+        self.assertFalse(any("?ref=" in path and path.rsplit("?ref=", 1)[-1] != dt.BRANCH
+                             for path, _ in calls))
+
+    def test_malformed_put_response_is_classified_without_exposing_body(self):
+        state = dn.new_state()
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                if not path: return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT": raise dt.Error("Invalid JSON data")
+                return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "a" * 40,
+                        "content": base64.b64encode(dt.canonical(state)).decode()}
+
+        ledger = dt.Ledger(GH()); ledger.load()
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(state)
+        self.assertEqual(caught.exception.code, "put_response_invalid")
+        self.assertNotIn("private-body", str(caught.exception))
+
+    def test_ledger_put_rejection_is_typed_redacted_and_not_retried(self):
+        state = dn.new_state(); calls = []
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                calls.append((path, kwargs))
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT":
+                    raise dt.HTTPError(409, {"X-Debug": "secret-header"}, b"private payload")
+                return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "a" * 40,
+                        "content": base64.b64encode(dt.canonical(state)).decode()}
+
+        ledger = dt.Ledger(GH()); ledger.load()
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(state, purpose="delivered")
+        error = caught.exception
+        self.assertEqual((error.code, error.status, error.purpose), ("put_rejected", 409, "delivered"))
+        self.assertNotIn("private", str(error))
+        self.assertNotIn("secret", repr(error.__dict__))
+        self.assertEqual(sum(kwargs.get("method") == "PUT" for _, kwargs in calls), 1)
+
+    def test_real_ledger_boundary_pending_and_delivered_ambiguous_puts_never_duplicate_post(self):
+        message = dn.payload("title", "synthetic", dn.object_url(18), {"owner": "111111111111111111"})
+        key = "incident:synthetic"
+
+        class StorageGH:
+            def __init__(self, state, fail_call, fail_after_write):
+                self.data = dt.canonical(state)
+                self.fail_call = fail_call
+                self.fail_after_write = fail_after_write
+                self.put_count = 0
+
+            def _blob_sha(self, data):
+                return dt.hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+
+            def repo(self, path, **kwargs):
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT":
+                    self.put_count += 1
+                    if self.put_count == self.fail_call and not self.fail_after_write:
+                        raise dt.HTTPError(503)
+                    self.data = base64.b64decode(kwargs["payload"]["content"])
+                    if self.put_count == self.fail_call:
+                        raise dt.Error("Remote request outcome unknown")
+                    return {"content": {"sha": self._blob_sha(self.data)},
+                            "commit": {"sha": f"{self.put_count:040x}"}}
+                if path == f"/contents/{dt.STATE_FILE}?ref={dt.BRANCH}":
+                    return {"type": "file", "path": dt.STATE_FILE, "encoding": "base64",
+                            "sha": self._blob_sha(self.data),
+                            "content": base64.b64encode(self.data).decode()}
+                raise AssertionError("Unexpected remote operation")
+
+        for mode, fail_call, after_write, expected_posts, expected_status in (
+                ("pending_rejected", 1, False, 0, "ready"),
+                ("pending_ambiguous_persisted", 1, True, 0, "pending"),
+                ("delivered_ambiguous_persisted", 2, True, 1, "delivered")):
+            with self.subTest(mode=mode):
+                initial = dn.new_state(); dn.queue(initial, key, message)
+                gh = StorageGH(initial, fail_call, after_write)
+                ledger = dt.Ledger(gh)
+                state = ledger.load(purpose="reconcile")
+                posts = []
+
+                class Webhook:
+                    def __init__(self, deliveries): self.deliveries = deliveries
+                    def send(self, payload):
+                        self.deliveries.append(payload)
+                        return "333333333333333333"
+
+                with self.assertRaises(dt.LedgerFailure):
+                    dn.deliver(state, ledger, Webhook(posts))
+                self.assertEqual(len(posts), expected_posts,
+                                 f"posts={len(posts)} puts={gh.put_count} durable={dt.json_data(gh.data)}")
+                self.assertEqual(gh.put_count, fail_call)
+                durable_ledger = dt.Ledger(gh)
+                durable_state = durable_ledger.load(purpose="reconcile")
+                self.assertEqual(durable_state["outbox"][key]["status"], expected_status)
+                followup_calls = []
+                followup_posts = Webhook(followup_calls)
+                if expected_status == "pending":
+                    self.assertEqual(dn.deliver(durable_state, durable_ledger, followup_posts), 1)
+                else:
+                    self.assertEqual(dn.deliver(durable_state, durable_ledger, followup_posts), 0)
+                self.assertEqual(len(followup_calls), 1 if mode == "pending_rejected" else 0)
+                self.assertEqual(len(posts), expected_posts)
+
+    def test_ledger_failure_metadata_rejects_untrusted_values(self):
+        error = dt.LedgerFailure("untrusted-code", purpose="secret-purpose", operation="secret-operation",
+                                 intended_blob_sha="token", observed_blob_sha="webhook",
+                                 commit_sha="a" * 40,
+                                 expected_digest="webhook", immutable_check="secret")
+        self.assertEqual(error.code, "load_unknown")
+        self.assertIsNone(error.purpose)
+        self.assertEqual(error.operation, "validate")
+        self.assertIsNone(error.intended_blob_sha)
+        self.assertIsNone(error.observed_blob_sha)
+        self.assertEqual(error.commit_sha, "a" * 40)
+        self.assertIsNone(error.expected_digest)
+        self.assertEqual(error.immutable_check, "unavailable")
+
+    def test_ledger_readback_preserves_typed_http_failure(self):
+        state = dn.new_state()
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "PUT":
+                    return {}
+                raise dt.HTTPError(503, {"X-Debug": "hidden"}, b"hidden body")
+
+        ledger = dt.Ledger(GH()); ledger.sha = "a" * 40
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(state, purpose="reconcile")
+        self.assertEqual((caught.exception.code, caught.exception.status), ("load_rejected", 503))
+        self.assertEqual(caught.exception.purpose, "reconcile")
+        self.assertEqual(caught.exception.operation, "readback")
+        self.assertIsNotNone(caught.exception.intended_blob_sha)
+        self.assertEqual(caught.exception.expected_digest, dt.hashlib.sha256(dt.canonical(state)).hexdigest())
+        self.assertNotIn("hidden", str(caught.exception))
+
+    def test_malformed_contents_shapes_are_safe_load_failures(self):
+        cases = [[], None,
+                 {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "a" * 40,
+                  "content": None},
+                 {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": "a" * 40,
+                  "content": ["not", "text"]},
+                 {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": 7,
+                  "content": "e30="}]
+        for response in cases:
+            with self.subTest(response_type=type(response).__name__):
+                class GH:
+                    def repo(inner, path, **kwargs):
+                        if not path: return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                        return response
+                ledger = dt.Ledger(GH())
+                with self.assertRaises(dt.LedgerFailure) as caught:
+                    ledger.load(purpose="recovery")
+                self.assertEqual((caught.exception.code, caught.exception.purpose,
+                                  caught.exception.operation),
+                                 ("load_invalid", "recovery", "readback"))
+
+    def test_nonhttp_and_invalid_json_readback_errors_keep_safe_reason_and_metadata(self):
+        state = dn.new_state()
+        for source_error, expected_code in ((dt.Error("Remote request outcome unknown"), "load_unknown"),
+                                            (dt.Error("Invalid JSON data"), "load_invalid")):
+            with self.subTest(code=expected_code):
+                class GH:
+                    def repo(inner, path, **kwargs):
+                        if not path: return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                        if kwargs.get("method") == "PUT":
+                            return {"content": {"sha": "b" * 40}, "commit": {"sha": "c" * 40}}
+                        raise source_error
+                ledger = dt.Ledger(GH()); ledger.sha = "a" * 40
+                with self.assertRaises(dt.LedgerFailure) as caught:
+                    ledger.save(state, purpose="pending")
+                error = caught.exception
+                self.assertEqual((error.code, error.purpose, error.operation),
+                                 (expected_code, "pending", "readback"))
+                self.assertEqual(error.intended_blob_sha, dt.hashlib.sha1(
+                    b"blob " + str(len(dt.canonical(state))).encode() + b"\0" + dt.canonical(state)).hexdigest())
+                self.assertEqual(error.put_blob_sha, "b" * 40)
+                self.assertEqual(error.commit_sha, "c" * 40)
+                self.assertNotIn("Remote request", str(error))
+                self.assertNotIn("Invalid JSON", str(error))
+
+    def test_diagnostic_cli_only_accepts_fixed_host_get(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import discord_ledger_diagnose as diag
+        command = diag._command(diag.BRANCH_CONTENT_RESOURCE)
+        self.assertEqual(command[command.index("--method") + 1], "GET")
+        self.assertNotIn("token", " ".join(command).lower())
+        with self.assertRaises(diag.DiagnosticUnavailable):
+            diag._command("repos/Aurelia-aurity/Replica/contents/discord-state.json", method="POST")
+        with self.assertRaises(diag.DiagnosticUnavailable):
+            diag._command("repos/other/repository/contents/discord-state.json")
+        with self.assertRaises(diag.DiagnosticUnavailable):
+            diag._command("repos/Aurelia-aurity/Replica/issues/48")
+        self.assertEqual(diag.MAX_SAMPLES * diag.MAX_REQUESTS_PER_SAMPLE, 18)
+
+    def test_diagnostic_ref_requires_exact_branch_and_commit_binding(self):
+        import discord_ledger_diagnose as diag
+        sha = "a" * 40
+        valid = {"ref": diag.REF_NAME, "object": {"type": "commit", "sha": sha}}
+        with patch.object(diag, "_run_readonly", return_value=valid):
+            self.assertEqual(diag.GhApi().get_ref(), sha)
+
+        invalid = (
+            {"ref": "refs/heads/main", "object": {"type": "commit", "sha": sha}},
+            {"object": {"type": "commit", "sha": sha}},
+            {"ref": diag.REF_NAME, "object": {"type": "blob", "sha": sha}},
+            {"ref": diag.REF_NAME, "object": {"sha": sha}},
+        )
+        for value in invalid:
+            with self.subTest(value=value), patch.object(diag, "_run_readonly", return_value=value):
+                report = diag.sample(diag.GhApi())
+                self.assertEqual(report["status"], "unavailable")
+                self.assertEqual(report["codes"], ["invalid_shape"])
+
+        data = b"synthetic-ledger"
+        blob_sha = dt.hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        stable_responses = [
+            valid,
+            {"sha": sha, "tree": {"sha": "b" * 40}},
+            {"sha": "b" * 40, "truncated": False, "tree": [
+                {"path": dt.STATE_FILE, "mode": "100644", "type": "blob", "sha": blob_sha}]},
+            {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": blob_sha,
+             "content": base64.b64encode(data).decode()},
+            {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": blob_sha,
+             "content": base64.b64encode(data).decode()},
+            valid,
+        ]
+        for value in invalid:
+            with self.subTest(final_ref=value), patch.object(
+                    diag, "_run_readonly", side_effect=[*stable_responses[:-1], value]):
+                report = diag.sample(diag.GhApi())
+                self.assertEqual(report["status"], "unavailable")
+                self.assertEqual(report["codes"], ["invalid_shape"])
+
+    def test_diagnostic_cli_contains_duplicate_and_deep_json_failures(self):
+        import contextlib
+        import discord_ledger_diagnose as diag
+
+        sentinel = "private-nested-response-body"
+        duplicate = (b'{"ref":"' + diag.REF_NAME.encode() + b'","object":{"type":"commit",'
+                     b'"sha":"' + b"a" * 40 + b'","sha":"' + b"b" * 40 + b'"}}')
+        deeply_nested = b"[" * 10_000 + b'"' + sentinel.encode() + b'"' + b"]" * 10_000
+
+        class FakeProcess:
+            def __init__(self, output):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, output)
+                os.close(write_fd)
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+            def wait(self, timeout=None): return 0
+            def kill(self): pass
+
+        valid_json = (b'{"ref":"' + diag.REF_NAME.encode() + b'","object":{"type":"commit",'
+                      b'"sha":"' + b"a" * 40 + b'"}}')
+        for label, payload, injected_recursion in (("duplicate_keys", duplicate, False),
+                                                   ("deep_nesting", deeply_nested, False),
+                                                   ("injected_recursion", valid_json, True)):
+            with self.subTest(case=label):
+                process = FakeProcess(payload)
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with patch.object(diag.subprocess, "Popen", return_value=process), \
+                     contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    if injected_recursion:
+                        with patch.object(diag.json, "loads", side_effect=RecursionError(sentinel)):
+                            result = diag.main(["--samples", "1"])
+                    else:
+                        result = diag.main(["--samples", "1"])
+                self.assertEqual(result, 1)
+                report = json.loads(stdout.getvalue())
+                self.assertEqual(report["samples"][0]["status"], "unavailable")
+                self.assertEqual(report["samples"][0]["codes"], ["invalid_json"])
+                self.assertNotIn(sentinel, stdout.getvalue())
+                self.assertNotIn(payload.decode(), stdout.getvalue())
+                self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+
+    def test_diagnostic_duplicate_keys_are_rejected_at_all_six_response_positions(self):
+        import contextlib
+        import discord_ledger_diagnose as diag
+
+        commit_sha, tree_sha = "a" * 40, "b" * 40
+        data = b"synthetic-ledger"
+        blob_sha = dt.hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        content = {"type": "file", "path": dt.STATE_FILE, "encoding": "base64",
+                   "sha": blob_sha, "content": base64.b64encode(data).decode()}
+        valid = [
+            {"ref": diag.REF_NAME, "object": {"type": "commit", "sha": commit_sha}},
+            {"sha": commit_sha, "tree": {"sha": tree_sha}},
+            {"sha": tree_sha, "truncated": False, "tree": [
+                {"path": dt.STATE_FILE, "mode": "100644", "type": "blob", "sha": blob_sha}]},
+            content,
+            content,
+            {"ref": diag.REF_NAME, "object": {"type": "commit", "sha": commit_sha}},
+        ]
+        duplicates = [
+            '{"ref":' + json.dumps(diag.REF_NAME) + ',"object":{"type":"commit","sha":"' +
+            commit_sha + '","sha":"' + "c" * 40 + '"}}',
+            '{"sha":"' + commit_sha + '","sha":"' + "c" * 40 + '","tree":{"sha":"' +
+            tree_sha + '"}}',
+            '{"sha":"' + tree_sha + '","truncated":false,"tree":[],"tree":[]}',
+            '{"type":"file","path":' + json.dumps(dt.STATE_FILE) +
+            ',"encoding":"base64","sha":"' + blob_sha + '","sha":"' + "c" * 40 +
+            '","content":"' + base64.b64encode(data).decode() + '"}',
+            '{"type":"file","path":' + json.dumps(dt.STATE_FILE) +
+            ',"encoding":"base64","sha":"' + blob_sha + '","sha":"' + "c" * 40 +
+            '","content":"' + base64.b64encode(data).decode() + '"}',
+            '{"ref":' + json.dumps(diag.REF_NAME) + ',"ref":"refs/heads/main",' +
+            '"object":{"type":"commit","sha":"' + commit_sha + '"}}',
+        ]
+
+        class FakeProcess:
+            def __init__(self, output):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, output)
+                os.close(write_fd)
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+            def wait(self, timeout=None): return 0
+            def kill(self): pass
+
+        for index, raw_duplicate in enumerate(duplicates):
+            with self.subTest(response_position=index + 1):
+                outputs = [json.dumps(item, separators=(",", ":")).encode() for item in valid]
+                outputs[index] = raw_duplicate.encode()
+                response_body = outputs[index].decode()
+                stdout, stderr = io.StringIO(), io.StringIO()
+
+                def popen(*_args, **_kwargs):
+                    return FakeProcess(outputs.pop(0))
+
+                with patch.object(diag.subprocess, "Popen", side_effect=popen), \
+                     contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    result = diag.main(["--samples", "1"])
+                report = json.loads(stdout.getvalue())
+                self.assertEqual(result, 1)
+                self.assertEqual(report["samples"][0]["status"], "unavailable")
+                self.assertEqual(report["samples"][0]["codes"], ["invalid_json"])
+                self.assertNotIn(response_body, stdout.getvalue())
+                self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+                self.assertEqual(len(outputs), 5 - index)
+
+    def test_diagnostic_json_encoding_and_utf8_depth_boundaries(self):
+        import contextlib
+        import discord_ledger_diagnose as diag
+
+        commit_sha, tree_sha = "a" * 40, "b" * 40
+        data = b"synthetic-ledger"
+        blob_sha = dt.hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        content = {"type": "file", "path": dt.STATE_FILE, "encoding": "base64",
+                   "sha": blob_sha, "content": base64.b64encode(data).decode()}
+        note = 'escaped quote: " and brackets [ ] { } and backslash \\'
+
+        def ref_json(array_depth, *, include_sentinel=False):
+            details = {"ref": diag.REF_NAME,
+                       "object": {"type": "commit", "sha": commit_sha},
+                       "note": note + (" " + "UNIQUE_PRIVATE_RESPONSE_BODY" if include_sentinel else "")}
+            prefix = json.dumps(details, separators=(",", ":"))[:-1] + ',"extra":'
+            return (prefix + "[" * array_depth + "0" + "]" * array_depth + "}").encode("utf-8")
+
+        class FakeProcess:
+            def __init__(self, output):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, output)
+                os.close(write_fd)
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+            def wait(self, timeout=None): return 0
+            def kill(self): pass
+
+        # Root object plus 127 arrays is exactly 128 structural levels.
+        valid_responses = [ref_json(127),
+                           json.dumps({"sha": commit_sha, "tree": {"sha": tree_sha}}).encode(),
+                           json.dumps({"sha": tree_sha, "truncated": False, "tree": [
+                               {"path": dt.STATE_FILE, "mode": "100644", "type": "blob",
+                                "sha": blob_sha}]}).encode(),
+                           json.dumps(content).encode(), json.dumps(content).encode(),
+                           json.dumps({"ref": diag.REF_NAME,
+                                       "object": {"type": "commit", "sha": commit_sha}}).encode()]
+        valid_outputs = list(valid_responses)
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(diag.subprocess, "Popen", side_effect=lambda *_a, **_k:
+                          FakeProcess(valid_outputs.pop(0))), \
+             contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            result = diag.main(["--samples", "1"])
+        valid_report = json.loads(stdout.getvalue())
+        self.assertEqual(result, 0)
+        self.assertEqual(valid_report["samples"][0]["status"], "stable")
+        self.assertFalse(valid_outputs)
+        self.assertEqual(stderr.getvalue(), "")
+
+        for label, payload in (("depth_129", ref_json(128, include_sentinel=True)),
+                               ("utf8_bom", json.dumps({"ref": diag.REF_NAME,
+                                "object": {"type": "commit", "sha": commit_sha}}).encode("utf-8-sig"))):
+            with self.subTest(case=label):
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with patch.object(diag.subprocess, "Popen", return_value=FakeProcess(payload)), \
+                     contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    result = diag.main(["--samples", "1"])
+                report = json.loads(stdout.getvalue())
+                self.assertEqual(result, 1)
+                self.assertEqual(report["samples"][0]["status"], "unavailable")
+                self.assertEqual(report["samples"][0]["codes"], ["invalid_json"])
+                self.assertNotIn("UNIQUE_PRIVATE_RESPONSE_BODY", stdout.getvalue())
+                self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+
+        counterexample = (json.dumps({"ref": diag.REF_NAME,
+                        "object": {"type": "commit", "sha": commit_sha}, "note": '"'},
+                        separators=(",", ":"))[:-1] + ',"extra":' + "[" * 200 + "0" + "]" * 200 + "}")
+        encoded_responses = []
+        for encoding in ("utf-16-le", "utf-16-be", "utf-32-le", "utf-32-be"):
+            encoded_responses.append((encoding + "_no_bom", counterexample.encode(encoding)))
+            encoded_responses.append((encoding + "_bom", ("\ufeff" + counterexample).encode(encoding)))
+        for encoding, payload in encoded_responses:
+            with self.subTest(encoding=encoding):
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with patch.object(diag.subprocess, "Popen", return_value=FakeProcess(payload)), \
+                     contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    result = diag.main(["--samples", "1"])
+                report = json.loads(stdout.getvalue())
+                self.assertEqual(result, 1)
+                self.assertEqual(report["samples"][0]["status"], "unavailable")
+                self.assertEqual(report["samples"][0]["codes"], ["invalid_json"])
+                self.assertNotIn(counterexample, stdout.getvalue())
+                self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+
+    def test_diagnostic_cli_binds_content_to_validated_commit_tree_entry(self):
+        import discord_ledger_diagnose as diag
+        commit_sha, tree_sha, blob_sha = "a" * 40, "b" * 40, "c" * 40
+        with patch.object(diag, "_run_readonly", side_effect=[
+                {"sha": commit_sha, "tree": {"sha": tree_sha}},
+                {"sha": tree_sha, "truncated": False, "tree": [
+                    {"path": dt.STATE_FILE, "mode": "100644", "type": "blob", "sha": blob_sha}]}]) as call:
+            api = diag.GhApi()
+            self.assertEqual(api.get_commit_tree(commit_sha), tree_sha)
+            self.assertEqual(api.get_tree_blob(tree_sha), blob_sha)
+        self.assertEqual(call.call_args_list[0].args[0], diag.COMMIT_PREFIX + commit_sha)
+        self.assertEqual(call.call_args_list[1].args[0], diag.TREE_PREFIX + tree_sha)
+        with patch.object(diag, "_run_readonly", return_value={"sha": "d" * 40, "tree": {"sha": tree_sha}}):
+            with self.assertRaises(diag.DiagnosticUnavailable):
+                diag.GhApi().get_commit_tree(commit_sha)
+
+    def test_diagnostic_cli_classifies_stable_raced_inconsistent_and_unavailable(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import discord_ledger_diagnose as diag
+        data_a, data_b = b"synthetic-a", b"synthetic-b"
+        sha_a = dt.hashlib.sha1(b"blob " + str(len(data_a)).encode() + b"\0" + data_a).hexdigest()
+        sha_b = dt.hashlib.sha1(b"blob " + str(len(data_b)).encode() + b"\0" + data_b).hexdigest()
+
+        class API:
+            def __init__(self, refs, contents, tree_blobs=None):
+                self.refs, self.contents = iter(refs), iter(contents)
+                self.tree_blobs = iter(tree_blobs or [sha_a])
+                self.requests = 0
+            def get_ref(self):
+                self.requests += 1
+                value = next(self.refs)
+                if isinstance(value, Exception): raise value
+                return value
+            def get_commit_tree(self, sha):
+                self.requests += 1
+                return "e" * 40
+            def get_tree_blob(self, sha):
+                self.requests += 1
+                value = next(self.tree_blobs)
+                if isinstance(value, Exception): raise value
+                return value
+            def get_contents(self, ref):
+                self.requests += 1
+                value = next(self.contents)
+                if isinstance(value, Exception): raise value
+                return value
+
+        stable_api = API(["a" * 40, "a" * 40], [(sha_a, data_a), (sha_a, data_a)], [sha_a])
+        stable = diag.sample(stable_api)
+        raced = diag.sample(API(["a" * 40, "b" * 40], [(sha_a, data_a), (sha_a, data_a)], [sha_a]))
+        inconsistent = diag.sample(API(["a" * 40, "a" * 40], [(sha_a, data_a), (sha_b, data_b)], [sha_a]))
+        tree_mismatch = diag.sample(API(["a" * 40, "a" * 40], [(sha_a, data_a), (sha_a, data_a)], [sha_b]))
+        unavailable = diag.sample(API(["a" * 40], [], [diag.DiagnosticUnavailable("timeout")]))
+        self.assertEqual([stable["status"], raced["status"], inconsistent["status"], unavailable["status"]],
+                         ["stable", "raced", "inconsistent", "unavailable"])
+        self.assertEqual(tree_mismatch["status"], "inconsistent")
+        self.assertIn("immutable_tree_disagree", tree_mismatch["codes"])
+        self.assertEqual(stable_api.requests, diag.MAX_REQUESTS_PER_SAMPLE)
+
+    def test_diagnostic_cli_output_never_contains_ledger_bytes(self):
+        import contextlib
+        import discord_ledger_diagnose as diag
+        secret_like = b"synthetic-private-message-body"
+        blob_sha = dt.hashlib.sha1(b"blob " + str(len(secret_like)).encode() + b"\0" + secret_like).hexdigest()
+
+        class API:
+            def get_ref(self): return "a" * 40
+            def get_commit_tree(self, sha): return "e" * 40
+            def get_tree_blob(self, sha): return blob_sha
+            def get_contents(self, ref): return blob_sha, secret_like
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(diag.main(["--samples", "1"], api_factory=API), 0)
+        self.assertNotIn(secret_like.decode(), output.getvalue())
+        report = dt.json_data(output.getvalue().encode())
+        self.assertEqual(report["samples"][0]["status"], "stable")
+        self.assertFalse(report["freshness_claimed"])
+
+    def test_content_accepts_only_base64_ascii_line_wrapping(self):
+        import discord_ledger_diagnose as diag
+        raw = b"synthetic-content"
+        sha = dt.hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+        wrapped = base64.b64encode(raw).decode()
+        wrapped = wrapped[:5] + "\n" + wrapped[5:]
+        value = {"type": "file", "path": dt.STATE_FILE, "encoding": "base64", "sha": sha,
+                 "content": wrapped}
+        self.assertEqual(diag._content(value), (sha, raw))
+        value["content"] = wrapped.replace("\n", "\v")
+        with self.assertRaises(diag.DiagnosticUnavailable):
+            diag._content(value)
+
+    def test_diagnostic_process_enforces_output_and_time_bounds(self):
+        import discord_ledger_diagnose as diag
+
+        class FakeProcess:
+            def __init__(self, output=b"", keep_open=False):
+                read_fd, write_fd = os.pipe()
+                if output:
+                    os.write(write_fd, output)
+                if not keep_open:
+                    os.close(write_fd)
+                self.write_fd = write_fd if keep_open else None
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+                self.killed = False
+            def kill(self):
+                self.killed = True
+                if self.write_fd is not None:
+                    os.close(self.write_fd)
+                    self.write_fd = None
+            def wait(self, timeout=None): return 0
+
+        output_process = FakeProcess(b"{" * 11)
+        with patch.object(diag, "MAX_OUTPUT_BYTES", 10), \
+             patch.object(diag.subprocess, "Popen", return_value=output_process) as popen:
+            with self.assertRaises(diag.DiagnosticUnavailable) as caught:
+                diag._run_readonly(diag.REF_RESOURCE)
+        self.assertEqual(caught.exception.code, "output_limit")
+        self.assertTrue(output_process.killed)
+        self.assertFalse(popen.call_args.kwargs["shell"])
+        self.assertEqual(popen.call_args.args[0][popen.call_args.args[0].index("--method") + 1], "GET")
+
+        timeout_process = FakeProcess(keep_open=True)
+
+        class Selector:
+            def register(self, *_args): pass
+            def select(self, _timeout): return []
+            def close(self): pass
+
+        with patch.object(diag.selectors, "DefaultSelector", Selector), \
+             patch.object(diag.subprocess, "Popen", return_value=timeout_process):
+            with self.assertRaises(diag.DiagnosticUnavailable) as caught:
+                diag._run_readonly(diag.REF_RESOURCE)
+        self.assertEqual(caught.exception.code, "timeout")
+        self.assertTrue(timeout_process.killed)
+
+    def test_diagnostic_cleanup_wait_is_bounded_and_preserves_primary_limit_code(self):
+        import discord_ledger_diagnose as diag
+
+        class SlowCleanupProcess:
+            def __init__(self):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, b"0123456789")
+                os.close(write_fd)
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+                self.wait_calls = []
+            def kill(self): pass
+            def wait(self, timeout=None):
+                self.wait_calls.append(timeout)
+                raise diag.subprocess.TimeoutExpired("gh", timeout)
+
+        process = SlowCleanupProcess()
+        with patch.object(diag, "MAX_OUTPUT_BYTES", 5), \
+             patch.object(diag.subprocess, "Popen", return_value=process):
+            with self.assertRaises(diag.DiagnosticUnavailable) as caught:
+                diag._run_readonly(diag.REF_RESOURCE)
+        self.assertEqual(caught.exception.code, "output_limit")
+        self.assertEqual(process.wait_calls, [diag.CLEANUP_TIMEOUT_SECONDS])
+
+    def test_cli_redacts_child_stderr_and_invalid_or_failed_child_output(self):
+        import contextlib
+        import discord_ledger_diagnose as diag
+
+        sentinel = "private-webhook-token-child-stderr"
+
+        class FakeProcess:
+            def __init__(self, output, status):
+                read_fd, write_fd = os.pipe()
+                os.write(write_fd, output)
+                os.close(write_fd)
+                self.stdout = os.fdopen(read_fd, "rb", buffering=0)
+                self.status = status
+                self.stderr_payload = sentinel
+                self.killed = False
+            def wait(self, timeout=None): return self.status
+            def kill(self): self.killed = True
+
+        for output, status, expected_code in ((sentinel.encode(), 0, "invalid_json"),
+                                               (b"private child failure", 17, "gh_failed")):
+            with self.subTest(status=status):
+                process = FakeProcess(output, status)
+                captured = io.StringIO()
+                with patch.object(diag.subprocess, "Popen", return_value=process) as popen, \
+                     contextlib.redirect_stdout(captured), contextlib.redirect_stderr(io.StringIO()):
+                    result = diag.main(["--samples", "1"])
+                self.assertEqual(result, 1)
+                self.assertIs(popen.call_args.kwargs["stderr"], diag.subprocess.DEVNULL)
+                self.assertEqual(popen.call_args.kwargs["stdin"], diag.subprocess.DEVNULL)
+                self.assertFalse(popen.call_args.kwargs["shell"])
+                self.assertEqual(process.stderr_payload, sentinel)
+                self.assertNotIn(sentinel, captured.getvalue())
+                self.assertNotIn("private child failure", captured.getvalue())
+                report = json.loads(captured.getvalue())
+                self.assertEqual(report["samples"][0]["codes"], [expected_code])
+                self.assertEqual(report["samples"][0]["status"], "unavailable")
+
     def test_pagination_total_truncation_fails(self):
         gh = dt.GitHub("synthetic")
         with patch.object(gh, "call", return_value=({"total_count": 2, "workflow_runs": [{}]}, {})):
@@ -61,9 +766,33 @@ class Transport(unittest.TestCase):
         commit = next(x for p, x in mutations if p == "/git/commits")
         self.assertEqual(commit["parents"], [])
         self.assertEqual(commit["author"], dt.BOT); self.assertEqual(commit["committer"], dt.BOT)
+        ref = next(x for p, x in mutations if p == "/git/refs")
+        self.assertEqual(ref["sha"], SHA)
         tree = next(x for p, x in mutations if p == "/git/trees")
         self.assertEqual(len(tree["tree"]), 1)
         self.assertFalse(any("main" in p for p, _ in mutations))
+
+    def test_bootstrap_missing_commit_sha_aborts_before_ref_post(self):
+        state = dn.new_state(); mutations = []
+
+        class GH:
+            def repo(inner, path, **kwargs):
+                if not path:
+                    return {"id": dt.REPO_ID, "full_name": dt.REPO}
+                if kwargs.get("method") == "POST":
+                    mutations.append(path)
+                    if path == "/git/commits":
+                        return {"message": "commit response without required SHA"}
+                    return {"sha": SHA}
+                raise AssertionError("Bootstrap without commit SHA must not read back")
+
+        ledger = dt.Ledger(GH())
+        with self.assertRaises(dt.LedgerFailure) as caught:
+            ledger.save(state, bootstrap=True)
+        self.assertEqual((caught.exception.code, caught.exception.purpose,
+                          caught.exception.operation), ("put_unknown", "bootstrap", "put"))
+        self.assertEqual(mutations, ["/git/blobs", "/git/trees", "/git/commits"])
+        self.assertNotIn("/git/refs", mutations)
 
     def test_missing_file_existing_branch_cannot_reinitialize(self):
         class GH:

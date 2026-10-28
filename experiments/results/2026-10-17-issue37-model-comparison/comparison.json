@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "issue": 37,
+  "selection_rule": "pre-registered: machine first (record QA whole + instructions whole, within 5%p = tie), then KoBEST mean; human 4-area mean is auxiliary (exclude if >=0.5 below baseline); then operational metrics",
+  "recommendation": {
+    "model": "qwen3-8b",
+    "status": "conditional",
+    "follow_up": "human grounding 2.95 vs baseline 4.10; measure grounding first in RAG/fine-tuning stages"
+  },
+  "models": {
+    "qwen2.5-7b-instruct": {
+      "record_qa_whole": 0.5,
+      "instructions_whole": 0.75,
+      "kobest_mean": 0.6753826613725857,
+      "human_naturalness": 4.75,
+      "human_instructions": 4.4,
+      "human_usefulness": 4.1,
+      "human_grounding": 4.1,
+      "human_mean4": 4.3375,
+      "record_qa_format_validity": 1,
+      "instructions_compound": 0.5,
+      "kobest_tasks": {
+        "kobest_boolq": 0.7549857549857549,
+        "kobest_copa": 0.72,
+        "kobest_hellaswag": 0.46,
+        "kobest_sentineg": 0.9395465994962217,
+        "kobest_wic": 0.5023809523809524
+      },
+      "mean_tokens_per_second_qa": 32.35664896883126,
+      "max_peak_allocated_gib": 14.232742309570312
+    },
+    "ax-4.0-light": {
+      "record_qa_whole": 0.1,
+      "instructions_whole": 0.75,
+      "kobest_mean": 0.7679681512442217,
+      "human_naturalness": 5,
+      "human_instructions": 4.35,
+      "human_usefulness": 4.5,
+      "human_grounding": 3.5,
+      "human_mean4": 4.3375,
+      "record_qa_format_validity": 0.8,
+      "instructions_compound": 0.5,
+      "kobest_tasks": {
+        "kobest_boolq": 0.9316239316239316,
+        "kobest_copa": 0.821,
+        "kobest_hellaswag": 0.53,
+        "kobest_sentineg": 0.8564231738035264,
+        "kobest_wic": 0.7007936507936507
+      },
+      "mean_tokens_per_second_qa": 32.30253858157756,
+      "max_peak_allocated_gib": 13.556038856506348
+    },
+    "ax-3.1-light": {
+      "record_qa_whole": 0.05,
+      "instructions_whole": 0.65,
+      "kobest_mean": 0.7635921581170951,
+      "human_naturalness": 5,
+      "human_instructions": 3.6,
+      "human_usefulness": 4.35,
+      "human_grounding": 2.45,
+      "human_mean4": 3.85,
+      "record_qa_format_validity": 0.05,
+      "instructions_compound": 0.375,
+      "kobest_tasks": {
+        "kobest_boolq": 0.9259259259259259,
+        "kobest_copa": 0.828,
+        "kobest_hellaswag": 0.516,
+        "kobest_sentineg": 0.9496221662468514,
+        "kobest_wic": 0.5984126984126984
+      },
+      "mean_tokens_per_second_qa": 34.853307336372104,
+      "max_peak_allocated_gib": 13.633708477020264
+    },
+    "qwen3-8b": {
+      "record_qa_whole": 0.55,
+      "instructions_whole": 0.7,
+      "kobest_mean": 0.6400740802252137,
+      "human_naturalness": 5,
+      "human_instructions": 3.7,
+      "human_usefulness": 4.4,
+      "human_grounding": 2.95,
+      "human_mean4": 4.0125,
+      "record_qa_format_validity": 1,
+      "instructions_compound": 0.375,
+      "kobest_tasks": {
+        "kobest_boolq": 0.6118233618233618,
+        "kobest_copa": 0.696,
+        "kobest_hellaswag": 0.454,
+        "kobest_sentineg": 0.906801007556675,
+        "kobest_wic": 0.5317460317460317
+      },
+      "mean_tokens_per_second_qa": 24.77488968691701,
+      "max_peak_allocated_gib": 15.31260061264038
+    },
+    "qwen3-4b-instruct-2507": {
+      "record_qa_whole": 0.6,
+      "instructions_whole": 0.75,
+      "kobest_mean": 0.5962206540916868,
+      "human_naturalness": 5,
+      "human_instructions": 3.95,
+      "human_usefulness": 4.1,
+      "human_grounding": 3.3,
+      "human_mean4": 4.0875,
+      "record_qa_format_validity": 1,
+      "instructions_compound": 0.5,
+      "kobest_tasks": {
+        "kobest_boolq": 0.5826210826210826,
+        "kobest_copa": 0.636,
+        "kobest_hellaswag": 0.422,
+        "kobest_sentineg": 0.8261964735516373,
+        "kobest_wic": 0.5142857142857142
+      },
+      "mean_tokens_per_second_qa": 24.956296975629872,
+      "max_peak_allocated_gib": 7.5425872802734375
+    },
+    "kanana-1.5-8b-instruct-2505": {
+      "record_qa_whole": 0.3,
+      "instructions_whole": 0.65,
+      "kobest_mean": 0.7119023399960428,
+      "human_naturalness": 4.95,
+      "human_instructions": 4,
+      "human_usefulness": 4.15,
+      "human_grounding": 3,
+      "human_mean4": 4.025,
+      "record_qa_format_validity": 1,
+      "instructions_compound": 0.5,
+      "kobest_tasks": {
+        "kobest_boolq": 0.7856125356125356,
+        "kobest_copa": 0.826,
+        "kobest_hellaswag": 0.496,
+        "kobest_sentineg": 0.9622166246851386,
+        "kobest_wic": 0.48968253968253966
+      },
+      "mean_tokens_per_second_qa": 32.06016369303858,
+      "max_peak_allocated_gib": 15.008588314056396
+    }
+  }
+}

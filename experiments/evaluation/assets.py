@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 BASE = ROOT.parent / 'baseline'
+DEFAULT_MODEL_ID = 'Qwen/Qwen2.5-7B-Instruct'
 sys.path.append(str(BASE))
 from common import EvaluationError, canonical, digest, read_json, write_json
 
@@ -20,6 +21,17 @@ def baseline_module(name):
 def require(condition):
     if not condition:
         raise EvaluationError('CONTRACT')
+
+
+def profile_settings(name):
+    # Pre-registered #37 model settings; the file is the single source of truth.
+    profiles = read_json(ROOT / 'model-profiles.json')['profiles']
+    require(isinstance(name, str) and name in profiles)
+    p = profiles[name]
+    require(set(p) == {'model_id', 'revision', 'chat_template_kwargs', 'kobest_add_bos_token'})
+    require(isinstance(p['model_id'], str) and isinstance(p['revision'], str) and len(p['revision']) == 40)
+    require(isinstance(p['chat_template_kwargs'], dict) and type(p['kobest_add_bos_token']) is bool)
+    return p
 
 
 def validate_release(raw, release):
@@ -49,15 +61,21 @@ def validate_release(raw, release):
 
 
 def validate_config(config, dataset):
+    profiled = 'model_profile' in config
+    profile = profile_settings(config['model_profile']) if profiled else None
     expected = {'system_prompt': '한국어로 간결하고 자연스럽게 답하세요.',
                 'do_sample': False, 'warmups': 3, 'rounds': 3,
                 'max_new_tokens': 160, 'supplement_max_new_tokens': 320,
-                'suite': dataset['suite'], 'model_id': 'Qwen/Qwen2.5-7B-Instruct'}
+                'suite': dataset['suite'], 'model_id': profile['model_id'] if profiled else DEFAULT_MODEL_ID}
+    if profiled:
+        expected.update(model_revision=profile['revision'], chat_template_kwargs=profile['chat_template_kwargs'])
+    else:
+        require(not {'model_revision', 'chat_template_kwargs'} & set(config))
     require(all(config.get(k) == v and type(config.get(k)) is type(v) for k, v in expected.items()))
     require(isinstance(config.get('evaluation_code_sha256'), dict) and bool(config['evaluation_code_sha256']))
 
 
-def inputs(suite):
+def inputs(suite, profile=None):
     raw = (ROOT / (suite + '.json')).read_bytes()
     release = read_json(ROOT / 'release.json')
     for filename, hash_value in release['files'].items():
@@ -66,12 +84,16 @@ def inputs(suite):
     # Reuse the baseline's immutable runner and strict journal reader. Its phase
     # name "baseline" means the scheduled main attempts for this suite too.
     release = dict(release, rubric_sha256=digest(canonical(data['category_rubrics'])))
-    config = {'model_id': 'Qwen/Qwen2.5-7B-Instruct', 'suite': suite,
+    config = {'model_id': DEFAULT_MODEL_ID, 'suite': suite,
               'system_prompt': '한국어로 간결하고 자연스럽게 답하세요.',
               'do_sample': False, 'warmups': 3, 'rounds': 3,
               'max_new_tokens': 160, 'supplement_max_new_tokens': 320,
               'evaluation_code_sha256': {str(p.relative_to(ROOT.parent)): digest(p.read_bytes())
                 for directory in (ROOT, BASE) for p in sorted(directory.glob('*.py'))}}
+    if profile is not None:
+        p = profile_settings(profile)
+        config.update(model_id=p['model_id'], model_profile=profile, model_revision=p['revision'],
+                      chat_template_kwargs=p['chat_template_kwargs'])
     validate_config(config, data)
     return raw, data, release, config
 

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "graded_sheet_sha256": "c7249c03b07a39a7c83490406a7caa1ec5fbb517c1af8db88244b7a71e5b9cb4",
+  "key_sha256": "7f538ba96a6cbaeb2e87f18f8035b52f4dd03db7747114efbdb0218fa5991eb9",
+  "grader": "user (single, blind)",
+  "responses_unchanged": true,
+  "per_model": {
+    "qwen2.5-7b-instruct": {
+      "naturalness": 4.75,
+      "instructions": 4.4,
+      "usefulness": 4.1,
+      "grounding": 4.1,
+      "mean4": 4.34,
+      "n": 20
+    },
+    "ax-4.0-light": {
+      "naturalness": 5,
+      "instructions": 4.35,
+      "usefulness": 4.5,
+      "grounding": 3.5,
+      "mean4": 4.34,
+      "n": 20
+    },
+    "ax-3.1-light": {
+      "naturalness": 5,
+      "instructions": 3.6,
+      "usefulness": 4.35,
+      "grounding": 2.45,
+      "mean4": 3.85,
+      "n": 20
+    },
+    "qwen3-8b": {
+      "naturalness": 5,
+      "instructions": 3.7,
+      "usefulness": 4.4,
+      "grounding": 2.95,
+      "mean4": 4.01,
+      "n": 20
+    },
+    "qwen3-4b-instruct-2507": {
+      "naturalness": 5,
+      "instructions": 3.95,
+      "usefulness": 4.1,
+      "grounding": 3.3,
+      "mean4": 4.09,
+      "n": 20
+    },
+    "kanana-1.5-8b-instruct-2505": {
+      "naturalness": 4.95,
+      "instructions": 4,
+      "usefulness": 4.15,
+      "grounding": 3,
+      "mean4": 4.03,
+      "n": 20
+    }
+  },
+  "score_distribution": {
+    "naturalness": {
+      "1": 1,
+      "2": 0,
+      "3": 0,
+      "4": 2,
+      "5": 117
+    },
+    "instructions": {
+      "1": 6,
+      "2": 12,
+      "3": 29,
+      "4": 2,
+      "5": 71
+    },
+    "usefulness": {
+      "1": 5,
+      "2": 1,
+      "3": 21,
+      "4": 23,
+      "5": 70
+    },
+    "grounding": {
+      "1": 47,
+      "2": 3,
+      "3": 8,
+      "4": 1,
+      "5": 61
+    }
+  },
+  "note": "4 areas equal weight; mean4 = mean of area means. Round-1 responses only."
+}

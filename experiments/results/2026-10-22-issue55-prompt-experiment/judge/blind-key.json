@@ -1,0 +1,1250 @@
+{
+ "B001": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P31"
+ },
+ "B002": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-P"
+ },
+ "B003": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P11"
+ },
+ "B004": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-M"
+ },
+ "B005": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P27"
+ },
+ "B006": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P14"
+ },
+ "B007": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-M"
+ },
+ "B008": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P18"
+ },
+ "B009": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P30"
+ },
+ "B010": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-M"
+ },
+ "B011": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-M"
+ },
+ "B012": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-P"
+ },
+ "B013": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P15"
+ },
+ "B014": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P10"
+ },
+ "B015": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P04"
+ },
+ "B016": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-O"
+ },
+ "B017": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-R"
+ },
+ "B018": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P03"
+ },
+ "B019": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P25"
+ },
+ "B020": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P09"
+ },
+ "B021": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-M"
+ },
+ "B022": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-O"
+ },
+ "B023": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P22"
+ },
+ "B024": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P09"
+ },
+ "B025": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-M"
+ },
+ "B026": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P29"
+ },
+ "B027": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P22"
+ },
+ "B028": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-R"
+ },
+ "B029": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-P"
+ },
+ "B030": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-R"
+ },
+ "B031": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P17"
+ },
+ "B032": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P18"
+ },
+ "B033": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P24"
+ },
+ "B034": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P07"
+ },
+ "B035": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-R"
+ },
+ "B036": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-M"
+ },
+ "B037": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-M"
+ },
+ "B038": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P01"
+ },
+ "B039": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P20"
+ },
+ "B040": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P12"
+ },
+ "B041": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P28"
+ },
+ "B042": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-M"
+ },
+ "B043": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P09"
+ },
+ "B044": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P32"
+ },
+ "B045": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P08"
+ },
+ "B046": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P19"
+ },
+ "B047": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-R"
+ },
+ "B048": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P32"
+ },
+ "B049": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-O"
+ },
+ "B050": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-R"
+ },
+ "B051": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-O"
+ },
+ "B052": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P18"
+ },
+ "B053": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P29"
+ },
+ "B054": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-M"
+ },
+ "B055": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P21"
+ },
+ "B056": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-M"
+ },
+ "B057": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P01"
+ },
+ "B058": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-R"
+ },
+ "B059": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-P"
+ },
+ "B060": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P16"
+ },
+ "B061": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-R"
+ },
+ "B062": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-P"
+ },
+ "B063": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P10"
+ },
+ "B064": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P07"
+ },
+ "B065": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-R"
+ },
+ "B066": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-M"
+ },
+ "B067": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P17"
+ },
+ "B068": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P17"
+ },
+ "B069": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P29"
+ },
+ "B070": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-R"
+ },
+ "B071": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P22"
+ },
+ "B072": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P02"
+ },
+ "B073": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-O"
+ },
+ "B074": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-O"
+ },
+ "B075": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-P"
+ },
+ "B076": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P30"
+ },
+ "B077": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-M"
+ },
+ "B078": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P22"
+ },
+ "B079": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-O"
+ },
+ "B080": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P11"
+ },
+ "B081": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P16"
+ },
+ "B082": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-P"
+ },
+ "B083": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P20"
+ },
+ "B084": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P26"
+ },
+ "B085": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P31"
+ },
+ "B086": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-O"
+ },
+ "B087": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-R"
+ },
+ "B088": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P01"
+ },
+ "B089": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-M"
+ },
+ "B090": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-O"
+ },
+ "B091": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P03"
+ },
+ "B092": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P26"
+ },
+ "B093": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-M"
+ },
+ "B094": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P14"
+ },
+ "B095": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-O"
+ },
+ "B096": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P02"
+ },
+ "B097": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P11"
+ },
+ "B098": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-O"
+ },
+ "B099": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P05"
+ },
+ "B100": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P07"
+ },
+ "B101": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P24"
+ },
+ "B102": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P23"
+ },
+ "B103": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P12"
+ },
+ "B104": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P16"
+ },
+ "B105": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P05"
+ },
+ "B106": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P24"
+ },
+ "B107": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P08"
+ },
+ "B108": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-M"
+ },
+ "B109": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P06"
+ },
+ "B110": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P23"
+ },
+ "B111": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-M"
+ },
+ "B112": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P32"
+ },
+ "B113": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-P"
+ },
+ "B114": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-R"
+ },
+ "B115": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P13"
+ },
+ "B116": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P15"
+ },
+ "B117": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-P"
+ },
+ "B118": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P29"
+ },
+ "B119": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P21"
+ },
+ "B120": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-U1-R"
+ },
+ "B121": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P25"
+ },
+ "B122": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P04"
+ },
+ "B123": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P10"
+ },
+ "B124": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P31"
+ },
+ "B125": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P05"
+ },
+ "B126": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-P"
+ },
+ "B127": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P28"
+ },
+ "B128": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-O"
+ },
+ "B129": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-O"
+ },
+ "B130": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P11"
+ },
+ "B131": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-P"
+ },
+ "B132": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P14"
+ },
+ "B133": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-P"
+ },
+ "B134": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P19"
+ },
+ "B135": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P21"
+ },
+ "B136": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P05"
+ },
+ "B137": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-M"
+ },
+ "B138": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P20"
+ },
+ "B139": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P26"
+ },
+ "B140": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P23"
+ },
+ "B141": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P30"
+ },
+ "B142": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P26"
+ },
+ "B143": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P25"
+ },
+ "B144": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P03"
+ },
+ "B145": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P20"
+ },
+ "B146": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P19"
+ },
+ "B147": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P15"
+ },
+ "B148": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P02"
+ },
+ "B149": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P32"
+ },
+ "B150": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P2-R"
+ },
+ "B151": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-O"
+ },
+ "B152": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P12"
+ },
+ "B153": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P13"
+ },
+ "B154": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P06"
+ },
+ "B155": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P23"
+ },
+ "B156": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P03"
+ },
+ "B157": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P08"
+ },
+ "B158": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-P"
+ },
+ "B159": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P25"
+ },
+ "B160": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-P"
+ },
+ "B161": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P06"
+ },
+ "B162": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P28"
+ },
+ "B163": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P06"
+ },
+ "B164": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P1-O"
+ },
+ "B165": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P31"
+ },
+ "B166": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P17"
+ },
+ "B167": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P14"
+ },
+ "B168": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A1-O"
+ },
+ "B169": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-P"
+ },
+ "B170": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-R"
+ },
+ "B171": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P15"
+ },
+ "B172": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P18"
+ },
+ "B173": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-P"
+ },
+ "B174": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-P"
+ },
+ "B175": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-O"
+ },
+ "B176": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-R"
+ },
+ "B177": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-P1-P"
+ },
+ "B178": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-R"
+ },
+ "B179": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P02"
+ },
+ "B180": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P12"
+ },
+ "B181": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-M"
+ },
+ "B182": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P04"
+ },
+ "B183": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P30"
+ },
+ "B184": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P27"
+ },
+ "B185": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A2-R"
+ },
+ "B186": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-O"
+ },
+ "B187": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P28"
+ },
+ "B188": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P04"
+ },
+ "B189": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P13"
+ },
+ "B190": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P24"
+ },
+ "B191": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P08"
+ },
+ "B192": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P27"
+ },
+ "B193": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-P"
+ },
+ "B194": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-U1-R"
+ },
+ "B195": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P16"
+ },
+ "B196": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-P"
+ },
+ "B197": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-A1-M"
+ },
+ "B198": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P27"
+ },
+ "B199": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P01"
+ },
+ "B200": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P09"
+ },
+ "B201": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P07"
+ },
+ "B202": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P10"
+ },
+ "B203": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "probe",
+  "case_id": "P13"
+ },
+ "B204": {
+  "model": "qwen3-8b",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-O"
+ },
+ "B205": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P21"
+ },
+ "B206": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "base",
+  "suite": "human",
+  "case_id": "E-P2-O"
+ },
+ "B207": {
+  "model": "qwen3-8b",
+  "prompt": "guarded",
+  "suite": "human",
+  "case_id": "E-A2-R"
+ },
+ "B208": {
+  "model": "qwen2.5-7b-instruct",
+  "prompt": "guarded",
+  "suite": "probe",
+  "case_id": "P19"
+ }
+}

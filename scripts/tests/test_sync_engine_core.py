@@ -17,6 +17,8 @@ import notification_report as nr
 import observation_clock
 import sync_engine as se
 
+TEST_STATUS_OPTIONS = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "fixture-cancel-option"}
+
 
 SOURCE_ID = "00000000-0000-4000-8000-000000000001"
 CONTROL_ID = "00000000-0000-4000-8000-000000000002"
@@ -70,10 +72,10 @@ def request_ui_patch_count(writes, page_id):
 
 def status_value(name):
     return {"__typename": "ProjectV2ItemFieldSingleSelectValue",
-            "id": f"PVTSV_fixture_{gp.EXPECTED_STATUS_OPTIONS[name]}",
+            "id": f"PVTSV_fixture_{TEST_STATUS_OPTIONS[name]}",
             "updatedAt": "2026-10-01T00:00:00Z",
             "field": {"id": STATUS_FIELD},
-            "optionId": gp.EXPECTED_STATUS_OPTIONS[name], "name": name}
+            "optionId": TEST_STATUS_OPTIONS[name], "name": name}
 
 
 def make_issue(*, created_at="2026-09-01T00:00:00Z", state="OPEN", reason=None,
@@ -251,13 +253,13 @@ class ProjectAPI:
                 raise gp.SyncError("synthetic wrong Project status field target")
             if query == gp.SET_STATUS_MUTATION:
                 option = variables["option"]
-                if option not in gp.EXPECTED_STATUS_OPTIONS.values():
+                if option not in TEST_STATUS_OPTIONS.values():
                     raise gp.SyncError("synthetic wrong Project status option")
                 if self.fail_status_write_once:
                     self.fail_status_write_once = False
                     raise gp.SyncError("synthetic Project SET failed before apply")
                 self.writes.append((query, copy.deepcopy(variables)))
-                name = next(name for name, value in gp.EXPECTED_STATUS_OPTIONS.items()
+                name = next(name for name, value in TEST_STATUS_OPTIONS.items()
                             if value == option)
                 value = [{"__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "id": f"PVTSV_{item_id}_{option}",
@@ -279,7 +281,7 @@ class ProjectAPI:
             fields = [
                 {"__typename": "ProjectV2SingleSelectField", "id": STATUS_FIELD, "name": "Status",
                  "options": [{"id": value, "name": name}
-                             for name, value in gp.EXPECTED_STATUS_OPTIONS.items()]},
+                             for name, value in TEST_STATUS_OPTIONS.items()]},
                 {"__typename": "ProjectV2IterationField", "id": "PVTIF_iteration", "name": "Iteration"},
             ]
             return {"node": self._project(fields=conn(fields))}, None
@@ -361,7 +363,7 @@ def make_project_item(*, item_id="PVTI_issue18", option="백로그", archived=Fa
                       issue_id=ISSUE_ID, issue_node=ISSUE_NODE, number=ISSUE_NUMBER):
     value = [] if option is None else [{"__typename": "ProjectV2ItemFieldSingleSelectValue",
         "id": f"PVTSV_{item_id}_{option}", "updatedAt": "2026-10-01T00:00:00Z",
-        "field": {"id": STATUS_FIELD}, "optionId": gp.EXPECTED_STATUS_OPTIONS[option], "name": option}]
+         "field": {"id": STATUS_FIELD}, "optionId": TEST_STATUS_OPTIONS[option], "name": option}]
     return {"id": item_id, "isArchived": archived,
             "content": {"__typename": "Issue", "id": issue_node, "databaseId": issue_id,
                         "number": number,
@@ -534,7 +536,7 @@ def control_internal():
 
 def config():
     return {"project_id": gp.EXPECTED_PROJECT_ID, "owner_id": gp.EXPECTED_PROJECT_OWNER_ID,
-            "status_field_id": STATUS_FIELD, "status_options": dict(gp.EXPECTED_STATUS_OPTIONS),
+            "status_field_id": STATUS_FIELD, "status_options": dict(TEST_STATUS_OPTIONS),
             "notion_source_id": SOURCE_ID, "notion_control_id": CONTROL_ID}
 
 
@@ -568,6 +570,7 @@ def make_pending_status_state(issue, item_id="PVTI_issue18", *, before="백로�
     state["migration_complete"] = migration_complete
     if migration_complete:
         state["project_item_id"] = item_id
+    state["review_pr_hash"] = se._digest([])
     item = {"id": item_id, "status_option_id": gp.EXPECTED_STATUS_OPTIONS[before]}
     facts = facts or {"repository_node_id": REPO_NODE, "pulls": {}}
     refs, _ = se._linked_pr_facts(issue, facts)
@@ -614,26 +617,39 @@ class SyncEngineCoreTests(unittest.TestCase):
                                         baseline_notion_status="백로그",
                                         project_status="백로그",
                                         baseline_project_status=None,
-                                        baseline_issue=None, issue=None):
+                                        baseline_issue=None, issue=None, pulls=()):
         issue = issue or make_issue()
         baseline_issue = baseline_issue or issue
         item = make_project_item(item_id="PVTI_bidirectional", option=project_status)
-        self.repo_graph = RepoGraph(issues=[issue])
-        self.rest = LegacyREST(issues=[{"id": issue["databaseId"], "node_id": issue["id"],
-            "number": issue["number"], "state": issue["state"].lower()}])
+        self.repo_graph = RepoGraph(issues=[issue], pulls=pulls)
+        rest_rows = [{"id": issue["databaseId"], "node_id": issue["id"],
+            "number": issue["number"], "state": issue["state"].lower()}]
+        rest_pull = None
+        if pulls:
+            pull = pulls[0]
+            rest_rows.append({"id": pull["databaseId"], "node_id": pull["id"],
+                "number": pull["number"], "state": pull["state"].lower(),
+                "pull_request": {"url": f"https://api.github.com/repos/{gp.REPOSITORY}/pulls/{pull['number']}"}})
+            rest_pull = {"id": pull["databaseId"], "node_id": pull["id"],
+                "number": pull["number"], "state": pull["state"].lower(),
+                "draft": pull["isDraft"], "merged": pull["state"] == "MERGED",
+                "base": {"ref": pull["baseRefName"], "repo": {
+                    "id": gp.REPOSITORY_ID, "node_id": REPO_NODE}}}
+        self.rest = LegacyREST(issues=rest_rows, pull=rest_pull)
         self.project = ProjectAPI([item])
         state = se.new_issue_state(issue["databaseId"], gp.EXPECTED_PROJECT_ID)
         state["migration_complete"] = True
         state["project_item_id"] = item["id"]
-        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        facts = {"repository_node_id": REPO_NODE,
+                 "pulls": {pull["id"]: pull for pull in pulls}}
         refs, _ = se._linked_pr_facts(baseline_issue, facts)
         baseline_project_status = baseline_project_status or project_status
         baseline_value = next((value for value in item["fieldValues"]["nodes"]
                                if value["optionId"] ==
-                               gp.EXPECTED_STATUS_OPTIONS[baseline_project_status]),
+                               TEST_STATUS_OPTIONS[baseline_project_status]),
                               status_value(baseline_project_status))
         baseline_item = {"id": item["id"],
-                         "status_option_id": gp.EXPECTED_STATUS_OPTIONS[baseline_project_status],
+                         "status_option_id": TEST_STATUS_OPTIONS[baseline_project_status],
                          "status_value_id": baseline_value["id"],
                          "status_updated_at": baseline_value["updatedAt"]}
         state["baseline"] = se._new_status_baseline(
@@ -645,6 +661,43 @@ class SyncEngineCoreTests(unittest.TestCase):
         return se.decode_internal(
             se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
             kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+
+    def _prepare_projection_writer_case(self, *, notion_status="준비 중",
+                                        target="진행 중", display_sent=False):
+        self._configure_bidirectional_status(
+            notion_status=notion_status, baseline_notion_status="백로그",
+            project_status="진행 중", baseline_project_status="백로그")
+        page = self.notion.pages[ISSUE_PAGE_ID]
+        state = self._read_bidirectional_state()
+        state["review_pr_hash"] = se._digest([])
+        issue = copy.deepcopy(self.repo_graph.issues[0])
+        item = copy.deepcopy(self.project.items[0])
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        refs, _ = se._linked_pr_facts(issue, facts)
+        metadata = se._make_metadata(
+            "Issue", issue, se.key_for(gp.REPOSITORY_ID, ISSUE_ID))
+        plan = {"target": target, "end_reason": None, "representative": None,
+                "confirmation": ""}
+        projection = {
+            "expected_option_id": TEST_STATUS_OPTIONS[target],
+            "expected_fingerprint": se._status_operation_fingerprint(issue, refs, item),
+            "checkpoint": {key: state[key] for key in se.STATUS_CHECKPOINT_KEYS},
+            "fact_contract": "semantic_v2", "request_id": None,
+            "expected_notion_status": "백로그", "result_notion_status": target,
+        }
+        state["projection"] = projection
+        if display_sent:
+            properties = se._projection_properties(
+                metadata, target=target, end_reason=None, representative=None,
+                confirmation="", state=state, now=NOW, kind="Issue")
+            fields, fingerprint = se._restore_projection_checkpoint(properties)
+            projection["display_checkpoint"] = {
+                "phase": "display_sent", "expected_fields": fields,
+                "expected_fingerprint": fingerprint}
+            properties["동기화 내부 상태"] = se.text_property(se.canonical_json(state))
+            se._patch_page(self.notion, SOURCE_ID, page, properties)
+            self.notion.writes.clear()
+        return page, metadata, plan, state, issue, item, facts
 
     def test_created_notion_page_id_mismatch_keeps_create_fence_and_does_not_index(self):
         self._configure_bidirectional_status()
@@ -898,6 +951,71 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID],
                                                 "작업 상태"), "백로그")
                 self.assertEqual(self.project.writes, [])
+    def test_flag_enabled_stale_project_list_uses_fresh_item_status_without_hold(self):
+        # The ProjectV2 items list can lag a just-written Status; the direct node read is current.
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+
+        result = self.run_sync(bidirectional_enabled=True)
+
+        state = self._read_bidirectional_state()
+        self.assertEqual(result["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "준비 중")
+        self.assertEqual(state["baseline"]["project"]["value_id"], "PVTSV_fresh_after_agent_write")
+        self.assertEqual(self.project.writes, [])
+
+    def test_flag_enabled_failed_fresh_status_read_keeps_list_value_and_holds(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+        self.project.fail_direct_readback_once = True
+
+        result = self.run_sync(bidirectional_enabled=True)
+
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(self._read_bidirectional_state()["hold"]["code"],
+                         "SOURCE_CHANGED_BEFORE_WRITE")
+        self.assertEqual(self.project.writes, [])
+
+    def test_flag_enabled_source_changed_hold_redisplay_keeps_task_status(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="진행 중",
+            project_status="진행 중", baseline_project_status="진행 중")
+        state = self._read_bidirectional_state()
+        state["request"] = se.status_sync.request_record(
+            "r1", "진행 중", observed_from="2026-10-01T00:00:00Z",
+            observed_to="2026-10-01T00:01:00Z", prior_notion_status="준비 중",
+            project_option_id=TEST_STATUS_OPTIONS["준비 중"], phase="completed",
+            reason="Project 상태와 Notion 표시를 확인했습니다.")
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["동기화 내부 상태"] = (
+            se.text_property(se.canonical_json(state)))
+        item_id = self.project.items[0]["id"]
+        self.project.status_values[item_id] = [dict(
+            status_value("준비 중"), id="PVTSV_fresh_after_agent_write",
+            updatedAt="2026-10-09T12:00:00Z")]
+        self.project.fail_direct_readback_once = True
+
+        first = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "진행 중")
+
+        second = self.run_sync(bidirectional_enabled=True)
+
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(self._read_bidirectional_state()["hold"]["code"],
+                         "SOURCE_CHANGED_BEFORE_WRITE")
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "진행 중")
+
     def test_flag_enabled_project_status_same_option_stamp_reset_blocks_late_write(self):
         self._configure_bidirectional_status(notion_status="진행 중")
         changed = False
@@ -1323,7 +1441,7 @@ class SyncEngineCoreTests(unittest.TestCase):
                          "준비 중")
         self.assertEqual(self.project.writes, writes_before_recovery)
 
-    def test_not_planned_and_duplicate_completion_clear_nullable_notion_select(self):
+    def test_not_planned_and_duplicate_project_cancellation_survives_projection_recovery(self):
         for reason, recovery in (("NOT_PLANNED", False), ("DUPLICATE", True)):
             with self.subTest(reason=reason, recovery=recovery):
                 duplicate = (None if reason != "DUPLICATE" else {
@@ -1338,7 +1456,7 @@ class SyncEngineCoreTests(unittest.TestCase):
                     nonlocal armed
                     if (armed or not recovery or path != f"/pages/{ISSUE_PAGE_ID}" or
                             "작업 상태" not in properties or
-                            properties["작업 상태"] != {"select": None}):
+                            properties["작업 상태"] != {"select": {"name": "취소"}}):
                         return
                     internal = properties.get("동기화 내부 상태")
                     saved = json.loads(rich_text_value(internal)) if internal else {}
@@ -1365,10 +1483,10 @@ class SyncEngineCoreTests(unittest.TestCase):
                 state = self._read_bidirectional_state()
                 page = self.notion.pages[ISSUE_PAGE_ID]
                 self.assertEqual(result["held"], 0)
-                self.assertIsNone(se.read_select(page, "작업 상태"))
+                self.assertEqual(se.read_select(page, "작업 상태"), "취소")
                 self.assertEqual(se.read_select(page, "종료 사유"),
                                  "미계획" if reason == "NOT_PLANNED" else "중복")
-                self.assertEqual(state["baseline"]["notion_status"], None)
+                self.assertEqual(state["baseline"]["notion_status"], "취소")
                 self.assertIsNone(state["projection"])
                 terminal_patches = []
                 terminal_markers = []
@@ -1387,11 +1505,11 @@ class SyncEngineCoreTests(unittest.TestCase):
                 self.assertTrue(terminal_patches)
                 if recovery:
                     self.assertGreaterEqual(len(terminal_patches), 2)
-                self.assertTrue(all(payload["작업 상태"] == {"select": None}
+                self.assertTrue(all(payload["작업 상태"] == {"select": {"name": "취소"}}
                                     for payload in terminal_patches))
                 self.assertTrue(all(se._restore_projection_matches(page, marker)
                                     for marker in terminal_markers))
-                self.assertIn(gp.CLEAR_STATUS_MUTATION,
+                self.assertIn(gp.SET_STATUS_MUTATION,
                               [query for query, _ in self.project.writes])
                 writes_after_completion = copy.deepcopy(self.project.writes)
 
@@ -1760,7 +1878,7 @@ class SyncEngineCoreTests(unittest.TestCase):
             self.assertEqual(pending["request_id"], request["id"])
             self.assertEqual(pending["target_option_id"], variables.get("option"))
             self.assertEqual(request["target"], next(
-                name for name, option in gp.EXPECTED_STATUS_OPTIONS.items()
+                name for name, option in TEST_STATUS_OPTIONS.items()
                 if option == variables.get("option")))
             observed.append((query, variables, copy.deepcopy(page), copy.deepcopy(original)))
 
@@ -1899,7 +2017,7 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(self.project.status_mutation_entries, [])
         self.assertEqual(self.project.writes, [])
 
-    def test_status_clear_entry_has_fresh_full_page_snapshot(self):
+    def test_cancel_status_entry_has_fresh_full_page_snapshot(self):
         baseline_issue = make_issue()
         closed_issue = make_issue(state="CLOSED", reason="NOT_PLANNED",
                                   closed_at="2026-10-03T00:00:00Z")
@@ -1913,9 +2031,11 @@ class SyncEngineCoreTests(unittest.TestCase):
             snapshots = [page for path, page in self.notion.read_snapshots
                          if path == f"/pages/{ISSUE_PAGE_ID}"]
             self.assertTrue(snapshots)
-            self.assertEqual(query, gp.CLEAR_STATUS_MUTATION)
+            self.assertEqual(query, gp.SET_STATUS_MUTATION)
             state = self._read_bidirectional_state()
-            self.assertIsNone(state["pending"]["target_option_id"])
+            self.assertEqual(state["pending"]["target_option_id"],
+                             TEST_STATUS_OPTIONS["취소"])
+            self.assertEqual(variables.get("option"), TEST_STATUS_OPTIONS["취소"])
             self.assertEqual(variables.get("item"), self.project.items[0]["id"])
             entries.append(copy.deepcopy(snapshots[-1]))
 
@@ -1924,7 +2044,7 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.project.before_status_mutation = None
         self.assertEqual(len(entries), 1)
         self.assertEqual([query for query, _ in self.project.status_mutation_entries],
-                         [gp.CLEAR_STATUS_MUTATION])
+                         [gp.SET_STATUS_MUTATION])
         self.assertEqual(self.project.status_mutation_attempts, 1)
 
     def test_clear_pre_mutation_page_mismatch_or_get_failure_stops_clear(self):
@@ -1962,7 +2082,8 @@ class SyncEngineCoreTests(unittest.TestCase):
                         se.read_text(snapshot, "동기화 내부 상태"), kind="issue",
                         project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
                     pending = state.get("pending") or {}
-                    if pending.get("kind") != "status" or pending.get("target_option_id") is not None:
+                    if pending.get("kind") != "status" or pending.get("target_option_id") != \
+                            TEST_STATUS_OPTIONS["취소"]:
                         return snapshot
                     pending_reads += 1
                     if pending_reads == 1:
@@ -2007,7 +2128,8 @@ class SyncEngineCoreTests(unittest.TestCase):
                                        kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
                                        object_id=ISSUE_ID)
             pending = state.get("pending") or {}
-            if pending.get("kind") == "status" and pending.get("target_option_id") is None:
+            if pending.get("kind") == "status" and pending.get("target_option_id") == \
+                    TEST_STATUS_OPTIONS["취소"]:
                 pending_reads += 1
                 if pending_reads == 2:
                     raise se.SyncError("synthetic clear pre-mutation GET failure")
@@ -2434,6 +2556,135 @@ class SyncEngineCoreTests(unittest.TestCase):
             self.assertEqual(se.read_select(
                 self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), old_a_target)
             self.assertEqual(self.project.writes, project_writes)
+
+    def test_checkpointed_projection_preserves_task_status_in_checkpoint_and_final_patch(self):
+        page, metadata, plan, state, issue, item, facts = \
+            self._prepare_projection_writer_case(notion_status="준비 중")
+
+        written = se._write_checkpointed_projection(
+            self.notion, SOURCE_ID, page, metadata, plan, state, NOW,
+            item=item, issue=issue, facts=facts, config=config(),
+            preserve_task_status="준비 중")
+
+        self.assertTrue(written)
+        checkpoint = state["projection"]["display_checkpoint"]
+        self.assertIn("작업 상태", checkpoint["expected_fields"])
+        self.assertEqual(se.read_select(page, "작업 상태"), "준비 중")
+        self.assertTrue(se._projection_display_matches(page, state["projection"]))
+        payloads = task_status_patch_payloads(self.notion.writes, ISSUE_PAGE_ID)
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["select"]["name"], "준비 중")
+
+    def test_checkpointed_projection_without_preservation_uses_plan_target(self):
+        page, metadata, plan, state, issue, item, facts = \
+            self._prepare_projection_writer_case(notion_status="백로그")
+
+        written = se._write_checkpointed_projection(
+            self.notion, SOURCE_ID, page, metadata, plan, state, NOW,
+            item=item, issue=issue, facts=facts, config=config())
+
+        self.assertTrue(written)
+        self.assertEqual(se.read_select(page, "작업 상태"), "진행 중")
+        self.assertTrue(se._projection_display_matches(page, state["projection"]))
+        payloads = task_status_patch_payloads(self.notion.writes, ISSUE_PAGE_ID)
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["select"]["name"], "진행 중")
+
+    def test_checkpointed_projection_matching_display_does_not_replay(self):
+        page, metadata, plan, state, issue, item, facts = \
+            self._prepare_projection_writer_case(
+                notion_status="진행 중", target="진행 중", display_sent=True)
+
+        written = se._write_checkpointed_projection(
+            self.notion, SOURCE_ID, page, metadata, plan, state, NOW,
+            item=item, issue=issue, facts=facts, config=config(),
+            preserve_task_status="진행 중")
+
+        self.assertTrue(written)
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(se.read_select(page, "작업 상태"), "진행 중")
+
+    def test_checkpointed_projection_card_race_does_not_send_stale_task_status(self):
+        page, metadata, plan, state, issue, item, facts = \
+            self._prepare_projection_writer_case(notion_status="준비 중")
+        moved = False
+
+        def move_after_checkpoint(path, properties, notion):
+            nonlocal moved
+            if moved or path != f"/pages/{ISSUE_PAGE_ID}":
+                return
+            raw = properties.get("동기화 내부 상태")
+            saved = json.loads(rich_text_value(raw)) if raw else {}
+            checkpoint = ((saved.get("projection") or {}).get(
+                "display_checkpoint") or {})
+            if checkpoint.get("phase") == "display_sent":
+                moved = True
+                notion.pages[ISSUE_PAGE_ID]["properties"]["작업 상태"] = {
+                    "select": {"name": "백로그"}}
+
+        self.notion.after_patch = move_after_checkpoint
+        written = se._write_checkpointed_projection(
+            self.notion, SOURCE_ID, page, metadata, plan, state, NOW,
+            item=item, issue=issue, facts=facts, config=config(),
+            preserve_task_status="준비 중")
+
+        self.assertTrue(moved)
+        self.assertFalse(written)
+        self.assertEqual(se.read_select(page, "작업 상태"), "백로그")
+        self.assertEqual(task_status_patch_payloads(self.notion.writes, ISSUE_PAGE_ID), [])
+        saved = self._read_bidirectional_state()
+        self.assertEqual(saved["hold"]["code"], "REQUEST_RACE")
+
+    def test_pm_projection_recovery_writer_receives_and_keeps_deferred_card_status(self):
+        self._configure_bidirectional_status(notion_status="진행 중")
+
+        def interrupt_after_projection(*args, **kwargs):
+            raise se.SyncError("synthetic interruption after projection write")
+
+        with patch.object(se, "_finalize_bidirectional_projection",
+                          side_effect=interrupt_after_projection):
+            with self.assertRaisesRegex(se.SyncError, "after projection write"):
+                self.run_sync(bidirectional_enabled=True)
+        state = self._read_bidirectional_state()
+        self.assertEqual(state["projection"]["display_checkpoint"]["phase"],
+                         "display_sent")
+
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["작업 상태"] = {
+            "select": {"name": "준비 중"}}
+        held = self.run_sync(bidirectional_enabled=True)
+        deferred = self._read_bidirectional_state()["deferred_request"]
+        self.assertEqual(held["held"], 1)
+        self.assertEqual(deferred["target"], "준비 중")
+        self.assertEqual(deferred["phase"], "held")
+
+        original_writer = se._write_checkpointed_projection
+        write_start = len(self.notion.writes)
+        with patch.object(se, "_write_checkpointed_projection",
+                          wraps=original_writer) as writer:
+            result = self.run_sync(
+                bidirectional_enabled=True, resolve_issue_numbers="18",
+                env=pm_env(991881))
+
+        matching_calls = [call for call in writer.call_args_list
+                          if call.kwargs.get("preserve_task_status") is not None]
+        self.assertTrue(matching_calls)
+        self.assertEqual(matching_calls[0].kwargs["preserve_task_status"], "준비 중")
+        task_payloads = task_status_patch_payloads(
+            self.notion.writes[write_start:], ISSUE_PAGE_ID)
+        self.assertTrue(task_payloads)
+        self.assertTrue(all(payload["select"]["name"] == "준비 중"
+                            for payload in task_payloads), task_payloads)
+        state = self._read_bidirectional_state()
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(state["request"]["phase"], "completed")
+        self.assertEqual(state["deferred_request"]["target"], "준비 중")
+        self.assertEqual(se.read_select(
+            self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "준비 중")
+        project_writes = copy.deepcopy(self.project.writes)
+        self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(self.project.writes, project_writes)
+        self.assertEqual(se.read_select(
+            self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "준비 중")
 
     def test_pm_resume_of_old_projection_preserves_latest_c_after_b_across_restart(self):
         for b_status in ("백로그", "완료"):
@@ -3917,6 +4168,94 @@ class SyncEngineCoreTests(unittest.TestCase):
                     self.assertEqual(len(self.project.writes), 1)
                     self.assertEqual(self._read_bidirectional_state()["baseline"]
                                      ["notion_status"], "완료")
+
+    def test_non_completed_closure_supersedes_confirmed_restore_under_same_guards(self):
+        for reason in ("NOT_PLANNED", "DUPLICATE"):
+            with self.subTest(reason=reason):
+                opened = make_issue()
+                closed = make_issue(state="CLOSED", reason=reason,
+                                    closed_at="2026-10-03T00:00:00Z")
+                self._configure_bidirectional_status(
+                    notion_status="검토 중", baseline_notion_status="진행 중",
+                    project_status="진행 중", baseline_project_status="진행 중",
+                    baseline_issue=opened, issue=opened)
+                first = self.run_sync(bidirectional_enabled=True)
+                restored = self._read_bidirectional_state()
+                self.assertEqual(first["held"], 1)
+                self.assertEqual(restored["hold"]["code"], "STATUS_REQUEST_INVALID")
+                self.assertEqual(restored["notion_write"]["phase"], "confirmed")
+                self.repo_graph.issues[0] = closed
+                self.rest.issues[0]["state"] = "closed"
+
+                result = self.run_sync(bidirectional_enabled=True)
+
+                saved = self._read_bidirectional_state()
+                self.assertEqual(result["held"], 0)
+                self.assertEqual(result["project_changes"], 1)
+                self.assertEqual(len(self.project.writes), 1)
+                self.assertEqual(self.project.writes[0][1]["option"],
+                                 TEST_STATUS_OPTIONS["취소"])
+                self.assertEqual(saved["request"]["phase"], "rejected")
+                self.assertIsNone(saved["hold"])
+                self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"),
+                                 "취소")
+                self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "종료 사유"),
+                                 "미계획" if reason == "NOT_PLANNED" else "중복")
+                repeated = self.run_sync(bidirectional_enabled=True)
+                self.assertEqual(repeated["held"], 0)
+                self.assertEqual(len(self.project.writes), 1)
+
+    def test_cancel_pm_resume_checkpoint_accepts_source_derived_option_after_restart(self):
+        for reason in ("NOT_PLANNED", "DUPLICATE"):
+            with self.subTest(reason=reason):
+                source = make_issue(
+                    state="CLOSED", reason=reason, closed_at="2026-10-03T00:00:00Z",
+                    duplicate=({"id": "I_other", "url":
+                        f"https://github.com/{gp.REPOSITORY}/issues/7"}
+                        if reason == "DUPLICATE" else None))
+                state = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+                state.update({"migration_complete": True,
+                              "project_item_id": "PVTI_issue18",
+                              "review_pr_hash": se._digest([]),
+                              "hold": se._new_hold("MIGRATION_CONFLICT",
+                                  "PM-resumable fixture hold",
+                                  se._source_fingerprint(source, [],
+                                      {"id": "PVTI_issue18",
+                                       "status_option_id": TEST_STATUS_OPTIONS["백로그"]}))})
+                self._install_historical_pending_snapshot(source, state,
+                    pending_option="백로그", pending_task="완료")
+                self.project.after_status_write = lambda *_args: (
+                    self.notion.fail_readback_after_patch.add(ISSUE_PAGE_ID))
+                with self.assertRaises(se.SyncError):
+                    self.run_sync(resolve_issue_numbers="18", env=pm_env(918850 +
+                                                                          (reason == "DUPLICATE")))
+                self.assertEqual([variables["option"] for query, variables in self.project.writes
+                                  if query == gp.SET_STATUS_MUTATION],
+                                 [TEST_STATUS_OPTIONS["취소"]])
+                after_failed_checkpoint = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                self.assertEqual(after_failed_checkpoint["resume"]["approved_notion_status"],
+                                 "완료")
+                self.assertEqual(after_failed_checkpoint["resume"]["expected_option_id"],
+                                 TEST_STATUS_OPTIONS["취소"])
+
+                resumed = self.run_sync(resolve_issue_numbers="18", env=pm_env(918852 +
+                                                                                (reason == "DUPLICATE")))
+                saved = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                healthy = se.decode_internal(
+                    se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+                self.assertEqual(resumed["held"], 0)
+                self.assertIsNone(saved["hold"])
+                self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"),
+                                 "취소")
+                self.assertEqual(len([1 for query, _ in self.project.writes
+                                      if query == gp.SET_STATUS_MUTATION]), 1)
+                self.assertIsNone(healthy["hold"])
+                self.assertTrue(healthy["migration_complete"])
 
     def test_flag_enabled_github_only_reverse_and_forbidden_status_requests(self):
         with self.subTest(direction="github_only"):
@@ -5451,6 +5790,13 @@ class SyncEngineCoreTests(unittest.TestCase):
         plan = result["issue_plans"][0]
         self.assertEqual(plan["issue_number"], ISSUE_NUMBER)
         self.assertEqual(plan["target"], "백로그")
+        effect_report = result["full_effect_report"]
+        self.assertEqual(effect_report["mode"], "full_source_potential_effect_envelope")
+        self.assertTrue(effect_report["read_only"])
+        self.assertEqual(effect_report["mutation_calls"], 0)
+        self.assertTrue(effect_report["coverage"]["selected_issue_filter"] is False)
+        self.assertIn("summary and success timestamp update", " ".join(
+            effect_report["control_row_effects"]))
         self.assertIsNone(plan["hold"])
         self.assertFalse(plan["project_add_required"])
         self.assertFalse(plan["project_change"])
@@ -5458,6 +5804,10 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(self.project.writes, [])
         self.assertEqual(se.read_text(self.notion.pages[CONTROL_ID], "동기화 내부 상태"),
                          control_internal())
+        self.run_sync()
+        self.assertFalse(effect_report["exact_snapshot_effects"][0][
+            "project_mutation_on_snapshot"])
+        self.assertEqual(self.project.writes, [])
 
     def test_readonly_dry_run_previews_new_issue_project_add_without_marker(self):
         self.repo_graph = RepoGraph(issues=[make_issue(created_at="2026-10-03T00:00:00Z")])
@@ -5471,6 +5821,89 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(self.notion.creates, 0)
         self.assertEqual(self.notion.writes, [])
         self.assertEqual(self.project.writes, [])
+
+    def test_full_effect_report_matches_mock_execution_trace_for_cancellation(self):
+        issue = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                           closed_at="2026-10-03T00:00:00Z")
+        self.repo_graph = RepoGraph(issues=[issue])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "closed"}])
+        self.project = ProjectAPI([make_project_item(option="백로그")])
+        self.notion = FakeNotion([control_page(control_internal()),
+                                  active_issue_page(task="백로그")])
+        preview = self.run_sync(dry_run=True)
+        reported = preview["full_effect_report"]["exact_snapshot_effects"][0]
+        first_fingerprint = preview["full_effect_report"]["source_config_fingerprint"]
+        self.assertEqual(reported["project_before"], "백로그")
+        self.assertEqual(reported["project_after"], "취소")
+        self.assertTrue(reported["project_mutation_on_snapshot"])
+        self.assertEqual(self.project.writes, [])
+        self.assertEqual(self.notion.writes, [])
+
+        issue["title"] = "Source metadata changed after dry-run"
+        changed_preview = self.run_sync(dry_run=True)
+        self.assertNotEqual(changed_preview["full_effect_report"]["source_config_fingerprint"],
+                            first_fingerprint)
+        self.assertEqual(self.project.writes, [])
+        self.assertEqual(self.notion.writes, [])
+
+        self.run_sync()
+        self.assertEqual([variables["option"] for query, variables in self.project.writes
+                          if query == gp.SET_STATUS_MUTATION], [TEST_STATUS_OPTIONS["취소"]])
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "취소")
+
+        unknown_closure = make_issue(state="CLOSED", reason=None,
+                                     closed_at="2026-10-03T00:00:00Z")
+        self.repo_graph = RepoGraph(issues=[unknown_closure])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "closed"}])
+        self.project = ProjectAPI([make_project_item(option="백로그")])
+        self.notion = FakeNotion([control_page(control_internal()),
+                                  active_issue_page(task="백로그")])
+        clear_preview = self.run_sync(dry_run=True)
+        clear_entry = clear_preview["full_effect_report"]["exact_snapshot_effects"][0]
+        self.assertIsNone(clear_entry["project_after"])
+        self.assertTrue(clear_entry["project_mutation_on_snapshot"])
+        clear_potential = next(
+            row for row in clear_preview["full_effect_report"]["potential_row_effects"]
+            if row["key"] == "Issue #18")
+        self.assertIn("Project Status", clear_potential["fields"])
+        self.assertEqual(self.project.writes, [])
+
+        self.run_sync()
+        self.assertEqual([query for query, _ in self.project.writes], [gp.CLEAR_STATUS_MUTATION])
+        self.assertEqual(self.project.status_mutation_attempts, 1)
+
+    def test_full_effect_report_includes_unconditional_existing_pr_patch_fields(self):
+        pr = make_pr()
+        self.repo_graph = RepoGraph(pulls=[pr])
+        self.rest = LegacyREST(issues=[{"id": PR_REST_ID, "node_id": PR_NODE,
+            "number": 19, "state": "closed",
+            "pull_request": {"url": "https://api.github.com/pulls/19"}}],
+            pull={"id": PR_DATABASE_ID, "node_id": PR_NODE, "number": 19,
+                  "state": "closed", "draft": False, "merged": True,
+                  "base": {"ref": "main", "repo": {"id": gp.REPOSITORY_ID,
+                                                        "node_id": REPO_NODE}}})
+        key = se.key_for(gp.REPOSITORY_ID, PR_REST_ID)
+        page = notion_page(PR_PAGE_ID, key=key, kind="PR", number=19)
+        metadata = se._make_metadata("PR", pr, key)
+        page["properties"].update(copy.deepcopy(metadata))
+        page["properties"]["동기화 시각"] = {"date": {"start": "2026-10-01T00:00:00Z"}}
+        self.notion = FakeNotion([control_page(control_internal()), page])
+
+        preview = self.run_sync(dry_run=True)
+        report_row = next(row for row in preview["full_effect_report"][
+            "potential_row_effects"] if row["key"] == "PR #19")
+        expected_fields = set(metadata) | {"동기화 시각"}
+        self.assertEqual(set(report_row["fields"]), expected_fields)
+        self.assertEqual(report_row["classification"], "potential_full_sync")
+        self.assertEqual(self.notion.writes, [])
+
+        self.run_sync()
+        pr_patch = next(payload for method, path, payload, _ in self.notion.writes
+                        if method == "PATCH" and path == f"/pages/{PR_PAGE_ID}")
+        self.assertEqual(set(pr_patch["properties"]), expected_fields)
+        self.assertEqual(set(pr_patch["properties"]), set(report_row["fields"]))
 
     def test_dispatch_dry_run_previews_pm_resolution_without_any_write(self):
         self.repo_graph = RepoGraph(issues=[make_issue()])
@@ -5740,18 +6173,1263 @@ class SyncEngineCoreTests(unittest.TestCase):
     def _plan(self, issue, *, project_state="백로그", notion_state="백로그", state=None, facts=None):
         state = state or se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
         item = {"id": "PVTI_issue18", "status_option_id":
-                gp.EXPECTED_STATUS_OPTIONS[project_state] if project_state else None}
+                TEST_STATUS_OPTIONS[project_state] if project_state else None}
         row = {"properties": {"작업 상태": {"select": {"name": notion_state} if notion_state else None}}}
         facts = facts or {"repository_node_id": REPO_NODE, "pulls": {}}
         return se._plan_issue(issue, item, row, state, facts, CUTOFF,
-                              gp.EXPECTED_PROJECT_ID, gp.EXPECTED_STATUS_OPTIONS)
+                              gp.EXPECTED_PROJECT_ID, TEST_STATUS_OPTIONS)
+
+    def test_open_issue_on_cancelled_project_is_held_and_preserved(self):
+        issue = make_issue(state="OPEN")
+        plan = self._plan(issue, project_state="취소", notion_state="취소")
+        self.assertEqual(plan["hold"]["code"], "OPEN_PROJECT_COMPLETED")
+        self.assertIn("일반 상태", plan["hold"]["message"])
+
+    def test_persisted_dynamic_option_ids_require_current_runtime_binding(self):
+        state = {"pending": {"kind": "status",
+                             "before_option_id": TEST_STATUS_OPTIONS["백로그"],
+                             "target_option_id": TEST_STATUS_OPTIONS["취소"]},
+                 "projection": None, "resume": None}
+        self.assertIs(se._validate_state_option_bindings(state, TEST_STATUS_OPTIONS), state)
+        unbound = copy.deepcopy(state)
+        unbound["pending"]["target_option_id"] = "unbound-cancel-option"
+        with self.assertRaisesRegex(se.SyncError, "현재 검증된 mapping"):
+            se._validate_state_option_bindings(unbound, TEST_STATUS_OPTIONS)
+
+    def test_pending_and_resume_cancel_ids_bind_to_runtime_map_not_card_value(self):
+        issue = make_issue(state="OPEN")
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        state = make_pending_status_state(issue, before="백로그", target="진행 중",
+                                          migration_complete=True, facts=facts,
+                                          semantic_v2=True)
+        pending = state["pending"]
+        pending["before_option_id"] = TEST_STATUS_OPTIONS["취소"]
+        pending["target_option_id"] = TEST_STATUS_OPTIONS["백로그"]
+        pending["notion_status"] = "완료"
+        item = {"id": pending["item_id"],
+                "status_option_id": TEST_STATUS_OPTIONS["취소"]}
+        refs, _ = se._linked_pr_facts(issue, facts)
+        pending["semantic_fingerprint"] = se._pending_semantic_fingerprint(
+            issue, refs, item, "status")
+
+        decoded = se.decode_internal(se.canonical_json(state), kind="issue",
+                                     project_id=gp.EXPECTED_PROJECT_ID,
+                                     object_id=ISSUE_ID)
+        self.assertEqual(decoded["pending"]["notion_status"], "완료")
+        self.assertIs(se._validate_state_option_bindings(decoded, TEST_STATUS_OPTIONS), decoded)
+        unknown_before = copy.deepcopy(decoded)
+        unknown_before["pending"]["before_option_id"] = "unbound-cancel-option"
+        with self.assertRaisesRegex(se.SyncError, "현재 검증된 mapping"):
+            se._validate_state_option_bindings(unknown_before, TEST_STATUS_OPTIONS)
+
+        resume = {
+            "actor_id": gp.EXPECTED_PM_USER_ID, "run_id": "resume-fixture",
+            "approved_option_id": TEST_STATUS_OPTIONS["백로그"],
+            "fingerprint": "a" * 64, "display_pending": True,
+            "expected_option_id": TEST_STATUS_OPTIONS["취소"],
+            "expected_fingerprint": "b" * 64, "request_id": None,
+            "facts_fingerprint": "c" * 64, "fact_contract": "semantic_v2",
+            "approved_notion_status": "완료",
+        }
+        se._validate_resume(resume)
+        resumed_state = {"pending": None, "projection": None, "resume": resume}
+        self.assertIs(se._validate_state_option_bindings(resumed_state, TEST_STATUS_OPTIONS),
+                      resumed_state)
+        unknown_resume = copy.deepcopy(resumed_state)
+        unknown_resume["resume"]["expected_option_id"] = "unbound-cancel-option"
+        with self.assertRaisesRegex(se.SyncError, "현재 검증된 mapping"):
+            se._validate_state_option_bindings(unknown_resume, TEST_STATUS_OPTIONS)
+
+    def test_legacy_null_pending_is_only_finalized_when_source_and_both_sides_match(self):
+        issue = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                           closed_at="2026-10-03T00:00:00Z")
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        state = make_pending_status_state(issue, target="완료", migration_complete=True,
+                                          facts=facts, semantic_v2=True)
+        pending = state["pending"]
+        pending["target_option_id"] = None
+        pending["notion_status"] = "백로그"
+        row = {"properties": {"작업 상태": {"select": None}}}
+        item = {"id": pending["item_id"],
+                "status_option_id": None,
+                "status_field_id": STATUS_FIELD, "status_value_id": None,
+                "status_updated_at": None}
+        exact = se._pending_status_resolution(
+            issue, item, row, state, facts, config(), CUTOFF)
+        self.assertEqual(exact["mode"], "checkpoint")
+        self.assertTrue(exact["legacy_null_finalized"])
+
+        changed_issue = copy.deepcopy(issue)
+        changed_issue["stateReason"] = "UNKNOWN_REASON"
+        changed = se._pending_status_resolution(
+            changed_issue, item, row, state, facts, config(), CUTOFF)
+        self.assertEqual(changed["mode"], "hold")
+        self.assertEqual(changed["hold"]["code"], "PENDING_FACTS_CHANGED")
+        self.assertIn("재전송하지 않습니다", changed["hold"]["message"])
+
+        changed_project = dict(item, status_option_id=TEST_STATUS_OPTIONS["준비 중"])
+        changed_checkpoint = se._pending_status_resolution(
+            issue, changed_project, row, state, facts, config(), CUTOFF)
+        self.assertEqual(changed_checkpoint["mode"], "hold")
+        self.assertEqual(changed_checkpoint["hold"]["code"], "PENDING_RESULT_UNCLEAR")
+
+        before_still_visible = dict(item,
+                                    status_option_id=pending["before_option_id"])
+        unresolved = se._pending_status_resolution(
+            issue, before_still_visible, row, state, facts, config(), CUTOFF)
+        self.assertEqual(unresolved["mode"], "hold")
+        self.assertEqual(unresolved["hold"]["code"], "PENDING_RESULT_UNCLEAR")
+
+    def test_legacy_null_projection_is_acknowledged_before_distinct_cancel_write(self):
+        issue = make_issue(state="CLOSED", reason="DUPLICATE",
+                           closed_at="2026-10-03T00:00:00Z")
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        item = make_project_item(option=None)
+        refs, _ = se._linked_pr_facts(issue, facts)
+        state = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state["v"] = 1
+        state["migration_complete"] = True
+        state["project_item_id"] = item["id"]
+        state["review_pr_hash"] = se._digest([])
+        for key in ("baseline", "request", "readback", "notion_write",
+                    "deferred_request"):
+            state.pop(key, None)
+        checkpoint = {field: state[field] for field in se.STATUS_CHECKPOINT_KEYS}
+        state["projection"] = {
+            "expected_option_id": None,
+            "expected_fingerprint": se._source_fingerprint(issue, refs, item),
+            "checkpoint": checkpoint,
+        }
+
+        def install(*, complete_display):
+            self.repo_graph = RepoGraph(issues=[issue])
+            self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+                "number": ISSUE_NUMBER, "state": "closed"}])
+            self.project = ProjectAPI([copy.deepcopy(item)])
+            page = active_issue_page(task=None, internal=se.canonical_json(state))
+            if complete_display:
+                props = page["properties"]
+                props["GitHub 상태"] = {"select": {"name": "Closed"}}
+                props["종료 사유"] = {"select": {"name": "중복"}}
+                props["대표 이슈"] = {"url": None}
+                props["확인 필요"] = se.text_property("대표 이슈 지정 필요")
+            self.notion = FakeNotion([control_page(control_internal()), page])
+
+        install(complete_display=False)
+        incomplete = self.run_sync()
+        held = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(incomplete["held"], 1)
+        self.assertEqual(held["hold"]["code"], "PENDING_RESULT_UNCLEAR")
+        self.assertIsNotNone(held["projection"])
+        self.assertEqual(self.project.writes, [])
+
+        install(complete_display=True)
+
+        result = self.run_sync()
+
+        mutations = [query for query, _ in self.project.writes]
+        self.assertEqual(mutations, [gp.SET_STATUS_MUTATION])
+        self.assertEqual(self.project.writes[0][1]["option"], TEST_STATUS_OPTIONS["취소"])
+        self.assertEqual(result["held"], 0)
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "취소")
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "종료 사유"), "중복")
+        saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertIsNone(saved["projection"])
+
+    def test_legacy_null_pending_is_not_replayed_before_fresh_cancel_operation(self):
+        issue = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                           closed_at="2026-10-03T00:00:00Z")
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        state = make_pending_status_state(
+            issue, before="백로그", target="완료", migration_complete=True,
+            facts=facts)
+        state["pending"]["target_option_id"] = None
+        state["pending"]["notion_status"] = "백로그"
+        item = make_project_item(option=None)
+        state["project_item_id"] = item["id"]
+        state["pending"]["item_id"] = item["id"]
+        state["pending"]["project_item_id"] = item["id"]
+        self.repo_graph = RepoGraph(issues=[issue])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "closed"}])
+        self.project = ProjectAPI([item])
+        self.notion = FakeNotion([control_page(control_internal()),
+            active_issue_page(task=None, internal=se.canonical_json(state))])
+
+        result = self.run_sync()
+
+        mutations = [query for query, _ in self.project.writes]
+        self.assertEqual(mutations, [gp.SET_STATUS_MUTATION])
+        self.assertEqual(self.project.writes[0][1]["option"], TEST_STATUS_OPTIONS["취소"])
+        self.assertNotIn(gp.CLEAR_STATUS_MUTATION, mutations)
+        self.assertEqual(result["held"], 0)
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "취소")
+        saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertIsNone(saved["pending"])
+
+    def test_legacy_null_pending_fact_drift_holds_only_that_issue_and_continues_issue_b(self):
+        prior = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                           closed_at="2026-10-03T00:00:00Z")
+        current = copy.deepcopy(prior)
+        current["stateReason"] = None
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        state = make_pending_status_state(
+            prior, before="백로그", target="완료", migration_complete=True,
+            facts=facts)
+        state["pending"]["target_option_id"] = None
+        state["pending"]["notion_status"] = "백로그"
+        item_a = make_project_item(option=None)
+
+        issue_b = make_issue()
+        issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=issue_b["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[current, issue_b])
+        self.rest = LegacyREST(issues=[
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "closed"},
+            {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+        ])
+        self.project = ProjectAPI([item_a, item_b])
+        self.notion = FakeNotion([control_page(control_internal()),
+            active_issue_page(task=None, internal=se.canonical_json(state)),
+            active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                              number=19, task="백로그")])
+
+        result = self.run_sync()
+
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(self.project.writes, [])
+        saved_a = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        self.assertEqual(saved_a["hold"]["code"], "PENDING_FACTS_CHANGED")
+        self.assertIsNotNone(saved_a["pending"])
+        self.assertIsNone(saved_a["pending"]["target_option_id"])
+        self.assertIsNone(saved_b["hold"])
+        self.assertTrue(saved_b["migration_complete"])
+
+    def test_legacy_null_pending_snapshot_detail_drift_keeps_record_and_issue_b_continues(self):
+        snapshot = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                              closed_at="2026-10-03T00:00:00Z")
+        state = make_pending_status_state(snapshot, before="백로그", target="완료",
+                                          migration_complete=True)
+        state["pending"]["target_option_id"] = None
+        state["pending"]["notion_status"] = "백로그"
+        self._install_historical_pending_snapshot(snapshot, state, pending_option=None,
+                                                  pending_task=None)
+        self.repo_graph.issue_detail_transform = lambda latest: (
+            {**latest, "stateReason": "COMPLETED"}
+            if latest["id"] == ISSUE_NODE else latest)
+
+        first = self.run_sync()
+        saved_a = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        pending_before_repeat = copy.deepcopy(saved_a["pending"])
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(saved_a["hold"]["code"], "SOURCE_CHANGED_BEFORE_WRITE")
+        self.assertEqual(saved_a["pending"], state["pending"])
+        self.assertIsNone(saved_b["hold"])
+        self.assertTrue(saved_b["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+        second = self.run_sync()
+        repeated = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(repeated["pending"], pending_before_repeat)
+        self.assertEqual(self.project.writes, [])
+
+    def _install_complete_legacy_null_projection_case(self, *, semantic=False,
+                                                       source_open=False, missing_item=False):
+        original = make_issue(state="CLOSED", reason="DUPLICATE",
+                              closed_at="2026-10-03T00:00:00Z")
+        current_a = copy.deepcopy(original)
+        if source_open:
+            current_a.update({"state": "OPEN", "stateReason": None, "closedAt": None})
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        item_a = make_project_item(option=None)
+        item_a.update({"content_id": original["id"], "status_option_id": None,
+                       "status_value_id": None, "status_updated_at": None,
+                       "status_field_id": STATUS_FIELD, "is_archived": False})
+        state_a = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state_a.update({"migration_complete": True, "project_item_id": item_a["id"],
+                        "review_pr_hash": se._digest([])})
+        if not semantic:
+            state_a["v"] = 1
+            for field in ("baseline", "request", "readback", "notion_write",
+                          "deferred_request"):
+                state_a.pop(field, None)
+        linked, _ = se._linked_pr_facts(original, facts)
+        projection_item = item_a
+        projection = {
+            "expected_option_id": None,
+            "expected_fingerprint": (
+                se._status_operation_fingerprint(original, linked, projection_item) if semantic else
+                se._source_fingerprint(original, linked, projection_item)),
+            "checkpoint": {field: state_a[field] for field in se.STATUS_CHECKPOINT_KEYS},
+        }
+        if semantic:
+            projection.update({"fact_contract": "semantic_v2", "request_id": None,
+                               "expected_notion_status": None,
+                               "result_notion_status": None})
+        state_a["projection"] = copy.deepcopy(projection)
+
+        issue_b = make_issue()
+        issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=issue_b["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[issue_b, current_a])
+        self.rest = LegacyREST(issues=[
+            {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER,
+             "state": "open" if source_open else "closed"},
+        ])
+        self.project = ProjectAPI([item_b] if missing_item else [item_b, item_a])
+        page_a = active_issue_page(task=None, internal=se.canonical_json(state_a))
+        plan = se._plan_issue(original, item_a, page_a, copy.deepcopy(state_a), facts,
+                              CUTOFF, gp.EXPECTED_PROJECT_ID, TEST_STATUS_OPTIONS)
+        metadata = se._make_metadata(
+            "Issue", original, se.key_for(gp.REPOSITORY_ID, ISSUE_ID))
+        display = se._projection_properties(
+            metadata, target=None, end_reason=plan.get("end_reason"),
+            representative=plan.get("representative"),
+            confirmation=plan.get("confirmation", ""), state=plan.get("state", state_a),
+            now=NOW, kind="Issue")
+        display_fields = {name: display[name] for name in (
+            "작업 상태", "GitHub 상태", "종료 사유", "대표 이슈", "확인 필요",
+            "요청 처리", "요청 상태") if name in display}
+        page_a["properties"].update(display_fields)
+        page_b = active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                                   number=19, task="백로그")
+        self.notion = FakeNotion([control_page(control_internal()), page_a, page_b])
+        return {"issue": original, "state": state_a, "projection": projection,
+                "item": item_a, "page": page_a, "display_fields": display_fields}
+
+    def test_legacy_null_missing_project_item_holds_locally_without_dereference(self):
+        fixture = self._install_complete_legacy_null_projection_case(missing_item=True)
+
+        result = self.run_sync()
+
+        saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(saved["hold"]["code"], "PROJECT_ITEM_MISSING")
+        self.assertEqual(saved["projection"], fixture["projection"])
+        self.assertEqual(saved["project_item_id"], fixture["item"]["id"])
+        self.assertIsNone(saved_b["hold"])
+        self.assertEqual(self.project.writes, [])
+
+        repeated = self.run_sync()
+        repeated_saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(repeated["held"], 1)
+        self.assertEqual(repeated_saved["hold"]["code"], "PROJECT_ITEM_MISSING")
+        self.assertEqual(repeated_saved["projection"], fixture["projection"])
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_negative_snapshot_preserves_new_projection_q_on_repeat(self):
+        fixture = self._install_complete_legacy_null_projection_case(source_open=True)
+        projection_q = copy.deepcopy(fixture["projection"])
+        projection_q["expected_fingerprint"] = se._digest({"newer": "Q"})
+        changed = False
+
+        def install_q_after_b_write(path, _properties, notion):
+            nonlocal changed
+            if path != f"/pages/{SECOND_ISSUE_PAGE_ID}" or changed:
+                return
+            changed = True
+            page = notion.pages[ISSUE_PAGE_ID]
+            current = se.decode_internal(
+                se.read_text(page, "동기화 내부 상태"), kind="issue",
+                project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+            current["projection"] = copy.deepcopy(projection_q)
+            page["properties"]["동기화 내부 상태"] = se.text_property(
+                se.canonical_json(current))
+
+        self.notion.after_patch = install_q_after_b_write
+        first = self.run_sync()
+        saved_first = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertTrue(changed)
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(saved_first["projection"], projection_q)
+        writes_a_first = [entry for entry in self.notion.writes
+                          if entry[1] == f"/pages/{ISSUE_PAGE_ID}"]
+        self.assertEqual(writes_a_first, [])
+        self.assertTrue(se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)["migration_complete"])
+
+        second = self.run_sync()
+        saved_repeat = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(saved_repeat["projection"], projection_q)
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_early_project_holds_preserve_new_projection_q(self):
+        for route in ("missing", "replaced", "archived"):
+            with self.subTest(route=route):
+                fixture = self._install_complete_legacy_null_projection_case()
+                item_a = copy.deepcopy(fixture["item"])
+                if route == "missing":
+                    self.project.items = [item for item in self.project.items
+                                          if item["id"] != item_a["id"]]
+                elif route == "replaced":
+                    replacement = copy.deepcopy(item_a)
+                    replacement["id"] = "PVTI_replacement"
+                    self.project.items = [replacement if item["id"] == item_a["id"] else item
+                                          for item in self.project.items]
+                else:
+                    for item in self.project.items:
+                        if item["id"] == item_a["id"]:
+                            item["isArchived"] = True
+
+                projection_q = copy.deepcopy(fixture["projection"])
+                projection_q["expected_fingerprint"] = se._digest({"newer": "Q"})
+                changed = False
+
+                def install_q_after_b_write(path, _properties, notion):
+                    nonlocal changed
+                    if path != f"/pages/{SECOND_ISSUE_PAGE_ID}" or changed:
+                        return
+                    changed = True
+                    page = notion.pages[ISSUE_PAGE_ID]
+                    state = se.decode_internal(
+                        se.read_text(page, "동기화 내부 상태"), kind="issue",
+                        project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                    state["projection"] = copy.deepcopy(projection_q)
+                    page["properties"]["동기화 내부 상태"] = se.text_property(
+                        se.canonical_json(state))
+
+                self.notion.after_patch = install_q_after_b_write
+                first = self.run_sync()
+                saved = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                self.assertTrue(changed)
+                self.assertEqual(first["held"], 1)
+                self.assertEqual(saved["projection"], projection_q)
+                self.assertEqual([entry for entry in self.notion.writes
+                                  if entry[1] == f"/pages/{ISSUE_PAGE_ID}"], [])
+                self.assertTrue(se.decode_internal(
+                    se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+                    object_id=556)["migration_complete"])
+                self.assertEqual(self.project.writes, [])
+
+                self.notion.after_patch = None
+                second = self.run_sync()
+                repeated = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                self.assertGreaterEqual(second["held"], 1)
+                self.assertEqual(repeated["projection"], projection_q)
+                self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_coherent_rebinding_is_skipped_before_state_decode(self):
+        fixture = self._install_complete_legacy_null_projection_case()
+        self.repo_graph.issues.reverse()
+        self.rest.issues.reverse()
+        self.project.items.reverse()
+
+        def rebind_fresh_a(path, page):
+            if path != f"/pages/{ISSUE_PAGE_ID}":
+                return page
+            rebound = se.new_issue_state(556, gp.EXPECTED_PROJECT_ID)
+            page["properties"]["동기화 키"] = se.text_property(
+                se.key_for(gp.REPOSITORY_ID, 556))
+            page["properties"]["동기화 내부 상태"] = se.text_property(
+                se.canonical_json(rebound))
+            return page
+
+        self.notion.get_response_transform = rebind_fresh_a
+        result = self.run_sync()
+
+        self.assertEqual(result["held"], 1)
+        self.assertEqual([entry for entry in self.notion.writes
+                          if entry[1] == f"/pages/{ISSUE_PAGE_ID}"], [])
+        self.assertTrue(se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+            object_id=556)["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+        self.assertEqual(fixture["state"]["projection"], fixture["projection"])
+
+    def test_legacy_null_fresh_key_and_item_binding_drift_preserves_row_and_continues(self):
+        for drift in ("canonical_key", "saved_item_id"):
+            with self.subTest(drift=drift):
+                fixture = self._install_complete_legacy_null_projection_case()
+                changed = False
+
+                def change_binding_after_b_write(path, _properties, notion):
+                    nonlocal changed
+                    if path != f"/pages/{SECOND_ISSUE_PAGE_ID}" or changed:
+                        return
+                    changed = True
+                    page = notion.pages[ISSUE_PAGE_ID]
+                    if drift == "canonical_key":
+                        page["properties"]["동기화 키"] = se.text_property("gh:9981:issue:9999")
+                    else:
+                        state = se.decode_internal(
+                            se.read_text(page, "동기화 내부 상태"), kind="issue",
+                            project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                        state["project_item_id"] = "PVTI_new_binding"
+                        page["properties"]["동기화 내부 상태"] = se.text_property(
+                            se.canonical_json(state))
+
+                self.notion.after_patch = change_binding_after_b_write
+                result = self.run_sync()
+                saved = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                self.assertTrue(changed)
+                self.assertEqual(result["held"], 1)
+                self.assertEqual(saved["projection"], fixture["projection"])
+                if drift == "canonical_key":
+                    self.assertEqual(se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 키"),
+                                     "gh:9981:issue:9999")
+                else:
+                    self.assertEqual(saved["project_item_id"], "PVTI_new_binding")
+                self.assertIsNone(saved["hold"])
+                self.assertEqual([entry for entry in self.notion.writes
+                                  if entry[1] == f"/pages/{ISSUE_PAGE_ID}"], [])
+                self.assertTrue(se.decode_internal(
+                    se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+                    object_id=556)["migration_complete"])
+                self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_display_checkpoint_fingerprint_mismatch_holds_and_preserves_marker(self):
+        fixture = self._install_complete_legacy_null_projection_case(semantic=True)
+        projection = fixture["projection"]
+        fields, _ = se._restore_projection_checkpoint(fixture["display_fields"])
+        projection["display_checkpoint"] = {
+            "phase": "display_sent", "expected_fields": fields,
+            "expected_fingerprint": se._digest({"different": "display"}),
+        }
+        fixture["state"]["projection"] = copy.deepcopy(projection)
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["동기화 내부 상태"] = se.text_property(
+            se.canonical_json(fixture["state"]))
+        self.assertTrue(se._properties_match(self.notion.pages[ISSUE_PAGE_ID],
+                                              fixture["display_fields"]))
+        self.assertFalse(se._projection_display_matches(
+            self.notion.pages[ISSUE_PAGE_ID], projection))
+
+        result = self.run_sync()
+
+        saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(saved["hold"]["code"], "PROJECTION_CHECKPOINT_CHANGED")
+        self.assertEqual(saved["projection"], projection)
+        self.assertIsNone(saved["request"])
+        self.assertTrue(se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+            object_id=556)["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+    def test_archived_fresh_legacy_null_page_is_skipped_and_issue_b_continues(self):
+        fixture = self._install_complete_legacy_null_projection_case()
+        self.repo_graph.issues.reverse()
+        self.rest.issues.reverse()
+        archived = False
+
+        def archive_a_before_fresh_read(path, page):
+            nonlocal archived
+            if path == f"/pages/{ISSUE_PAGE_ID}" and not archived:
+                archived = True
+                page["is_archived"] = True
+                page["archived"] = True
+            return page
+
+        self.notion.get_response_transform = archive_a_before_fresh_read
+        result = self.run_sync()
+
+        saved = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        writes_a = [entry for entry in self.notion.writes
+                    if entry[1] == f"/pages/{ISSUE_PAGE_ID}"]
+        self.assertTrue(archived)
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(saved["projection"], fixture["projection"])
+        self.assertEqual(writes_a, [])
+        self.assertTrue(se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+            object_id=556)["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_projection_open_source_drift_keeps_projection_and_issue_b_continues(self):
+        closed = make_issue(state="CLOSED", reason="DUPLICATE",
+                            closed_at="2026-10-03T00:00:00Z")
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        item_a = make_project_item(option=None)
+        state_a = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state_a.update({"v": 1, "migration_complete": True,
+                        "project_item_id": item_a["id"],
+                        "review_pr_hash": se._digest([])})
+        for field in ("baseline", "request", "readback", "notion_write",
+                      "deferred_request"):
+            state_a.pop(field, None)
+        refs, _ = se._linked_pr_facts(closed, facts)
+        state_a["projection"] = {
+            "expected_option_id": None,
+            "expected_fingerprint": se._source_fingerprint(closed, refs, item_a),
+            "checkpoint": {field: state_a[field] for field in se.STATUS_CHECKPOINT_KEYS},
+        }
+        open_issue = make_issue()
+        open_issue.update({"state": "OPEN", "stateReason": None, "closedAt": None})
+        healthy = make_issue()
+        healthy.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=healthy["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[open_issue, healthy])
+        self.rest = LegacyREST(issues=[
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "open"},
+            {"id": 556, "node_id": healthy["id"], "number": 19, "state": "open"}])
+        self.project = ProjectAPI([item_a, item_b])
+        self.notion = FakeNotion([control_page(control_internal()),
+            active_issue_page(task=None, internal=se.canonical_json(state_a)),
+            active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                              number=19, task="백로그")])
+
+        first = self.run_sync()
+        saved_a = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        projection_before_repeat = copy.deepcopy(saved_a["projection"])
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(saved_a["hold"]["code"], "PROJECTION_CHECKPOINT_CHANGED")
+        self.assertEqual(saved_a["projection"], state_a["projection"])
+        self.assertIsNone(saved_b["hold"])
+        self.assertTrue(saved_b["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+        second = self.run_sync()
+        repeated = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(repeated["projection"], projection_before_repeat)
+        self.assertEqual(self.project.writes, [])
+
+    def test_semantic_v2_null_projection_historical_drift_keeps_exact_marker_and_issue_b_continues(self):
+        closed = make_issue(state="CLOSED", reason="DUPLICATE",
+                            closed_at="2026-10-03T00:00:00Z")
+        current = copy.deepcopy(closed)
+        current.update({"state": "OPEN", "stateReason": None, "closedAt": None})
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        item_a = make_project_item(option=None)
+        state_a = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state_a.update({"migration_complete": True, "project_item_id": item_a["id"],
+                        "review_pr_hash": se._digest([])})
+        linked, _ = se._linked_pr_facts(closed, facts)
+        projection = {
+            "expected_option_id": None,
+            "expected_fingerprint": se._status_operation_fingerprint(closed, linked, item_a),
+            "checkpoint": {field: state_a[field] for field in se.STATUS_CHECKPOINT_KEYS},
+            "fact_contract": "semantic_v2", "request_id": None,
+            "expected_notion_status": None, "result_notion_status": None,
+        }
+        state_a["projection"] = copy.deepcopy(projection)
+        issue_b = make_issue()
+        issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=issue_b["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[current, issue_b])
+        self.rest = LegacyREST(issues=[
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "open"},
+            {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+        ])
+        self.project = ProjectAPI([item_a, item_b])
+        self.notion = FakeNotion([control_page(control_internal()),
+            active_issue_page(task=None, internal=se.canonical_json(state_a)),
+            active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                              number=19, task="백로그")])
+
+        first = self.run_sync()
+        saved_a = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(saved_a["hold"]["code"], "PROJECTION_CHECKPOINT_CHANGED")
+        self.assertEqual(saved_a["projection"], projection)
+        self.assertIsNone(saved_b["hold"])
+        self.assertTrue(saved_b["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+        second = self.run_sync()
+        repeated = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(repeated["projection"], projection)
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_projection_same_run_source_race_preserves_marker_and_continues_issue_b(self):
+        issue_a = make_issue(state="CLOSED", reason="DUPLICATE",
+                             closed_at="2026-10-03T00:00:00Z")
+        item_a = make_project_item(option=None)
+        state_a = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state_a.update({"v": 1, "migration_complete": True,
+                        "project_item_id": item_a["id"],
+                        "review_pr_hash": se._digest([])})
+        for field in ("baseline", "request", "readback", "notion_write",
+                      "deferred_request"):
+            state_a.pop(field, None)
+        facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+        linked, _ = se._linked_pr_facts(issue_a, facts)
+        projection = {
+            "expected_option_id": None,
+            "expected_fingerprint": se._source_fingerprint(issue_a, linked, item_a),
+            "checkpoint": {field: state_a[field] for field in se.STATUS_CHECKPOINT_KEYS},
+        }
+        state_a["projection"] = copy.deepcopy(projection)
+        issue_b = make_issue()
+        issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=issue_b["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[issue_b, issue_a])
+        self.rest = LegacyREST(issues=[
+            {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "closed"},
+        ])
+        self.project = ProjectAPI([item_b, item_a])
+        page_a = active_issue_page(task=None, internal=se.canonical_json(state_a))
+        normalized_item_a = gp.fetch_project_item(
+            self.project, gp.EXPECTED_PROJECT_ID, item_a["id"], STATUS_FIELD,
+            status_options=TEST_STATUS_OPTIONS)
+        metadata = se._make_metadata(
+            "Issue", issue_a, se.key_for(gp.REPOSITORY_ID, ISSUE_ID))
+        plan = se._plan_issue(issue_a, normalized_item_a, page_a,
+                              copy.deepcopy(state_a), facts,
+                              CUTOFF, gp.EXPECTED_PROJECT_ID, TEST_STATUS_OPTIONS)
+        display = se._projection_properties(
+            metadata, target=None, end_reason=plan.get("end_reason"),
+            representative=plan.get("representative"),
+            confirmation=plan.get("confirmation", ""), state=plan.get("state", state_a),
+            now=NOW, kind="Issue")
+        display_fields = {name: display[name] for name in (
+            "작업 상태", "GitHub 상태", "종료 사유", "대표 이슈", "확인 필요",
+            "요청 처리", "요청 상태")}
+        page_a["properties"].update(display_fields)
+        page_b = active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                                  number=19, task="백로그")
+        self.notion = FakeNotion([control_page(control_internal()), page_a, page_b])
+
+        def change_issue_a_after_b_write(path, properties, _notion):
+            if path == f"/pages/{SECOND_ISSUE_PAGE_ID}":
+                self.repo_graph.issue_detail_transform = lambda latest: (
+                    {**latest, "stateReason": "COMPLETED"}
+                    if latest["id"] == ISSUE_NODE else latest)
+
+        self.notion.after_patch = change_issue_a_after_b_write
+
+        first = self.run_sync()
+        saved_a = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        saved_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        self.assertEqual(first["held"], 1)
+        self.assertEqual(saved_a["hold"]["code"], "PROJECTION_CHECKPOINT_CHANGED")
+        self.assertEqual(saved_a["projection"], projection)
+        self.assertIsNone(saved_b["hold"])
+        self.assertTrue(saved_b["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+        second = self.run_sync()
+        repeated = se.decode_internal(
+            se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        self.assertEqual(second["held"], 1)
+        self.assertEqual(repeated["projection"], projection)
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_candidate_readback_and_checkpoint_drift_are_issue_local(self):
+        for drift in ("notion_status", "saved_checkpoint"):
+            with self.subTest(drift=drift):
+                issue_a = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                                     closed_at="2026-10-03T00:00:00Z")
+                facts = {"repository_node_id": REPO_NODE, "pulls": {}}
+                state_a = make_pending_status_state(
+                    issue_a, before="백로그", target="완료", migration_complete=True,
+                    facts=facts, semantic_v2=True)
+                state_a["pending"]["target_option_id"] = None
+                state_a["pending"]["notion_status"] = "백로그"
+                if drift == "saved_checkpoint":
+                    state_a["review_cycle"] += 1
+
+                issue_b = make_issue()
+                issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                    "title": "Healthy issue B",
+                    "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+                item_a = make_project_item(option=None)
+                item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                    issue_id=556, issue_node=issue_b["id"], number=19)
+                self.repo_graph = RepoGraph(issues=[issue_a, issue_b])
+                self.rest = LegacyREST(issues=[
+                    {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER,
+                     "state": "closed"},
+                    {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+                ])
+                self.project = ProjectAPI([item_a, item_b])
+                card_status = "진행 중" if drift == "notion_status" else None
+                self.notion = FakeNotion([
+                    control_page(control_internal()),
+                    active_issue_page(task=card_status, internal=se.canonical_json(state_a)),
+                    active_issue_page(page_id=SECOND_ISSUE_PAGE_ID, issue_id=556,
+                        number=19, task="백로그"),
+                ])
+
+                result = self.run_sync()
+
+                self.assertEqual(result["held"], 1)
+                saved_a = se.decode_internal(
+                    se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+                saved_b = se.decode_internal(
+                    se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+                    kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+                self.assertEqual(saved_a["hold"]["code"], "PENDING_RESULT_UNCLEAR")
+                self.assertIsNotNone(saved_a["pending"])
+                self.assertIsNone(saved_a["pending"]["target_option_id"])
+                self.assertIsNone(saved_b["hold"])
+                self.assertTrue(saved_b["migration_complete"])
+                self.assertEqual(self.project.writes, [])
+
+    def test_full_effect_report_models_accepted_card_request_project_write(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="준비 중",
+            project_status="준비 중", baseline_project_status="준비 중")
+
+        preview = self.run_sync(dry_run=True, bidirectional_enabled=True)
+
+        report = preview["full_effect_report"]
+        exact = report["exact_snapshot_effects"][0]
+        request = report["bidirectional_request_effects"][0]
+        self.assertEqual(exact["project_after"], "진행 중")
+        self.assertEqual(exact["project_target_source"], "accepted_bidirectional_request")
+        self.assertTrue(exact["project_mutation_on_snapshot"])
+        self.assertEqual(request["project_after"], "진행 중")
+        self.assertTrue(request["project_write_on_snapshot"])
+        self.assertEqual(self.project.writes, [])
+        self.assertEqual(self.notion.writes, [])
+
+        self.run_sync(bidirectional_enabled=True)
+        self.assertEqual([variables["option"] for query, variables in self.project.writes
+                          if query == gp.SET_STATUS_MUTATION], [
+                              TEST_STATUS_OPTIONS["진행 중"]])
+
+    def test_full_effect_report_gates_held_and_unresolved_projection_requests(self):
+        for gate in ("hold", "projection", "held_baseline_identity"):
+            with self.subTest(gate=gate):
+                self._configure_bidirectional_status(
+                    notion_status="진행 중", baseline_notion_status="백로그",
+                    project_status="백로그", baseline_project_status="백로그")
+                state = self._read_bidirectional_state()
+                if gate in {"hold", "held_baseline_identity"}:
+                    state["hold"] = se._new_hold("MIGRATION_CONFLICT",
+                        "synthetic preserved hold", se._digest("hold"))
+                    if gate == "held_baseline_identity":
+                        state["project_item_id"] = "PVTI_stale_baseline"
+                        state["baseline"]["project_item_id"] = "PVTI_stale_baseline"
+                else:
+                    state["review_pr_hash"] = se._digest([])
+                    state["projection"] = {
+                        "expected_option_id": TEST_STATUS_OPTIONS["백로그"],
+                        "expected_fingerprint": se._digest("projection"),
+                        "checkpoint": {field: state[field]
+                                       for field in se.STATUS_CHECKPOINT_KEYS},
+                        "fact_contract": "semantic_v2", "request_id": "prior-request",
+                        "expected_notion_status": "백로그",
+                        "result_notion_status": "준비 중",
+                    }
+                self.notion.pages[ISSUE_PAGE_ID]["properties"]["동기화 내부 상태"] = \
+                    se.text_property(se.canonical_json(state))
+
+                preview = self.run_sync(dry_run=True, bidirectional_enabled=True)
+
+                report = preview["full_effect_report"]
+                effect = report["bidirectional_request_effects"][0]
+                self.assertEqual(effect["project_target_classification"],
+                                 "potential_gated_or_unresolved")
+                self.assertIsNone(effect["project_after"])
+                self.assertIsNone(effect["project_write_on_snapshot"])
+                expected_gate = ("projection_recovery" if gate == "projection" else "issue_hold")
+                self.assertTrue(effect["execution_gates"][expected_gate])
+                if gate == "held_baseline_identity":
+                    self.assertTrue(effect["execution_gates"][
+                        "baseline_item_identity_mismatch"])
+                self.assertFalse(any(item["key"] == "Issue #18"
+                                     for item in report["exact_snapshot_effects"]))
+                self.assertEqual(self.project.writes, [])
+                self.assertEqual(self.notion.writes, [])
+
+                actual = self.run_sync(bidirectional_enabled=True)
+                self.assertGreaterEqual(actual["held"], 1)
+                self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID],
+                                                "작업 상태"), "진행 중")
+                saved = self._read_bidirectional_state()
+                self.assertTrue(saved["hold"] or saved["request"] or
+                                saved["deferred_request"])
+                self.assertEqual(self.project.writes, [])
+
+    def test_full_effect_fingerprint_covers_notion_managed_values_and_schema(self):
+        self.repo_graph = RepoGraph(issues=[make_issue()])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "open"}])
+        self.project = ProjectAPI([make_project_item(option="백로그")])
+        self.notion = FakeNotion([control_page(control_internal()),
+                                  active_issue_page(task="백로그")])
+
+        initial = self.run_sync(dry_run=True)["full_effect_report"]
+        initial_digest = initial["source_config_fingerprint"]
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["제목"] = \
+            se.text_property("Changed Notion-managed title", "title")
+        changed_row = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertNotEqual(changed_row["source_config_fingerprint"], initial_digest)
+        self.assertNotIn("Changed Notion-managed title", json.dumps(changed_row))
+
+        prior_schema = self.notion.schema
+        schema = prior_schema()
+        schema["properties"]["제목"]["description"] = "validated schema metadata drift"
+        self.notion.schema = lambda: copy.deepcopy(schema)
+        changed_schema = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertNotEqual(changed_schema["source_config_fingerprint"],
+                            changed_row["source_config_fingerprint"])
+        self.assertNotIn("validated schema metadata drift", json.dumps(changed_schema))
+
+        first_archive = make_project_item(item_id="PVTI_archived_one", archived=True)
+        self.project.items.append(first_archive)
+        archived_one = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertNotEqual(archived_one["source_config_fingerprint"],
+                            changed_schema["source_config_fingerprint"])
+        second_archive = make_project_item(item_id="PVTI_archived_two", archived=True)
+        self.project.items.append(second_archive)
+        archived_two = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertNotEqual(archived_two["source_config_fingerprint"],
+                            archived_one["source_config_fingerprint"])
+        self.project.items.reverse()
+        archived_reordered = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertEqual(archived_reordered["source_config_fingerprint"],
+                         archived_two["source_config_fingerprint"])
+        self.project.items.remove(first_archive)
+        archived_removed = self.run_sync(dry_run=True)["full_effect_report"]
+        self.assertNotEqual(archived_removed["source_config_fingerprint"],
+                            archived_two["source_config_fingerprint"])
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.project.writes, [])
+
+    def test_legacy_null_structural_identity_mismatch_still_fails_global_preflight(self):
+        issue = make_issue(state="CLOSED", reason="NOT_PLANNED",
+                           closed_at="2026-10-03T00:00:00Z")
+        state = make_pending_status_state(issue, before="백로그", target="완료",
+                                          migration_complete=True)
+        state["pending"]["target_option_id"] = None
+        state["pending"]["notion_status"] = None
+        state["pending"]["project_item_id"] = "PVTI_mismatched_identity"
+        self.repo_graph = RepoGraph(issues=[issue])
+        self.rest = LegacyREST(issues=[{"id": ISSUE_ID, "node_id": ISSUE_NODE,
+            "number": ISSUE_NUMBER, "state": "closed"}])
+        self.project = ProjectAPI([make_project_item(option=None)])
+        self.notion = FakeNotion([control_page(control_internal()),
+            active_issue_page(task=None, internal=se.canonical_json(state))])
+
+        with self.assertRaisesRegex(se.SyncError, "pending status item/event ID 관계 오류"):
+            self.run_sync()
+
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.project.writes, [])
+
+    def test_cancelled_card_request_is_rejected_and_serializes_null_request_select(self):
+        baseline_stamp = {"field_id": STATUS_FIELD,
+                          "option_id": TEST_STATUS_OPTIONS["백로그"],
+                          "value_id": "PVTSV_before", "updated_at": "2026-10-01T00:00:00Z"}
+        baseline = se.status_sync.make_baseline(
+            "백로그", baseline_stamp, "PVTI_issue18", se._digest("facts"),
+            "2026-10-01T00:00:00Z")
+        current_stamp = dict(baseline_stamp, option_id=TEST_STATUS_OPTIONS["백로그"])
+        decision = se.status_sync.decide(baseline, "취소", current_stamp, "백로그",
+                                        facts_verified=True)
+        self.assertEqual(decision["action"], "hold_invalid_request")
+        state = se.new_issue_state(ISSUE_ID, gp.EXPECTED_PROJECT_ID)
+        state["request"] = se.status_sync.request_record(
+            "cancel-attempt", "취소", observed_from=baseline["observed_at"],
+            observed_to="2026-10-02T00:00:00Z", prior_notion_status="백로그",
+            project_option_id=TEST_STATUS_OPTIONS["백로그"], phase="rejected",
+            reason="취소는 요청 상태로 허용되지 않습니다.")
+        properties = se._status_request_properties(state)
+        self.assertEqual(properties["요청 처리"], {"select": {"name": "요청 거절"}})
+        self.assertEqual(properties["요청 상태"], {"select": None})
+
+    def test_cancelled_card_request_restore_is_issue_local_and_keeps_five_request_states(self):
+        self._configure_bidirectional_status(
+            notion_status="취소", baseline_notion_status="백로그",
+            project_status="백로그", baseline_project_status="백로그")
+        issue_b = make_issue()
+        issue_b.update({"id": "I_issue_b", "databaseId": 556, "number": 19,
+                        "title": "Healthy issue B",
+                        "url": f"https://github.com/{gp.REPOSITORY}/issues/19"})
+        item_b = make_project_item(item_id="PVTI_issue19", option="백로그",
+                                   issue_id=556, issue_node=issue_b["id"], number=19)
+        self.repo_graph = RepoGraph(issues=[self.repo_graph.issues[0], issue_b])
+        self.rest = LegacyREST(issues=[
+            {"id": ISSUE_ID, "node_id": ISSUE_NODE, "number": ISSUE_NUMBER, "state": "open"},
+            {"id": 556, "node_id": issue_b["id"], "number": 19, "state": "open"},
+        ])
+        self.project.items.append(item_b)
+        self.project.source_issues[issue_b["id"]] = issue_b
+        state_b = se.new_issue_state(556, gp.EXPECTED_PROJECT_ID)
+        self.notion.pages[SECOND_ISSUE_PAGE_ID] = active_issue_page(
+            page_id=SECOND_ISSUE_PAGE_ID, issue_id=556, number=19, task="백로그",
+            internal=se.canonical_json(state_b))
+
+        result = self.run_sync(bidirectional_enabled=True)
+
+        state_a = self._read_bidirectional_state()
+        state_b = se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=556)
+        self.assertEqual(result["held"], 1)
+        self.assertEqual(state_a["request"]["phase"], "rejected")
+        self.assertEqual(state_a["request"]["target"], "취소")
+        props_a = self.notion.pages[ISSUE_PAGE_ID]["properties"]
+        self.assertEqual(props_a["요청 처리"]["select"]["name"], "요청 거절")
+        self.assertIsNone(props_a["요청 상태"]["select"])
+        self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID], "작업 상태"), "백로그")
+        self.assertTrue(state_b["migration_complete"])
+        self.assertEqual(self.project.writes, [])
+
+        repeated = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(repeated["held"], 0)
+        self.assertEqual(self._read_bidirectional_state()["request"]["phase"], "rejected")
+        self.assertEqual(self.project.writes, [])
+        self.assertTrue(se.decode_internal(
+            se.read_text(self.notion.pages[SECOND_ISSUE_PAGE_ID], "동기화 내부 상태"),
+            kind="issue", project_id=gp.EXPECTED_PROJECT_ID,
+            object_id=556)["migration_complete"])
+
+    def test_terminal_completion_preserves_missing_duplicate_representative_notice(self):
+        opened = make_issue()
+        closed = make_issue(state="CLOSED", reason="DUPLICATE",
+                            closed_at="2026-10-03T00:00:00Z")
+        self._configure_bidirectional_status(
+            notion_status="백로그", baseline_notion_status="백로그",
+            project_status="백로그", baseline_project_status="백로그",
+            baseline_issue=opened, issue=closed)
+
+        failed_readback = False
+
+        def lose_completion_display_readback(path, properties, notion):
+            nonlocal failed_readback
+            if failed_readback or path != f"/pages/{ISSUE_PAGE_ID}":
+                return
+            raw = properties.get("동기화 내부 상태")
+            saved = json.loads(rich_text_value(raw)) if raw else {}
+            checkpoint = (saved.get("projection") or {}).get("display_checkpoint") or {}
+            if (checkpoint.get("phase") == "completion_pending" and
+                    properties.get("작업 상태", {}).get("select") == {"name": "취소"}):
+                failed_readback = True
+                notion.fail_readback_after_patch.add(ISSUE_PAGE_ID)
+
+        self.notion.after_patch = lose_completion_display_readback
+        with self.assertRaisesRegex(se.SyncError, "readback failure"):
+            self.run_sync(bidirectional_enabled=True)
+        self.assertTrue(failed_readback)
+        self.assertEqual(len(self.project.writes), 1)
+
+        self.notion.after_patch = None
+        first = self.run_sync(bidirectional_enabled=True)
+        page = self.notion.pages[ISSUE_PAGE_ID]
+        self.assertEqual(first["held"], 0)
+        self.assertEqual(se.read_select(page, "작업 상태"), "취소")
+        self.assertIn("대표 이슈 지정 필요", se.read_text(page, "확인 필요"))
+        state = self._read_bidirectional_state()
+        self.assertIsNone(state["request"])
+
+        second = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(second["held"], 0)
+        self.assertIn("대표 이슈 지정 필요",
+                      se.read_text(self.notion.pages[ISSUE_PAGE_ID], "확인 필요"))
+        self.assertEqual(len(self.project.writes), 1)
+
+    def test_duplicate_notice_coexists_with_completed_and_rejected_request_reasons(self):
+        opened = make_issue()
+        duplicate = make_issue(state="CLOSED", reason="DUPLICATE",
+                               closed_at="2026-10-03T00:00:00Z")
+        cases = ("completed_request", "rejected_request")
+        for case in cases:
+            with self.subTest(case=case):
+                if case == "completed_request":
+                    self._configure_bidirectional_status(
+                        notion_status="진행 중", baseline_notion_status="백로그",
+                        project_status="백로그", baseline_project_status="백로그",
+                        baseline_issue=opened, issue=opened)
+                    initial = self.run_sync(bidirectional_enabled=True)
+                    self.assertEqual(initial["project_changes"], 1)
+                    prior = self._read_bidirectional_state()
+                    self.assertEqual(prior["request"]["phase"], "completed")
+                    self.repo_graph.issues[0] = duplicate
+                    self.rest.issues[0]["state"] = "closed"
+                else:
+                    self._configure_bidirectional_status(
+                        notion_status="취소", baseline_notion_status="백로그",
+                        project_status="백로그", baseline_project_status="백로그",
+                        baseline_issue=opened, issue=duplicate)
+
+                failed_readback = False
+
+                def lose_terminal_readback(path, properties, notion):
+                    nonlocal failed_readback
+                    if failed_readback or path != f"/pages/{ISSUE_PAGE_ID}":
+                        return
+                    raw = properties.get("동기화 내부 상태")
+                    saved = json.loads(rich_text_value(raw)) if raw else {}
+                    checkpoint = (saved.get("projection") or {}).get(
+                        "display_checkpoint") or {}
+                    if (checkpoint.get("phase") == "completion_pending" and
+                            properties.get("작업 상태", {}).get("select") ==
+                            {"name": "취소"}):
+                        failed_readback = True
+                        notion.fail_readback_after_patch.add(ISSUE_PAGE_ID)
+
+                self.notion.after_patch = lose_terminal_readback
+                with self.assertRaisesRegex(se.SyncError, "readback failure"):
+                    self.run_sync(bidirectional_enabled=True)
+                self.assertTrue(failed_readback)
+                writes_before_recovery = 2 if case == "completed_request" else 1
+                self.assertEqual(len(self.project.writes), writes_before_recovery)
+                self.notion.after_patch = None
+
+                first = self.run_sync(bidirectional_enabled=True)
+                page = self.notion.pages[ISSUE_PAGE_ID]
+                state = self._read_bidirectional_state()
+                request = state["request"]
+                expected_phase = "completed" if case == "completed_request" else "rejected"
+                self.assertEqual(first["held"], 0)
+                self.assertEqual(request["phase"], expected_phase)
+                note = se.read_text(page, "확인 필요")
+                self.assertIn("대표 이슈 지정 필요", note)
+                self.assertIn(request["reason"], note)
+                self.assertEqual(se.read_select(page, "요청 처리"),
+                                 "반영 완료" if expected_phase == "completed" else "요청 거절")
+                self.assertEqual(se.read_select(page, "요청 상태"),
+                                 request["target"] if expected_phase == "completed" else None)
+                self.assertEqual(se.read_select(page, "작업 상태"), "취소")
+
+                repeated = self.run_sync(bidirectional_enabled=True)
+                self.assertEqual(repeated["held"], 0)
+                self.assertEqual(self._read_bidirectional_state()["request"]["phase"],
+                                 expected_phase)
+                self.assertEqual(se.read_text(self.notion.pages[ISSUE_PAGE_ID], "확인 필요"),
+                                 note)
+                self.assertEqual(len(self.project.writes), writes_before_recovery)
+
+    def test_full_effect_report_includes_rejected_cancel_request_with_bidirectional_on(self):
+        self._configure_bidirectional_status()
+        self.notion.pages[ISSUE_PAGE_ID]["properties"]["작업 상태"] = {
+            "select": {"name": "취소"}}
+        result = self.run_sync(dry_run=True, bidirectional_enabled=True)
+        report = result["full_effect_report"]
+        self.assertTrue(report["bidirectional_enabled"])
+        self.assertEqual(len(report["bidirectional_request_effects"]), 1)
+        effect = report["bidirectional_request_effects"][0]
+        self.assertEqual(effect["action"], "hold_invalid_request")
+        self.assertEqual(effect["phase"], "rejected")
+        self.assertEqual(effect["target"], "취소")
+        self.assertIn("요청 상태", effect["fields"])
+        self.assertEqual(self.notion.writes, [])
+        self.assertEqual(self.project.writes, [])
+
+    def test_rejected_cancel_request_does_not_suppress_verified_closure_or_reopen(self):
+        eligible_pr = make_pr()
+        eligible_pr.update({"state": "OPEN", "isDraft": False, "mergedAt": None})
+        pr_issue = make_issue(linked=[pr_reference(eligible_pr)])
+        scenarios = (
+            ("closure", make_issue(state="CLOSED", reason="NOT_PLANNED",
+                                    closed_at="2026-10-03T00:00:00Z"),
+             make_issue(), "백로그", "백로그", "취소", []),
+            ("reopen", make_issue(state="OPEN", reopens=[{
+                "id": "REOPEN_EVENT_CANCEL_REQUEST",
+                "createdAt": "2026-10-04T00:00:00Z", "stateReason": "REOPENED"}]),
+             make_issue(state="CLOSED", reason="COMPLETED",
+                        closed_at="2026-10-03T00:00:00Z"),
+             "취소", "취소", "백로그", []),
+            ("eligible_pr", pr_issue, pr_issue,
+             "취소", "취소", "검토 중", [eligible_pr]),
+        )
+        for (name, current_issue, baseline_issue, project_status,
+             baseline_project_status, automatic_target, pulls) in scenarios:
+            with self.subTest(scenario=name):
+                self._configure_bidirectional_status(
+                    issue=current_issue, baseline_issue=baseline_issue,
+                    project_status=project_status,
+                    baseline_project_status=baseline_project_status, pulls=pulls)
+                self.notion.pages[ISSUE_PAGE_ID]["properties"]["작업 상태"] = {
+                    "select": {"name": "취소"}}
+
+                result = self.run_sync(bidirectional_enabled=True)
+
+                state = self._read_bidirectional_state()
+                self.assertEqual(result["held"], 0)
+                self.assertEqual(self.project.items[0]["fieldValues"]["nodes"][0]["optionId"],
+                                 TEST_STATUS_OPTIONS[automatic_target])
+                self.assertEqual(state["request"]["phase"], "rejected")
+                self.assertEqual(state["request"]["target"], "취소")
+                self.assertEqual(se.read_select(self.notion.pages[ISSUE_PAGE_ID],
+                                                "요청 처리"), "요청 거절")
+                self.assertIsNone(se.read_select(self.notion.pages[ISSUE_PAGE_ID],
+                                                 "요청 상태"))
 
     def test_closure_duplicate_unknown_reason_and_reopen_priority(self):
         completed = make_issue(state="CLOSED", reason="COMPLETED", closed_at="2026-10-03T00:00:00Z")
         self.assertEqual(self._plan(completed)["target"], "완료")
         duplicate = make_issue(state="CLOSED", reason="DUPLICATE", closed_at="2026-10-03T00:00:00Z")
         result = self._plan(duplicate)
-        self.assertIsNone(result["target"])
+        self.assertEqual(result["target"], "취소")
         self.assertEqual(result["end_reason"], "중복")
         self.assertIn("대표 이슈", result["confirmation"])
         unknown = make_issue(state="CLOSED", reason=None, closed_at="2026-10-03T00:00:00Z")
@@ -6356,6 +8034,62 @@ class SyncEngineCoreTests(unittest.TestCase):
         self.assertEqual(current["deferred_request"]["phase"], "held")
         self.assertEqual(self.project.writes, [])
 
+    def _complete_first_card_request_then_move_card_back(self):
+        self._configure_bidirectional_status(
+            notion_status="진행 중", baseline_notion_status="준비 중",
+            project_status="준비 중", baseline_project_status="준비 중")
+        first = self.run_sync(bidirectional_enabled=True)
+        self.assertEqual(first["held"], 0)
+        old_request = copy.deepcopy(self._read_bidirectional_state()["request"])
+        self.assertEqual(old_request["phase"], "completed")
+        self.assertEqual(len(self.project.writes), 1)
+        page = self.notion.pages[ISSUE_PAGE_ID]
+        page["properties"]["작업 상태"] = {"select": {"name": "준비 중"}}
+
+        def stale_query(response, payload):
+            for row in response["results"]:
+                if row["id"] == ISSUE_PAGE_ID:
+                    row["properties"]["작업 상태"] = {"select": {"name": "진행 중"}}
+            return response
+
+        # The list snapshot still shows the old card while the page read is current.
+        self.notion.query_response_transform = stale_query
+        return page, old_request
+
+    def test_stale_list_card_after_completed_request_still_starts_new_request(self):
+        page, old_request = self._complete_first_card_request_then_move_card_back()
+        second = self.run_sync(bidirectional_enabled=True)
+        state = self._read_bidirectional_state()
+        self.assertEqual(second["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertIsNone(state["projection"])
+        self.assertEqual(len(self.project.writes), 2)
+        self.assertEqual(state["request"]["target"], "준비 중")
+        self.assertEqual(state["request"]["phase"], "completed")
+        self.assertNotEqual(state["request"]["id"], old_request["id"])
+        self.assertEqual(se.read_select(page, "작업 상태"), "준비 중")
+
+    def test_failed_fresh_page_read_keeps_stale_row_and_does_not_race_completed_request(self):
+        page, old_request = self._complete_first_card_request_then_move_card_back()
+        original_request = self.notion.request
+        page_path = f"/pages/{ISSUE_PAGE_ID}"
+        fail_next = {"armed": True}
+
+        def failing_first_page_get(method, path, payload=None, **kwargs):
+            if method == "GET" and path == page_path and fail_next["armed"]:
+                fail_next["armed"] = False
+                raise se.SyncError("synthetic fresh page read failure")
+            return original_request(method, path, payload, **kwargs)
+
+        self.notion.request = failing_first_page_get
+        raced = self.run_sync(bidirectional_enabled=True)
+        state = self._read_bidirectional_state()
+        self.assertEqual(raced["held"], 0)
+        self.assertIsNone(state["hold"])
+        self.assertIsNone(state["projection"])
+        self.assertEqual(state["request"], old_request)
+        self.assertEqual(len(self.project.writes), 1)
+
     def test_add_readback_contradiction_can_resume_only_after_exact_relation_repair(self):
         self._configure_post_cutoff_project_add()
         self.project.add_item_transform = lambda item: (
@@ -6851,7 +8585,7 @@ class SyncEngineCoreTests(unittest.TestCase):
                     se.read_text(self.notion.pages[ISSUE_PAGE_ID], "동기화 내부 상태"),
                     kind="issue", project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
                 self.assertTrue(state["migration_complete"])
-                expected = {"COMPLETED": "완료", "NOT_PLANNED": None, "DUPLICATE": None}[reason]
+                expected = {"COMPLETED": "완료", "NOT_PLANNED": "취소", "DUPLICATE": "취소"}[reason]
                 self.assertEqual(self.project.items[0]["fieldValues"]["nodes"] and
                     self.project.items[0]["fieldValues"]["nodes"][0]["name"] or None, expected)
 
@@ -7365,9 +9099,11 @@ class SyncEngineCoreTests(unittest.TestCase):
                          gp.EXPECTED_STATUS_OPTIONS["백로그"])
         invalid = copy.deepcopy(checkpointed)
         invalid["resume"]["expected_option_id"] = "PVTSSF_unrecognized"
-        with self.assertRaises(se.SyncError):
-            se.decode_internal(se.canonical_json(invalid), kind="issue",
-                               project_id=gp.EXPECTED_PROJECT_ID, object_id=ISSUE_ID)
+        decoded_invalid = se.decode_internal(se.canonical_json(invalid), kind="issue",
+                                             project_id=gp.EXPECTED_PROJECT_ID,
+                                             object_id=ISSUE_ID)
+        with self.assertRaisesRegex(se.SyncError, "현재 검증된 mapping"):
+            se._validate_state_option_bindings(decoded_invalid, TEST_STATUS_OPTIONS)
         self.assertEqual(len(self.project.writes), 1)
 
         self.notion.fail_patch = None

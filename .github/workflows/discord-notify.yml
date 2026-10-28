@@ -84,6 +84,7 @@ jobs:
           DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
           DISCORD_USER_MAP: ${{ vars.DISCORD_USER_MAP }}
           DISCORD_PROJECT_READ_TOKEN: ${{ secrets.DISCORD_PROJECT_READ_TOKEN }}
+          PROJECT_STATUS_OPTIONS: ${{ vars.PROJECT_STATUS_OPTIONS }}
           DISCORD_APPROVED_SHA: ${{ inputs.approved_sha }}
           DISCORD_RESOLVE_KEY: ${{ inputs.resolve_key }}
           DISCORD_RESOLVE_OUTCOME: ${{ inputs.resolve_outcome }}

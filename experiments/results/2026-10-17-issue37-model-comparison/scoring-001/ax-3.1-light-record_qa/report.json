@@ -1,0 +1,1617 @@
+{
+  "schema_version": 1,
+  "suite": "record_qa",
+  "execution_kind": "school_gpu_user_run",
+  "run_id": "9f8bd115-1080-43f9-8de8-eac530f54992",
+  "dataset_sha256": "0958c27c1b22e7a3bb5753c21e30caa9ab67557da250f75cd4297cadbcf7696a",
+  "config": {
+    "model_id": "skt/A.X-3.1-Light",
+    "suite": "record_qa",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+      "evaluation/collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+    },
+    "model_profile": "ax-3.1-light",
+    "model_revision": "9b41bb2406472634d8812c0b8931fa40fa9a6c3a",
+    "chat_template_kwargs": {},
+    "model_artifacts_sha256": {
+      "config.json": "00b41a5f1d858a245578556641168bde934bd19bafd30e0bd1b5c8e038507abf",
+      "generation_config.json": "ec89afc8e606799b259aabe3380a1a9916cbdb2100fd7d3a9a7fb8d227d0d503",
+      "merges.txt": "d33bd322a424d0144e5bd123dbeef33f2538ac57adabf639984599ee9b9ca9b3",
+      "model-00001-of-00003.safetensors": "355d88dc6d7fabd7d2662aa3613829cd97c3d5fa0eddb037c3f11f56925e9719",
+      "model-00002-of-00003.safetensors": "59169b8a449f1fef04785f62218c027b806c9103e36c5b371db771808cfd96e9",
+      "model-00003-of-00003.safetensors": "544c0532aeac3c10fe888e5433f00d0f1bb2bd0f410c9b41e5327ed189b5bc8e",
+      "model.safetensors.index.json": "91f834bcda61e44f1a879642ba5ed1a9553781c4ccafc0a99025e9924ead9260",
+      "special_tokens_map.json": "312ce7c2be09ff7794368a33c1ee54ed7ed100ac84225653bb4a366c93e71039",
+      "tokenizer.json": "e3973eceeed921e72d54fbbf597e1bea0a219112a0809ad8eaf62a1754f8ea44",
+      "tokenizer_config.json": "b4e565400981ea6ff86bcb870bce46d8c8e0b87ef6addf293f97e5639027d2c5",
+      "vocab.json": "aa321d72a70362cc860441bb8c26a897adee22137ceb4d8974f764ed6b005474"
+    }
+  },
+  "raw_artifact_sha256": {
+    "metadata.json": "46a61e4cce405a49debfdf4e2a463e3df7900176e929388477c74f83865e7bf1",
+    "cases.json": "0958c27c1b22e7a3bb5753c21e30caa9ab67557da250f75cd4297cadbcf7696a",
+    "events.jsonl": "e2dc4dce0ebb5ddf21d674870a8039e7502c2e22c593fae4ffcc2585be084d7c"
+  },
+  "counts": {
+    "warmup": {
+      "expected": 3,
+      "started": 3,
+      "success": [
+        "w1",
+        "w2",
+        "w3"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "baseline": {
+      "expected": 60,
+      "started": 60,
+      "success": [
+        "r1-J-E-A1-O",
+        "r1-J-E-A1-P",
+        "r1-J-E-A1-R",
+        "r1-J-E-A1-M",
+        "r1-J-E-A2-O",
+        "r1-J-E-A2-P",
+        "r1-J-E-A2-R",
+        "r1-J-E-A2-M",
+        "r1-J-E-P1-O",
+        "r1-J-E-P1-P",
+        "r1-J-E-P1-R",
+        "r1-J-E-P1-M",
+        "r1-J-E-P2-O",
+        "r1-J-E-P2-P",
+        "r1-J-E-P2-R",
+        "r1-J-E-P2-M",
+        "r1-J-E-U1-O",
+        "r1-J-E-U1-P",
+        "r1-J-E-U1-R",
+        "r1-J-E-U1-M",
+        "r2-J-E-A1-O",
+        "r2-J-E-A1-P",
+        "r2-J-E-A1-R",
+        "r2-J-E-A1-M",
+        "r2-J-E-A2-O",
+        "r2-J-E-A2-P",
+        "r2-J-E-A2-R",
+        "r2-J-E-A2-M",
+        "r2-J-E-P1-O",
+        "r2-J-E-P1-P",
+        "r2-J-E-P1-R",
+        "r2-J-E-P1-M",
+        "r2-J-E-P2-O",
+        "r2-J-E-P2-P",
+        "r2-J-E-P2-R",
+        "r2-J-E-P2-M",
+        "r2-J-E-U1-O",
+        "r2-J-E-U1-P",
+        "r2-J-E-U1-R",
+        "r2-J-E-U1-M",
+        "r3-J-E-A1-O",
+        "r3-J-E-A1-P",
+        "r3-J-E-A1-R",
+        "r3-J-E-A1-M",
+        "r3-J-E-A2-O",
+        "r3-J-E-A2-P",
+        "r3-J-E-A2-R",
+        "r3-J-E-A2-M",
+        "r3-J-E-P1-O",
+        "r3-J-E-P1-P",
+        "r3-J-E-P1-R",
+        "r3-J-E-P1-M",
+        "r3-J-E-P2-O",
+        "r3-J-E-P2-P",
+        "r3-J-E-P2-R",
+        "r3-J-E-P2-M",
+        "r3-J-E-U1-O",
+        "r3-J-E-U1-P",
+        "r3-J-E-U1-R",
+        "r3-J-E-U1-M"
+      ],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    },
+    "supplement": {
+      "expected": 0,
+      "started": 0,
+      "success": [],
+      "failed": [],
+      "interrupted": [],
+      "unexecuted": []
+    }
+  },
+  "schedule_complete": true,
+  "journal_damaged": false,
+  "operational": {
+    "scope": "successful_main_attempts_only_including_empty",
+    "successful_attempts": 60,
+    "mean_generation_ms": 714.9345414000001,
+    "mean_tokens_per_second": 34.853307336372104,
+    "input_tokens": 6681,
+    "generated_tokens_including_terminal_eos": 1500,
+    "max_peak_allocated_bytes": 14639083008,
+    "max_peak_reserved_bytes": 14722007040,
+    "load": {
+      "environment": {
+        "attention": "eager",
+        "cache_policy": "generation_default_fresh_per_call",
+        "device": "cuda:0",
+        "driver_version": null,
+        "dtype": "bfloat16",
+        "gpu_capability": [
+          8,
+          6
+        ],
+        "gpu_name": "NVIDIA RTX A6000",
+        "gpu_total_memory_bytes": 51041271808,
+        "model_revision": "9b41bb2406472634d8812c0b8931fa40fa9a6c3a",
+        "model_revision_status": "declared_by_profile",
+        "packages": {
+          "accelerate": "1.15.0",
+          "safetensors": "0.8.0",
+          "torch": "2.7.1+cu118",
+          "transformers": "4.57.1"
+        },
+        "python": "3.12.7",
+        "resident_allocated_bytes": 14535893504,
+        "resident_reserved_bytes": 14537457664,
+        "torch_cuda_build": "11.8"
+      },
+      "load_ms": 4210.80199,
+      "run_id": "9f8bd115-1080-43f9-8de8-eac530f54992",
+      "seq": 2,
+      "status": "success",
+      "time": "2026-10-17T11:22:17.050853+00:00",
+      "type": "load_result"
+    },
+    "cache_recovery_occurred": false,
+    "not_measured": [
+      "TTFT",
+      "end_to_end_latency",
+      "whole_gpu_VRAM"
+    ]
+  },
+  "evaluation_axis": "deterministic_mechanical",
+  "rounds": [
+    {
+      "round": 1,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.05,
+        "format_validity": 0.05,
+        "slots": {
+          "score": 0.05,
+          "correct_slots": 1,
+          "eligible_slots": 48,
+          "eligible_questions": 20
+        },
+        "known": {
+          "score": 0.058823529411764705,
+          "correct_slots": 1,
+          "eligible_slots": 37,
+          "eligible_questions": 17
+        },
+        "null": {
+          "score": 0,
+          "correct_slots": 0,
+          "eligible_slots": 11,
+          "eligible_questions": 11
+        }
+      },
+      "rows": [
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-O",
+          "attempt_id": "r1-J-E-A1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-P",
+          "attempt_id": "r1-J-E-A1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-R",
+          "attempt_id": "r1-J-E-A1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-M",
+          "attempt_id": "r1-J-E-A1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-O",
+          "attempt_id": "r1-J-E-A2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-P",
+          "attempt_id": "r1-J-E-A2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-R",
+          "attempt_id": "r1-J-E-A2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-M",
+          "attempt_id": "r1-J-E-A2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-O",
+          "attempt_id": "r1-J-E-P1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-P",
+          "attempt_id": "r1-J-E-P1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-R",
+          "attempt_id": "r1-J-E-P1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-M",
+          "attempt_id": "r1-J-E-P1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-O",
+          "attempt_id": "r1-J-E-P2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-P",
+          "attempt_id": "r1-J-E-P2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-R",
+          "attempt_id": "r1-J-E-P2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-M",
+          "attempt_id": "r1-J-E-P2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-O",
+          "attempt_id": "r1-J-E-U1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-P",
+          "attempt_id": "r1-J-E-U1-P"
+        },
+        {
+          "state": "correct",
+          "whole_success": true,
+          "format_valid": true,
+          "slots": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "known": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-U1-R",
+          "attempt_id": "r1-J-E-U1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-M",
+          "attempt_id": "r1-J-E-U1-M"
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.05,
+        "format_validity": 0.05,
+        "slots": {
+          "score": 0.05,
+          "correct_slots": 1,
+          "eligible_slots": 48,
+          "eligible_questions": 20
+        },
+        "known": {
+          "score": 0.058823529411764705,
+          "correct_slots": 1,
+          "eligible_slots": 37,
+          "eligible_questions": 17
+        },
+        "null": {
+          "score": 0,
+          "correct_slots": 0,
+          "eligible_slots": 11,
+          "eligible_questions": 11
+        }
+      },
+      "rows": [
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-O",
+          "attempt_id": "r2-J-E-A1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-P",
+          "attempt_id": "r2-J-E-A1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-R",
+          "attempt_id": "r2-J-E-A1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-M",
+          "attempt_id": "r2-J-E-A1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-O",
+          "attempt_id": "r2-J-E-A2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-P",
+          "attempt_id": "r2-J-E-A2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-R",
+          "attempt_id": "r2-J-E-A2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-M",
+          "attempt_id": "r2-J-E-A2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-O",
+          "attempt_id": "r2-J-E-P1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-P",
+          "attempt_id": "r2-J-E-P1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-R",
+          "attempt_id": "r2-J-E-P1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-M",
+          "attempt_id": "r2-J-E-P1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-O",
+          "attempt_id": "r2-J-E-P2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-P",
+          "attempt_id": "r2-J-E-P2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-R",
+          "attempt_id": "r2-J-E-P2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-M",
+          "attempt_id": "r2-J-E-P2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-O",
+          "attempt_id": "r2-J-E-U1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-P",
+          "attempt_id": "r2-J-E-U1-P"
+        },
+        {
+          "state": "correct",
+          "whole_success": true,
+          "format_valid": true,
+          "slots": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "known": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-U1-R",
+          "attempt_id": "r2-J-E-U1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-M",
+          "attempt_id": "r2-J-E-U1-M"
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "planned": 20,
+      "attempted": 20,
+      "pending": [],
+      "complete": true,
+      "scores": {
+        "whole_accuracy": 0.05,
+        "format_validity": 0.05,
+        "slots": {
+          "score": 0.05,
+          "correct_slots": 1,
+          "eligible_slots": 48,
+          "eligible_questions": 20
+        },
+        "known": {
+          "score": 0.058823529411764705,
+          "correct_slots": 1,
+          "eligible_slots": 37,
+          "eligible_questions": 17
+        },
+        "null": {
+          "score": 0,
+          "correct_slots": 0,
+          "eligible_slots": 11,
+          "eligible_questions": 11
+        }
+      },
+      "rows": [
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-O",
+          "attempt_id": "r3-J-E-A1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-P",
+          "attempt_id": "r3-J-E-A1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-R",
+          "attempt_id": "r3-J-E-A1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A1-M",
+          "attempt_id": "r3-J-E-A1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-O",
+          "attempt_id": "r3-J-E-A2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-P",
+          "attempt_id": "r3-J-E-A2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-R",
+          "attempt_id": "r3-J-E-A2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-A2-M",
+          "attempt_id": "r3-J-E-A2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-O",
+          "attempt_id": "r3-J-E-P1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-P",
+          "attempt_id": "r3-J-E-P1-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-R",
+          "attempt_id": "r3-J-E-P1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 3,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P1-M",
+          "attempt_id": "r3-J-E-P1-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-O",
+          "attempt_id": "r3-J-E-P2-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-P",
+          "attempt_id": "r3-J-E-P2-P"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-R",
+          "attempt_id": "r3-J-E-P2-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 2,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-P2-M",
+          "attempt_id": "r3-J-E-P2-M"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-O",
+          "attempt_id": "r3-J-E-U1-O"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-P",
+          "attempt_id": "r3-J-E-U1-P"
+        },
+        {
+          "state": "correct",
+          "whole_success": true,
+          "format_valid": true,
+          "slots": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "known": {
+            "correct": 1,
+            "eligible": 1,
+            "score": 1
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "case_id": "J-E-U1-R",
+          "attempt_id": "r3-J-E-U1-R"
+        },
+        {
+          "state": "format_invalid",
+          "whole_success": false,
+          "format_valid": false,
+          "slots": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "known": {
+            "correct": 0,
+            "eligible": 0,
+            "score": null
+          },
+          "null": {
+            "correct": 0,
+            "eligible": 1,
+            "score": 0
+          },
+          "case_id": "J-E-U1-M",
+          "attempt_id": "r3-J-E-U1-M"
+        }
+      ]
+    }
+  ],
+  "three_round_mean": {
+    "whole_accuracy": 0.05,
+    "format_validity": 0.05,
+    "slots": 0.05,
+    "known": 0.058823529411764705,
+    "null": 0
+  },
+  "main_complete": true
+}

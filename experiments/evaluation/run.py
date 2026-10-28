@@ -7,9 +7,9 @@ from assets import EvaluationError, baseline_module, inputs
 from kobest import hash_file
 
 
-def execute(suite, model_path, output, runtime_factory=None):
+def execute(suite, model_path, output, runtime_factory=None, profile=None):
     def provider():
-        raw, data, release, config = inputs(suite)
+        raw, data, release, config = inputs(suite, profile)
         if runtime_factory:
             config['model_artifacts_sha256'] = {'mock': 'synthetic_not_model_weights'}
         else:
@@ -31,10 +31,11 @@ def main():
     parser.add_argument('--suite', choices=['human', 'record_qa', 'instructions'], required=True)
     parser.add_argument('--model-path', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--profile', help='model-profiles.json entry (#37); omit for the #36 baseline')
     args = parser.parse_args()
     prior = signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
-        return execute(args.suite, args.model_path, args.output)
+        return execute(args.suite, args.model_path, args.output, profile=args.profile)
     except (EvaluationError, OSError, KeyboardInterrupt):
         print('실행 중단: 출력 경로·환경·입력 계약을 확인하세요. 기존 결과는 새 실행으로 대체하지 마세요.', file=sys.stderr)
         return 1

@@ -812,6 +812,21 @@ def notice_active(state, key):
     return True
 
 
+def _load_ledger(ledger, purpose):
+    if isinstance(ledger, dt.Ledger):
+        return ledger.load(purpose=purpose)
+    return ledger.load()
+
+
+def _save_ledger(ledger, state, purpose, *, bootstrap=False):
+    """Add diagnostics to production Ledger while preserving legacy fake call shapes."""
+    if isinstance(ledger, dt.Ledger):
+        return ledger.save(state, purpose=purpose, bootstrap=bootstrap)
+    if bootstrap:
+        return ledger.save(state, bootstrap=True)
+    return ledger.save(state)
+
+
 def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
             hold_recovery_check=None, sync_check=None):
     errors = 0
@@ -825,7 +840,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
             continue
         if not notice_active(state, key):
             invalidate(state, key)
-            ledger.save(state)
+            _save_ledger(ledger, state, "reconcile")
             continue
         is_sync_notice = key.startswith(("hold:", "hold-delay:", "failure:sync:",
                                          "recovery:failure:sync:"))
@@ -833,7 +848,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
             current = sync_check(key)
             if current is False:
                 invalidate(state, key)
-                ledger.save(state)
+                _save_ledger(ledger, state, "reconcile")
                 continue
             if current is None:
                 continue  # Unknown latest sync evidence preserves the ready entry.
@@ -841,7 +856,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
             current = ci_check(key)
             if current is False:
                 invalidate(state, key)
-                ledger.save(state)
+                _save_ledger(ledger, state, "reconcile")
                 continue
             if current is None:
                 continue  # Incomplete/pending current CI evidence cannot authorize POST.
@@ -856,18 +871,18 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
                 continue  # A pending/failed/invalid latest sync cannot confirm recovery.
             if current is False:
                 invalidate(state, key)
-                ledger.save(state)
+                _save_ledger(ledger, state, "reconcile")
                 continue
         if event_check and re.fullmatch(r"pr:[1-9][0-9]*:timeline:[1-9][0-9]*", key):
             current_message = event_check(key)
             if current_message is None:
                 item["status"] = "retired"
-                ledger.save(state)
+                _save_ledger(ledger, state, "reconcile")
                 continue
             item["payload"] = seal_message(key, current_message)
             item["hash"] = dt.digest(item["payload"])
         item["status"] = "pending"
-        ledger.save(state)  # A crash or ambiguous POST is fenced before sending.
+        _save_ledger(ledger, state, "pending")  # A crash or ambiguous POST is fenced before sending.
         dynamic_notice = (
             bool(event_check and re.fullmatch(r"pr:[1-9][0-9]*:timeline:[1-9][0-9]*", key)) or
             bool(ci_check and key.startswith(("failure:ci:", "recovery:failure:ci:"))) or
@@ -908,7 +923,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
                     item["status"] = "retired"
                 else:
                     invalidate(state, key)
-            ledger.save(state)
+            _save_ledger(ledger, state, "reconcile")
             continue
         except dt.HTTPError as error:
             if error.status == 429 and dynamic_notice:
@@ -927,7 +942,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
                     item["status"] = "ready"
             else:
                 item["status"] = "rejected"
-            ledger.save(state)
+            _save_ledger(ledger, state, "reconcile")
             if item["status"] == "rejected":
                 errors += 1
                 print("::warning::Discord rejected delivery: " + dt.digest(key)[:12])
@@ -946,7 +961,7 @@ def deliver(state, ledger, discord, *, event_check=None, ci_check=None,
                 else:
                     discord._before_rate_limit_retry = previous_retry_guard
         item.update(status="delivered", message_id=mid)
-        ledger.save(state)  # Failed save keeps the remote pending fence; abort run.
+        _save_ledger(ledger, state, "delivered")  # Failed save keeps the remote pending fence; abort run.
     return errors
 
 
@@ -966,8 +981,8 @@ def resolve(state, key, outcome, mid, discord):
         raise dt.Error("Delivery remains unknown")
 
 
-def project_backlog(token, objects):
-    if not token:
+def project_backlog(token, objects, status_options_raw=None):
+    if not token or not status_options_raw:
         return set()
     try:
         reader = dt.GitHub(token)
@@ -976,16 +991,17 @@ def project_backlog(token, objects):
         if "read:project" not in scopes or "project" in scopes:
             return set()
         import github_project as gp
+        status_options = gp.parse_status_options(status_options_raw)
         graph = gp.GraphQLClient(token)
         # Existing verifier binds owner/project/status IDs, using reads only.
         repository_node = reader.repo("")["node_id"]
         project = gp.fetch_project(graph, project_id=gp.EXPECTED_PROJECT_ID,
                                    owner_id=gp.EXPECTED_PROJECT_OWNER_ID,
                                    status_field_id="PVTSSF_lAHOBda_2c4BmKKVzhk0RA4",
-                                   status_options=gp.EXPECTED_STATUS_OPTIONS,
+                                   status_options=status_options,
                                    repository_node_id=repository_node)
         return {i["number"] for i in objects if "head" not in i and
-                (project["items"].get(i["id"]) or {}).get("status_option_id") == gp.EXPECTED_STATUS_OPTIONS["백로그"]}
+                (project["items"].get(i["id"]) or {}).get("status_option_id") == status_options["백로그"]}
     except Exception:
         return set()  # Optional observation must never claim unverified registration.
 
@@ -1715,6 +1731,8 @@ def manual_guard(env):
 
 def diagnostic_reason(error):
     """Emit only fixed classifications, never exception text or response data."""
+    if isinstance(error, dt.LedgerFailure):
+        return error.code
     if isinstance(error, dt.HTTPError):
         status = error.status
         return f"http_{status}" if type(status) is int and 100 <= status <= 599 else "http"
@@ -1729,6 +1747,24 @@ def diagnostic_reason(error):
         "Invalid API path": "api_path",
     }
     return fixed.get(str(error), "unclassified") if isinstance(error, dt.Error) else "unclassified"
+
+
+def ledger_diagnostic_context(error):
+    if not isinstance(error, dt.LedgerFailure):
+        return ""
+    fields = [f"ledger_purpose={error.purpose or 'unknown'}",
+              f"ledger_operation={error.operation}",
+              f"immutable_check={error.immutable_check}"]
+    if error.status is not None:
+        fields.append(f"http_status={error.status}")
+    for name, value in (("intended_blob_sha", error.intended_blob_sha),
+                        ("observed_blob_sha", error.observed_blob_sha),
+                        ("put_blob_sha", error.put_blob_sha),
+                        ("commit_sha", error.commit_sha),
+                        ("expected_digest", error.expected_digest)):
+        if value:
+            fields.append(f"{name}={value}")
+    return "; " + "; ".join(fields)
 
 
 def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, discord_factory=None):
@@ -1752,7 +1788,7 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
         ledger = (ledger_factory or dt.Ledger)(gh)
         workflows = workflows_config(json.dumps(config["ci_workflows"]), gh)
         stage = "ledger_load"
-        state = ledger.load()
+        state = _load_ledger(ledger, "reconcile")
         bootstrap = state is None
         migration_needed = bool(state is not None and state.get("schema") == 1)
         if state is not None:
@@ -1764,16 +1800,17 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
                 raise dt.Error("Delivery recovery requires PM main dispatch")
             resolve(state, env["DISCORD_RESOLVE_KEY"], env.get("DISCORD_RESOLVE_OUTCOME"),
                     env.get("DISCORD_RESOLVE_MESSAGE_ID"), discord)
-            ledger.save(state)
+            _save_ledger(ledger, state, "recovery")
         stage = "source_collect"
         objects, pulls, timelines = collect_objects(gh)
-        backlog = project_backlog(env.get("DISCORD_PROJECT_READ_TOKEN"), objects)
+        backlog = project_backlog(env.get("DISCORD_PROJECT_READ_TOKEN"), objects,
+                                  env.get("PROJECT_STATUS_OPTIONS"))
         events = source_events(objects, timelines, mapping, backlog)
         if bootstrap:
             state = new_state()
             reconcile_events(state, events, bootstrap=True)
             stage = "baseline_save"
-            ledger.save(state, bootstrap=True)
+            _save_ledger(ledger, state, "bootstrap", bootstrap=True)
             # Durable activation boundary. A same-second unseen ID is still new.
             stage = "source_refresh"
             objects, pulls, timelines = collect_objects(gh)
@@ -1815,7 +1852,7 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
         reconcile_hold_delays(state, clock_reading, mapping)
         if state != before or migration_needed:
             stage = "ledger_save"
-            ledger.save(state)
+            _save_ledger(ledger, state, "reconcile")
         stage = "delivery"
         def hold_recovery_check(key):
             return current_hold_recovery(gh, key, main_sha)
@@ -1831,7 +1868,8 @@ def main(argv=None, env=None, *, github_factory=None, ledger_factory=None, disco
     except Exception as error:
         # Fixed message only: no exception repr, API response, token or webhook URL.
         print("::error::Discord 알림 처리 실패: 설정·실행 기록·전송 보류 상태를 확인하세요. "
-              + f"stage={stage}; reason={diagnostic_reason(error)}")
+              + f"stage={stage}; reason={diagnostic_reason(error)}"
+              + ledger_diagnostic_context(error))
         return 1
 
 

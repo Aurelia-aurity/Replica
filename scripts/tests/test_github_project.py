@@ -1,4 +1,5 @@
 import copy
+import json
 import io
 import unittest
 from datetime import datetime, timezone
@@ -91,7 +92,7 @@ class FactsREST:
 
 class ProjectReader:
     def __init__(self, items, *, incomplete_field_values=False, later_values=None, item_pages=None,
-                 direct_items=None):
+                 direct_items=None, raw_status_options=None):
         self.items = items
         self.item_pages = item_pages
         self.direct_items = direct_items or {}
@@ -100,16 +101,19 @@ class ProjectReader:
         self.queries = []
         self.expected_cursors = {}
         self.expected_field_cursors = {}
+        self.raw_status_options = raw_status_options
 
     def request(self, query, variables=None, *, mutation=False):
         variables = copy.deepcopy(variables or {})
         self.queries.append((query, variables))
         if query == gp.PROJECT_FIELDS_QUERY:
             self._check_project_request(query, variables)
+            raw_status_options = self.raw_status_options or [
+                {"id": value, "name": name}
+                for name, value in gp.EXPECTED_STATUS_OPTIONS.items()]
             fields = [
                 {"__typename": "ProjectV2SingleSelectField", "id": STATUS_FIELD, "name": "Status",
-                 "options": [{"id": value, "name": name}
-                             for name, value in gp.EXPECTED_STATUS_OPTIONS.items()]},
+                 "options": copy.deepcopy(raw_status_options)},
                 {"__typename": "ProjectV2IterationField", "id": "PVTIF_iteration", "name": "Iteration"},
             ]
             return {"node": self._project(fields=connection(fields))}, None
@@ -181,6 +185,71 @@ def project_item(item_id, *, archived=False, option_id=None, field_values=None,
 
 
 class GitHubProjectTests(unittest.TestCase):
+    def test_status_option_binding_requires_six_names_stable_legacy_ids_and_runtime_cancel_id(self):
+        mapping = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "operator-bound-cancel-option"}
+        self.assertEqual(gp.parse_status_options(json.dumps(mapping, ensure_ascii=False)), mapping)
+        for candidate in (
+            gp.EXPECTED_STATUS_OPTIONS,
+            {**mapping, "백로그": "guessed-old-id"},
+            {**mapping, "취소": gp.EXPECTED_STATUS_OPTIONS["완료"]},
+            {**mapping, "duplicate": "operator-bound-cancel-option"},
+        ):
+            with self.subTest(candidate=candidate), self.assertRaises(gp.SyncError):
+                gp.parse_status_options(json.dumps(candidate, ensure_ascii=False))
+
+    def test_fetch_project_validates_raw_option_rows_before_mapping(self):
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        valid_rows = [{"id": value, "name": name} for name, value in options.items()]
+        self.assertEqual(len(gp.EXPECTED_STATUS_OPTIONS), 5)
+
+        valid_six = ProjectReader([], raw_status_options=valid_rows)
+        result = gp.fetch_project(valid_six, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=options, repository_node_id=REPO_NODE)
+        self.assertEqual(result["status_options"], options)
+
+        duplicate_cancel = [row for row in valid_rows if row["name"] != "취소"]
+        duplicate_cancel.extend([
+            {"id": "bad-cancel-id", "name": "취소"},
+            {"id": options["취소"], "name": "취소"},
+        ])
+        reverse_duplicate_cancel = [row for row in valid_rows if row["name"] != "취소"]
+        reverse_duplicate_cancel.extend([
+            {"id": options["취소"], "name": "취소"},
+            {"id": "bad-cancel-id", "name": "취소"},
+        ])
+        duplicate_backlog = [row for row in valid_rows if row["name"] != "백로그"]
+        duplicate_backlog.extend([
+            {"id": "bad-backlog-id", "name": "백로그"},
+            {"id": options["백로그"], "name": "백로그"},
+        ])
+        invalid_cases = (
+            duplicate_cancel,
+            reverse_duplicate_cancel,
+            duplicate_backlog,
+            [row for row in valid_rows if row["name"] != "취소"],
+            [{**row, "id": ""} if row["name"] == "취소" else row
+             for row in valid_rows],
+            [{key: value for key, value in row.items() if key != "id"}
+             if row["name"] == "취소" else row for row in valid_rows],
+            [{**row, "id": "wrong-cancel-id"} if row["name"] == "취소" else row
+             for row in valid_rows],
+            [{**row, "id": options["백로그"]} if row["name"] == "취소" else row
+             for row in valid_rows],
+        )
+        for rows in invalid_cases:
+            with self.subTest(rows=rows), self.assertRaises(gp.SyncError):
+                gp.fetch_project(ProjectReader([], raw_status_options=rows),
+                    project_id=gp.EXPECTED_PROJECT_ID,
+                    owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+                    status_options=options, repository_node_id=REPO_NODE)
+
+        legacy = ProjectReader([])
+        legacy_result = gp.fetch_project(legacy, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE)
+        self.assertEqual(legacy_result["status_options"], gp.EXPECTED_STATUS_OPTIONS)
+
     def test_direct_project_item_id_readback_validates_project_and_status_metadata(self):
         row = project_item("PVTI_returned", option_id=gp.EXPECTED_STATUS_OPTIONS["진행 중"])
         row["project"] = {"id": gp.EXPECTED_PROJECT_ID, "number": gp.PROJECT_NUMBER,

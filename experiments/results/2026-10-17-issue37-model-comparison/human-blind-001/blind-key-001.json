@@ -1,0 +1,494 @@
+{
+  "items": {
+    "B001": {
+      "case_id": "E-P1-M",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B002": {
+      "case_id": "E-P1-M",
+      "profile": "ax-4.0-light"
+    },
+    "B003": {
+      "case_id": "E-P1-M",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B004": {
+      "case_id": "E-P1-M",
+      "profile": "ax-3.1-light"
+    },
+    "B005": {
+      "case_id": "E-P1-M",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B006": {
+      "case_id": "E-P1-M",
+      "profile": "qwen3-8b"
+    },
+    "B007": {
+      "case_id": "E-P2-O",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B008": {
+      "case_id": "E-P2-O",
+      "profile": "ax-3.1-light"
+    },
+    "B009": {
+      "case_id": "E-P2-O",
+      "profile": "ax-4.0-light"
+    },
+    "B010": {
+      "case_id": "E-P2-O",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B011": {
+      "case_id": "E-P2-O",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B012": {
+      "case_id": "E-P2-O",
+      "profile": "qwen3-8b"
+    },
+    "B013": {
+      "case_id": "E-A1-R",
+      "profile": "ax-3.1-light"
+    },
+    "B014": {
+      "case_id": "E-A1-R",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B015": {
+      "case_id": "E-A1-R",
+      "profile": "qwen3-8b"
+    },
+    "B016": {
+      "case_id": "E-A1-R",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B017": {
+      "case_id": "E-A1-R",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B018": {
+      "case_id": "E-A1-R",
+      "profile": "ax-4.0-light"
+    },
+    "B019": {
+      "case_id": "E-A1-P",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B020": {
+      "case_id": "E-A1-P",
+      "profile": "ax-3.1-light"
+    },
+    "B021": {
+      "case_id": "E-A1-P",
+      "profile": "qwen3-8b"
+    },
+    "B022": {
+      "case_id": "E-A1-P",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B023": {
+      "case_id": "E-A1-P",
+      "profile": "ax-4.0-light"
+    },
+    "B024": {
+      "case_id": "E-A1-P",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B025": {
+      "case_id": "E-U1-O",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B026": {
+      "case_id": "E-U1-O",
+      "profile": "ax-4.0-light"
+    },
+    "B027": {
+      "case_id": "E-U1-O",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B028": {
+      "case_id": "E-U1-O",
+      "profile": "qwen3-8b"
+    },
+    "B029": {
+      "case_id": "E-U1-O",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B030": {
+      "case_id": "E-U1-O",
+      "profile": "ax-3.1-light"
+    },
+    "B031": {
+      "case_id": "E-A1-M",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B032": {
+      "case_id": "E-A1-M",
+      "profile": "ax-3.1-light"
+    },
+    "B033": {
+      "case_id": "E-A1-M",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B034": {
+      "case_id": "E-A1-M",
+      "profile": "qwen3-8b"
+    },
+    "B035": {
+      "case_id": "E-A1-M",
+      "profile": "ax-4.0-light"
+    },
+    "B036": {
+      "case_id": "E-A1-M",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B037": {
+      "case_id": "E-P1-R",
+      "profile": "ax-3.1-light"
+    },
+    "B038": {
+      "case_id": "E-P1-R",
+      "profile": "qwen3-8b"
+    },
+    "B039": {
+      "case_id": "E-P1-R",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B040": {
+      "case_id": "E-P1-R",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B041": {
+      "case_id": "E-P1-R",
+      "profile": "ax-4.0-light"
+    },
+    "B042": {
+      "case_id": "E-P1-R",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B043": {
+      "case_id": "E-U1-P",
+      "profile": "ax-4.0-light"
+    },
+    "B044": {
+      "case_id": "E-U1-P",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B045": {
+      "case_id": "E-U1-P",
+      "profile": "qwen3-8b"
+    },
+    "B046": {
+      "case_id": "E-U1-P",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B047": {
+      "case_id": "E-U1-P",
+      "profile": "ax-3.1-light"
+    },
+    "B048": {
+      "case_id": "E-U1-P",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B049": {
+      "case_id": "E-A2-R",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B050": {
+      "case_id": "E-A2-R",
+      "profile": "qwen3-8b"
+    },
+    "B051": {
+      "case_id": "E-A2-R",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B052": {
+      "case_id": "E-A2-R",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B053": {
+      "case_id": "E-A2-R",
+      "profile": "ax-3.1-light"
+    },
+    "B054": {
+      "case_id": "E-A2-R",
+      "profile": "ax-4.0-light"
+    },
+    "B055": {
+      "case_id": "E-A1-O",
+      "profile": "ax-3.1-light"
+    },
+    "B056": {
+      "case_id": "E-A1-O",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B057": {
+      "case_id": "E-A1-O",
+      "profile": "qwen3-8b"
+    },
+    "B058": {
+      "case_id": "E-A1-O",
+      "profile": "ax-4.0-light"
+    },
+    "B059": {
+      "case_id": "E-A1-O",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B060": {
+      "case_id": "E-A1-O",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B061": {
+      "case_id": "E-A2-P",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B062": {
+      "case_id": "E-A2-P",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B063": {
+      "case_id": "E-A2-P",
+      "profile": "ax-4.0-light"
+    },
+    "B064": {
+      "case_id": "E-A2-P",
+      "profile": "ax-3.1-light"
+    },
+    "B065": {
+      "case_id": "E-A2-P",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B066": {
+      "case_id": "E-A2-P",
+      "profile": "qwen3-8b"
+    },
+    "B067": {
+      "case_id": "E-P2-M",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B068": {
+      "case_id": "E-P2-M",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B069": {
+      "case_id": "E-P2-M",
+      "profile": "ax-4.0-light"
+    },
+    "B070": {
+      "case_id": "E-P2-M",
+      "profile": "ax-3.1-light"
+    },
+    "B071": {
+      "case_id": "E-P2-M",
+      "profile": "qwen3-8b"
+    },
+    "B072": {
+      "case_id": "E-P2-M",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B073": {
+      "case_id": "E-U1-R",
+      "profile": "ax-4.0-light"
+    },
+    "B074": {
+      "case_id": "E-U1-R",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B075": {
+      "case_id": "E-U1-R",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B076": {
+      "case_id": "E-U1-R",
+      "profile": "qwen3-8b"
+    },
+    "B077": {
+      "case_id": "E-U1-R",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B078": {
+      "case_id": "E-U1-R",
+      "profile": "ax-3.1-light"
+    },
+    "B079": {
+      "case_id": "E-P2-R",
+      "profile": "ax-4.0-light"
+    },
+    "B080": {
+      "case_id": "E-P2-R",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B081": {
+      "case_id": "E-P2-R",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B082": {
+      "case_id": "E-P2-R",
+      "profile": "qwen3-8b"
+    },
+    "B083": {
+      "case_id": "E-P2-R",
+      "profile": "ax-3.1-light"
+    },
+    "B084": {
+      "case_id": "E-P2-R",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B085": {
+      "case_id": "E-P2-P",
+      "profile": "ax-4.0-light"
+    },
+    "B086": {
+      "case_id": "E-P2-P",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B087": {
+      "case_id": "E-P2-P",
+      "profile": "qwen3-8b"
+    },
+    "B088": {
+      "case_id": "E-P2-P",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B089": {
+      "case_id": "E-P2-P",
+      "profile": "ax-3.1-light"
+    },
+    "B090": {
+      "case_id": "E-P2-P",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B091": {
+      "case_id": "E-U1-M",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B092": {
+      "case_id": "E-U1-M",
+      "profile": "ax-4.0-light"
+    },
+    "B093": {
+      "case_id": "E-U1-M",
+      "profile": "ax-3.1-light"
+    },
+    "B094": {
+      "case_id": "E-U1-M",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B095": {
+      "case_id": "E-U1-M",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B096": {
+      "case_id": "E-U1-M",
+      "profile": "qwen3-8b"
+    },
+    "B097": {
+      "case_id": "E-A2-M",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B098": {
+      "case_id": "E-A2-M",
+      "profile": "ax-3.1-light"
+    },
+    "B099": {
+      "case_id": "E-A2-M",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B100": {
+      "case_id": "E-A2-M",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B101": {
+      "case_id": "E-A2-M",
+      "profile": "ax-4.0-light"
+    },
+    "B102": {
+      "case_id": "E-A2-M",
+      "profile": "qwen3-8b"
+    },
+    "B103": {
+      "case_id": "E-P1-P",
+      "profile": "qwen3-8b"
+    },
+    "B104": {
+      "case_id": "E-P1-P",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B105": {
+      "case_id": "E-P1-P",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B106": {
+      "case_id": "E-P1-P",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B107": {
+      "case_id": "E-P1-P",
+      "profile": "ax-3.1-light"
+    },
+    "B108": {
+      "case_id": "E-P1-P",
+      "profile": "ax-4.0-light"
+    },
+    "B109": {
+      "case_id": "E-P1-O",
+      "profile": "qwen3-8b"
+    },
+    "B110": {
+      "case_id": "E-P1-O",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B111": {
+      "case_id": "E-P1-O",
+      "profile": "ax-4.0-light"
+    },
+    "B112": {
+      "case_id": "E-P1-O",
+      "profile": "qwen2.5-7b-instruct"
+    },
+    "B113": {
+      "case_id": "E-P1-O",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B114": {
+      "case_id": "E-P1-O",
+      "profile": "ax-3.1-light"
+    },
+    "B115": {
+      "case_id": "E-A2-O",
+      "profile": "ax-4.0-light"
+    },
+    "B116": {
+      "case_id": "E-A2-O",
+      "profile": "kanana-1.5-8b-instruct-2505"
+    },
+    "B117": {
+      "case_id": "E-A2-O",
+      "profile": "qwen3-4b-instruct-2507"
+    },
+    "B118": {
+      "case_id": "E-A2-O",
+      "profile": "ax-3.1-light"
+    },
+    "B119": {
+      "case_id": "E-A2-O",
+      "profile": "qwen3-8b"
+    },
+    "B120": {
+      "case_id": "E-A2-O",
+      "profile": "qwen2.5-7b-instruct"
+    }
+  },
+  "round": 1,
+  "schema_version": 1,
+  "source_runs": {
+    "ax-3.1-light": "issue37-ax-3.1-light-human-001",
+    "ax-4.0-light": "issue37-ax-4.0-light-human-001",
+    "kanana-1.5-8b-instruct-2505": "issue37-kanana-1.5-8b-instruct-2505-human-001",
+    "qwen2.5-7b-instruct": "issue37-qwen2.5-7b-instruct-human-001",
+    "qwen3-4b-instruct-2507": "issue37-qwen3-4b-instruct-2507-human-001",
+    "qwen3-8b": "issue37-qwen3-8b-human-001"
+  }
+}
