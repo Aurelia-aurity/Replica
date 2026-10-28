@@ -42,6 +42,8 @@ class AuthIdentity {
 
 /// The UI depends on this interface, never on tokens or Supabase SDK types.
 abstract class AuthService extends ChangeNotifier {
+  AuthService({DateTime Function()? now}) : _now = now ?? DateTime.now;
+  final DateTime Function() _now;
   AuthIdentity? _identity;
   Timer? _expiry;
   DateTime? _expiresAt;
@@ -84,7 +86,7 @@ abstract class AuthService extends ChangeNotifier {
   void checkSessionExpiry() {
     if (_identity != null &&
         _expiresAt != null &&
-        !_expiresAt!.isAfter(DateTime.now())) {
+        !_expiresAt!.isAfter(_now())) {
       notice = '세션이 만료되었어요. 다시 로그인해 주세요.';
       updateIdentity(null);
     }
@@ -94,11 +96,11 @@ abstract class AuthService extends ChangeNotifier {
   void updateIdentity(AuthIdentity? next, {DateTime? expiresAt}) {
     _expiry?.cancel();
     _expiresAt = expiresAt;
-    if (expiresAt != null && !expiresAt.isAfter(DateTime.now())) next = null;
+    if (expiresAt != null && !expiresAt.isAfter(_now())) next = null;
     if (_identity?.id != next?.id) _generation++;
     _identity = next;
     if (next != null && expiresAt != null) {
-      _expiry = Timer(expiresAt.difference(DateTime.now()), () {
+      _expiry = Timer(expiresAt.difference(_now()), () {
         notice = '세션이 만료되었어요. 다시 로그인해 주세요.';
         updateIdentity(null);
       });

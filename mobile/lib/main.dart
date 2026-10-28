@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auth/auth_gate.dart';
+import 'auth/auth_config.dart';
 import 'auth/auth_service.dart';
 import 'auth/preview_auth_service.dart';
 import 'chat/chat_service.dart';
@@ -9,10 +10,16 @@ import 'shared/conversation_widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConfig.fromEnvironment();
-  // Frontend-only entry point; actual integration replaces this injected dummy.
-  runApp(ReplicaApp(authService: PreviewAuthService()));
+  final app = AppConfig.fromEnvironment();
+  final auth = AuthConfig.fromEnvironment(app.environment);
+  runApp(ReplicaApp(authService: selectAuthService(app, auth)));
 }
+
+/// No real authentication client is activated until integration is agreed.
+AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
+    app.environment == 'dev' && auth.mode == 'preview'
+    ? PreviewAuthService()
+    : UnconfiguredAuthService();
 
 class ReplicaApp extends StatelessWidget {
   const ReplicaApp({super.key, required this.authService, this.chatService});

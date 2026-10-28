@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 
 class SupabaseAuthService extends AuthService {
-  SupabaseAuthService(this._client) {
+  SupabaseAuthService(this._client, {super.now}) {
     _accept(_client.auth.currentSession);
     _subscription = _client.auth.onAuthStateChange.listen(
       (state) {

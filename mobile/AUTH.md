@@ -24,7 +24,7 @@ flutter run -d chrome --dart-define-from-file=config/dev.local.json
 flutter run -d <기기ID> --dart-define-from-file=config/dev.android.json
 ```
 
-2026-10-13 SC-01 반영 이후 앱 시작점은 설정과 관계없이 더미 `PreviewAuthService`만 주입합니다. 실제 인증·회원 생성·메일 발송·서버 통신을 하지 않습니다. 이전 `AuthConfig`와 SDK 어댑터는 앱 실행 경로에 연결하지 않습니다. 화면 동작과 기획서 대응은 [SC01.md](SC01.md)를 참고하세요.
+2026-10-13 SC-01 반영 이후 앱 시작점은 환경·인증 설정을 읽으며 `dev`와 `AUTH_MODE=preview`인 경우에만 더미 `PreviewAuthService`를 주입합니다. 그 외에는 인증 미설정 상태로 접근을 차단합니다. 실제 인증·회원 생성·메일 발송·서버 통신을 하지 않습니다. `AuthConfig`는 서비스 선택 검증에 사용하며 SDK 어댑터는 활성화하지 않습니다. 화면 동작과 기획서 대응은 [SC01.md](SC01.md)를 참고하세요.
 
 | 합성 시험 계정 이메일 | 비밀번호 |
 | --- | --- |
@@ -35,7 +35,7 @@ flutter run -d <기기ID> --dart-define-from-file=config/dev.android.json
 
 ## 추후 실제 인증 연결
 
-현재 실행은 더미 인증만 제공합니다. `config/auth.example.json`, `AuthConfig`, 기존 SDK 어댑터는 이전 준비 코드이며 현재 앱 시작점에서는 사용하지 않습니다. 설정 파일을 바꾸어도 실제 인증으로 전환되지 않습니다.
+현재 실행은 더미 인증만 제공합니다. `AuthConfig`는 앱 시작점에서 검증하며 실제 SDK 어댑터는 여전히 연결하지 않습니다. 설정 파일을 바꾸어도 실제 인증으로 전환되지 않습니다.
 
 백엔드 담당과 인증 및 오류 계약을 합의한 뒤 `ReplicaApp`에 실제 `AuthService`를 주입하는 방식으로 교체합니다. SC-01은 가입 시 `register` 계약에 이메일·비밀번호·개인 기록 처리 동의를 전달하며 화면에서 저장하거나 통신하지 않습니다.
 

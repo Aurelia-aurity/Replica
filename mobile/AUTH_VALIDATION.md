@@ -1,5 +1,12 @@
 # 이슈 #8 프론트엔드 검증 기록
 
+## 2026-10-28 PR #62 수정 요청 반영
+
+- 실제 main 진입점이 AppConfig와 AuthConfig를 읽고 dev + preview에서만 더미 인증을 선택하도록 수정했습니다. staging/prod의 supabase 설정은 인증 미설정 화면으로 연결하며 SDK나 서버에 연결하지 않습니다. staging/prod에서 preview를 지정하면 기존 설정 가드가 실행을 거부합니다.
+- 환경·모드 6가지 선택 경계와 실제 main 진입점 테스트를 추가했습니다. 별도 빌드 정의로 prod/supabase, staging/supabase, dev/preview 진입점 검사가 각각 통과했습니다.
+- 만료 테스트는 주입 가능한 시계와 FakeAsync 타이머를 사용합니다. 구독 및 초기 이벤트 처리 후 가상 시간 4초(만료 전)·추가 2초(만료 후)를 검사하며 6초 실제 대기를 제거했습니다.
+- 전체 Flutter 테스트 55개 통과, flutter analyze --no-pub No issues found. 실제 서버·기기·릴리스 빌드는 여전히 미검증입니다.
+
 ## 2026-10-28 PR 첨부 화면 및 최신 main 반영
 
 - 최신 main `1daaa94`를 반영한 코드에서 정적 분석 No issues found, Flutter 테스트 48개 통과, `git diff --check` 통과를 확인했습니다.
