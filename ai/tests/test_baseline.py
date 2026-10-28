@@ -172,6 +172,21 @@ class BaselineTests(unittest.TestCase):
                 baseline.read_settings(self.config, "q", path)
             self.assertEqual(ctx.exception.code, "MODEL_PATH")
 
+    def test_optional_thinking_setting_preserves_existing_cli_configuration(self):
+        self.config.write_text(json.dumps({
+            "system_prompt": "system", "max_new_tokens": 160,
+            "model_id": "configurable/model", "enable_thinking": False}))
+        self.settings = baseline.read_settings(self.config, "q", str(self.model_path))
+        runtime = self.fake_runtime()
+        self.run_fake(runtime)
+        self.assertFalse(runtime[2].apply_chat_template.call_args.kwargs["enable_thinking"])
+        self.assertFalse(runtime[3].generate.call_args.kwargs["use_model_defaults"])
+        self.config.write_text(json.dumps({
+            "system_prompt": "system", "max_new_tokens": 160, "enable_thinking": "false"}))
+        with self.assertRaises(baseline.BaselineError) as ctx:
+            baseline.read_settings(self.config, "q", str(self.model_path))
+        self.assertEqual(ctx.exception.code, "CONFIG")
+
     def test_sensitive_exceptions_are_not_printed(self):
         for phase in ("load", "template", "generate"):
             runtime = self.fake_runtime()
