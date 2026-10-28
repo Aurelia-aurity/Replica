@@ -7,6 +7,7 @@ import 'ai_disclosure_sheet.dart';
 import 'voice_screen.dart';
 import 'reply_audio_player.dart';
 import 'reply_evidence.dart';
+import 'voice_recorder.dart';
 import '../shared/conversation_widgets.dart';
 import '../services/backend_service.dart';
 
@@ -28,6 +29,8 @@ class ChatScreen extends StatefulWidget {
     this.historyNotice,
     this.initialReplies = const {},
     this.audioPlayer,
+    this.voiceRecorder,
+    this.voiceAudioPlayer,
   });
   final ChatService service;
   final String conversationName;
@@ -37,6 +40,8 @@ class ChatScreen extends StatefulWidget {
   final String? historyNotice;
   final Map<int, ChatReply> initialReplies;
   final ReplyAudioPlayer? audioPlayer;
+  final VoiceRecorder? voiceRecorder;
+  final ReplyAudioPlayer? voiceAudioPlayer;
 
   /// AI acknowledgement stored with the conversation by its service.
   final DateTime? acknowledgedAt;
@@ -51,7 +56,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _messages = <({String text, bool isUser})>[];
   bool _loading = false;
   String? _failedMessage;
-  late bool _voiceMode;
   final _replyDetails = <int, ChatReply>{};
   final _speechCache = <int, SpeechAudio>{};
   final _speechFailed = <int>{};
@@ -67,7 +71,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _voiceMode = widget.initialVoiceMode;
     _messages.addAll(widget.initialMessages);
     _replyDetails.addAll(widget.initialReplies);
     _audio = widget.audioPlayer ?? DeviceReplyAudioPlayer();
@@ -82,6 +85,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? _latestText({required bool isUser}) {
     for (final message in _messages.reversed) {
       if (message.isUser == isUser) return message.text;
+    }
+    return null;
+  }
+
+  ChatReply? _lastReplyDetails() {
+    for (var index = _messages.length - 1; index >= 0; index--) {
+      if (!_messages[index].isUser) return _replyDetails[index];
+    }
+    return null;
+  }
+
+  SpeechAudio? _lastReplyAudio() {
+    for (var index = _messages.length - 1; index >= 0; index--) {
+      if (!_messages[index].isUser) return _speechCache[index];
     }
     return null;
   }
@@ -480,12 +497,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_voiceMode) {
+    if (widget.initialVoiceMode) {
       return VoiceScreen(
+        service: widget.service,
+        recorder: widget.voiceRecorder,
+        audioPlayer: widget.voiceAudioPlayer,
+        blockedReason: widget.blockedReason,
         conversationName: widget.conversationName,
-        onKeyboard: () => setState(() => _voiceMode = false),
         lastQuestion: _latestText(isUser: true),
         lastReply: _latestText(isUser: false),
+        lastReplyDetails: _lastReplyDetails(),
+        initialAudio: _lastReplyAudio(),
+        onAudio: (reply, audio) {
+          if (!mounted) return;
+          for (final entry in _replyDetails.entries) {
+            if (entry.value.turnId == reply.turnId) {
+              _speechCache[entry.key] = audio;
+            }
+          }
+        },
+        onReply: (result) {
+          if (!mounted) return;
+          setState(() {
+            _messages.add((text: result.transcript, isUser: true));
+            final index = _messages.length;
+            _replyDetails[index] = result.reply;
+            if (result.audio != null) _speechCache[index] = result.audio!;
+            _messages.add((text: result.reply.text, isUser: false));
+          });
+        },
       );
     }
     return Scaffold(
@@ -694,22 +734,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      IconButton.filledTonal(
-                        tooltip: '음성 대화',
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFE3EFEB),
-                          foregroundColor: _green,
-                        ),
-                        onPressed: _loading || _failedMessage != null
-                            ? null
-                            : () {
-                                FocusScope.of(context).unfocus();
-                                unawaited(_stopAudio());
-                                setState(() => _voiceMode = true);
-                              },
-                        icon: const Icon(Icons.mic_none),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _input,

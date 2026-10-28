@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../chat/chat_service.dart';
 import '../services/backend_service.dart';
@@ -21,12 +22,21 @@ abstract class DetailedConversationService implements ConversationService {
   Future<SpeechAudio> synthesize(ChatReply reply);
 }
 
+abstract class VoiceConversationService implements DetailedConversationService {
+  Future<VoiceReply> sendVoice(
+    String id,
+    String turnId,
+    VoiceRecording recording,
+  );
+}
+
 /// Owned by one login generation, never shared between accounts or persisted.
-class MemoryConversationService implements DetailedConversationService {
+class MemoryConversationService implements VoiceConversationService {
   MemoryConversationService({required this.backend, required this.chat});
   final BackendService backend;
   final ChatService chat;
   final _items = <String, Conversation>{};
+  final _voiceReplies = <String, VoiceReply>{};
   @override
   bool get isDemo => true;
   @override
@@ -101,13 +111,57 @@ class MemoryConversationService implements DetailedConversationService {
     throw UnsupportedError('No speech service');
   });
   @override
+  Future<VoiceReply> sendVoice(
+    String id,
+    String turnId,
+    VoiceRecording recording,
+  ) => backend.run(() async {
+    recording.validate();
+    if (_voiceReplies.containsKey(turnId)) return _voiceReplies[turnId]!;
+    final before = _items[id]!;
+    const transcript = '음성 대화 화면 확인용 합성 질문입니다.';
+    final reply = await sendDetailed(id, turnId, transcript);
+    final current = _items[id]!;
+    _items[id] = Conversation(
+      id: id,
+      personaId: current.personaId,
+      createdAt: before.createdAt,
+      updatedAt: current.updatedAt,
+      acknowledgedAt: before.acknowledgedAt,
+      initialVoice: before.initialVoice,
+      turns: [
+        for (final turn in current.turns)
+          if (turn.id == turnId)
+            ConversationTurn(
+              id: turn.id,
+              number: turn.number,
+              createdAt: turn.createdAt,
+              question: turn.question,
+              answer: turn.answer,
+              replyDetails: turn.replyDetails,
+              voice: true,
+            )
+          else
+            turn,
+      ],
+    );
+    return _voiceReplies[turnId] = VoiceReply(
+      transcript: transcript,
+      reply: reply,
+      preview: true,
+    );
+  });
+  @override
   Future<void> delete(String id) => backend.run(() async {
+    for (final turn in _items[id]?.turns ?? <ConversationTurn>[]) {
+      _voiceReplies.remove(turn.id);
+    }
     _items.remove(id);
   });
 }
 
 /// Adapter for the supplied draft API. No preview credentials are sent here.
-class HttpConversationService implements DetailedConversationService {
+class HttpConversationService implements VoiceConversationService {
   HttpConversationService({
     required this.backend,
     required this.baseUrl,
@@ -122,22 +176,28 @@ class HttpConversationService implements DetailedConversationService {
   @override
   bool get isDemo => false;
 
+  Uri _uri(String path, [Map<String, String>? query]) => baseUrl.replace(
+    path: '${baseUrl.path.replaceFirst(RegExp(r'/$'), '')}$path',
+    queryParameters: query,
+  );
+
   Future<Object?> _request(
     String method,
     String path, {
     Map<String, String>? query,
     Map<String, Object?>? body,
-  }) => backend.run(() async {
+  }) {
+    final request = http.Request(method, _uri(path, query))
+      ..headers['Content-Type'] = 'application/json';
+    if (body != null) request.body = jsonEncode(body);
+    return _perform(request);
+  }
+
+  Future<Object?> _perform(http.BaseRequest request) => backend.run(() async {
     final headers = await backend.auth.authorizationHeaders();
     // Check generation again after asynchronous token acquisition.
     return backend.run(() async {
-      final uri = baseUrl.replace(
-        path: '${baseUrl.path.replaceFirst(RegExp(r'/$'), '')}$path',
-        queryParameters: query,
-      );
-      final request = http.Request(method, uri)
-        ..headers.addAll({...headers, 'Content-Type': 'application/json'});
-      if (body != null) request.body = jsonEncode(body);
+      request.headers.addAll(headers);
       final response = await (() async => http.Response.fromStream(
         await client.send(request),
       ))().timeout(const Duration(seconds: 30));
@@ -155,7 +215,7 @@ class HttpConversationService implements DetailedConversationService {
           body: json,
         );
       }
-      if (method == 'DELETE' && response.statusCode != 204) {
+      if (request.method == 'DELETE' && response.statusCode != 204) {
         throw const FormatException('Deletion not confirmed');
       }
       return json;
@@ -308,6 +368,29 @@ class HttpConversationService implements DetailedConversationService {
   }
 
   @override
+  Future<VoiceReply> sendVoice(
+    String id,
+    String turnId,
+    VoiceRecording recording,
+  ) async {
+    recording.validate();
+    final request = http.MultipartRequest('POST', _uri('/chat/voice'))
+      ..fields.addAll({'session_id': id, 'turn_id': turnId})
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          recording.bytes,
+          filename: recording.fileName,
+          contentType: MediaType.parse(recording.mimeType),
+        ),
+      );
+    final json = await _perform(request) as Map<String, dynamic>;
+    final result = VoiceReply.fromJson(json, turnId);
+    (_replyDetails[id] ??= {})[turnId] = result.reply;
+    return result;
+  }
+
+  @override
   Future<void> delete(String id) async {
     await _request('DELETE', '/sessions/${Uri.encodeComponent(id)}');
     _initialVoiceModes.remove(id);
@@ -316,11 +399,13 @@ class HttpConversationService implements DetailedConversationService {
 }
 
 /// Keeps the turn ID stable for retries of the same failed message.
-class ConversationChatService implements DetailedChatService {
+class ConversationChatService implements VoiceChatService {
   ConversationChatService(this.service, this.id);
   final ConversationService service;
   final String id;
   String? _pendingId, _pendingMessage;
+  VoiceRecording? _pendingRecording;
+  String? _pendingVoiceId;
   @override
   bool get isDemo => service.isDemo;
   @override
@@ -353,5 +438,27 @@ class ConversationChatService implements DetailedChatService {
       return (service as DetailedConversationService).synthesize(reply);
     }
     throw UnsupportedError('No speech service');
+  }
+
+  @override
+  Future<VoiceReply> replyVoice(VoiceRecording recording) async {
+    if (service is! VoiceConversationService) {
+      throw UnsupportedError('No voice service');
+    }
+    if (!identical(_pendingRecording, recording)) {
+      _pendingVoiceId = newConversationId();
+    }
+    _pendingRecording = recording;
+    final turnId = _pendingVoiceId!;
+    final result = await (service as VoiceConversationService).sendVoice(
+      id,
+      turnId,
+      recording,
+    );
+    if (_pendingVoiceId == turnId && identical(_pendingRecording, recording)) {
+      _pendingVoiceId = null;
+      _pendingRecording = null;
+    }
+    return result;
   }
 }

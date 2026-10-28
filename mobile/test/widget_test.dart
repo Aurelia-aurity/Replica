@@ -53,11 +53,8 @@ void main() {
     expect(find.textContaining('음성 재생을 제공하지 않습니다'), findsOneWidget);
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('음성 대화'));
-    await tester.pumpAndSettle();
-    expect(find.text('음성 화면 미리보기 · 마이크는 사용하지 않습니다.'), findsOneWidget);
-    await tester.tap(find.byTooltip('텍스트 대화로 전환'));
-    await tester.pumpAndSettle();
+    expect(find.byTooltip('음성 대화'), findsNothing);
+    expect(find.widgetWithIcon(IconButton, Icons.mic_none), findsNothing);
     expect(find.text('응답'), findsOneWidget);
   });
 

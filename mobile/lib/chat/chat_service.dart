@@ -1,7 +1,9 @@
 import '../services/backend_service.dart';
 import 'chat_reply.dart';
+import 'voice_models.dart';
 
 export 'chat_reply.dart';
+export 'voice_models.dart';
 
 /// Basic text transport. DetailedChatService also supplies metadata and speech.
 abstract class ChatService {
@@ -12,6 +14,10 @@ abstract class ChatService {
 abstract class DetailedChatService implements ChatService {
   Future<ChatReply> replyDetailed(String message);
   Future<SpeechAudio> synthesize(ChatReply reply);
+}
+
+abstract class VoiceChatService implements DetailedChatService {
+  Future<VoiceReply> replyVoice(VoiceRecording recording);
 }
 
 /// Keeps the existing screen independent of authentication and transport.

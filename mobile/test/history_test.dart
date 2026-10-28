@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/chat/chat_service.dart';
+import 'package:mobile/chat/voice_screen.dart';
 import 'package:mobile/history/conversation.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/history/history_screen.dart';
@@ -145,7 +146,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('대화 시작'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('텍스트 대화로 전환'), findsOneWidget);
+      expect(find.byType(VoiceScreen), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.textContaining(' · 음성'), findsOneWidget);
@@ -159,19 +160,19 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byTooltip('텍스트 대화로 전환'), findsOneWidget);
-      await tester.tap(find.byTooltip('텍스트 대화로 전환'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '키보드로 이어가는 합성 질문');
+      expect(find.byType(VoiceScreen), findsOneWidget);
+      expect(find.byTooltip('텍스트 대화로 전환'), findsNothing);
+      await tester.tap(find.byTooltip('눌러서 말하기'));
       await tester.pump();
-      await tester.tap(find.byTooltip('메시지 전송'));
+      await tester.tap(find.byTooltip('녹음 종료 후 전송'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('뒤로'));
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.textContaining('텍스트 · 메시지 2개'), findsOneWidget);
-      await tester.tap(find.text('키보드로 이어가는 합성 질문'));
+      expect(find.textContaining('음성 · 메시지 2개'), findsOneWidget);
+      await tester.tap(find.text('음성 대화 화면 확인용 합성 질문입니다.'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('메시지 전송'), findsOneWidget);
+      expect(find.byType(VoiceScreen), findsOneWidget);
+      expect(find.byTooltip('메시지 전송'), findsNothing);
       expect(find.byTooltip('텍스트 대화로 전환'), findsNothing);
     },
   );
@@ -450,7 +451,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.creates, 1);
     expect(service.createdVoice, true);
-    expect(find.byTooltip('텍스트 대화로 전환'), findsOneWidget);
+    expect(find.byType(VoiceScreen), findsOneWidget);
   });
 
   testWidgets(
@@ -550,29 +551,25 @@ void main() {
     },
   );
 
-  testWidgets(
-    'voice history resumes in voice mode and keyboard retains messages',
-    (tester) async {
-      final service = TestHistory()..items = [conversation(voice: true)];
-      tester.view.physicalSize = const Size(320, 568);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        MaterialApp(home: HistoryScreen(service: service)),
-      );
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('합성 첫 질문 session-1'));
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('텍스트 대화로 전환'), findsOneWidget);
-      await tester.tap(find.byTooltip('텍스트 대화로 전환'));
-      await tester.pumpAndSettle();
-      expect(find.text('저장된 합성 답변'), findsOneWidget);
-      expect(find.text('AI 생성'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('voice history resumes in voice mode without a text switch', (
+    tester,
+  ) async {
+    final service = TestHistory()..items = [conversation(voice: true)];
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('합성 첫 질문 session-1'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VoiceScreen), findsOneWidget);
+    expect(find.byTooltip('텍스트 대화로 전환'), findsNothing);
+    expect(find.text('저장된 합성 답변'), findsOneWidget);
+    expect(find.text('AI 생성'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('pending history blocks duplicate sends', (tester) async {
     final service = TestHistory()..items = [conversation(pending: true)];
