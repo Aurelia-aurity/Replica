@@ -11,7 +11,7 @@ from app.db import (AuthenticationError, ConflictError, Database, DatabaseError,
                     DatabaseUnavailableError, NotFoundError, PermissionDeniedError,
                     Settings, ValidationError, to_http_error, to_public_row)
 from app.db.transport import Response
-from test_db import FakeTransport, SETTINGS, U1, S, T, P
+from tests.test_db import FakeTransport, SETTINGS, U1, S, T, P
 
 
 class BoundaryTests(unittest.IsolatedAsyncioTestCase):
@@ -70,6 +70,38 @@ class BoundaryTests(unittest.IsolatedAsyncioTestCase):
             await self.user.finish_chat_stage(T, "tts", attempt=1, ok=True, finish_reason="stop")
         with self.assertRaises(ValidationError):
             await self.user.finish_chat_stage(T, "llm", attempt=1, ok=False, finish_reason="stop")
+
+    async def test_linked_attempt_requires_request_id_even_without_new_metadata(self):
+        for ok in (True, False):
+            for metadata in ({}, {"total_ms": 5}):
+                with self.subTest(ok=ok, metadata=metadata):
+                    self.transport.calls.clear()
+                    self.transport.responses[("GET", "/rest/v1/chat_turns")] = [
+                        Response(200, [{"id": T, "user_id": U1, "llm_request_id": P}])]
+                    with self.assertRaises(ConflictError) as caught:
+                        await self.user.finish_chat_stage(T, "llm", attempt=1, ok=ok,
+                            text="answer" if ok else None, **metadata)
+                    self.assertEqual(caught.exception.code, "55000")
+                    self.assertFalse(any("/rpc/" in c["path"] for c in self.transport.calls))
+
+    async def test_linked_success_and_failure_send_the_original_id_to_v2(self):
+        for ok in (True, False):
+            self.transport.responses[("GET", "/rest/v1/chat_turns")] = [
+                Response(200, [{"id": T, "user_id": U1, "llm_request_id": P}])]
+            await self.user.finish_chat_stage(T, "llm", attempt=1, ok=ok,
+                text="answer" if ok else None, request_id=P)
+            call = self.transport.calls[-1]
+            self.assertEqual(call["path"], "/rest/v1/rpc/finish_chat_stage_v2")
+            self.assertEqual(call["body"]["p_request_id"], P)
+            self.assertEqual(call["body"]["p_ok"], ok)
+
+    async def test_unlinked_legacy_success_and_failure_keep_the_original_rpc(self):
+        for ok in (True, False):
+            await self.user.finish_chat_stage(T, "llm", attempt=1, ok=ok,
+                text="answer" if ok else None)
+            call = self.transport.calls[-1]
+            self.assertEqual(call["path"], "/rest/v1/rpc/finish_chat_stage")
+            self.assertNotIn("p_request_id", call["body"])
 
     async def test_postgrest_55000_http_500_is_conflict_not_outage(self):
         self.transport.responses[("POST", "/rest/v1/rpc/start_chat_stage_v2")] = [

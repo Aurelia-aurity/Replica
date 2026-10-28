@@ -92,6 +92,8 @@ user_db = await db.for_user(access_token)
 
 2026-10-28 통합 보완: `start_chat_stage`는 선택 인자 `request_id: UUID | None=None`를 추가로 받는다(LLM만). `finish_chat_stage`는 `total_ms: int | None=None`, `finish_reason: stop/length | None=None`, `request_id: UUID | None=None`를 추가로 받는다. 종료 사유는 LLM 성공에서만 가능하며 요청 ID는 시작한 시도와 일치해야 한다. 확장 인자가 있으면 v2 RPC를 사용한다. 기존 인자만 쓰는 호출과 SQL 8개는 유지한다. 신규 배포 SQL은 `infra/supabase/weekend_integration.sql`이며 이 SQL을 적용하기 전에는 확장 인자를 사용하지 않는다.
 
+리뷰 보완: 요청 ID를 연결해 시작한 LLM 시도는 **성공·실패 모두 같은 `request_id`가 필수**다. 생략하면 `ConflictError(code="55000")`로 거부한다. ID 없이 시작한 기존 호출은 기존 완료 RPC와 호환된다. 직접 RPC 호출의 우회와 조회·저장 사이 경합도 막도록 `infra/supabase/guard_llm_request_id.sql`을 추가했다. 기존 배포 SQL은 수정하지 않았으며, 이 후속 SQL은 #63의 실패 호출부가 ID를 전달하도록 반영된 후 적용한다.
+
 호출 흐름:
 
 ```python

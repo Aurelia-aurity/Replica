@@ -8,6 +8,7 @@
 - 기존 이력: `20261008055335 baseline_chat_schema`.
 - 적용한 이력: `20261009073108 replica_db_redesign`.
 - 2026-10-28 추가 이력: `20261028053701 weekend_db_integration`. `weekend_integration.sql`은 요청 ID·종료 사유 컬럼과 v2 시작/완료·전체 시간 기록 RPC 3개의 추가 배포 보관본이다. 기존 RPC 8개는 유지한다. 상세·실제 사용자 검증은 [주말 통합 인계](../../docs/architecture/db-weekend-integration.md)를 참고한다.
+- 리뷰 후속 SQL: `guard_llm_request_id.sql`은 요청 ID가 연결된 LLM을 기존 완료 함수로 저장하는 우회를 차단한다. #63의 실패 호출부 ID 전달 수정이 반영된 뒤 적용하며, 기존 배포 SQL을 다시 실행하지 않는다. `verify_llm_request_id.sql`은 롤백형 성공·실패/혼합 호출 호환 검증이다. 이번 검증에서는 함수 교체까지 ROLLBACK했으므로 후속 SQL의 원격 영구 적용은 아직이다.
 - `redesign.sql`은 실제 적용 SQL의 보관본이다. 기존 baseline이 있어야 하며 이미 적용된 DB에 다시 실행하지 않는다.
 - 애플리케이션 테이블 9개, 백엔드 전용 DB 함수 8개. Auth는 Supabase의 `auth.users`를 그대로 사용한다.
 - 기존 Auth 사용자 2명은 변경하지 않았다. 기존 애플리케이션 데이터는 0건이었다.

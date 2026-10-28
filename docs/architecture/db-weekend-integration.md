@@ -5,7 +5,7 @@
 ## 기준 문서와 브랜치
 
 - 백엔드↔DB: `contracts/backend-db/api-spec.md` — 원본 blob `970f1be4f9c75736a9fa457c35868db7a9ccd3e8`의 보존 사본.
-- 앱↔백엔드: `contracts/app-backend/api-spec.md` — 원본 blob `84707751b927fdf28969ebd75cd644ebf044c5f3`의 보존 사본.
+- 앱↔백엔드: `contracts/app-backend/api-spec.md` — 원본 blob `84707751b927fdf28969ebd75cd644ebf044c5f3` 기반 작업 사본. #61 리뷰에 따라 413 설명의 정정안을 반영했다. 글자 수·이력 쌍 수 제한과 UTF-8 JSON 바이트 한도를 구분한다. 원본 `docs/40-api-spec` 브랜치는 변경하지 않았으며 원작성자 윤서준의 재리뷰·원본 반영 합의가 필요하다.
 - 원본 브랜치: `docs/40-api-spec`, 작성 커밋 `3420b00`. 원문에 있는 ‘PR 없음’ 등 이전 시점 설명은 그대로 보존했다. 원문을 최신 확정본으로 오해하지 않는다.
 - 기존 DB 함수 관리 원본: [Python DB 명세](db-python-api.md). 이번 호출 보완·선택 사항은 이 문서로 구분한다.
 - 구현 브랜치: `jaesung_41-db-integration`. 기존 PR #45의 head `0772aa4`를 이어받았다. #45 브랜치와 다른 팀원 브랜치를 변경하지 않았다. `db_baseline`은 기존 스키마의 별도 구현이므로 이 DB 패키지 위에 덮어쓰지 않는다. 정본 제안은 Supabase Auth/REST/RPC 구현이며 다른 브랜치 정리는 팀 합의 후 한다.
@@ -57,7 +57,7 @@ async def handle_text(access_token, session_id, turn_id, message, ai_generate, m
     return to_public_row("turn", saved)
 ```
 
-이 예시는 DB 성공 경로만 보여준다. 앱 API의 answer/timings 등 응답 조립, AI 요청 직렬화·응답 ID/스키마 검사, AI 실패를 `finish_chat_stage(ok=False, error_code=...)`로 저장하는 처리는 API/AI 담당이 연결한다. UNKNOWN 결과에는 자동 재시도하지 않고 턴·시도 상태를 확인한다. `model_name`은 호출 전에 API/AI 설정에서 받아야 하며 응답이 올 때까지 기다렸다가 임의 값으로 claim하지 않는다.
+이 예시는 DB 성공 경로만 보여준다. 앱 API의 answer/timings 등 응답 조립, AI 요청 직렬화·응답 ID/스키마 검사, AI 실패를 `finish_chat_stage(ok=False, request_id=request_id, error_code=...)`로 저장하는 처리는 API/AI 담당이 연결한다. ID를 연결한 LLM 시도는 실패 완료에도 같은 ID를 반드시 전달한다. UNKNOWN 결과에는 자동 재시도하지 않고 턴·시도 상태를 확인한다. `model_name`은 호출 전에 API/AI 설정에서 받아야 하며 응답이 올 때까지 기다렸다가 임의 값으로 claim하지 않는다.
 
 ```python
 try:
@@ -77,7 +77,7 @@ except DatabaseError as error:
 3. **오류**: 초안 변환표는 구현했지만 앱/백엔드 쪽 채택·리뷰는 아직이다. SQLSTATE 55000은 PostgREST에서 HTTP 500이 될 수 있으므로 도메인 충돌로 먼저 분류한다.
 4. **저장 자료**: records는 예약 메타데이터다. 실제 원본 업로드·무결성 확인·Storage 버킷·삭제 worker는 초안에서 별도/미정인 범위라 이번 DB 접근 모듈에 넣지 않았다. deletion job이 있다는 이유로 파일 삭제 성공을 반환하면 안 된다.
 5. **고도화 계약**: PR #29의 불변 source_snapshot_id, analysis_operation_id/attempt, 전체 입력 범위와 원자적 프로필 게시, RAG 인덱스 완료 상태는 첫 baseline과 분리한다. 기존 data_revision/source_ids 검사만으로 해당 요구를 완성했다고 하지 않는다.
-6. **병합**: 새 브랜치는 기존 PR #45의 두 커밋을 포함한다. 후속 PR은 #45와의 의존성을 표시하고, 다른 팀원 문서의 원문 사본과 DB 추가 합의 내용을 구분해 리뷰한다. 이번 작업만으로 #41/팀 합의를 완료 처리하지 않는다.
+6. **병합**: 2026-10-28 PM 코멘트의 새 순서는 #63 선병합 → #61 base를 main으로 변경 → 누적 결과 재검증·리뷰다. #61은 #45의 SQL·검증·문서를 포함한다. #45의 대체 종료는 #61에 내용이 보존되고 담당자들이 처리 방향에 동의한 뒤 진행한다. #41/팀 합의를 자동 완료하지 않는다. #63과의 병합 충돌은 백엔드 API README·설정과 DB 사용법을 함께 보존하도록 정리한다.
 
 ## 실행·테스트
 
@@ -86,6 +86,14 @@ except DatabaseError as error:
 ```text
 python -X utf8 -m unittest discover -s tests -v
 ```
+
+#63과 합친 백엔드는 Python 3.12에서 `pip install -r requirements-dev.txt` 후 `pytest`로 검사한다. DB 테스트는 `tests` 패키지에서 가져오므로 `PYTHONPATH=.:tests`가 필요하지 않다. 실제 DB 쓰기·읽기 검사는 기본 비활성 상태를 유지한다.
+
+## 요청 ID 검증 후속 SQL
+
+`guard_llm_request_id.sql`은 기존 `finish_chat_stage`의 서명·권한을 유지하면서 ID가 연결된 LLM의 레거시 완료를 행 잠금 안에서 거부한다. Python의 사전 검사와 별도로 직접 RPC 우회를 막는다. ID 없는 기존 LLM 호출, STT·TTS는 호환된다.
+
+배포 순서: #63 실패 호출부의 ID 전달 수정 반영 → `guard_llm_request_id.sql` 적용 → `verify_llm_request_id.sql` 롤백 검증. 이미 적용된 `weekend_integration.sql`은 재실행하지 않는다. 이번 리뷰 보완에서는 후속 함수 교체와 성공·실패/잘못된 ID/다른 사용자/재시도/기존 호출 호환 검사를 한 트랜잭션에서 실행하고 ROLLBACK했으며, 후속 SQL을 원격 DB에 영구 적용하지 않았다.
 
 데이터 변경이 있는 통합 시험은 기본 비활성이다. 개발 프로젝트의 서버 설정이 들어 있는 로컬 `.env`가 있고, 운영자가 임시 계정 생성·정리에 동의한 경우에만 실행한다. PowerShell:
 
