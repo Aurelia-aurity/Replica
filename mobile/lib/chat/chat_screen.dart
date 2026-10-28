@@ -19,10 +19,16 @@ class ChatScreen extends StatefulWidget {
     this.conversationName = '엄마',
     this.initialVoiceMode = false,
     this.acknowledgedAt,
+    this.initialMessages = const [],
+    this.blockedReason,
+    this.historyNotice,
   });
   final ChatService service;
   final String conversationName;
   final bool initialVoiceMode;
+  final List<({String text, bool isUser})> initialMessages;
+  final String? blockedReason;
+  final String? historyNotice;
 
   /// Session acknowledgement; persisted only when an API contract is added.
   final DateTime? acknowledgedAt;
@@ -43,6 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _voiceMode = widget.initialVoiceMode;
+    _messages.addAll(widget.initialMessages);
+    if (_messages.isNotEmpty) _scrollToLatest();
   }
 
   String? _latestText({required bool isUser}) {
@@ -73,7 +81,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _send({String? retry}) async {
     final text = retry ?? _input.text.trim();
-    if (_loading || text.isEmpty || (_failedMessage != null && retry == null)) {
+    if (widget.blockedReason != null ||
+        _loading ||
+        text.isEmpty ||
+        (_failedMessage != null && retry == null)) {
       return;
     }
     setState(() {
@@ -408,6 +419,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                 ),
+                if (widget.blockedReason != null)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(widget.blockedReason!),
+                  ),
+                if (widget.historyNotice != null)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(widget.historyNotice!),
+                  ),
                 Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
@@ -435,7 +456,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: TextField(
                           controller: _input,
-                          readOnly: _loading || _failedMessage != null,
+                          readOnly:
+                              widget.blockedReason != null ||
+                              _loading ||
+                              _failedMessage != null,
                           minLines: 1,
                           maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
                               ? 2
@@ -473,6 +497,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           onPressed:
                               _loading ||
+                                  widget.blockedReason != null ||
                                   _failedMessage != null ||
                                   value.text.trim().isEmpty
                               ? null
