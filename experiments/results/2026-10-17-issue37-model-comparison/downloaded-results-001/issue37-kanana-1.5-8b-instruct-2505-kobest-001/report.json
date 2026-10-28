@@ -1,0 +1,73 @@
+{
+  "complete_full_test": true,
+  "execution_kind": "school_gpu_full_test",
+  "tasks": {
+    "kobest_boolq": {
+      "accuracy": 0.7856125356125356,
+      "computed": 1404,
+      "expected": 1404,
+      "additional_metrics": {
+        "name": "kobest_boolq",
+        "alias": "kobest_boolq",
+        "sample_len": 1404,
+        "acc,none": 0.7856125356125356,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_copa": {
+      "accuracy": 0.826,
+      "computed": 1000,
+      "expected": 1000,
+      "additional_metrics": {
+        "name": "kobest_copa",
+        "alias": "kobest_copa",
+        "sample_len": 1000,
+        "acc,none": 0.826,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_hellaswag": {
+      "accuracy": 0.496,
+      "computed": 500,
+      "expected": 500,
+      "additional_metrics": {
+        "name": "kobest_hellaswag",
+        "alias": "kobest_hellaswag",
+        "sample_len": 500,
+        "acc,none": 0.496,
+        "acc_stderr,none": "N/A",
+        "acc_norm,none": 0.562,
+        "acc_norm_stderr,none": "N/A"
+      }
+    },
+    "kobest_sentineg": {
+      "accuracy": 0.9622166246851386,
+      "computed": 397,
+      "expected": 397,
+      "additional_metrics": {
+        "name": "kobest_sentineg",
+        "alias": "kobest_sentineg",
+        "sample_len": 397,
+        "acc,none": 0.9622166246851386,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "kobest_wic": {
+      "accuracy": 0.48968253968253966,
+      "computed": 1260,
+      "expected": 1260,
+      "additional_metrics": {
+        "name": "kobest_wic",
+        "alias": "kobest_wic",
+        "sample_len": 1260,
+        "acc,none": 0.48968253968253966,
+        "acc_stderr,none": "N/A"
+      }
+    }
+  },
+  "project_equal_task_mean": 0.7119023399960428,
+  "aggregate_is_official": false,
+  "result_file": "result-b4dbce17-5fb6-44b5-9f87-a57cf76b9b55.json",
+  "result_sha256": "f6b0cb28eaea59c542e520cbccabdd2d0a5a4c176a740a7ee31931bba47d152a",
+  "identity_sha256": "a21a3329622252f7dac0e7dce751bbc2005504cd375d432914394b26def9933e"
+}

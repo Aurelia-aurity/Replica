@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "replica-notion-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": {"enabled": false},
+  "triggers": {"crons": ["* * * * *"]},
+  "vars": {"RELAY_MODE": "STOPPED", "BOOTSTRAP_ENABLED": "false"},
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "replica-notion-relay",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }]
+}

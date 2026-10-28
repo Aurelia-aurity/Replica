@@ -1,0 +1,126 @@
+# Discord 사용과 개발 알림
+
+Replica 서버의 `일반` 채팅·음성 채널을 유지하고 `개발-알림` 채팅 채널과 `회의` 음성 채널을 사용한다. 기존 대화 공간은 그대로 사용한다. 결정·일정·완료 근거는 GitHub 이슈·PR 또는 Notion에 기록한다.
+
+## 알림 규칙
+
+| 사건 | 구분 | 멘션 |
+|---|---|---|
+| Issue 생성·종료·재오픈 | 일반 | 없음 |
+| PR 생성(Draft 포함)·병합·병합 없는 종료·재오픈 | 일반 | 없음 |
+| 명시적인 리뷰 요청 | 중요 | 요청받은 리뷰어 |
+| PR CI 실패 | 중요 | PR 작성자 |
+| main CI 실패 | 중요 | PM |
+| Notion 동기화 실행 실패 | 중요 | PM |
+| 같은 Issue·원인의 동기화 보류가 서로 다른 유효 실행에서 두 번 연속 관측됨 | 중요 | PM |
+| 첫 보류 후 15분 이상 후속 유효 관측이 없음(검증된 시각 기준) | 중요 | PM |
+| 실행 오류 복구·개별 보류 해제 | 일반 | 없음 |
+
+Ready 전환 자체, 모든 커밋, 평상시 동기화 성공은 알리지 않는다. 취소된 리뷰 요청은 멘션하지 않는다. 팀 리뷰 요청은 팀 이름만 표시한다. 매핑이 없는 계정은 GitHub login을 표시한다. `everyone`·`here`·역할 전체 멘션을 사용하지 않는다.
+
+전송 전 대기 중인 리뷰 요청이 취소·대체되거나 PR CI 실패의 PR이 닫히면 아직 전송하지 않은 안내를 정리한다. 전송 결과가 불확실한 `pending`은 전달 여부를 추정하지 않고 확인 대상으로 남긴다. 성공한 과거 동기화 실행에 새 보고서가 없다는 이유만으로 실행 실패를 알리지 않으며, 확인할 수 없는 결과는 보류 해제에 쓰지 않는다.
+
+PR 타임라인 알림은 실제 전송 직전에도 PR·전체 타임라인을 다시 확인한다. 요청 목록·사용자·팀 식별자가 누락되면 빈 목록으로 추정하지 않고 조회를 실패 처리한다. 새 동기화 실행이 진행 중이어도 이미 완료된 중간 실행의 실패와 관측 간격은 기록하지만 이전 성공을 현재 복구로 안내하지 않는다. 승인되지 않은 수동 재실행의 보고서는 신뢰하지 않으며 그 실행은 관측 간격으로 처리한다.
+
+PR 병합 여부·시각·종료 상태가 불완전하거나 서로 모순되면 종료 알림을 만들지 않고 조회를 실패 처리한다. CI 실행과 PR HEAD에는 유효한 전체 SHA가 필요하며, 누락된 값끼리 같다는 이유로 실패·복구를 판정하지 않는다. CI 알림도 실제 전송 직전에 현재 HEAD와 최신 실행을 다시 확인한다.
+
+보류 원인이 바뀌면 사라진 원인의 과거 미전송 안내를 무효화하지만 Issue 전체의 복구로 알리지는 않는다. CI 정보 누락이나 실행 목록·상세의 attempt·상태 충돌은 전송 보류이며, 확인된 불일치만 무효화한다. 복구 알림에는 근거 실행·attempt를 키에 기록하고 이후 중간 실패도 확인하므로, 조회 사이에 실패 후 다시 성공했더라도 과거 복구 안내를 재전송하지 않는다.
+
+CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 HEAD를 각각 확인하므로 새 커밋으로 수정한 정상 복구도 안내한다. 아직 전송하지 않은 과거 HEAD의 실패 안내는 확인된 최신 실패로 교체하지만, 이미 전달했거나 결과가 불명확한 안내는 중복 전송하지 않는다. 명백히 다른 워크플로·PR의 실행은 해당 알림의 불완전한 증거로 취급하지 않는다.
+
+같은 장애는 첫 안내와 복구 안내만 보낸다. 승인·확인 버튼, 반응 처리, 주기적인 독촉은 없다. CI 복구는 같은 PR·워크플로의 최신 현재 커밋 성공으로 판단하며 이전 커밋 성공·취소·스킵은 복구가 아니다. 닫힌 PR의 장애는 조용히 정리한다. 보류는 Issue와 원인별로 확인하고 새로운 대상·원인도 두 실행이 필요하다. 원인 변경만으로 복구를 알리지 않으며 실제 전체 조회에서 해당 대상이 해제돼야 한다. 일부만 해제되면 남은 보류 건수를 표시한다.
+
+새 Issue 알림은 지연하지 않는다. 읽기 전용 Project 조회로 실제 백로그 상태가 확인된 경우에만 등록 확인을 표시한다. 조회 권한이 없거나 확인에 실패하면 `Project 등록 미확인`과 링크를 표시한다. 추가적인 등록 완료 알림은 보내지 않는다.
+
+백로그 관측을 사용하려면 Actions Variable `PROJECT_STATUS_OPTIONS`에 sync workflow와 같은 6개 상태 이름→실제 옵션 ID JSON을 등록한다. 기존 5개 옵션 ID를 보존하고 `취소` ID는 실제 Project readback으로 검증한 값을 쓴다. 변수가 없거나 Project의 현재 mapping과 맞지 않으면 백로그 주석을 생략하며 다른 알림 흐름은 계속된다. 이 값은 읽기 전용 관측에만 쓰이고, 알림 작업에는 기존 Project read 권한 외 권한을 추가하지 않는다.
+
+## Actions 설정
+
+서버 `Replica` → `개발-알림` → 채널 설정 → 연동에서 incoming Webhook을 준비하고 저장소 Actions Secret `DISCORD_WEBHOOK_URL`에 직접 등록한다. Webhook URL을 채팅·문서·코드·로그에 붙이지 않는다. 별도 Discord 봇은 필요 없다.
+
+| 저장 위치 | 이름 | 값·역할 |
+|---|---|---|
+| Secret | `DISCORD_WEBHOOK_URL` | `개발-알림` Webhook URL |
+| Variable | `DISCORD_CHANNEL_ID` | `1558167686582894713` |
+| Variable | `DISCORD_USER_MAP` | GitHub login → Discord 숫자 사용자 ID의 JSON 객체. ID는 문자열로 입력 |
+| Variable | `DISCORD_NOTIFICATIONS_ENABLED` | 활성화하려면 `true`, 그 전에는 `false` 또는 미설정 |
+| 선택 Secret | `DISCORD_PROJECT_READ_TOKEN` | 검증 가능한 읽기 전용 Project 토큰. 없어도 알림 동작 |
+| Variable | `PROJECT_STATUS_OPTIONS` | 백로그 관측용 6개 상태 이름 → 실제 Project 옵션 ID JSON. 누락·불일치 시 백로그 주석 생략 |
+
+매핑 예: `{"github-login":"123456789012345678"}`. Discord 사용자 이름이나 표시 이름 대신 개발자 모드의 `사용자 ID 복사`로 얻은 숫자 ID를 쓴다. 팀원 ID 매핑은 Actions 변수에 보관한다.
+
+Project 선택 토큰은 classic scope `read:project`가 확인되고 쓰기 scope `project`가 없어야 사용한다. 이 조건을 확인할 수 없는 토큰은 조회에 쓰지 않는다. 알림 작업에는 기존 `PROJECT_TOKEN`·`NOTION_TOKEN`을 전달하지 않는다. Project 등록·Notion 변경은 기존 동기화 작업이 담당한다.
+
+`.github/discord-notifications.json`의 `ci_workflows`는 현재 빈 목록이다. #18에서 CI 자체를 만들지 않는다. CI 추가 후 담당자가 검토한 실제 workflow 숫자 ID와 경로를 `{"id":123,"path":".github/workflows/ci.yml"}` 형식으로 지정한다. 빠른 완료 알림이 필요하면 `discord-notify.yml`의 `workflow_run.workflows`에 그 이름도 추가한다. 정기 조회는 15분 간격으로 누락된 이벤트를 보완한다. 알림 작업과 동기화 작업은 CI 목록에 넣지 않는다.
+
+## 최초 활성화와 확인
+
+1. 검토된 구현이 main에 반영된 후 Webhook·채널 ID·계정 매핑을 등록하고 `DISCORD_NOTIFICATIONS_ENABLED=true`로 설정한다.
+2. PM `Just-Simple0`가 main에서 `GitHub → Discord`를 수동 실행한다. `approved_sha`에 확인한 main 전체 40자리 SHA를 넣는다. 재실행 대신 새 수동 실행을 사용한다.
+3. 최초 실행은 기존 Issue·PR 이벤트를 기준선으로 저장한다. 기준선 저장·재조회가 완료된 때부터 새 이벤트가 대상이다. 설정 중 기준선에 포함된 이벤트는 이전 이벤트로 처리한다. 현재 유효한 미해결 실행 실패는 초기에도 알리고, 보류는 다음 별도 실행까지 이어져야 알린다.
+4. 실제 Issue·PR·리뷰 요청 및 실행 실패·복구의 메시지, 멘션 대상, 링크를 확인한다. 동일 원본을 재조회해 중복이 없음을 확인한다. Actions 성공만으로 Discord 화면·모바일 수신을 확인했다고 판단하지 않는다.
+5. 상태 브랜치의 커밋 author와 committer가 모두 `github-actions[bot]`인지 확인한다. 설정 전·로컬 합성 검사만 통과한 상태와 실제 운영 확인을 구분한다.
+
+알림 상태는 `automation/discord-state` 브랜치의 `discord-state.json`에 저장한다. 초기 브랜치는 데이터 파일 하나만 가진 독립된 root commit으로 생성하며 main을 수정하지 않는다. 단일 Actions concurrency 그룹과 기존 파일 SHA 비교, 저장 후 재조회가 충돌과 중복을 방지한다. 파일이 사라지거나 손상되면 실패 처리하며 정기 작업은 기준선을 다시 만들지 않는다. 상태 파일에는 알림 본문·전송 상태·메시지 ID·관측 키가 저장되며 비밀값은 저장하지 않는다. 상태 크기 제한을 초과하면 실패 처리하므로 장기 운영 시 크기를 점검한다.
+
+## Draft PR에서 병합 전 검증
+
+기존 workflow가 main에 등록되어 있으므로, 같은 저장소의 검토된 Draft 브랜치 버전을 `--ref`로 수동 실행할 수 있다. PM은 현재 Draft PR HEAD의 전체 SHA를 확인하고 다음과 같이 실행한다.
+
+```sh
+gh workflow run discord-notify.yml --repo Aurelia-aurity/Replica \
+  --ref <Draft-브랜치> -f mode=probe -f draft_pr=<PR번호> \
+  -f approved_sha=<검토한-40자리-HEAD-SHA> -f send_test=false
+```
+
+`probe`는 지정 PM의 첫 attempt만 허용한다. 같은 저장소·main 대상·열린 Draft·현재 HEAD·체크아웃 SHA를 확인하고, GitHub 읽기 권한만 사용한다. 기존 상태 브랜치를 읽어 메모리에서 계산하며 운영 상태·활성화 변수·Project·Notion을 변경하지 않는다. 기존 상태가 없거나 손상되면 초기화하지 않고 실패한다. 모의 전송 수는 실제 전달 수신 기록이 아니다. 일반 이벤트 알림은 전송하지 않는다.
+
+검토된 같은 커밋에서 실제 멘션 검증을 승인한 경우에만 `send_test=true`로 새 수동 실행을 한다. 관측 뒤에도 Draft·HEAD를 다시 확인하고 `개발-알림`에 “테스트 알림”과 PM 멘션을 1건 보낸다. PM 숫자 ID 매핑이 없으면 실패한다. 운영 알림의 확인 버튼이나 승인 절차를 추가하는 기능은 아니다.
+
+결과 artifact `discord-probe-<run_id>-<attempt>`의 `probe-result.json`에는 관측 결과·모의 전송 수·상태 브랜치 불변 여부와 테스트 메시지의 `pending`·`confirmed`·`rejected`·`unknown` 및 실제 메시지 ID만 기록한다. 예외 본문·Secret·Webhook URL은 기록하지 않는다. 전송 결과가 불명확하거나 artifact 업로드가 실패하면 채널 표시를 먼저 확인하고 자동 재전송하지 않는다. Actions 재실행은 허용하지 않는다. 새 수동 실행은 별도의 테스트이므로 앞선 불명확한 결과를 해결하기 위해 임의로 반복하지 않는다.
+
+Draft 검증 성공은 main 운영 검증과 구분한다. main 반영 후 운영 상태 저장·실제 이벤트·반복 실행을 확인해야 #18을 완료할 수 있다.
+
+## 전송 결과가 불확실할 때
+
+Discord POST 전에 상태를 `pending`으로 저장·재조회한다. 확인된 메시지 ID를 받으면 `delivered`로 저장한다. 명시적인 429 거절만 제한적으로 재시도하며, 동적 알림은 재시도 직전에 최신 유효성을 다시 확인한다. 취소되었거나 확인할 수 없으면 추가 POST를 보류하고 다음 상태 조정에서 다시 판단한다. 연결 오류·시간 초과·5xx·응답 유실은 자동 재전송하지 않는다. 다른 독립 알림은 계속 처리한다. 최초 장애 안내가 확인되지 않은 경우 복구 안내는 기다린다.
+
+Actions 경고에 표시된 짧은 키를 상태 파일의 알림 key 해시와 대조하고 PM이 Discord 표시를 확인한다. 알림 key 해시 계산 예: `hashlib.sha256(json.dumps(key,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()[:12]`.
+
+각 메시지 마지막의 `알림 ID`는 비밀값이 없는 사건 식별 해시다. 수동 확인 시 해당 알림 ID까지 내용이 일치해야 한다. 과거의 같은 내용인 메시지나 다른 사건에 이미 연결한 메시지 ID를 새 전송의 수신 증거로 재사용할 수 없다. 설정 채널 ID와 Webhook 조회 결과 모두 코드에 고정한 `개발-알림` ID와 일치해야 한다.
+
+- 메시지가 있으면 새 PM main 수동 실행의 `resolve_key`에 전체 key, `resolve_outcome=found`, `resolve_message_id`에 숫자 메시지 ID를 넣는다. Webhook으로 해당 채널·내용·Webhook 소유 메시지를 재조회해 확인한 뒤 전송 완료로 기록한다.
+- 확실히 전송되지 않았으면 `resolve_outcome=not_sent`로 현재도 유효한 알림에 한해 한 번의 새 전송을 허용한다. 해제된 보류·종료된 장애·재발로 무효화된 과거 복구는 다시 보내지 않는다. 무효화 이력은 상태 파일의 `invalidated` 목록에 유지하므로 새 동기화 실행이 없어도 적용된다. 불확실한 `pending` 자체는 전달 확인 전까지 보존한다. 추정만으로 이 값을 선택하면 중복될 수 있다.
+- 확인할 수 없으면 `unknown`을 유지한다. 상태 파일을 임의 삭제하거나 브랜치를 초기화해 재전송하지 않는다.
+
+수동 조치는 PM ID, 현재 main SHA, 실행자 일치, 첫 attempt 조건을 확인한다. 이것은 전송 사고 조치이며 팀원의 알림 승인 절차가 아니다. 전달 후 상태 저장이 실패하면 원격 `pending`이 남으므로 동일하게 확인한다. 정확히 한 번의 전달을 보장한다고 가정하지 않는다.
+
+## 동기화 결과 계약과 검사
+
+기존 `GitHub → Notion`은 실제 체크아웃 SHA를 고정하고 전체 처리·최종 readback 뒤에 `notion-notification-report.json`을 만든다. artifact 이름은 `notion-notification-{run_id}-{attempt}`다. 숫자 저장소·run·attempt, workflow/checkout SHA, dry-run 여부, 완료 범위, Issue 번호와 고정 원인 코드만 포함한다. projection·resume 표시 보류도 포함한다. 실패·dry-run·불완전 조회는 개별 보류의 해제 근거가 아니다.
+
+소비자는 고정 저장소·동기화 workflow·main 이력·실제 attempt와 artifact를 대조한다. 이전 attempt artifact를 대신 쓰지 않으며 ZIP 안의 정확한 JSON 파일 하나만 크기·경로·종류를 확인해서 읽는다. 보고서 코드를 실행하지 않는다. 중간 실행의 실패·보고서 부재는 연속 보류 횟수를 끊는다.
+
+로컬 합성 검사: `python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'`. 실제 Webhook 전송·팀원 알림 수신은 활성화 후 별도로 확인한다.
+
+Draft 테스트 전송은 HTTP POST도 최대 한 번만 시도하며 429 응답에도 재시도하지 않는다. 운영 전송의 기존 제한된 429 재시도 정책은 유지한다.
+
+## 상태 ledger 읽기 진단
+
+현재 Discord 상태 브랜치의 읽기 응답 일관성을 조사할 때는 다음 도구를 사용한다.
+
+```sh
+python3 -B scripts/discord_ledger_diagnose.py --samples 3
+```
+
+도구는 기존 `gh` 인증을 통해 고정 저장소·브랜치·파일만 조회한다. 표본마다 ref 전후, 해당 commit, commit tree, 브랜치 Contents, commit 고정 Contents를 최대 6회 GET으로 대조한다. 최대 3개 표본, 실행 전체 최대 18개 `gh api` 프로세스이며 각 프로세스의 실행 대기 한도는 8초, 종료 후 cleanup 대기 한도는 1초, 출력 한도는 12,000,000바이트다(각 대기 한도의 합계는 각각 144초와 18초이며 시작·종료와 응답 검증 시간은 별도). 토큰을 별도로 추출하거나 출력하지 않고 POST·상태 쓰기·Discord 전송을 수행하지 않는다. 결과에는 상태, 원인 코드, 검증된 SHA만 포함하며 파일 본문은 출력하지 않는다.
+
+`stable`은 관측한 ref·commit·tree·Contents가 서로 일치했다는 뜻이며 최신 상태나 캐시 신선도를 증명하지 않는다. `inconsistent`는 같은 표본에서 tree 또는 브랜치 Contents와 commit 고정 Contents가 달랐다는 뜻이다. `raced`는 조회 중 브랜치 ref가 바뀐 경우다. `unavailable`은 조회·응답 검증을 마치지 못한 경우다. 이는 현재 읽기 관측이며 과거의 특정 실패 원인이나 Discord 미전달을 단독으로 확정하지 않는다.
+
+## #32 보류 관측과 지연 안내
+
+동기화는 5분 예약 조회를 사용하고 알림은 기존 완료 이벤트와 15분 정기 실행을 유지합니다. 같은 run/attempt 보고서 반복 소비나 알림 cron만으로 연속 횟수를 올리지 않습니다. 실패·불완전 조회는 정상 보류 관측을 쌓지 않으며 보류 해제 근거도 아닙니다. 사유별 episode의 최초 관측·후속 관측·streak·지연 key는 구분하고 같은 안내를 반복하지 않습니다. 요청자가 미확인이면 개인 작성자를 추정해 멘션하지 않고 PM에게 요청합니다. 최신 실행이 진행 중이어도 이미 완료된 유효 보고서 두 번의 보류 관측으로 알림을 예약합니다. 그 뒤 유효 보고서에서 해당 원인이 사라지면 무후속 타이머와 미전송 알림을 취소하고, 다시 나타나면 새 발생으로 기록합니다. 복구 완료 안내는 해제를 기록한 실행부터 최신 실행까지의 증거를 확인합니다. 중간에 보류가 재발하면 기존 미전송 복구 안내를 무효화합니다. 같은 workflow의 필수 실행 번호나 해제 이후 재시도 증거가 빠지면 ready와 전달 의존성을 보존하고 자동 전송을 보류합니다. 전송 결과가 불명확한 pending 기록은 취소된 사건에서도 확인 전까지 보존합니다.
+
+schema=2는 observed_at과 observation_uncertainty_seconds를 함께 제공합니다. 관측 시각은 보고서용 snapshot 확정 시각이며 업로드·소비 시각으로 대체하지 않습니다. 생산자·소비자 각각 snapshot/판정 근처 새 GitHub Date, 요청 왕복 지연, monotonic/UTC, 정밀도·근거 나이·clock 점프를 검증해 전체 오차 상한 60초 이하일 때만 timer에 사용합니다. 불명확하면 두 필드 null로 남기며 유효 보류 관측과 2회 계산은 유지합니다. 소비자 clock을 입증하지 못하면 지연 판정만 중단합니다.
+
+후속 유효 관측이 없는 episode는 검증된 timer_origin_at에서 `now - timer_origin_at - 120초 >= 15분`일 때 다음 알림 실행에서 지연 안내를 만들 수 있습니다. 시각 미확정이어도 후속 유효 snapshot이 있으면 미전송 지연 후보를 취소합니다. 최초 시각이 없는 legacy 기록은 과거 시각을 만들지 않고 다음 검증된 관측에서 별도 timer origin을 시작합니다. schema=1과 기존 outbox/pending/streak/alert/cursor는 보존합니다. 오차와 Actions/Discord 실행 지연이 더해지므로 15분 정시 전달을 보장하지 않습니다. 알림 경로 자체가 멈추면 같은 경로로 정시 안내할 수 없습니다. 불확실한 전송의 수동 확인 규칙은 유지합니다.

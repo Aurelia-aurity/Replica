@@ -101,6 +101,7 @@ python -X utf8 -m unittest discover -s tests -v
 - DB 단독 `pytest`: 48개 통과·실제 연결 선택 검사 7개 skip. ID 없는 연결 시도 완료는 RPC 호출 전에 거부하고, ID 없는 기존 시도의 성공·실패는 기존 RPC로 전달하는 것을 검사했다.
 - #63 수정 커밋을 #61 작업 브랜치에 병합해 README·설정 예시·DB 저장 코드의 충돌을 해결했다. 이는 main 병합이 아니며 #63 선병합 뒤 #61의 base를 main으로 변경하는 절차를 유지한다. 원래 #45의 SQL·검증·문서와 HTTP 500/55000 분류 보완도 유지한다.
 - Python 3.12.14에서 합친 `backend`의 기본 `pytest`: **176개 통과·7개 skip**, subtest 29개 통과. `PYTHONPATH`를 추가하지 않았다. Starlette TestClient의 기존 의존성 사용 중단 안내 1개가 있다.
+- 최신 main `1daaa94`도 작업 브랜치에 병합한 뒤 같은 결과를 확인했다. main의 AI·실험·협업 스크립트 파일은 그대로 유지하며 이들 전체 테스트를 재실행한 결과는 아니다.
 - `.github/workflows/backend-tests.yml`에 Python 3.12 / Ubuntu·Windows의 오프라인 pytest를 추가했다. 실제 DB 읽기·쓰기 검사는 CI에서 명시적으로 비활성화한다. GitHub 실행 결과는 별도 확인한다.
 - SQL 교체·합성 시나리오 롤백 후 persona/session/turn 각 0건, 기존 Auth 2명 유지, 후속 SQL 영구 미적용을 확인했다. 실제 앱·GPU·음성 공급자 통합이나 운영 배포 시험은 아니다.
 

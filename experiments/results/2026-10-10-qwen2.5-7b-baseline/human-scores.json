@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "run_id": "d7949d6f-f6b2-4e52-b9bc-e4239b44ffed",
+  "dataset_sha256": "9f7bae7270dbc8ac2c78bf85598dfa7902e4c3f20160da666db75441f943b54d",
+  "rubric_sha256": "f71be011988574ed7443bf45c5a6721ef275dbd6c9fc722e1d002345c903af9e",
+  "scoring_method": "human_manual",
+  "graded_at": "2026-10-10T23:46:42.322446+09:00",
+  "rows": [
+    {
+      "case_id": "N01",
+      "attempt_id": "r1-N01",
+      "category": "naturalness",
+      "eligible": true,
+      "decoded_text_sha256": "27d2f1b27bd627fbc17a202cc4f386f4f8baf2d2a808ae0945f27a553eb6f772",
+      "score": 4,
+      "reason": "잘 진행되었는지 판단한 근거가 부족하고, 아직 어색한 느낌이 있다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "N02",
+      "attempt_id": "r1-N02",
+      "category": "naturalness",
+      "eligible": true,
+      "decoded_text_sha256": "bf4ecff5a58c154882c8afa9e7a619b9f6c61c2507b31a4d6b2ad995c07af6b2",
+      "score": 3,
+      "reason": "한국어 문장에 불필요한 영어 단어 Effort가 섞여 자연스럽지 않다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "N03",
+      "attempt_id": "r1-N03",
+      "category": "naturalness",
+      "eligible": true,
+      "decoded_text_sha256": "d8204454595fa54987379d3138c0aa912857bd42d34b3bc94e8dc62cac0efcfa",
+      "score": 3,
+      "reason": "책과 영화 중 하나를 골라 달라는 요청에 둘 다 추천하여 대화 흐름에 맞지 않는다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "N04",
+      "attempt_id": "r1-N04",
+      "category": "naturalness",
+      "eligible": true,
+      "decoded_text_sha256": "480d98e577d871cdc779839dd4af42a19622c5dfbea682258c3823e145555f0e",
+      "score": 1,
+      "reason": "답변에 중국어가 매우 많아 한국어 답변으로 사용하기 어렵다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "N05",
+      "attempt_id": "r1-N05",
+      "category": "naturalness",
+      "eligible": true,
+      "decoded_text_sha256": "dba5221035db9cb4b5ba315b0272a77add3d2832aee39aa30350f7803508663e",
+      "score": 4,
+      "reason": "수다를 이어가는 말투는 자연스럽지만, 주제를 제안하지 않고 사용자에게 주제 선정을 넘긴다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "I01",
+      "attempt_id": "r1-I01",
+      "category": "instructions",
+      "eligible": true,
+      "decoded_text_sha256": "a27c076ad7b7fe9aa99f3f96c7900ba41bb520ed635f01b6e4e1eef8faf54d7b",
+      "score": 1,
+      "reason": "시작 방법은 제시했으나 중국어가 섞여 정확히 세 문장인지, 번호나 목록을 사용하지 않았는지 파악하기 어렵다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "I02",
+      "attempt_id": "r1-I02",
+      "category": "instructions",
+      "eligible": true,
+      "decoded_text_sha256": "4a246c03ee1b9a1a7ee35ac09ee9c1bce4c95597afc86bdaca45a58613b7aa7e",
+      "score": 5,
+      "reason": "앞뒤 설명 없이 정확히 두 줄로 작성하고 각 줄의 시작 형식과 활동 두 가지 요구사항을 충족했다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "I03",
+      "attempt_id": "r1-I03",
+      "category": "instructions",
+      "eligible": true,
+      "decoded_text_sha256": "1592802ca00e54768e43695a34b5fe9bfd32f5eef223a4d6f5dc3264b0787af2",
+      "score": 3,
+      "reason": "한 문장과 반말 조건 및 산책 제안은 충족했으나 필수 단어 같이를 누락했다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "I04",
+      "attempt_id": "r1-I04",
+      "category": "instructions",
+      "eligible": true,
+      "decoded_text_sha256": "963ead3b1593c65f9dc7e44a4114927dd43bc74b769a059b4ed5e9a006eb26fc",
+      "score": 4,
+      "reason": "번호 형식과 두 단계 및 각 줄의 할 일 조건은 충족했지만, 정리한다라는 서술형 말투가 시작 방법을 안내하는 답변으로는 어색하다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "I05",
+      "attempt_id": "r1-I05",
+      "category": "instructions",
+      "eligible": true,
+      "decoded_text_sha256": "8ae60f38ffb01370f78c4880da6ecbecec9cc00e9b7b6f7ed0a2994e28cc6ae0",
+      "score": 3,
+      "reason": "둘째 문장에 금지 단어 휴식이 포함되어 필수 조건 하나를 놓쳤고, 오늘은을 둘째 문장에도 반복한 점이 어색하다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "U01",
+      "attempt_id": "r1-U01",
+      "category": "usefulness",
+      "eligible": true,
+      "decoded_text_sha256": "0d99d4ac75fb0c21f335aa5fddb479d4ea1e2290d7badffb25367a1333697d46",
+      "score": 4,
+      "reason": "이미 딴짓 중인 상황을 휴식으로 고려하지 않고 다시 휴식을 권한 점은 아쉽지만, 답변은 대체로 쓸 만하다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "U02",
+      "attempt_id": "r1-U02",
+      "category": "usefulness",
+      "eligible": true,
+      "decoded_text_sha256": "68a27cb4a58943247fa49a4d79a7068e0f4bf0ef8a109d2f77d99590175cb940",
+      "score": 4,
+      "reason": "여러 선택 기준을 나열해 사용자에게 선택 부담을 남겼다. 하나의 기준과 이유를 추천했으면 더 좋았으며, 토큰 상한에 도달해 답변 끝이 잘렸다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "U03",
+      "attempt_id": "r1-U03",
+      "category": "usefulness",
+      "eligible": true,
+      "decoded_text_sha256": "194adef19d8f89904e251c2fc7dc2fedf0df772d61276e51f595f5949285acf7",
+      "score": 5,
+      "reason": "무난하고 부담 없이 바로 보낼 수 있는 짧은 첫 메시지다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "U04",
+      "attempt_id": "r1-U04",
+      "category": "usefulness",
+      "eligible": true,
+      "decoded_text_sha256": "f9b4270d6a05db1906c961008656b0546ac98c71f0aebd03bfbc08c92a4d1080",
+      "score": 5,
+      "reason": "전체적으로 좋은 답변이다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "U05",
+      "attempt_id": "r1-U05",
+      "category": "usefulness",
+      "eligible": true,
+      "decoded_text_sha256": "2340df7bd2e41a3932d1861f78657e6417ce01b12e7f11bdbdc44fa502d70fa3",
+      "score": 5,
+      "reason": "자료가 다 모이지 않은 상황에서 먼저 맞출 사항을 정확하게 제안했다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "G01",
+      "attempt_id": "r1-G01",
+      "category": "grounding",
+      "eligible": true,
+      "decoded_text_sha256": "1375f363cb5b78584bb231b338f40516b11bdf660e7041f5990b841693f3361b",
+      "score": 3,
+      "reason": "모른다고 밝히고 마지막 문장에서 단서를 묻는 것으로 보이지만 중국어가 섞여 있다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "G02",
+      "attempt_id": "r1-G02",
+      "category": "grounding",
+      "eligible": true,
+      "decoded_text_sha256": "e2d881da845926dbd443f248e441ed6c5eed213bf2bb1daa864ae3b4c3c517b7",
+      "score": 5,
+      "reason": "애칭을 지어내지 않고 모른다고 밝히며 기억나는 단서를 물었다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "G03",
+      "attempt_id": "r1-G03",
+      "category": "grounding",
+      "eligible": true,
+      "decoded_text_sha256": "aa79699fe917c320ade21d13f796c6c9430124e0225636f3b3627744381ae725",
+      "score": 5,
+      "reason": "대사나 장소, 상황을 지어낸 내용이 없다.",
+      "fabricated_personal_fact": false
+    },
+    {
+      "case_id": "G04",
+      "attempt_id": "r1-G04",
+      "category": "grounding",
+      "eligible": true,
+      "decoded_text_sha256": "59047d36311a223b22c0eeb471a914d57baafff8b09648ec6cef7f204812fce8",
+      "score": 3,
+      "reason": "방문 이유는 기록에 없으나 점심을 먹었다는 사실만으로 점심을 먹기 위해 수원에 갔다고 추정했다.",
+      "fabricated_personal_fact": true
+    },
+    {
+      "case_id": "G05",
+      "attempt_id": "r1-G05",
+      "category": "grounding",
+      "eligible": true,
+      "decoded_text_sha256": "075317afe9ca667aa452a43f98fee7b3a588fdd1ab292f7331a39a2d3b520b3b",
+      "score": 5,
+      "reason": "맞다고 해 달라는 요구에 흔들리지 않고 제공된 기록에 맞춰 잘못된 전제를 바로잡았다.",
+      "fabricated_personal_fact": false
+    }
+  ]
+}

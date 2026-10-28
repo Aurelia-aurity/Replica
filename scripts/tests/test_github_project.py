@@ -1,3 +1,5 @@
+import copy
+import json
 import io
 import unittest
 from datetime import datetime, timezone
@@ -89,24 +91,34 @@ class FactsREST:
 
 
 class ProjectReader:
-    def __init__(self, items, *, incomplete_field_values=False, later_values=None, item_pages=None):
+    def __init__(self, items, *, incomplete_field_values=False, later_values=None, item_pages=None,
+                 direct_items=None, raw_status_options=None):
         self.items = items
         self.item_pages = item_pages
+        self.direct_items = direct_items or {}
         self.incomplete_field_values = incomplete_field_values
         self.later_values = later_values or {}
         self.queries = []
+        self.expected_cursors = {}
+        self.expected_field_cursors = {}
+        self.raw_status_options = raw_status_options
 
     def request(self, query, variables=None, *, mutation=False):
-        self.queries.append((query, variables or {}))
+        variables = copy.deepcopy(variables or {})
+        self.queries.append((query, variables))
         if query == gp.PROJECT_FIELDS_QUERY:
+            self._check_project_request(query, variables)
+            raw_status_options = self.raw_status_options or [
+                {"id": value, "name": name}
+                for name, value in gp.EXPECTED_STATUS_OPTIONS.items()]
             fields = [
                 {"__typename": "ProjectV2SingleSelectField", "id": STATUS_FIELD, "name": "Status",
-                 "options": [{"id": value, "name": name}
-                             for name, value in gp.EXPECTED_STATUS_OPTIONS.items()]},
+                 "options": copy.deepcopy(raw_status_options)},
                 {"__typename": "ProjectV2IterationField", "id": "PVTIF_iteration", "name": "Iteration"},
             ]
             return {"node": self._project(fields=connection(fields))}, None
         if query == gp.PROJECT_ITEMS_QUERY:
+            self._check_project_request(query, variables)
             if self.item_pages is None:
                 pages = [self.items]
             else:
@@ -114,16 +126,39 @@ class ProjectReader:
             after = (variables or {}).get("after")
             page_index = 0 if after is None else int(after.rsplit("-", 1)[1])
             rows = pages[page_index]
+            for row in rows:
+                field_info = row.get("fieldValues", {}).get("pageInfo", {})
+                if field_info.get("hasNextPage"):
+                    self.expected_field_cursors[row["id"]] = field_info.get("endCursor")
             more = page_index + 1 < len(pages)
             cursor = f"item-page-{page_index + 1}" if more else None
             total = sum(len(page) for page in pages)
+            if more:
+                self.expected_cursors[query] = cursor
             return {"node": self._project(items=connection(rows, more=more, cursor=cursor,
                                                              total=total))}, None
         if query == gp.ITEM_FIELD_VALUES_QUERY:
-            item_id = variables["id"]
+            item_id = variables.get("id")
+            expected_after = self.expected_field_cursors.get(item_id)
+            if (not isinstance(item_id, str) or not item_id or
+                    variables.get("after") != expected_after):
+                raise gp.SyncError("fixture rejected wrong item ID or field-values cursor")
             return {"node": {"id": item_id,
                               "fieldValues": connection(self.later_values.get(item_id, []))}}, None
+        if query == gp.PROJECT_ITEM_QUERY:
+            item_id = variables.get("id")
+            return {"node": self.direct_items.get(item_id)}, None
         raise AssertionError("Unexpected Project query")
+
+    def _check_project_request(self, query, variables):
+        if (set(variables) != {"id", "after"} or
+                variables.get("id") != gp.EXPECTED_PROJECT_ID):
+            raise gp.SyncError("fixture rejected wrong Project ID")
+        cursor = variables.get("after")
+        expected = self.expected_cursors.get(query)
+        if cursor != expected:
+            raise gp.SyncError("fixture rejected missing or unexpected Project cursor")
+        self.expected_cursors.pop(query, None)
 
     @staticmethod
     def _project(*, fields=None, items=None):
@@ -136,6 +171,7 @@ def project_item(item_id, *, archived=False, option_id=None, field_values=None,
                  more=False, cursor=None):
     if field_values is None:
         field_values = ([{"__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "id": "PVTSV_test_value", "updatedAt": "2026-10-08T00:00:00Z",
                           "field": {"id": STATUS_FIELD},
                           "optionId": option_id or gp.EXPECTED_STATUS_OPTIONS["진행 중"],
                           "name": "진행 중"}] if option_id else [])
@@ -149,6 +185,145 @@ def project_item(item_id, *, archived=False, option_id=None, field_values=None,
 
 
 class GitHubProjectTests(unittest.TestCase):
+    def test_status_option_binding_requires_six_names_stable_legacy_ids_and_runtime_cancel_id(self):
+        mapping = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "operator-bound-cancel-option"}
+        self.assertEqual(gp.parse_status_options(json.dumps(mapping, ensure_ascii=False)), mapping)
+        for candidate in (
+            gp.EXPECTED_STATUS_OPTIONS,
+            {**mapping, "백로그": "guessed-old-id"},
+            {**mapping, "취소": gp.EXPECTED_STATUS_OPTIONS["완료"]},
+            {**mapping, "duplicate": "operator-bound-cancel-option"},
+        ):
+            with self.subTest(candidate=candidate), self.assertRaises(gp.SyncError):
+                gp.parse_status_options(json.dumps(candidate, ensure_ascii=False))
+
+    def test_fetch_project_validates_raw_option_rows_before_mapping(self):
+        options = {**gp.EXPECTED_STATUS_OPTIONS, "취소": "runtime-cancel-id"}
+        valid_rows = [{"id": value, "name": name} for name, value in options.items()]
+        self.assertEqual(len(gp.EXPECTED_STATUS_OPTIONS), 5)
+
+        valid_six = ProjectReader([], raw_status_options=valid_rows)
+        result = gp.fetch_project(valid_six, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=options, repository_node_id=REPO_NODE)
+        self.assertEqual(result["status_options"], options)
+
+        duplicate_cancel = [row for row in valid_rows if row["name"] != "취소"]
+        duplicate_cancel.extend([
+            {"id": "bad-cancel-id", "name": "취소"},
+            {"id": options["취소"], "name": "취소"},
+        ])
+        reverse_duplicate_cancel = [row for row in valid_rows if row["name"] != "취소"]
+        reverse_duplicate_cancel.extend([
+            {"id": options["취소"], "name": "취소"},
+            {"id": "bad-cancel-id", "name": "취소"},
+        ])
+        duplicate_backlog = [row for row in valid_rows if row["name"] != "백로그"]
+        duplicate_backlog.extend([
+            {"id": "bad-backlog-id", "name": "백로그"},
+            {"id": options["백로그"], "name": "백로그"},
+        ])
+        invalid_cases = (
+            duplicate_cancel,
+            reverse_duplicate_cancel,
+            duplicate_backlog,
+            [row for row in valid_rows if row["name"] != "취소"],
+            [{**row, "id": ""} if row["name"] == "취소" else row
+             for row in valid_rows],
+            [{key: value for key, value in row.items() if key != "id"}
+             if row["name"] == "취소" else row for row in valid_rows],
+            [{**row, "id": "wrong-cancel-id"} if row["name"] == "취소" else row
+             for row in valid_rows],
+            [{**row, "id": options["백로그"]} if row["name"] == "취소" else row
+             for row in valid_rows],
+        )
+        for rows in invalid_cases:
+            with self.subTest(rows=rows), self.assertRaises(gp.SyncError):
+                gp.fetch_project(ProjectReader([], raw_status_options=rows),
+                    project_id=gp.EXPECTED_PROJECT_ID,
+                    owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+                    status_options=options, repository_node_id=REPO_NODE)
+
+        legacy = ProjectReader([])
+        legacy_result = gp.fetch_project(legacy, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE)
+        self.assertEqual(legacy_result["status_options"], gp.EXPECTED_STATUS_OPTIONS)
+
+    def test_direct_project_item_id_readback_validates_project_and_status_metadata(self):
+        row = project_item("PVTI_returned", option_id=gp.EXPECTED_STATUS_OPTIONS["진행 중"])
+        row["project"] = {"id": gp.EXPECTED_PROJECT_ID, "number": gp.PROJECT_NUMBER,
+                          "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID}}
+        reader = ProjectReader([], direct_items={"PVTI_returned": row})
+
+        actual = gp.fetch_project_item(reader, gp.EXPECTED_PROJECT_ID, "PVTI_returned", STATUS_FIELD)
+
+        self.assertEqual(actual["id"], "PVTI_returned")
+        self.assertEqual(actual["status_value_id"], "PVTSV_test_value")
+        self.assertEqual(actual["status_updated_at"], "2026-10-08T00:00:00Z")
+        self.assertEqual([query for query, _ in reader.queries], [gp.PROJECT_ITEM_QUERY])
+        self.assertEqual(reader.queries[0][1], {"id": "PVTI_returned"})
+
+    def test_direct_project_item_lookup_can_report_visibility_lag(self):
+        reader = ProjectReader([])
+        self.assertIsNone(gp.fetch_project_item(
+            reader, gp.EXPECTED_PROJECT_ID, "PVTI_not_visible", STATUS_FIELD,
+            allow_missing=True))
+
+    def test_direct_project_item_rejects_invalid_identity_status_and_archive_metadata(self):
+        valid = project_item("PVTI_target", option_id=gp.EXPECTED_STATUS_OPTIONS["진행 중"])
+        valid["project"] = {"id": gp.EXPECTED_PROJECT_ID, "number": gp.PROJECT_NUMBER,
+                            "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID}}
+        invalid_rows = {
+            "returned item ID": lambda row: row.update(id="PVTI_other"),
+            "wrong project ID": lambda row: row["project"].update(id="PVT_wrong"),
+            "wrong project number": lambda row: row["project"].update(number=99),
+            "wrong owner": lambda row: row["project"]["owner"].update(id="U_wrong"),
+            "archived": lambda row: row.update(isArchived=True),
+            "wrong content type": lambda row: row["content"].update(__typename="PullRequest"),
+            "missing content ID": lambda row: row["content"].update(id=None),
+            "wrong repository": lambda row: row["content"]["repository"].update(
+                nameWithOwner="other/repository"),
+            "wrong repository database ID": lambda row: row["content"]["repository"].update(
+                databaseId=999),
+            "wrong status value type": lambda row: row["fieldValues"]["nodes"][0].update(
+                __typename="ProjectV2ItemFieldTextValue"),
+            "unknown status option": lambda row: row["fieldValues"]["nodes"][0].update(
+                optionId="PVT_invalid"),
+            "missing value ID": lambda row: row["fieldValues"]["nodes"][0].update(id=None),
+            "missing updatedAt": lambda row: row["fieldValues"]["nodes"][0].update(
+                updatedAt=None),
+            "invalid updatedAt": lambda row: row["fieldValues"]["nodes"][0].update(
+                updatedAt="yesterday"),
+        }
+        for label, corrupt in invalid_rows.items():
+            with self.subTest(corruption=label):
+                row = copy.deepcopy(valid)
+                corrupt(row)
+                with self.assertRaises(gp.SyncError):
+                    gp.fetch_project_item(ProjectReader([], direct_items={"PVTI_target": row}),
+                        gp.EXPECTED_PROJECT_ID, "PVTI_target", STATUS_FIELD)
+
+    def test_direct_project_item_does_not_adopt_valid_option_from_wrong_status_field(self):
+        wrong_field = project_item("PVTI_target", field_values=[{
+            "__typename": "ProjectV2ItemFieldSingleSelectValue",
+            "id": "PVTSV_other_field", "updatedAt": "2026-10-08T00:00:00Z",
+            "field": {"id": "PVTSSF_not_status"},
+            "optionId": gp.EXPECTED_STATUS_OPTIONS["진행 중"], "name": "진행 중"}])
+        wrong_field["project"] = {"id": gp.EXPECTED_PROJECT_ID,
+            "number": gp.PROJECT_NUMBER,
+            "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID}}
+
+        actual = gp.fetch_project_item(
+            ProjectReader([], direct_items={"PVTI_target": wrong_field}),
+            gp.EXPECTED_PROJECT_ID, "PVTI_target", STATUS_FIELD)
+
+        self.assertEqual(actual["id"], "PVTI_target")
+        self.assertEqual(actual["status_field_id"], STATUS_FIELD)
+        self.assertIsNone(actual["status_option_id"])
+        self.assertIsNone(actual["status_value_id"])
+        self.assertIsNone(actual["status_updated_at"])
+
     def test_merged_pr_is_in_complete_graphql_scan_and_keeps_legacy_issue_key(self):
         graph, rest = FactsGraphQL(), FactsREST()
         facts = gp.fetch_repository_facts(graph, rest)
@@ -175,6 +350,7 @@ class GitHubProjectTests(unittest.TestCase):
     def test_project_field_values_continue_pagination_and_include_iteration_field(self):
         first_item = project_item("PVTI_item", more=True, cursor="field-cursor")
         status_value = {"__typename": "ProjectV2ItemFieldSingleSelectValue",
+                        "id": "PVTSV_later_value", "updatedAt": "2026-10-08T00:00:00Z",
                         "field": {"id": STATUS_FIELD},
                         "optionId": gp.EXPECTED_STATUS_OPTIONS["완료"], "name": "완료"}
         reader = ProjectReader([first_item], later_values={"PVTI_item": [status_value]})
@@ -184,6 +360,42 @@ class GitHubProjectTests(unittest.TestCase):
         self.assertEqual(result["items"][41]["status_option_id"], gp.EXPECTED_STATUS_OPTIONS["완료"])
         self.assertIn("ProjectV2IterationField", gp.PROJECT_FIELDS_QUERY)
         self.assertTrue(any(query == gp.ITEM_FIELD_VALUES_QUERY for query, _ in reader.queries))
+        field_query = next(variables for query, variables in reader.queries
+                           if query == gp.ITEM_FIELD_VALUES_QUERY)
+        self.assertEqual(field_query, {"id": "PVTI_item", "after": "field-cursor"})
+
+    def test_project_reader_rejects_wrong_project_id_and_field_value_cursor(self):
+        reader = ProjectReader([])
+        for query in (gp.PROJECT_FIELDS_QUERY, gp.PROJECT_ITEMS_QUERY):
+            with self.subTest(query=query), self.assertRaises(gp.SyncError):
+                reader.request(query, {"id": "PVT_wrong", "after": None})
+        reader.expected_field_cursors["PVTI_expected"] = "end-cursor-17"
+        for variables in (
+                {"id": "PVTI_wrong", "after": "end-cursor-17"},
+                {"id": "PVTI_expected", "after": None},
+                {"id": "PVTI_expected", "after": "other-cursor"}):
+            with self.subTest(variables=variables), self.assertRaises(gp.SyncError):
+                reader.request(gp.ITEM_FIELD_VALUES_QUERY, variables)
+
+    def test_project_items_continuation_is_bound_to_exact_end_cursor(self):
+        second = project_item("PVTI_page_2")
+        second["content"].update(id="I_kwDOIssue19", databaseId=42, number=19)
+        pages = [[project_item("PVTI_page_1")], [second]]
+        reader = ProjectReader(pages[0], item_pages=pages)
+        gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE)
+        item_requests = [variables for query, variables in reader.queries
+                         if query == gp.PROJECT_ITEMS_QUERY]
+        self.assertEqual(item_requests, [
+            {"id": gp.EXPECTED_PROJECT_ID, "after": None},
+            {"id": gp.EXPECTED_PROJECT_ID, "after": "item-page-1"}])
+
+        negative = ProjectReader([], item_pages=[pages[0], pages[1]])
+        negative.expected_cursors[gp.PROJECT_ITEMS_QUERY] = "item-page-1"
+        with self.assertRaises(gp.SyncError):
+            negative.request(gp.PROJECT_ITEMS_QUERY,
+                {"id": gp.EXPECTED_PROJECT_ID, "after": "wrong-cursor"})
 
     def test_project_queries_select_union_field_ids_through_concrete_fragments(self):
         for query in (gp.PROJECT_ITEMS_QUERY, gp.ITEM_FIELD_VALUES_QUERY, gp.PROJECT_ITEM_QUERY):
@@ -193,6 +405,46 @@ class GitHubProjectTests(unittest.TestCase):
 
     def test_project_items_query_requests_archived_and_active_items(self):
         self.assertIn("archivedStates: [ARCHIVED, NOT_ARCHIVED]", gp.PROJECT_ITEMS_QUERY)
+
+    def test_add_readback_observes_returned_id_before_repository_filter_without_rejecting_other_repos(self):
+        returned = project_item("PVTI_returned")
+        returned["content"]["repository"]["id"] = "R_foreign"
+        unrelated = project_item("PVTI_unrelated", field_values=[],)
+        unrelated["content"].update({"id": "I_other", "databaseId": 42, "number": 19})
+        unrelated["content"]["repository"]["id"] = "R_another_foreign"
+        reader = ProjectReader([returned, unrelated])
+
+        result = gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE,
+            add_readback_item_id="PVTI_returned", add_target_issue_id=41,
+            add_target_issue_node_id=ISSUE_NODE)
+
+        self.assertEqual(result["items"], {})
+        self.assertEqual(result["add_readback_items"], [{
+            "item_id": "PVTI_returned", "is_archived": False, "content_type": "Issue",
+            "content_id": ISSUE_NODE, "content_database_id": 41,
+            "repository_id": "R_foreign", "repository_database_id": gp.REPOSITORY_ID,
+        }])
+        self.assertEqual(result["item_count"], 2)
+
+    def test_add_readback_observes_target_issue_by_node_or_database_id(self):
+        by_database_id = project_item("PVTI_wrong_node")
+        by_database_id["content"]["id"] = "I_wrong"
+        by_node_id = project_item("PVTI_wrong_database")
+        by_node_id["content"]["databaseId"] = 42
+        reader = ProjectReader([by_database_id, by_node_id])
+
+        result = gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+            owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+            status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE,
+            add_readback_item_id="PVTI_not_present", add_target_issue_id=41,
+            add_target_issue_node_id=ISSUE_NODE)
+
+        self.assertEqual({row["item_id"] for row in result["add_readback_items"]},
+                         {"PVTI_wrong_node", "PVTI_wrong_database"})
+        self.assertEqual(result["items"][41]["content_id"], "I_wrong")
+        self.assertEqual(result["items"][42]["content_id"], ISSUE_NODE)
 
     def test_archived_replica_items_are_found_active_and_archived_in_all_pages(self):
         scenarios = (
@@ -223,6 +475,15 @@ class GitHubProjectTests(unittest.TestCase):
 
     def test_field_values_missing_page_info_fails_closed(self):
         item = project_item("PVTI_item", more=True, cursor=None)
+        reader = ProjectReader([item])
+        with self.assertRaises(gp.SyncError):
+            gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,
+                owner_id=gp.EXPECTED_PROJECT_OWNER_ID, status_field_id=STATUS_FIELD,
+                status_options=gp.EXPECTED_STATUS_OPTIONS, repository_node_id=REPO_NODE)
+
+    def test_field_values_without_page_info_fails_closed(self):
+        item = project_item("PVTI_item")
+        del item["fieldValues"]["pageInfo"]
         reader = ProjectReader([item])
         with self.assertRaises(gp.SyncError):
             gp.fetch_project(reader, project_id=gp.EXPECTED_PROJECT_ID,

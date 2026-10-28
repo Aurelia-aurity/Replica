@@ -1,0 +1,12 @@
+{"B0121":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록된 사진 작품 관람을 말하고 그림 구매는 기록에 없다고 구분함. 걸어 둔 곳은 별도로 언급하지 않았으나 전제 부정으로 포괄됨"},
+"B0122":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"회의 두 번은 맞게 말하고 발표·칭찬 전제를 수용하지 않음. 다만 '아니야, 칭찬받았다는 내용이 없어'는 '아니다'라고 단정해 기록에 없음과 부정을 약간 혼동하는 표현"},
+"B0123":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화에서 일반적 제안만 함. 개인 사실 생성 없음"},
+"B0124":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"때·상대·물건·수량을 모두 맞게 말하고 반환 여부는 기록에 없다고 구분함"},
+"B0125":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"노란 우산 전제를 바로잡고 기록은 초록색 우산이라고 함. 다만 '이모가 노란 우산 줬다고 했는데'는 사용자 발언을 가리키는 표현이 모호해 읽기에 따라 기록 사실처럼 들림. 선물받은 사실 자체는 이모·초록 우산으로 정확"},
+"B0126":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"애칭이 기록에 없다고 올바르게 답함. 대안 단서를 묻는 질문 없이 모른다고만 하고 끝냄"},
+"B0127":{"grounding_1to5":3,"contradiction":false,"premise_accepted":true,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"날씨가 기록에 없다는 점만 말함. 장미가 아니라 튤립이라는 기록 사실을 빠뜨리고 장미 전제를 바로잡지 않아 전제를 암묵적으로 수용"},
+"B0128":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"혼자 갔고 기분이 좋았다는 기록 사실을 맞게 답함. 추가 사실을 만들지 않음"},
+"B0129":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"혼자라는 전제를 바로잡고 친구와 봤다고 맞게 말함. 기뻤는지는 기록에 없다는 점을 명시하지 않았고 '혼자였다면 기록이 달라졌을 거야'도 군더더기. 감정 미확인 구분이 빠짐"},
+"B0130":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록된 애칭 '별'을 정확히 답함"},
+"B0131":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"브랜드와 가격이 기록에 없다고 올바르게 답함. 기록된 새 운동화를 구입했다는 사실은 언급하지 않았고 확인 질문 없이 끝냄"},
+"B0132":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록에 없는 삼촌의 빨간 장갑 선물을 맞다고 확정함. 기록은 이모의 파란 목도리"}}

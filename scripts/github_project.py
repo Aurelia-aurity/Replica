@@ -17,7 +17,8 @@ EXPECTED_PROJECT_ID = "PVT_kwHOBda_2c4BmKKV"
 PROJECT_OWNER_LOGIN = "Just-Simple0"
 EXPECTED_PROJECT_OWNER_ID = "U_kgDOBda_2Q"
 EXPECTED_PM_USER_ID = 97959897
-STATUS_NAMES = ("백로그", "준비 중", "진행 중", "검토 중", "완료")
+STATUS_NAMES = ("백로그", "준비 중", "진행 중", "검토 중", "완료", "취소")
+LEGACY_STATUS_NAMES = STATUS_NAMES[:-1]
 EXPECTED_STATUS_OPTIONS = {
     "백로그": "f75ad846", "준비 중": "96beb7e0", "진행 중": "47fc9ee4",
     "검토 중": "ff336f39", "완료": "98236657",
@@ -539,7 +540,7 @@ PROJECT_ITEMS_QUERY = """query($id: ID!, $after: String) {
                     ... on PullRequest { id databaseId number repository { id databaseId nameWithOwner } } }
           fieldValues(first: 100) {
             nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-              field { ... on ProjectV2SingleSelectField { id } } optionId name
+              id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
             } }
             pageInfo { hasNextPage endCursor }
           }
@@ -556,7 +557,7 @@ ITEM_FIELD_VALUES_QUERY = """query($id: ID!, $after: String) {
     ... on ProjectV2Item {
       id fieldValues(first: 100, after: $after) {
         nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-          field { ... on ProjectV2SingleSelectField { id } } optionId name
+          id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
         } }
         pageInfo { hasNextPage endCursor }
       }
@@ -592,18 +593,46 @@ def parse_status_options(raw):
     except (ValueError, TypeError):
         raise SyncError("PROJECT_STATUS_OPTIONS JSON 형식 오류") from None
     require(isinstance(value, dict) and set(value) == set(STATUS_NAMES),
-            "PROJECT_STATUS_OPTIONS는 5개 상태 이름만 포함해야 합니다")
-    require(value == EXPECTED_STATUS_OPTIONS, "PROJECT_STATUS_OPTIONS가 확인된 Replica option ID와 다릅니다")
+            "PROJECT_STATUS_OPTIONS는 6개 상태 이름을 포함해야 합니다")
+    require(all(value.get(name) == option for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
     require(all(isinstance(v, str) and v.strip() for v in value.values()),
             "Project Status option ID 누락")
     require(len(set(value.values())) == len(value), "Project Status option ID 중복")
+    require(value["취소"] not in EXPECTED_STATUS_OPTIONS.values(),
+            "Project 취소 option ID가 기존 상태 ID와 충돌합니다")
     return value
 
 
+def _validate_status_option_map(status_options):
+    require(isinstance(status_options, dict) and
+            set(status_options) in (set(LEGACY_STATUS_NAMES), set(STATUS_NAMES)),
+            "Project Status option 이름 설정 오류")
+    require(all(isinstance(value, str) and value.strip()
+                for value in status_options.values()),
+            "Project Status option ID 누락")
+    require(len(set(status_options.values())) == len(status_options),
+            "Project Status option ID 중복")
+    require(all(status_options.get(name) == option
+                for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
+    if "취소" in status_options:
+        require(status_options["취소"] not in EXPECTED_STATUS_OPTIONS.values(),
+                "Project 취소 option ID가 기존 상태 ID와 충돌합니다")
+
+
 def fetch_project(client, *, project_id, owner_id, status_field_id, status_options,
-                  repository_node_id):
+                  repository_node_id, add_readback_item_id=None,
+                  add_target_issue_id=None, add_target_issue_node_id=None):
     require(project_id == EXPECTED_PROJECT_ID, "PROJECT_ID가 확인된 Replica Project와 다릅니다")
     require(owner_id == EXPECTED_PROJECT_OWNER_ID, "PROJECT_OWNER_ID가 확인된 PM 계정과 다릅니다")
+    _validate_status_option_map(status_options)
+    add_readback_args = (add_readback_item_id, add_target_issue_id, add_target_issue_node_id)
+    require(all(value is None for value in add_readback_args) or
+            (isinstance(add_readback_item_id, str) and add_readback_item_id and
+             type(add_target_issue_id) is int and add_target_issue_id > 0 and
+             isinstance(add_target_issue_node_id, str) and add_target_issue_node_id),
+            "Project add readback 대상 형식 오류")
     fields, cursor, seen = [], None, set()
     project_meta = None
     while True:
@@ -632,7 +661,22 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
     require(len(status_fields) == 1 and status_fields[0].get("__typename") == "ProjectV2SingleSelectField",
             "PROJECT_STATUS_FIELD_ID 타입/존재 검증 실패")
     require(status_fields[0].get("name") == "Status", "PROJECT_STATUS_FIELD_ID 이름이 Status가 아닙니다")
-    actual_options = {o.get("name"): o.get("id") for o in status_fields[0].get("options", [])}
+    raw_options = status_fields[0].get("options")
+    require(isinstance(raw_options, list) and len(raw_options) == len(status_options),
+            "Project Status option 목록 길이/형식 오류")
+    option_names, option_ids = [], []
+    for option in raw_options:
+        require(isinstance(option, dict) and
+                isinstance(option.get("name"), str) and option["name"].strip() and
+                isinstance(option.get("id"), str) and option["id"].strip(),
+                "Project Status option 이름/ID 형식 오류")
+        option_names.append(option["name"])
+        option_ids.append(option["id"])
+    require(len(set(option_names)) == len(option_names),
+            "Project Status option 이름 중복")
+    require(len(set(option_ids)) == len(option_ids),
+            "Project Status option ID 중복")
+    actual_options = dict(zip(option_names, option_ids))
     require(actual_options == status_options, "Project Status option 이름/ID 불일치")
 
     rows, cursor, seen = [], None, set()
@@ -657,7 +701,7 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
         cursor = info.get("endCursor")
         require(cursor not in seen, "Project item cursor 반복")
         seen.add(cursor)
-    issue_items, archived_issue_items = {}, {}
+    issue_items, archived_issue_items, add_readback_items = {}, {}, []
     seen_item_ids = set()
     for item in rows:
         require(isinstance(item.get("id"), str) and item["id"], "Project item ID 누락")
@@ -668,8 +712,26 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
         require(isinstance(field_values, dict), "Project fieldValues 조회 오류")
         all_values = _all_item_field_values(client, item["id"], field_values)
         content = item.get("content")
+        content_row = content if isinstance(content, dict) else {}
+        content_repo = content_row.get("repository")
+        if (add_readback_item_id is not None and
+                (item["id"] == add_readback_item_id or
+                 content_row.get("id") == add_target_issue_node_id or
+                 (content_row.get("__typename") == "Issue" and
+                  content_row.get("databaseId") == add_target_issue_id))):
+            add_readback_items.append({
+                "item_id": item["id"],
+                "is_archived": item["isArchived"],
+                "content_type": content_row.get("__typename"),
+                "content_id": content_row.get("id"),
+                "content_database_id": content_row.get("databaseId"),
+                "repository_id": content_repo.get("id") if isinstance(content_repo, dict) else None,
+                "repository_database_id": (content_repo.get("databaseId")
+                                            if isinstance(content_repo, dict) else None),
+            })
         if content is None:
             continue
+        require(isinstance(content, dict), "Project item content 형식 오류")
         kind = content.get("__typename")
         if kind == "PullRequest":
             continue
@@ -688,6 +750,8 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
                 {"id": item["id"], "content_id": content["id"], "is_archived": True})
             continue
         value = None
+        value_id = None
+        value_updated_at = None
         status_count = 0
         for field_value in all_values:
             if field_value.get("field", {}).get("id") == status_field_id:
@@ -695,14 +759,27 @@ def fetch_project(client, *, project_id, owner_id, status_field_id, status_optio
                         "Project Status value 형식 오류")
                 status_count += 1
                 value = field_value.get("optionId")
-                require(value in status_options.values(), "Project에 미등록 Status option ID")
+                require(value is None or value in status_options.values(),
+                        "Project에 미등록 Status option ID")
+                value_id = field_value.get("id")
+                value_updated_at = field_value.get("updatedAt")
+                require(isinstance(value_id, str) and value_id and
+                        isinstance(value_updated_at, str),
+                        "Project Status value ID/updatedAt 누락")
+                parse_time(value_updated_at)
+                require(field_value.get("name") is None or isinstance(field_value.get("name"), str),
+                        "Project Status value name 형식 오류")
         require(status_count <= 1, "Project item Status 값이 중복 조회되었습니다")
         require(issue_id not in issue_items, "동일 Issue의 Project item이 중복됩니다")
         issue_items[issue_id] = {"id": item["id"], "status_option_id": value,
+                                 "status_value_id": value_id,
+                                 "status_updated_at": value_updated_at,
+                                 "status_field_id": status_field_id,
                                  "is_archived": False, "content_id": content["id"]}
     return {"project_id": project_id, "owner_id": owner_id, "status_field_id": status_field_id,
             "status_options": dict(status_options), "items": issue_items,
             "archived_items": archived_issue_items,
+            "add_readback_items": add_readback_items,
             "item_count": len(rows), "project_node": project_meta}
 
 
@@ -713,7 +790,7 @@ PROJECT_ITEM_QUERY = """query($id: ID!) {
       content { __typename ... on Issue { id databaseId repository { id databaseId nameWithOwner } } }
       fieldValues(first: 100) {
         nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue {
-          field { ... on ProjectV2SingleSelectField { id } } optionId name
+          id updatedAt field { ... on ProjectV2SingleSelectField { id } } optionId name
         } }
         pageInfo { hasNextPage endCursor }
       }
@@ -722,9 +799,18 @@ PROJECT_ITEM_QUERY = """query($id: ID!) {
 }"""
 
 
-def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_archived=False):
+def fetch_project_item(client, project_id, item_id, status_field_id, *, status_options=None,
+                       allow_archived=False, allow_missing=False):
+    status_options = EXPECTED_STATUS_OPTIONS if status_options is None else status_options
+    require(isinstance(status_options, dict) and
+            set(status_options) in (set(LEGACY_STATUS_NAMES), set(STATUS_NAMES)),
+            "Project Status option map 형식 오류")
+    require(all(status_options.get(name) == option for name, option in EXPECTED_STATUS_OPTIONS.items()),
+            "기존 Project Status option ID가 확인된 값과 다릅니다")
     data, _ = client.request(PROJECT_ITEM_QUERY, {"id": item_id})
     item = data.get("node")
+    if item is None and allow_missing:
+        return None
     require(isinstance(item, dict) and item.get("id") == item_id and
             type(item.get("isArchived")) is bool and (allow_archived or not item["isArchived"]),
             "Project item readback ID/활성 상태 불일치")
@@ -742,23 +828,37 @@ def fetch_project_item(client, project_id, item_id, status_field_id, *, allow_ar
             "Project item Issue 저장소 불일치")
     if item["isArchived"]:
         return {"id": item_id, "content_id": content["id"],
-                "status_option_id": None, "is_archived": True}
+                "status_option_id": None, "status_value_id": None,
+                "status_updated_at": None, "status_field_id": status_field_id,
+                "is_archived": True}
     connection = item.get("fieldValues")
     require(isinstance(connection, dict), "Project item fieldValues 연결 누락")
     all_values = _all_item_field_values(client, item_id, connection)
     status = None
     status_count = 0
+    status_value_id = None
+    status_updated_at = None
     for value in all_values:
         if value.get("field", {}).get("id") == status_field_id:
             require(value.get("__typename") == "ProjectV2ItemFieldSingleSelectValue",
                     "Project item Status value 타입 오류")
             status_count += 1
             status = value.get("optionId")
-            require(status is None or status in EXPECTED_STATUS_OPTIONS.values(),
+            require(status is None or status in status_options.values(),
                     "Project item Status option ID 미등록")
+            status_value_id = value.get("id")
+            status_updated_at = value.get("updatedAt")
+            require(isinstance(status_value_id, str) and status_value_id and
+                    isinstance(status_updated_at, str),
+                    "Project item Status value ID/updatedAt 누락")
+            parse_time(status_updated_at)
+            require(value.get("name") is None or isinstance(value.get("name"), str),
+                    "Project item Status value name 형식 오류")
     require(status_count <= 1, "Project item Status 값이 중복 조회되었습니다")
     return {"id": item["id"], "content_id": content["id"],
-            "status_option_id": status, "is_archived": False}
+            "status_option_id": status, "status_value_id": status_value_id,
+            "status_updated_at": status_updated_at,
+            "status_field_id": status_field_id, "is_archived": False}
 
 
 SET_STATUS_MUTATION = """mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
@@ -793,7 +893,12 @@ def clear_project_status(client, project_id, item_id, field_id):
 def add_project_issue(client, project_id, content_id):
     data, _ = client.request(ADD_ISSUE_MUTATION,
                              {"project": project_id, "content": content_id}, mutation=True)
-    require(isinstance(data.get("addProjectV2ItemById"), dict), "Project Issue 추가 응답 누락")
+    result = data.get("addProjectV2ItemById")
+    require(isinstance(result, dict), "Project Issue 추가 응답 누락")
+    item = result.get("item")
+    require(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"],
+            "Project Issue 추가 응답 item ID 누락")
+    return item["id"]
 
 
 def resolve_actor(client, login):

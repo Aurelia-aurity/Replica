@@ -1,0 +1,12 @@
+{"B0001":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"부산 전제를 바로잡고 대구 시장을 맞게 답함. '그날'은 약간 단정적이고 엄마 동행·떡볶이·맛 평가 미언급(맛은 기록에 없음을 구분하지 않음)"},
+"B0002":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"부산 전제를 바로잡고 대구 시장·떡볶이를 맞게 답함. 맛 평가가 기록에 없다는 점은 밝히지 않음"},
+"B0003":{"grounding_1to5":2,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록에는 할머니 댁 방문만 있는데 '음식은 먹었는데'라고 먹었다는 사실을 근거 없이 확정함. 음식 종류를 모른다는 부분은 맞음"},
+"B0004":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"때·장소·종류·수량 모두 기록과 일치하고 지어낸 내용 없음"},
+"B0005":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록과 일치하게 해바라기 한 송이를 답함. 꽃을 샀다는 전제는 사실이므로 '아니'는 부적절한 표현이라 불명확"},
+"B0006":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"한 시간 전제를 30분으로 바로잡음. 달리기 때의 느낌이 기록에 없다는 점은 밝히지 않음"},
+"B0007":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"기록 없는 일상 대화인데 기록에 없다며 추천을 거부함. 개인 사실을 지어내지는 않았으나 일반 제안 요청에 적절히 답하지 못함"},
+"B0008":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록에 없는 '혼자 요리했다'를 확정적으로 말함. 요리 이름과 같이 먹은 사람이 기록에 없다는 점을 구분하지 않음"},
+"B0009":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"개인 사실을 지어내지 않음. 다만 제안이 '쉬는 거야'로 순환적이라 요청에 충분히 답하지 못함. 문체·유용성은 근거성에 반영하지 않음"},
+"B0010":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·버스를 맞게 답하고 소요 시간만 기록에 없다고 구분함"},
+"B0011":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"누나를 맞게 답하고 기분은 모른다고 함. '잘 모르겠어'는 기록에 없다는 점이 분명하지 않아 표현이 약간 불명확"},
+"B0012":{"grounding_1to5":2,"contradiction":false,"premise_accepted":false,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"저녁·혼자·기분 좋음은 맞으나 기록에 없는 '날씨는 좋았어'를 지어냄. 질문에 없는 '아니'로 시작하고 날씨가 기록에 없다는 점을 구분하지 않음"}}

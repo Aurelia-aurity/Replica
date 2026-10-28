@@ -24,10 +24,13 @@ SCHEMA = {
     "라벨": "rich_text", "GitHub 수정": "date", "동기화 키": "rich_text",
     "동기화 시각": "date", "Pending create": "rich_text",
     "작업 상태": "select", "일정": "date", "메모": "rich_text",
+    "요청 처리": "select", "요청 상태": "select",
 }
 OPTIONS = {"종류": {"Issue", "PR", "Sync"},
            "GitHub 상태": {"Open", "Closed", "Draft", "Merged"},
-           "작업 상태": {"백로그", "진행 중", "검토 중", "완료"}}
+           "작업 상태": {"백로그", "준비 중", "진행 중", "검토 중", "완료"},
+           "요청 처리": {"반영 대기", "반영 완료", "요청 거절", "자동 확인 중", "PM 확인 필요"},
+           "요청 상태": {"백로그", "준비 중", "진행 중", "검토 중", "완료"}}
 KEY_RE = re.compile(r"gh:([1-9][0-9]*):issue:([1-9][0-9]*)\Z")
 
 
@@ -205,6 +208,45 @@ def bound_page(page, source_id):
     identifier(page["id"])
 
 
+def _verify_page_write_readback(page, source_id, page_id, expected_properties):
+    bound_page(page, source_id)
+    require(identifier(page.get("id")) == page_id and not is_archived(page),
+            "Notion write readback 페이지 ID/활성 상태 불일치")
+    for name, expected in expected_properties.items():
+        require(name in SCHEMA and isinstance(expected, dict) and
+                set(expected) == {SCHEMA[name]}, "Notion write 속성 계약 오류")
+        kind = SCHEMA[name]
+        response_property = page.get("properties", {}).get(name)
+        require(isinstance(response_property, dict) and
+                response_property.get("type", kind) == kind and kind in response_property,
+                "Notion write readback 속성 누락/타입 불일치")
+        actual = response_property[kind]
+        requested = expected[kind]
+        if kind in {"title", "rich_text"}:
+            require(isinstance(actual, list), "Notion write readback 텍스트 형식 오류")
+            actual_value = "".join(part.get("plain_text",
+                part.get("text", {}).get("content", "")) for part in actual)
+            requested_value = "".join(part["text"]["content"] for part in requested)
+            require(actual_value == requested_value,
+                    "Notion write readback 속성 값 불일치")
+        elif kind == "select":
+            actual_value = actual.get("name") if actual else None
+            requested_value = requested.get("name") if requested else None
+            require(actual_value == requested_value,
+                    "Notion write readback 속성 값 불일치")
+        elif kind == "date":
+            actual_value = actual.get("start") if actual else None
+            requested_value = requested.get("start") if requested else None
+            require((actual_value is None and requested_value is None) or
+                    (isinstance(actual_value, str) and isinstance(requested_value, str) and
+                     timestamp(actual_value) == timestamp(requested_value)),
+                    "Notion write readback 속성 값 불일치")
+        elif kind == "number":
+            require(actual == requested, "Notion write readback 속성 값 불일치")
+        elif kind == "url":
+            require(actual == requested, "Notion write readback 속성 값 불일치")
+
+
 def is_archived(page):
     return page.get("is_archived", False) or page.get("archived", False) or page.get("in_trash", False)
 
@@ -278,17 +320,25 @@ def sync(github, notion, source_id, control_id, *, dry_run=False):
             if date and timestamp(date["start"]) > timestamp(properties["GitHub 수정"]["date"]["start"]):
                 counts["newer_skipped"] += 1
                 continue
-            notion.request("PATCH", f"/pages/{identifier(row['id'])}",
-                           {"properties": {**properties, "동기화 시각": {"date": {"start": now}}}})
+            page_id = identifier(row["id"])
+            write_properties = {**properties,
+                                "동기화 시각": {"date": {"start": now}}}
+            notion.request("PATCH", f"/pages/{page_id}",
+                           {"properties": write_properties})
+            confirmed = notion.request("GET", f"/pages/{page_id}")
+            _verify_page_write_readback(confirmed, source_id, page_id, write_properties)
             counts["updated"] += 1
         else:
             update_pending(notion, source_id, control_id, key)
             # No retries on create, including definite errors. Persistent fence survives failure.
+            write_properties = {**properties,
+                                "동기화 시각": {"date": {"start": now}}}
             created = notion.request("POST", "/pages", {"parent": {"data_source_id": source_id},
-                                     "properties": {**properties, "동기화 시각": {"date": {"start": now}}}}, create=True)
-            row = notion.request("GET", f"/pages/{identifier(created['id'])}")
-            bound_page(row, source_id)
-            require(not is_archived(row) and read_text(row, "동기화 키") == key, "생성행 readback 불일치")
+                                     "properties": write_properties}, create=True)
+            page_id = identifier(created["id"])
+            row = notion.request("GET", f"/pages/{page_id}")
+            _verify_page_write_readback(row, source_id, page_id, write_properties)
+            require(read_text(row, "동기화 키") == key, "생성행 동기화 키 readback 불일치")
             update_pending(notion, source_id, control_id, "")
             index[key] = row
             counts["created"] += 1

@@ -1,0 +1,6 @@
+# Observed generation runtime from #33. Keep it when resolving a separate
+# benchmark environment; full benchmark package lock remains school-observed.
+torch==2.7.1+cu118
+transformers==4.57.1
+accelerate==1.15.0
+safetensors==0.8.0

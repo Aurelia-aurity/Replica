@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "run_id": "13395803-32f6-4070-9666-ac68a5afbf34",
+  "created_at": "2026-10-17T10:17:47.828630+00:00",
+  "execution_kind": "school_gpu_user_run",
+  "dataset_sha256": "e5dcc15082af5035ad9a3967e77ea027fc3b104ba297c841b0e81881a5fed686",
+  "rubric_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "config": {
+    "model_id": "kakaocorp/kanana-1.5-8b-instruct-2505",
+    "suite": "instructions",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+      "evaluation/collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+    },
+    "model_profile": "kanana-1.5-8b-instruct-2505",
+    "model_revision": "c963a5f4f6496c749f94064a20b33028b0db9f19",
+    "chat_template_kwargs": {},
+    "model_artifacts_sha256": {
+      "config.json": "9ee93dd19c07fbdf814478f42f013a0a28305792974b0c58134ea437ff6a7225",
+      "generation_config.json": "fe1560fb79f03c0355a2c5a56ff6f5fd845c233a89e06e1f32155e5b3a05b127",
+      "model-00001-of-00004.safetensors": "636be023406874bc59c62167c4d3b93ffe761a4c454f2062f0f8adb627d767aa",
+      "model-00002-of-00004.safetensors": "a45e6a3b5faa72d4f03ba65735e5b924bd832e211d13de13475e8a5c0c0ac593",
+      "model-00003-of-00004.safetensors": "242db2de2a9afea6d5848f4477a4eca067aae352f239907d1f1ec73bcf68904d",
+      "model-00004-of-00004.safetensors": "f936ffa1c2fa3918c3ce1233628453c24f2c8d53fb41aaf3b657a1e66f978150",
+      "model.safetensors.index.json": "d791e1e07fb157364752da8a03d1204e49b11a376e132a62de8a9ca6399b86e9",
+      "special_tokens_map.json": "7a6d7fa83a01e8192333cd7b848541159709c4b206739071980432612f807807",
+      "tokenizer.json": "31d17e500c82ff116fc14d4dd0106a08e49bd3512d8a81473047121ef8ea09f9",
+      "tokenizer_config.json": "b91085d61a2d8df5b774c8e607afce6bc7e01b1139fa95769f118be5bf2c7db6"
+    }
+  },
+  "config_sha256": "3927d28cdf1d35133ed4a609d105603c55ec9d3b284c1bb5655258f5b893236d",
+  "release": {
+    "schema_version": 1,
+    "dataset_id": "replica-issue36-v1",
+    "confirmation_status": "user_confirmed",
+    "confirmed_at": "2026-10-13",
+    "files": {
+      "record_qa.json": "0958c27c1b22e7a3bb5753c21e30caa9ab67557da250f75cd4297cadbcf7696a",
+      "instructions.json": "e5dcc15082af5035ad9a3967e77ea027fc3b104ba297c841b0e81881a5fed686",
+      "human.json": "d615102a588efed12f94a57d01f7822052ad7ceb0acc0595c4cbc5290f6309b0",
+      "scoring-contract.json": "c1ca94542afc6944b55fefa691620dd6abaf0adce27e69ca0031e6effb67a0fc",
+      "baseline-grounding-oracles.json": "c22fcc8f2c7acfbd1f9865ddf595aeadacdf7d8a1c0cbb10768576a672e143ef"
+    },
+    "rubric_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "git_commit": null,
+  "code_sha256": {
+    "common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+    "report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+    "run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+    "runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+  }
+}

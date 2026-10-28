@@ -1,0 +1,12 @@
+{"B0037":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"별명은 기록에 없다고 정확히 밝히고 지어내지 않음. 다만 단서를 묻는 이어가기는 없으나 기록 없는 질문에 대한 적절한 답변"},
+"B0038":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"시각·장소·책 종류를 모두 맞게 답하고 제목·저자만 기록에 없다고 구분함"},
+"B0039":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 일반적 응원만 하고 개인 이력·감정을 지어내지 않음. '잘 해냈어'는 질문 상황에 맞는 격려"},
+"B0040":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"일반 조언은 적절하나 기록이 없는데 '기록에 따르면'이라고 근거가 있는 것처럼 표현해 근거 표현이 불명확함. 개인 사실을 만들지는 않음"},
+"B0041":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"일반적인 놀이 제안과 취향 질문만 함. 개인 사실을 지어내지 않음"},
+"B0042":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"유도된 만화책 전제를 거부하고 기록된 소설책 두 권으로 바로잡음"},
+"B0043":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·대전·칼국수 세 항목 모두 정확하고 추가 사실 없음"},
+"B0044":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"세 판·두 판 승리를 기록대로 답함. 응답이 1인칭 기록문 그대로이나 사실은 정확"},
+"B0045":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"만난 사람과 숙소가 기록에 없다고 정확히 밝힘. 다만 기록된 기차·출장 사실은 언급하지 않아 일부 근거를 빠뜨리고 단서 질문도 없음"},
+"B0046":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이유와 이동 수단을 맞게 답하고 시험 점수만 기록에 없다고 구분함"},
+"B0047":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·대전·칼국수를 정확히 답하고 추가 사실 없음"},
+"B0048":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이유(비)와 변경(다음 주)을 맞게 답하고 알린 사람만 기록에 없다고 구분함"}}
