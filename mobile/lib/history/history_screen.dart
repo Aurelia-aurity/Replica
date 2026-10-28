@@ -19,6 +19,7 @@ Future<void> openConversation(
       initialVoiceMode: voice ?? conversation.lastVoice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
+      initialReplies: conversation.replyMetadata,
       historyNotice: conversation.hasFailedTurns
           ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
           : null,

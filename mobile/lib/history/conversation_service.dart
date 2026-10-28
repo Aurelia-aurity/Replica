@@ -16,8 +16,13 @@ abstract class ConversationService {
   Future<void> delete(String id);
 }
 
+abstract class DetailedConversationService implements ConversationService {
+  Future<ChatReply> sendDetailed(String id, String turnId, String message);
+  Future<SpeechAudio> synthesize(ChatReply reply);
+}
+
 /// Owned by one login generation, never shared between accounts or persisted.
-class MemoryConversationService implements ConversationService {
+class MemoryConversationService implements DetailedConversationService {
   MemoryConversationService({required this.backend, required this.chat});
   final BackendService backend;
   final ChatService chat;
@@ -45,14 +50,27 @@ class MemoryConversationService implements ConversationService {
         return item;
       });
   @override
-  Future<String> send(String id, String turnId, String message) =>
+  Future<String> send(String id, String turnId, String message) async =>
+      (await sendDetailed(id, turnId, message)).text;
+
+  @override
+  Future<ChatReply> sendDetailed(String id, String turnId, String message) =>
       backend.run(() async {
         final before = _items[id]!;
         for (final turn in before.turns) {
-          if (turn.id == turnId) return turn.answer!;
+          if (turn.id == turnId) {
+            return turn.replyDetails ??
+                ChatReply(text: turn.answer!, turnId: turnId);
+          }
         }
-        final answer = await backend.run(() => chat.reply(message));
-        if (answer.trim().isEmpty) throw const FormatException('Empty answer');
+        final detail = (await backend.run(
+          () async => chat is DetailedChatService
+              ? await (chat as DetailedChatService).replyDetailed(message)
+              : ChatReply(text: await chat.reply(message)),
+        )).withTurnId(turnId);
+        if (detail.text.trim().isEmpty) {
+          throw const FormatException('Empty answer');
+        }
         final now = DateTime.now();
         _items[id] = Conversation(
           id: id,
@@ -68,12 +86,20 @@ class MemoryConversationService implements ConversationService {
               number: before.turns.length + 1,
               createdAt: now,
               question: message,
-              answer: answer,
+              answer: detail.text,
+              replyDetails: detail,
             ),
           ],
         );
-        return answer;
+        return detail;
       });
+  @override
+  Future<SpeechAudio> synthesize(ChatReply reply) => backend.run(() async {
+    if (chat is DetailedChatService) {
+      return (chat as DetailedChatService).synthesize(reply);
+    }
+    throw UnsupportedError('No speech service');
+  });
   @override
   Future<void> delete(String id) => backend.run(() async {
     _items.remove(id);
@@ -81,7 +107,7 @@ class MemoryConversationService implements ConversationService {
 }
 
 /// Adapter for the supplied draft API. No preview credentials are sent here.
-class HttpConversationService implements ConversationService {
+class HttpConversationService implements DetailedConversationService {
   HttpConversationService({
     required this.backend,
     required this.baseUrl,
@@ -92,6 +118,7 @@ class HttpConversationService implements ConversationService {
   final http.Client client;
   // The draft session API has no initial input mode field. Keep it for this login.
   final _initialVoiceModes = <String, bool>{};
+  final _replyDetails = <String, Map<String, ChatReply>>{};
   @override
   bool get isDemo => false;
 
@@ -147,7 +174,14 @@ class HttpConversationService implements ConversationService {
       final items = (json['items'] as List).cast<Map<String, dynamic>>();
       final limit = json['limit'] as int;
       if (limit < 1) throw const FormatException('Invalid limit');
-      final page = items.map(ConversationTurn.fromJson).toList();
+      final page = items
+          .map(
+            (json) => ConversationTurn.fromJson(
+              json,
+              replyDetails: _replyDetails[id]?[json['turn_id']],
+            ),
+          )
+          .toList();
       if (page.any((turn) => turn.number <= after)) {
         throw const FormatException('Invalid turn cursor');
       }
@@ -244,29 +278,45 @@ class HttpConversationService implements ConversationService {
 
   @override
   Future<String> send(String id, String turnId, String message) async {
+    return (await sendDetailed(id, turnId, message)).text;
+  }
+
+  @override
+  Future<ChatReply> sendDetailed(
+    String id,
+    String turnId,
+    String message,
+  ) async {
     final json = await _request(
       'POST',
       '/chat/text',
       body: {'session_id': id, 'turn_id': turnId, 'message': message},
     ) as Map<String, dynamic>;
-    if (json['turn_id'] != turnId ||
-        json['is_ai_generated'] != true ||
-        json['answer'] is! String ||
-        (json['answer'] as String).trim().isEmpty) {
-      throw const FormatException('Invalid AI response');
-    }
-    return json['answer'] as String;
+    final reply = ChatReply.fromJson(json, expectedTurnId: turnId);
+    (_replyDetails[id] ??= {})[turnId] = reply;
+    return reply;
+  }
+
+  @override
+  Future<SpeechAudio> synthesize(ChatReply reply) async {
+    if (reply.turnId == null) throw const FormatException('Missing turn id');
+    final json = await _request(
+      'POST',
+      '/chat/turns/${Uri.encodeComponent(reply.turnId!)}/tts',
+    ) as Map<String, dynamic>;
+    return SpeechAudio.fromJson(json, reply.turnId!);
   }
 
   @override
   Future<void> delete(String id) async {
     await _request('DELETE', '/sessions/${Uri.encodeComponent(id)}');
     _initialVoiceModes.remove(id);
+    _replyDetails.remove(id);
   }
 }
 
 /// Keeps the turn ID stable for retries of the same failed message.
-class ConversationChatService implements ChatService {
+class ConversationChatService implements DetailedChatService {
   ConversationChatService(this.service, this.id);
   final ConversationService service;
   final String id;
@@ -275,11 +325,33 @@ class ConversationChatService implements ChatService {
   bool get isDemo => service.isDemo;
   @override
   Future<String> reply(String message) async {
+    return (await replyDetailed(message)).text;
+  }
+
+  @override
+  Future<ChatReply> replyDetailed(String message) async {
     if (_pendingMessage != message) _pendingId = newConversationId();
     _pendingMessage = message;
-    final answer = await service.send(id, _pendingId!, message);
+    final answer = service is DetailedConversationService
+        ? await (service as DetailedConversationService).sendDetailed(
+            id,
+            _pendingId!,
+            message,
+          )
+        : ChatReply(
+            text: await service.send(id, _pendingId!, message),
+            turnId: _pendingId,
+          );
     _pendingId = null;
     _pendingMessage = null;
     return answer;
+  }
+
+  @override
+  Future<SpeechAudio> synthesize(ChatReply reply) async {
+    if (service is DetailedConversationService) {
+      return (service as DetailedConversationService).synthesize(reply);
+    }
+    throw UnsupportedError('No speech service');
   }
 }

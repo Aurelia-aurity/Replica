@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import '../chat/chat_reply.dart';
+
 String newConversationId() {
   final random = Random.secure();
   final bytes = List.generate(16, (_) => random.nextInt(256));
@@ -19,6 +21,7 @@ class ConversationTurn {
     this.voice = false,
     this.questionStatus = 'done',
     this.answerStatus = 'done',
+    this.replyDetails,
   });
   final String id;
   final int number;
@@ -27,8 +30,12 @@ class ConversationTurn {
   final bool voice;
   final String questionStatus;
   final String? answerStatus;
+  final ChatReply? replyDetails;
 
-  factory ConversationTurn.fromJson(Map<String, dynamic> json) {
+  factory ConversationTurn.fromJson(
+    Map<String, dynamic> json, {
+    ChatReply? replyDetails,
+  }) {
     if (json['answer'] != null && json['is_ai_generated'] != true) {
       throw const FormatException('Missing AI disclosure');
     }
@@ -41,6 +48,24 @@ class ConversationTurn {
       voice: json['input_mode'] == 'voice',
       questionStatus: json['question_status'] as String,
       answerStatus: json['answer_status'] as String?,
+      replyDetails:
+          replyDetails ??
+          (json['answer'] is String
+              ? ChatReply(
+                  text: json['answer'] as String,
+                  turnId: json['turn_id'] as String,
+                  modelName: json['model_name'] as String?,
+                  timings: {
+                    for (final key in [
+                      'stt_ms',
+                      'llm_ms',
+                      'tts_ms',
+                      'total_ms',
+                    ])
+                      key: json[key] is int ? json[key] as int : null,
+                  },
+                )
+              : null),
     );
   }
 
@@ -112,6 +137,19 @@ class Conversation {
       if (turn.answer?.isNotEmpty == true) (text: turn.answer!, isUser: false),
     ],
   ];
+
+  Map<int, ChatReply> get replyMetadata {
+    final result = <int, ChatReply>{};
+    var index = 0;
+    for (final turn in turns) {
+      if (turn.question?.isNotEmpty == true) index++;
+      if (turn.answer?.isNotEmpty == true) {
+        result[index++] =
+            turn.replyDetails ?? ChatReply(text: turn.answer!, turnId: turn.id);
+      }
+    }
+    return result;
+  }
 }
 
 String conversationDateGroup(DateTime value, DateTime now) {
