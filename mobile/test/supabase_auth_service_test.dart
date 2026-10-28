@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -160,14 +162,36 @@ void main() {
         ),
       ),
     );
-    final auth = SupabaseAuthService(client);
-    await auth.signIn('synthetic@example.com', 'Example123!');
-    expect(auth.identity, isNotNull);
-    await Future<void>.delayed(const Duration(seconds: 6));
-    expect(auth.identity, isNull);
-    expect(auth.notice, contains('세션이 만료'));
-    auth.dispose();
-    await client.dispose();
+    addTearDown(client.dispose);
+    await client.auth.signInWithPassword(
+      email: 'synthetic@example.com',
+      password: 'Example123!',
+    );
+    final issuedAt = DateTime.fromMillisecondsSinceEpoch(
+      (client.auth.currentSession!.expiresAt! - 5) * 1000,
+    );
+    fakeAsync((time) {
+      final auth = SupabaseAuthService(
+        client,
+        now: () => issuedAt.add(time.elapsed),
+      );
+      final states = <String?>[];
+      auth.addListener(() => states.add(auth.identity?.id));
+      // Deliver queued initial/sign-in events before advancing virtual time.
+      time.flushMicrotasks();
+      expect(auth.identity, isNotNull);
+      expect(states, everyElement(userId));
+      states.clear();
+      time.elapse(const Duration(seconds: 4));
+      expect(auth.identity, isNotNull);
+      expect(states, isEmpty);
+      time.elapse(const Duration(seconds: 2));
+      expect(auth.identity, isNull);
+      expect(auth.notice, contains('세션이 만료'));
+      expect(states, [null]);
+      auth.dispose();
+      time.flushMicrotasks();
+    });
   });
 
   test(
