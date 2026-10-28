@@ -2,6 +2,8 @@
 
 2026-10-15 개정 · PM 방향 확정 · 교차 담당자 합의 및 구현 전
 
+2026-10-28 화자 역할·호칭 정보·기록 민감정보 마스킹: PM 결정 후 추가, 교차 담당자 재확인 필요 (윤서준·임재성).
+
 이 문서는 고도화 단계까지 합의할 호출 형태를 제안한다. 구현은 baseline부터 진행한다. 실제 호스트·서비스 인증 방식·수치 한도·시간 제한은 담당자와 확정해야 하며, 아래 경로는 현재 실행 가능한 URL이 아니다. 예제는 모두 합성 자료다.
 
 ## 담당 경계
@@ -110,9 +112,17 @@ POST /v1/persona/generate
 |---|---|
 | request_id, message, history, max_new_tokens | baseline과 같은 의미 |
 | persona_id | 백엔드가 권한을 확인한 대상 인물 |
+| persona | 필수 호칭 정보 객체. display_name, provider_address 모두 필수 |
+| persona.display_name | 정보 제공자가 페르소나를 부르는 호칭(예: "엄마"). 문자열 1~50자 |
+| persona.provider_address | 페르소나가 정보 제공자를 부르는 호칭. 문자열 1~50자 또는 미설정 시 null |
 | source_revision | 이번 검색·프로필 적용의 기준 자료 개정 번호 |
 | style_profile | 저장된 id, version, source_revision, source_snapshot_id, content |
-| evidence | AI 담당 모듈이 검색한 허용된 근거 목록. chunk_id, record_id, text_version_id, content |
+| evidence | AI 담당 모듈이 검색한 허용된 근거 목록. chunk_id, record_id, text_version_id, speaker_role, content |
+| evidence[].speaker_role | 필수 화자 역할. persona(선택된 페르소나), provider(정보 제공자·업로더), other(제3자) |
+
+persona의 두 호칭은 AI가 요청용으로 생성하지 않고 백엔드·DB에서 읽은 사용자 편집 가능 값을 전달한다. provider_address는 style_profile.content.speech_style.address_terms의 자동 추출 후보를 사용자가 확인·수정한 값이며, 미설정이면 null이다. style_profile의 address_terms는 자동 추출 후보 목록으로 유지한다.
+
+카카오톡 내보내기의 "나"는 업로더인 정보 제공자(provider)이자 페르소나와 대화하는 사용자다. persona는 SC-04에서 사용자가 선택한 화자다. persona 역할의 근거만 페르소나 본인의 발화·사실의 출처로 취급한다. provider 발화는 함께 겪은 사건을 설명할 수 있지만 문맥이며 페르소나 본인의 발화가 아니다. other 발화는 문맥 전용이며 페르소나 본인의 사실 근거로 쓰지 않는다. AI는 provider·other의 발화를 페르소나에게 귀속하지 않는다. 백엔드는 화자가 섞인 청크를 분할해 각 evidence 항목에 하나의 화자 역할만 담아야 한다.
 
 백엔드 AI 모듈이 현재 적용 가능한 프로필을 읽고 질문 임베딩과 search_record_chunks로 근거를 선택한다. 이전 확정본·삭제 중 자료·다른 인물의 자료는 제외한다. style_profile.source_snapshot_id는 실제 저장된 프로필의 전체 출처 스냅샷을 가리킨다. 전체 출처 목록과 현재 접근 가능 여부는 백엔드에서 확인하며 대화 호출에 전체 기록 ID를 나열하지 않는다. style_profile.source_revision은 요청의 source_revision과 같아야 한다. 호출 준비 중 자료가 변경되면 그 호출에 사용할 스냅샷 일치 여부를 다시 확인한다. GPU는 DB의 현재 상태를 알지 못하므로 접근 권한·최신성 보장의 주체는 백엔드다. 생성 도중 삭제·자료 변경이 발생한 답변의 저장·전달 전 재확인도 백엔드가 맡는다.
 
@@ -131,6 +141,12 @@ POST /v1/persona/generate
 개인 경험·관계·사실은 원본 기록 근거가 있을 때만 답한다. 관련 근거가 없으면 알 수 없다고 답하며 이는 HTTP 200이다. 일반 대화는 근거가 없어도 페르소나 말투를 적용할 수 있다. history는 문맥이며 원본 기록 근거로 취급하지 않고 자동 학습 자료로 편입하지 않는다. evidence_used는 입력 evidence의 부분집합이어야 한다. GPU의 근거 ID 반환이 답변의 사실성을 증명하지는 않으며 내용 검증은 별도 평가 대상이다.
 
 음성 질문도 STT 결과 텍스트로 같은 호출을 사용한다. 생성된 message를 백엔드가 TTS에 전달한다. 현재 초안은 음성용 별도 대본 재생성 API를 두지 않는다.
+
+## 기록 민감정보 마스킹
+
+기록 업로드 시 제공 동의를 받되, 백엔드는 저장·임베딩 전에 전화번호, 주민등록번호, 계좌·카드번호, 상세 주소, 건강정보 등 민감한 개인정보를 마스킹한다. analyze의 sources[].target_utterances와 개인화 대화의 evidence[].content는 이미 마스킹된 상태로 전달한다. 표기는 [전화번호], [주소], [계좌번호], [주민등록번호], [건강정보], [이름] 같은 대괄호 플레이스홀더를 사용한다. AI는 플레이스홀더를 그대로 유지하고 가려진 값을 추측·복원하거나 이런 민감정보 값을 생성하지 않는다.
+
+정확한 마스킹 탐지 방식·대상 목록은 백엔드·DB 담당 범위이며 이 계약에서 확정하지 않는다. history는 사용자↔AI 대화 이력으로 이 기록 마스킹 규칙의 대상이 아니다. 백엔드가 history에도 마스킹을 적용할지는 미정이다.
 
 ## 한도와 문맥 처리
 

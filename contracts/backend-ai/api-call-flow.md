@@ -40,6 +40,7 @@ GPU에는 매 호출의 request_id와 논리 노드 node_id를 따로 보낸다.
 앱 → 백엔드: 질문과 대화 세션
   → 백엔드: 사용자·페르소나·세션 권한 확인, 최근 완결 대화 조회
   → AI 모듈: 현재 유효 명세 조회, 질문 임베딩, 허용 기록 검색
+  → 백엔드: 저장된 사용자 편집 호칭을 persona에 구성, 근거를 화자별로 분할하고 speaker_role 지정
   → GPU: POST /v1/persona/generate
   → 백엔드: request_id·적용 프로필·사용 근거와 현재 자료 유효성 확인
   → DB: 현재 대화 시도로 결과 저장
@@ -49,6 +50,8 @@ GPU에는 매 호출의 request_id와 논리 노드 node_id를 따로 보낸다.
 - 개인화 대화: examples/03-persona-request.json → examples/03-persona-response.json
 - 근거 없는 개인 사실 질문: examples/04-no-evidence-request.json → examples/04-no-evidence-response.json. 추측하지 않는 정상 답변이다.
 - baseline: examples/01-baseline-request.json → examples/01-baseline-response.json. 명세·근거를 보내지 않는다.
+
+개인화 요청의 persona에는 display_name과 provider_address(미설정 시 null)를 넣는다. provider_address는 style_profile.content.speech_style.address_terms의 자동 추출 후보를 사용자가 확인·수정한 값이다. evidence는 저장·임베딩 전에 백엔드가 민감정보를 마스킹한 내용이며, 각 항목의 speaker_role은 persona·provider·other 중 하나다. AI는 persona 역할만 본인의 발화·사실 출처로 쓰고 provider·other 발화를 페르소나에게 귀속하지 않으며 마스킹 플레이스홀더를 유지한다. 세부 규칙과 미정인 history 마스킹 정책은 통합 명세를 따른다.
 
 음성 대화도 STT 결과 텍스트를 같은 generate 요청의 message에 담는다. LLM이 적용한 말투로 생성한 응답 message를 백엔드가 TTS에 전달한다. 텍스트 세션의 음성 입력 버튼과 음성 대화 세션의 구분은 앱·백엔드 계약을 따른다. GPU에 음성 파일이나 TTS 자격증명을 보내지 않는다.
 
