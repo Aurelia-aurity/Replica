@@ -95,6 +95,15 @@ python -X utf8 -m unittest discover -s tests -v
 
 배포 순서: #63 실패 호출부의 ID 전달 수정 반영 → `guard_llm_request_id.sql` 적용 → `verify_llm_request_id.sql` 롤백 검증. 이미 적용된 `weekend_integration.sql`은 재실행하지 않는다. 이번 리뷰 보완에서는 후속 함수 교체와 성공·실패/잘못된 ID/다른 사용자/재시도/기존 호출 호환 검사를 한 트랜잭션에서 실행하고 ROLLBACK했으며, 후속 SQL을 원격 DB에 영구 적용하지 않았다.
 
+### 2026-10-28 리뷰 보완 검증
+
+- #63 F1 수정 커밋 `f548b84`: LLM 실패 완료에 원래 요청 ID를 전달한다. AI 오류·예상 밖 예외 모두 실패 저장 후 수동 재시도에서 새 ID를 사용하는 회귀 검사를 추가했다. #63 단독 `pytest`: 128개 통과.
+- DB 단독 `pytest`: 48개 통과·실제 연결 선택 검사 7개 skip. ID 없는 연결 시도 완료는 RPC 호출 전에 거부하고, ID 없는 기존 시도의 성공·실패는 기존 RPC로 전달하는 것을 검사했다.
+- #63 수정 커밋을 #61 작업 브랜치에 병합해 README·설정 예시·DB 저장 코드의 충돌을 해결했다. 이는 main 병합이 아니며 #63 선병합 뒤 #61의 base를 main으로 변경하는 절차를 유지한다. 원래 #45의 SQL·검증·문서와 HTTP 500/55000 분류 보완도 유지한다.
+- Python 3.12.14에서 합친 `backend`의 기본 `pytest`: **176개 통과·7개 skip**, subtest 29개 통과. `PYTHONPATH`를 추가하지 않았다. Starlette TestClient의 기존 의존성 사용 중단 안내 1개가 있다.
+- `.github/workflows/backend-tests.yml`에 Python 3.12 / Ubuntu·Windows의 오프라인 pytest를 추가했다. 실제 DB 읽기·쓰기 검사는 CI에서 명시적으로 비활성화한다. GitHub 실행 결과는 별도 확인한다.
+- SQL 교체·합성 시나리오 롤백 후 persona/session/turn 각 0건, 기존 Auth 2명 유지, 후속 SQL 영구 미적용을 확인했다. 실제 앱·GPU·음성 공급자 통합이나 운영 배포 시험은 아니다.
+
 데이터 변경이 있는 통합 시험은 기본 비활성이다. 개발 프로젝트의 서버 설정이 들어 있는 로컬 `.env`가 있고, 운영자가 임시 계정 생성·정리에 동의한 경우에만 실행한다. PowerShell:
 
 ```powershell

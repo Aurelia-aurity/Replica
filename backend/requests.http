@@ -1,0 +1,43 @@
+### VS Code REST Client 확장으로 각 요청 위의 "Send Request"를 누르면 실행됩니다.
+@base = http://localhost:8000
+
+### 서버 상태 확인
+GET {{base}}/health
+
+### 텍스트 대화
+POST {{base}}/chat/text
+Content-Type: application/json
+
+{
+  "message": "엄마, 오늘 뭐 했어?",
+  "persona_id": null,
+  "history": []
+}
+
+### 음성 대화 (backend 폴더에 sample.m4a 같은 녹음 파일을 두고 파일명을 맞추세요)
+POST {{base}}/chat/voice
+Content-Type: multipart/form-data; boundary=----replica
+
+------replica
+Content-Disposition: form-data; name="file"; filename="sample.m4a"
+Content-Type: audio/mp4
+
+< ./sample.m4a
+------replica--
+
+### STT 단독 확인
+POST {{base}}/stt
+Content-Type: multipart/form-data; boundary=----replica
+
+------replica
+Content-Disposition: form-data; name="file"; filename="sample.m4a"
+Content-Type: audio/mp4
+
+< ./sample.m4a
+------replica--
+
+### TTS 단독 확인 (응답이 음성 파일이라 REST Client에서는 크기만 보입니다. Swagger에서 재생해 보세요)
+POST {{base}}/tts
+Content-Type: application/json
+
+{ "text": "안녕, 밥은 먹었니?" }
