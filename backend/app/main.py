@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import chat, health, speech
+from app.core.errors import register_error_handlers
+from app.routers import chat, health, personas, sessions, speech
 
 settings = get_settings()
 
@@ -26,6 +27,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+register_error_handlers(app)
+
 app.include_router(health.router)
+app.include_router(personas.router)
+app.include_router(sessions.router)
 app.include_router(chat.router)
 app.include_router(speech.router)

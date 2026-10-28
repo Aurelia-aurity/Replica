@@ -1,18 +1,13 @@
-"""대화 파이프라인: (음성이면) STT → LLM → (음성이면) TTS. 구간별 시간을 잰다(NFR-01)."""
+"""STT·TTS 단독 확인용 호출(개발 점검용 /stt, /tts). 구간별 시간을 잰다(NFR-01).
 
-import base64
+대화 흐름(텍스트·음성)은 chat_text.py, chat_voice.py, turn_stages.py에 있다.
+"""
+
 import time
 
-from app.clients.llm import get_llm_client
 from app.clients.stt import get_stt_client
 from app.clients.tts import get_tts_client
-from app.schemas.chat import (
-    ChatTextRequest,
-    ChatTextResponse,
-    ChatVoiceResponse,
-    SttResponse,
-    Timings,
-)
+from app.schemas.chat import SttResponse, Timings
 
 
 def _ms(start: float) -> int:
@@ -28,43 +23,3 @@ async def transcribe(audio: bytes, filename: str, content_type: str | None) -> S
 
 async def synthesize(text: str) -> tuple[bytes, str]:
     return await get_tts_client().synthesize(text)
-
-
-async def chat_text(req: ChatTextRequest) -> ChatTextResponse:
-    t0 = time.perf_counter()
-    llm = get_llm_client()
-    answer = await llm.generate(req.message, req.history, req.persona_id)
-    llm_ms = _ms(t0)
-    return ChatTextResponse(
-        answer=answer,
-        model_name=llm.name,
-        timings=Timings(llm_ms=llm_ms, total_ms=llm_ms),
-    )
-
-
-async def chat_voice(
-    audio: bytes, filename: str, content_type: str | None, persona_id: str | None
-) -> ChatVoiceResponse:
-    start = time.perf_counter()
-
-    t = time.perf_counter()
-    transcript = await get_stt_client().transcribe(audio, filename, content_type)
-    stt_ms = _ms(t)
-
-    t = time.perf_counter()
-    llm = get_llm_client()
-    answer = await llm.generate(transcript, [], persona_id)
-    llm_ms = _ms(t)
-
-    t = time.perf_counter()
-    speech, fmt = await get_tts_client().synthesize(answer)
-    tts_ms = _ms(t)
-
-    return ChatVoiceResponse(
-        transcript=transcript,
-        answer=answer,
-        model_name=llm.name,
-        audio_base64=base64.b64encode(speech).decode("ascii"),
-        audio_format=fmt,
-        timings=Timings(stt_ms=stt_ms, llm_ms=llm_ms, tts_ms=tts_ms, total_ms=_ms(start)),
-    )

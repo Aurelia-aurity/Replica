@@ -7,6 +7,7 @@ API 키 같은 비밀값은 .env에만 두고 저장소에 올리지 않는다(N
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,11 @@ class Settings(BaseSettings):
 
     # 외부 연동 방식. 값만 바꿔 mock ↔ 실제 구현을 교체한다(NFR-05).
     llm_mode: Literal["mock", "remote"] = "mock"
+    # LLM_MODE=remote일 때만 쓴다. 시간 제한 수치는 GPU 측정과 합의 전이라 기본값을 두지 않는다.
+    llm_server_url: str | None = None
+    llm_server_token: SecretStr | None = None  # 서비스 인증 방식은 #14 확인 후 확정. 지금은 Bearer로 보낸다.
+    llm_timeout_seconds: float | None = Field(default=None, gt=0)
+    llm_model_name: str = "Qwen2.5-7B-Instruct"
     stt_provider: str = "mock"
     tts_provider: str = "mock"
 
