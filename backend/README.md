@@ -15,7 +15,7 @@ FastAPI 기반 사용자·기록·대화 API와 외부 STT·TTS 연동을 관리
   STT·TTS는 아직 **Mock**입니다. 공급자와 호출 규격이 정해지면 `app/clients/stt.py`, `tts.py`에 구현을 추가합니다.
 - `/stt`, `/tts`는 개발 점검용이며 로그인 없이 Mock으로 동작합니다.
 - LLM은 `LLM_MODE=mock`(고정 응답) 또는 `remote`(AI 서버 호출 계약 `../contracts/baseline`, 담당자 합의 전)입니다.
-- `app/db/`는 PR #61(`jaesung_41-db-integration`, #45 위에 쌓인 후속 PR)의 DB 모듈 사본입니다. 두 PR이 병합되면 같은 파일이므로 그쪽을 기준으로 합니다.
+- `app/db/`는 PR #45·#61의 Supabase DB 모듈입니다. #63의 API와 함께 검증하며, #61의 요청 ID 검증 보완을 유지합니다.
   AI 요청 ID를 DB에 먼저 기록해 결과 저장 때 확인하고, `finish_reason`·전체 소요시간(`total_ms`)을 저장하며, 이력은 DB의 최근 20쌍 조회를 씁니다.
 
 ## 폴더 구조
@@ -39,7 +39,7 @@ backend/
 
 ## 실행 (Windows, VS Code)
 
-VS Code에서 `backend` 폴더를 연 뒤 터미널(Ctrl+`)에서 실행합니다.
+Python 3.12를 사용합니다. VS Code에서 `backend` 폴더를 연 뒤 터미널(Ctrl+`)에서 실행합니다.
 
 ```powershell
 python -m venv .venv
@@ -98,9 +98,20 @@ AWS EC2 배포 시에는 외부 노출을 막기 위해 `-p 127.0.0.1:8000:8000`
 | `APP_ENV` | local | local / dev / prod |
 | `LOG_LEVEL` | INFO | 로그 레벨 |
 | `CORS_ORIGINS` | `["*"]` | 허용 출처 (JSON 배열). 배포 시 웹앱 도메인으로 제한 |
-| `LLM_MODE` | mock | mock: 고정 응답, remote: 학교 GPU 서버 호출(미구현) |
+| `LLM_MODE` | mock | mock: 고정 응답, remote: 학교 GPU 서버 호출(실제 서버 통합 미검증) |
 | `STT_PROVIDER` | mock | mock 또는 STT 공급자 |
 | `TTS_PROVIDER` | mock | mock 또는 TTS 공급자 |
 | `MAX_UPLOAD_MB` | 25 | 음성 업로드 최대 크기(MB) |
 
 API 키 등 비밀 값은 `.env`에만 기록하고 커밋하지 않습니다.
+
+## DB 모듈과 초기화
+
+- [함수 인자·반환값·호출 예시](../docs/architecture/db-python-api.md), [통합 인계와 SQL 적용 순서](../docs/architecture/db-weekend-integration.md), [스키마·권한·검증 SQL](../infra/supabase/README.md).
+- DB 모듈은 표준 라이브러리를 사용합니다. FastAPI 서버·전체 테스트는 Python 3.12와 `requirements-dev.txt`가 필요합니다.
+- 서버 시작 시 설정 팩토리를 만들고, 각 요청의 JWT를 `await database.for_user(access_token)`으로 확인합니다. 사용자 객체를 다른 요청과 공유하지 않습니다.
+- DB 모듈 자체는 `.env`를 자동 탐색하지 않습니다. API의 `load_db_settings()`가 실행 폴더의 `.env`를 명시적으로 읽고 환경변수를 우선 적용합니다. DB만 사용할 때는 `Settings.from_env()` 또는 명시적 `Settings.from_env_file(path)`를 사용합니다.
+- LLM은 `start_chat_stage(..., request_id=...)`에 쓴 ID를 성공·실패의 `finish_chat_stage`에도 전달합니다. 누락 시 충돌로 거부하며, ID 없이 시작한 기존 호출은 호환됩니다.
+- PR 병합은 원격 DB를 초기화하지 않습니다. 기존 적용 이력을 확인하고 새 환경은 스키마 순서에 맞춰 초기화합니다. 이미 적용한 SQL은 재실행하지 않습니다. `guard_llm_request_id.sql`은 #63 실패 호출부 수정 반영 후 적용합니다.
+- DB 테스트만 실행: `python -m unittest discover -s tests -p "test_db*.py" -v`. 전체 백엔드 테스트는 `pytest`이며 `PYTHONPATH=.:tests`는 필요하지 않습니다.
+- 실제 읽기 검사는 `REPLICA_DB_LIVE_TEST=1`일 때만, 합성 계정 생성·정리는 `REPLICA_DB_MUTATING_TEST=1`일 때만 실행합니다. 기본 테스트와 CI는 둘 다 비활성입니다. 쓰기 시험은 통합 인계 문서의 동의·정리 절차를 따릅니다.
