@@ -113,7 +113,7 @@ seed 59로 섞은 `blind-items.json`에는 opaque bid와 기록·질문·정답 
 
 ### Prompt revision r2 (DEV-only)
 
-`generate.py --prompt-version r1|r2` selects the prompt revision; the default is
+`generate.py --prompt-version r1|r2|r3` selects the prompt revision; the default is
 `r1`. Its rendered messages remain byte-identical to the frozen r1
 `results/generation/prompts.jsonl`. Prompt and generation rows now include
 `prompt_version`; older generation rows without the field load as r1.
@@ -140,6 +140,30 @@ Local r2 verification: `67 passed, 2 warnings in 1.70s` (existing Typer/Click
 deprecations); `bash -n` and Python compilation passed. The r2 CLI dry run emitted
 240 prompts (80 per condition) without loading a model. LSP remained unavailable
 because `basedpyright-langserver` is not installed.
+
+### Prompt revision r3 (minimal r1 change)
+
+r3 keeps the r1 structure and user template. It replaces the conflicting
+source-explanation/follow-up wording with gentle factual correction and a brief
+in-character unknown, then adds short instructions for relevant evidence only,
+usually 1–3 sentences, no closing questions/offers or source commentary, and the
+persona's register in every sentence (including a compact 하게체 example), without
+emoji. It does not reuse r2's rule blocks. Frozen r1 and r2 input artifacts are
+checked byte-for-byte; A/B/C evidence selection and decoding are unchanged.
+The supplied DEV regression analysis informed the change; no generation responses
+or judge labels were opened for this revision.
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python generate.py --prompt-version r3 --dry-run \
+  --output /Users/admin/Project/Replica/.local-work/rag/prompt-r3/dry-run
+```
+
+The existing batch wrapper also accepts `REPLICA_PROMPT_VERSION=r3`; choose a
+fresh output directory. The fixed local `ACCEPTANCE_r3.md` governs later adoption:
+one r3 generation run only, all nine criteria must pass, otherwise retain r1 and
+stop tuning this round. CPU dry runs prepare 240 inputs, not quality evidence.
+No GPU generation, batch submission, or judge execution is part of this change.
 
 로컬 pytest는 `54 passed, 2 warnings in 0.99s`였다. 경고 2개는 기존 Typer/Click deprecation이다. CPU dry run은 `DRY_RUN_DONE prompts=240 conditions={'A': 80, 'B': 80, 'C': 80} model_loaded=False`로 끝났다. `bash -n run-generate.sbatch`와 새 Python 파일의 `py_compile`도 통과했다.
 

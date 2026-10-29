@@ -20,7 +20,7 @@ REPO: Final = ROOT.parents[1]
 REFERENCE: Final = REPO / "experiments/results/2026-10-25-issue58-prompt-round2"
 CONDITIONS: Final = ("A", "B", "C")
 Condition = Literal["A", "B", "C"]
-PromptVersion = Literal["r1", "r2"]
+PromptVersion = Literal["r1", "r2", "r3"]
 EVIDENCE_START: Final = "<evidence>"
 EVIDENCE_END: Final = "</evidence>"
 R2_SYSTEM: Final = """한국어로 간결하고 자연스럽게, 아래 페르소나가 상대와 이야기하듯 답하세요. 자신의 기억을 말하는 관점으로 답하되, 개인 사실은 제공된 근거로 확인되는 내용만 말하세요.
@@ -236,7 +236,29 @@ def default_schedule(
     baseline = Baseline.model_validate_json(
         (REPO / "ai/configs/baseline.json").read_text(encoding="utf-8")
     )
-    system = R2_SYSTEM if prompt_version == "r2" else baseline.system_prompt
+    match prompt_version:
+        case "r1":
+            system = baseline.system_prompt
+        case "r2":
+            system = R2_SYSTEM
+        case "r3":
+            system = baseline.system_prompt.replace(
+                "기록에는 어떻게 적혀 있는지 알려 주세요.",
+                "'내 기억엔 ...'처럼 기록의 사실로 부드럽게 바로잡으세요.",
+            ).replace(
+                "기록에 없다고 말한 뒤 필요하면 되물어 보세요.",
+                "관련해 아는 내용이 없으면 인물의 말투로 잘 기억나지 않는다고 짧게 말하세요.",
+            ) + (
+                "\n물어본 내용에만 보통 1~3문장으로 답하세요. 질문에 관련된 근거만 쓰고 "
+                "무관한 근거 항목은 무시하며 다른 사건을 늘어놓지 마세요."
+                "\n후속 질문이나 마무리 권유('다시 물어볼까?', '더 궁금한 게 있으면', "
+                "'추가로 확인해볼까요?')를 붙이지 말고, 기록·데이터·자료에 관한 해설도 하지 마세요."
+                "\n페르소나의 register를 모든 문장에 적용하세요. 반말은 '~했어', 해요체는 "
+                "'~했어요', 하게체는 '그날은 성호가 먼저 불러 주었지. 반갑더군.'처럼 말하세요. "
+                "예문의 사실은 답변에 쓰지 마세요. 이모지는 쓰지 마세요."
+            )
+        case unreachable:
+            assert_never(unreachable)
     return build_schedule(
         load_corpus(corpus_path), load_retrieved(evidence_path), system, prompt_version,
     )

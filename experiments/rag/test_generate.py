@@ -26,7 +26,7 @@ def retrieved():
     return load_retrieved(ROOT / "results/kure/evidence.json")
 
 
-@pytest.fixture(params=["r1", "r2"])
+@pytest.fixture(params=["r1", "r2", "r3"])
 def schedule(request):
     return default_schedule(prompt_version=request.param)
 
@@ -41,17 +41,33 @@ def without_evidence(prompt):
     return prompt.messages[0], before, after
 
 
-def test_r1_rendering_when_compared_with_frozen_prompts():
-    # Given: the original r1 artifact, compared mechanically without inspecting TEST.
-    frozen = (ROOT / "results/generation/prompts.jsonl").read_bytes().splitlines()
-    # When: render the default version and remove only the new metadata field.
+@pytest.mark.parametrize("version,directory", [
+    ("r1", "generation"), ("r2", "generation-r2"),
+])
+def test_legacy_rendering_when_compared_with_frozen_prompts(version, directory):
+    # Given: original input artifacts, compared mechanically without inspecting responses.
+    frozen = (ROOT / "results" / directory / "prompts.jsonl").read_bytes().splitlines()
+    # When: render the version, removing metadata only for the pre-version r1 artifact.
     rendered = [
-        p.model_dump_json(exclude={"prompt_version"}).encode("utf-8")
-        for p in default_schedule()
+        p.model_dump_json(exclude={"prompt_version"} if version == "r1" else set()).encode("utf-8")
+        for p in default_schedule(prompt_version=version)
     ]
     # Then: every original row, including message bytes, is unchanged.
     assert len(frozen) == len(rendered) == 240
     assert all(old == new for old, new in zip(frozen, rendered, strict=True))
+
+
+def test_user_rendering_when_r3_selected():
+    # Given: the baseline user messages and evidence schedule.
+    original = default_schedule()
+    # When: select r3.
+    revised = default_schedule(prompt_version="r3")
+    # Then: only the system message and version can change.
+    assert [
+        p.model_dump(exclude={"messages", "prompt_version"}) for p in revised
+    ] == [p.model_dump(exclude={"messages", "prompt_version"}) for p in original]
+    assert [p.messages[1] for p in revised] == [p.messages[1] for p in original]
+    assert all(p.messages[0] != old.messages[0] for p, old in zip(revised, original, strict=True))
 
 
 def test_prompt_metadata_when_version_selected(schedule):
@@ -225,7 +241,7 @@ def test_blind_loader_rejects_when_schedule_invalid(schedule, tmp_path, mutation
         load_generations(artifact, schedule)
 
 
-@pytest.mark.parametrize("version", ["r1", "r2"])
+@pytest.mark.parametrize("version", ["r1", "r2", "r3"])
 def test_dry_run_when_cpu_only_subprocess(tmp_path, version):
     # Given: a fresh CPU process and a new artifact directory.
     output = tmp_path / "dry-run"
