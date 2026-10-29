@@ -1,0 +1,79 @@
+{
+  "environment": {
+    "python": "3.12.7",
+    "packages": {
+      "torch": "2.7.1+cu118",
+      "transformers": "4.57.1",
+      "accelerate": "1.15.0",
+      "safetensors": "0.8.0"
+    },
+    "torch_cuda_build": "11.8",
+    "gpu_name": "NVIDIA RTX A6000",
+    "gpu_total_memory_bytes": 51041271808,
+    "gpu_capability": [
+      8,
+      6
+    ],
+    "dtype": "bfloat16",
+    "device": "cuda:0",
+    "attention": "eager",
+    "cache_policy": "generation_default_fresh_per_call",
+    "resident_allocated_bytes": 16383586816,
+    "resident_reserved_bytes": 16385048576,
+    "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "model_revision_status": "declared_by_profile",
+    "driver_version": null
+  },
+  "prompt_version": "r3",
+  "config": {
+    "model_id": "Qwen/Qwen3-8B",
+    "suite": "human",
+    "system_prompt": "한국어로 간결하고 자연스럽게 답하세요.",
+    "do_sample": false,
+    "warmups": 3,
+    "rounds": 3,
+    "max_new_tokens": 160,
+    "supplement_max_new_tokens": 320,
+    "evaluation_code_sha256": {
+      "evaluation/assets.py": "ec58e65d2220ed8c90f1fc4ab7eb81e108f1993ac19d0bdd72e9bd3c3dead408",
+      "evaluation/collect.py": "38ff14710405d1540ead272427694e46b6099a32795fbbc6f0f469f3b7717223",
+      "evaluation/human.py": "423fd67b496c65d05e51d313943487a900ec87f9a2f078fda82b7ae38bbdff3a",
+      "evaluation/kobest.py": "1be7206a7798f270924085f3d8a9680de2302f662d431fae88255e8e5b065504",
+      "evaluation/report.py": "b10be10775830825e2188f124a9532c05d3159f7aae874de73b13d5e07029382",
+      "evaluation/run.py": "618fe438d8a1204080d529ebe256e5db7178e164fe3ab45540df54114d43d3cb",
+      "evaluation/scoring.py": "2ffbb29345dcaff9c02bf7b4c738f86c2a732df2994ae8cc18b51106ad210ca5",
+      "baseline/common.py": "6ef2681eaa2020e850c7c5a4527a4793f469b74d647d150588ce4d90708dc3e2",
+      "baseline/report.py": "c1fbda74692cd3776e67660a749f651101e7422cd0bc332bc3b8278e9c228fdb",
+      "baseline/run.py": "2df2d8757267f5d0b703da2ca93c1435f97b11527fcf39bf2eeb8e92758e493e",
+      "baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd"
+    },
+    "model_profile": "qwen3-8b",
+    "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "conditions": [
+    "A",
+    "B",
+    "C"
+  ],
+  "rounds": 1,
+  "warmups_per_condition": 3,
+  "seed": null,
+  "temperature": null,
+  "settings_note": "As #58: no seed or temperature override; greedy GenerationConfig",
+  "model_path": "/abr/coss40/replica-models/Qwen3-8B",
+  "input_sha256": {
+    "experiments/rag/corpus.json": "b77a30348e89f528499edb671ebff3aa777a7ecab133d49b38b1129d1cdcde3b",
+    "experiments/rag/corpus.py": "10a7b54bfd662c727cce66e261a1b718c3824559df7bba65f9cdf06105300d53",
+    "experiments/rag/generate.py": "7a432cc7074e40d9dfb467e07b5b97d7aefd3692558cf927e28b3f592c9ad107",
+    "experiments/rag/results/kure/evidence.json": "a8d1542dac4a4189f40a4fae1e40b24eaa1aac161e37dcaf26d400dd52732329",
+    "experiments/rag/results/kure/calibration.json": "9ff44d47f829566a1b963c00e1d71d8288bab8a9d130bbd752f211a03e4100ee",
+    "experiments/rag/results/kure/manifest.json": "f41ff7e8022bcf5ca19932e3eb8c58666a45341a79a33af05e4188e5b14bde70",
+    "ai/configs/baseline.json": "fcdc39fde92bbc3ee5137ffba4b62b2984c0fa59075921fede529d20cce8528d",
+    "experiments/baseline/runtime.py": "d7db63e4465be2b8a1dd84b25fd481c7b9ef6a92a8d46e9bf10d4f2bf4f389cd",
+    "experiments/results/2026-10-25-issue58-prompt-round2/environment.json": "1a733dc9126f207d8d56b19b9fb9cd85a2bd0e6fe730deabf2b35f58f29f9637"
+  },
+  "prompts_sha256": "c2fc5eefcd90b9aa5b06abb9bc0181ab4e97e667d648e56dcf8ec21c3bea80c7"
+}
