@@ -68,6 +68,8 @@ class Question(FrozenModel):
     support: tuple[Support, ...]
     expected_answer: str | None
     note: str
+    required_slots: tuple[str, ...]
+    slot_surface_forms: dict[str, tuple[str, ...]] = Field(default_factory=dict)
 
 
 class Corpus(FrozenModel):
@@ -215,7 +217,7 @@ class CorpusIntegrityError(ValueError):
 def validate(corpus: Corpus) -> tuple[Chunk, ...]:
     """Reject invalid IDs, family leakage, unsupported gold and role misattribution.
 
-    Exact quotes prove fixture correspondence, not automatic semantic entailment.
+    Exact quotes and slot surfaces prove correspondence, not semantic entailment.
     Semantic gold and absence rationales were written/reviewed before retrieval.
     """
     failures: list[str] = []
@@ -292,6 +294,21 @@ def validate(corpus: Corpus) -> tuple[Chunk, ...]:
             failures.append(f"answerability/gold mismatch: {label}")
         if needs_evidence != bool(question.expected_answer):
             failures.append(f"answerability/answer mismatch: {label}")
+        if needs_evidence != bool(question.required_slots):
+            failures.append(f"answerability/slots mismatch: {label}")
+        if len(question.required_slots) != len(set(question.required_slots)):
+            failures.append(f"duplicate required slot: {label}")
+        if set(question.slot_surface_forms) - set(question.required_slots):
+            failures.append(f"unknown slot surface key: {label}")
+        support_text = "\n".join(s.quote for s in question.support)
+        for slot in question.required_slots:
+            surfaces = (slot, *question.slot_surface_forms.get(slot, ()))
+            if any(not surface.strip() for surface in surfaces):
+                failures.append(f"blank slot/surface: {label}")
+            elif not any(surface in support_text for surface in surfaces):
+                failures.append(f"required slot absent from gold support: {label}: {slot}")
+        if any(not forms for forms in question.slot_surface_forms.values()):
+            failures.append(f"empty slot surfaces: {label}")
         if question.type in {"multi", "ambiguity"} and len(gold) < 2:
             failures.append(f"multi requires two chunks: {label}")
         if question.type == "single" and len(gold) != 1:
@@ -336,6 +353,7 @@ def main() -> None:
     print("PASS: unique IDs; disjoint families; valid scoped gold; exact support quotes")
     print("PASS: unanswerable/ordinary gold empty; all factual gold persona-spoken")
     print("PASS: per-persona event families; known-name/noun particle checks")
+    print("PASS: factual required slots covered by exact gold support surfaces")
 
 
 if __name__ == "__main__":

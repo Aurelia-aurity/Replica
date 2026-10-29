@@ -4,10 +4,12 @@ from uuid import NAMESPACE_URL, uuid5
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from corpus import (
     CorpusIntegrityError,
     Evidence,
+    Question,
     QuestionType,
     Split,
     chunk_corpus,
@@ -55,6 +57,87 @@ def test_chunks_stable_when_input_order_reversed(corpus):
     reordered = {c.chunk_id: c for c in chunk_corpus(reversed_corpus)}
     # Then: chunk identity/content does not depend on traversal order.
     assert original == reordered
+
+
+def test_required_slots_mandatory_when_question_parsed(corpus):
+    # Given: a serialized question with its slot annotation removed.
+    data = corpus.questions[0].model_dump()
+    del data["required_slots"]
+    # When / Then: the boundary refuses an unannotated question.
+    with pytest.raises(ValidationError):
+        Question.model_validate(data)
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing", "empty", "blank", "duplicate", "unknown_surface",
+    "blank_surface", "empty_surface", "nonfactual",
+])
+def test_required_slots_rejected_when_annotation_invalid(corpus, mutation):
+    # Given: a single invalid slot contract, independent of the authored prose.
+    questions = list(corpus.questions)
+    q = questions[0]
+    match mutation:
+        case "missing":
+            q = q.model_copy(update={"required_slots": ("absent-slot",)})
+        case "empty":
+            q = q.model_copy(update={"required_slots": ()})
+        case "blank":
+            q = q.model_copy(update={"required_slots": (" ",)})
+        case "duplicate":
+            q = q.model_copy(update={"required_slots": (q.required_slots[0],) * 2})
+        case "unknown_surface":
+            q = q.model_copy(update={"slot_surface_forms": {"unknown": ("surface",)}})
+        case "blank_surface":
+            q = q.model_copy(update={
+                "slot_surface_forms": {q.required_slots[0]: ("",)},
+            })
+        case "empty_surface":
+            q = q.model_copy(update={
+                "slot_surface_forms": {q.required_slots[0]: ()},
+            })
+        case "nonfactual":
+            q = q.model_copy(update={
+                "type": "unanswerable", "gold_chunk_ids": (), "support": (),
+                "expected_answer": None, "note": "No evidence.",
+            })
+    questions[0] = q
+    damaged = corpus.model_copy(update={"questions": tuple(questions)})
+    # When / Then: neither missing facts nor vacuous annotations pass.
+    with pytest.raises(CorpusIntegrityError):
+        validate(damaged)
+
+
+def test_required_slot_surface_when_gold_uses_alternative(corpus):
+    # Given: a canonical slot represented by an explicitly listed gold surface.
+    q = corpus.questions[0]
+    changed = q.model_copy(update={
+        "required_slots": ("canonical-slot",),
+        "slot_surface_forms": {"canonical-slot": (q.support[0].answer,)},
+    })
+    changed_corpus = corpus.model_copy(update={
+        "questions": (changed, *corpus.questions[1:]),
+    })
+    # When: validate the real support-to-chunk correspondence and surface.
+    chunks = validate(changed_corpus)
+    # Then: a nonliteral but declared surface is supported.
+    assert chunks == chunk_corpus(corpus)
+
+
+def test_required_slots_reject_when_fact_outside_support(corpus):
+    # Given: an omitted fact still present in the same full gold chunk.
+    q = next(q for q in corpus.questions if len(q.required_slots) > 1)
+    slot = next(s for s in q.required_slots if s != q.support[0].answer)
+    narrowed = q.support[0].model_copy(update={"quote": q.support[0].answer})
+    changed = q.model_copy(update={
+        "required_slots": (slot,), "slot_surface_forms": {},
+        "support": (narrowed,),
+    })
+    changed_corpus = corpus.model_copy(update={
+        "questions": (changed, *corpus.questions[1:]),
+    })
+    # When / Then: full-chunk presence cannot hide an incomplete support quote.
+    with pytest.raises(CorpusIntegrityError, match="required slot absent"):
+        validate(changed_corpus)
 
 
 def test_diary_paragraphs_when_blank_lines_present(corpus):

@@ -3,22 +3,26 @@
 import json
 import subprocess
 import sys
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
 
 from build_blind import assemble
-from corpus import ROOT, Evidence, load_corpus, validate
+from corpus import ROOT, Evidence, validate
+from historical import HISTORICAL_CORPUS, historical_question, load_historical_corpus
 from generate import (
     EVIDENCE_END, EVIDENCE_START, Generation, InputError,
     build_schedule, default_schedule, load_generations, load_retrieved,
 )
 from retrieval import Trace, select_evidence
 
+default_schedule = partial(default_schedule, corpus_path=HISTORICAL_CORPUS)
+
 
 @pytest.fixture
 def corpus():
-    return load_corpus()
+    return load_historical_corpus()
 
 
 @pytest.fixture
@@ -42,7 +46,7 @@ def without_evidence(prompt):
 
 
 @pytest.mark.parametrize("version,directory", [
-    ("r1", "generation"), ("r2", "generation-r2"),
+    ("r1", "generation"), ("r2", "generation-r2"), ("r3", "generation-r3"),
 ])
 def test_legacy_rendering_when_compared_with_frozen_prompts(version, directory):
     # Given: original input artifacts, compared mechanically without inspecting responses.
@@ -112,7 +116,10 @@ def test_condition_evidence_when_real_frozen_threshold_applied(schedule, corpus)
     # Given: independently replayed frozen traces at the DEV-fitted threshold.
     threshold = json.loads((ROOT / "results/kure/calibration.json").read_text())["threshold"]
     raw = json.loads((ROOT / "results/kure/traces.json").read_text())
-    traces = [Trace.model_validate(t) for rows in raw.values() for t in rows]
+    traces = [
+        Trace.model_validate({**t, "question": historical_question(t["question"])})
+        for rows in raw.values() for t in rows
+    ]
     selected = {t.question.question_id: select_evidence(t, threshold).evidence for t in traces}
     chunks = {c.chunk_id: c for c in validate(corpus)}
     questions = {q.question_id: q for q in corpus.questions}
@@ -249,7 +256,8 @@ def test_dry_run_when_cpu_only_subprocess(tmp_path, version):
     result = subprocess.run(
         [sys.executable, "-c",
          "import sys; from pathlib import Path; from generate import main; "
-         "main(dry_run=True, output=Path(sys.argv[1]), prompt_version=sys.argv[2]); "
+         "from historical import HISTORICAL_CORPUS; "
+         "main(dry_run=True, output=Path(sys.argv[1]), prompt_version=sys.argv[2], corpus=HISTORICAL_CORPUS); "
          "assert not {'torch', 'transformers', 'runtime'} & sys.modules.keys()",
          str(output), version],
         cwd=ROOT, text=True, capture_output=True, check=True,
@@ -288,7 +296,7 @@ def test_generation_artifacts_when_existing_runtime_adapter_supplied(tmp_path, m
     monkeypatch.setitem(sys.modules, "common", SimpleNamespace(EvaluationError=FakeEvaluationError))
     output = tmp_path / "generation"
     # When: drive the real orchestration without a GPU or an external model.
-    main(output=output, prompt_version=schedule[0].prompt_version)
+    main(output=output, prompt_version=schedule[0].prompt_version, corpus=HISTORICAL_CORPUS)
     # Then: 240 persisted replies match their rendered prompts, plus nine warmups.
     rows = load_generations(output / "generations.jsonl", schedule)
     assert len(calls) == 249

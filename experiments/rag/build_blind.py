@@ -9,7 +9,8 @@ from typing import Final, Literal, assert_never
 import typer
 
 from corpus import ROOT, Corpus, FrozenModel, Persona, Question, validate, load_corpus
-from generate import Generation, InputError, default_schedule, load_generations
+from generate import Generation, InputError, PromptVersion, default_schedule, load_generations
+from historical import HISTORICAL_CORPUS, load_input_corpus
 
 SEED: Final = 59
 Profile = Literal["calm", "elder", "unknown"]
@@ -150,10 +151,14 @@ def assemble(
 def main(
     generations: Path,
     output: Path = ROOT / ".cache/blind-001",
+    corpus_path: Path = HISTORICAL_CORPUS,
+    prompt_version: PromptVersion = "r1",
 ) -> None:
     """Require a complete 240-response schedule and emit no condition labels to judges."""
-    corpus = load_corpus()
-    rows = load_generations(generations, default_schedule())
+    corpus = load_input_corpus(corpus_path)
+    rows = load_generations(
+        generations, default_schedule(corpus_path=corpus_path, prompt_version=prompt_version),
+    )
     blind, key, profiles = assemble(rows, corpus)
     output.mkdir(parents=True, exist_ok=False)
     artifacts = {
@@ -164,7 +169,7 @@ def main(
             "seed": SEED,
             "items": len(blind),
             "generations_sha256": sha256(generations.read_bytes()).hexdigest(),
-            "corpus_sha256": sha256((ROOT / "corpus.json").read_bytes()).hexdigest(),
+            "corpus_sha256": sha256(corpus_path.read_bytes()).hexdigest(),
             "unknown_profile_bids": [bid for bid, profile in profiles.items() if profile == "unknown"],
             "limitations": [
                 "Existing live hybrid judge rejects unknown profiles (hageche); do not relabel them.",

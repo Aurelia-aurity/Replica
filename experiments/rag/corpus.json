@@ -1393,7 +1393,7 @@
     },
     {
       "record_id": "ed82baa3-6e3e-5802-b192-c1e39eba9051",
-      "text_version_id": "692ec1ca-7ed5-5fe3-a311-a2fba94829de",
+      "text_version_id": "575c58dc-8ef5-5877-9f20-398ed61bf505",
       "alias": "p3-temple-walk-c",
       "persona_id": "p3",
       "family_id": "p3-temple-walk",
@@ -1409,7 +1409,7 @@
         },
         {
           "speaker": "다온",
-          "text": "아니. 내려올 땐 작은 마을버스 탔어. 발이 너무 뜨겁더라."
+          "text": "아니. 8월 15일에 절 갔던 날, 돌멩이를 빼고 나서는 작은 마을버스 탔어. 발이 너무 뜨겁더라."
         },
         {
           "speaker": "나",
@@ -2622,7 +2622,12 @@
         }
       ],
       "expected_answer": "소담이가 발로 박자를 맞춰 줬다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "소담",
+        "발로",
+        "박자"
+      ]
     },
     {
       "question_id": "q-p1-school-stage-single-2",
@@ -2630,7 +2635,7 @@
       "family_id": "p1-school-stage",
       "split": "dev",
       "type": "single",
-      "question": "기타 연주할 때 곡을 막판에 바꿨다며. 결국 뭘 쳤어?",
+      "question": "연주할 때 곡을 막판에 바꿨다며. 결국 뭘 쳤어?",
       "gold_chunk_ids": [
         "e5f7ebd8-65f0-588f-8036-d93834a46b09"
       ],
@@ -2642,7 +2647,10 @@
         }
       ],
       "expected_answer": "봄소풍을 쳤다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "봄소풍"
+      ]
     },
     {
       "question_id": "q-p1-robot-club-multi-3",
@@ -2663,12 +2671,24 @@
         },
         {
           "chunk_id": "79ad7b33-fd56-5828-9f30-5766b5b2f330",
-          "quote": "마루가 다시 납땜해 줬더니 됐어.",
+          "quote": "모터가 아니라 왼쪽 센서 선이 느슨했어. 마루가 다시 납땜해 줬더니 됐어.",
           "answer": "마루"
         }
       ],
       "expected_answer": "느린 번개 팀이고, 마루가 느슨한 왼쪽 센서 선을 다시 납땜했다.",
-      "note": "서로 다른 주의 기록 두 개를 결합한다."
+      "note": "서로 다른 주의 기록 두 개를 결합한다.",
+      "required_slots": [
+        "느린 번개",
+        "마루",
+        "느슨한",
+        "왼쪽 센서 선",
+        "납땜"
+      ],
+      "slot_surface_forms": {
+        "느슨한": [
+          "느슨했어"
+        ]
+      }
     },
     {
       "question_id": "q-p1-bus-card-multi-4",
@@ -2694,7 +2714,12 @@
         }
       ],
       "expected_answer": "편의점 복사기 앞에서 꺼냈고, 편의점 아저씨가 계산대 서랍에 보관했다.",
-      "note": "분실 일기와 다음 날 회수 대화의 사실이다."
+      "note": "분실 일기와 다음 날 회수 대화의 사실이다.",
+      "required_slots": [
+        "편의점 복사기",
+        "편의점 아저씨",
+        "계산대 서랍"
+      ]
     },
     {
       "question_id": "q-p1-umbrella-unanswerable-5",
@@ -2706,7 +2731,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "우산 브랜드는 어느 기록에도 없다."
+      "note": "우산 브랜드는 어느 기록에도 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p1-umbrella-false_premise-6",
@@ -2721,12 +2747,23 @@
       "support": [
         {
           "chunk_id": "07531d23-ca1a-5c7c-8c9e-d3a337f8343e",
-          "quote": "정류장까지 둘이 갔다.",
+          "quote": "도담이가 자기 우산을 같이 쓰자고 해서 정류장까지 둘이 갔다.",
           "answer": "둘이"
         }
       ],
       "expected_answer": "도담이와 우산을 같이 쓰고 갔다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "도담",
+        "우산",
+        "같이"
+      ],
+      "slot_surface_forms": {
+        "같이": [
+          "같이 쓰자고",
+          "둘이"
+        ]
+      }
     },
     {
       "question_id": "q-p1-study-spots-ambiguity-7",
@@ -2751,8 +2788,14 @@
           "answer": "보람"
         }
       ],
-      "expected_answer": "기말 전 토요일은 누리와 분식집, 시험 바로 전날은 보람이와 빵집 이층이다.",
-      "note": "비슷한 두 공부 모임을 날짜 없이 지칭한다."
+      "expected_answer": "누리와는 동네 분식집에서, 보람이와는 빵집 이층에서 공부했다.",
+      "note": "비슷한 두 공부 모임을 날짜 없이 지칭한다. RCA: 질문이 묻는 장소·동행만 정답으로 요구하고 gold 밖의 시험 전날 등 날짜 구분은 제외했다.",
+      "required_slots": [
+        "누리",
+        "분식집",
+        "보람",
+        "빵집 이층"
+      ]
     },
     {
       "question_id": "q-p1-study-spots-ordinary_chat-8",
@@ -2764,7 +2807,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p1-watercolor-single-9",
@@ -2784,7 +2828,10 @@
         }
       ],
       "expected_answer": "작은 섬 풍경을 그렸다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "작은 섬 풍경"
+      ]
     },
     {
       "question_id": "q-p1-watercolor-single-10",
@@ -2804,7 +2851,10 @@
         }
       ],
       "expected_answer": "바람 쉬는 섬이다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "바람 쉬는 섬"
+      ]
     },
     {
       "question_id": "q-p1-library-helper-multi-11",
@@ -2830,7 +2880,12 @@
         }
       ],
       "expected_answer": "어린이실 책 정리이고 화요일 오후에 간다.",
-      "note": "첫날 일기와 다음 주 일정 대화를 결합한다."
+      "note": "첫날 일기와 다음 주 일정 대화를 결합한다.",
+      "required_slots": [
+        "어린이실",
+        "책 정리",
+        "화요일 오후"
+      ]
     },
     {
       "question_id": "q-p1-camp-multi-12",
@@ -2856,7 +2911,18 @@
         }
       ],
       "expected_answer": "초롱이가 설거지를 도왔고 조는 정리상을 받았다.",
-      "note": "행사 당시와 귀가 뒤 대화의 사실이다."
+      "note": "행사 당시와 귀가 뒤 대화의 사실이다.",
+      "required_slots": [
+        "초롱",
+        "설거지",
+        "정리상"
+      ],
+      "slot_surface_forms": {
+        "설거지": [
+          "혼자 설거지",
+          "헹구는 걸 도와"
+        ]
+      }
     },
     {
       "question_id": "q-p1-skateboard-unanswerable-13",
@@ -2868,7 +2934,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "바퀴 치수는 어느 기록에도 없다."
+      "note": "바퀴 치수는 어느 기록에도 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p1-skateboard-false_premise-14",
@@ -2888,7 +2955,11 @@
         }
       ],
       "expected_answer": "첫날에는 묘기를 못 했다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "묘기",
+        "못 했다"
+      ]
     },
     {
       "question_id": "q-p1-birthday-plans-ambiguity-15",
@@ -2899,22 +2970,36 @@
       "question": "생일에 집에서 친구랑 놀았다는 얘기 있잖아. 누구네서 뭘 한 거야?",
       "gold_chunk_ids": [
         "9810a8c2-5ca6-57b1-abac-d8013691cc5d",
-        "7e3fa748-c0a2-50ea-886a-01b9840a1854"
+        "7e3fa748-c0a2-50ea-886a-01b9840a1854",
+        "c7752048-9030-5101-9056-c29319b4e1e3"
       ],
       "support": [
         {
           "chunk_id": "9810a8c2-5ca6-57b1-abac-d8013691cc5d",
-          "quote": "은결이랑 거실 바닥에서 오래된 보드게임을 꺼냈다.",
+          "quote": "내 생일엔 집에서 놀았다. 은결이랑 거실 바닥에서 오래된 보드게임을 꺼냈다.",
           "answer": "은결"
         },
         {
           "chunk_id": "7e3fa748-c0a2-50ea-886a-01b9840a1854",
-          "quote": "이번엔 같이 쿠키 구웠어.",
+          "quote": "그건 내 생일 때고, 이번엔 같이 쿠키 구웠어.",
           "answer": "쿠키"
+        },
+        {
+          "chunk_id": "c7752048-9030-5101-9056-c29319b4e1e3",
+          "quote": "응. 이번엔 시온이네 집에 갔어.",
+          "answer": "시온이네 집"
         }
       ],
       "expected_answer": "자기 생일에는 자기 집에서 은결이와 보드게임, 시온이 생일에는 시온이네서 쿠키를 구웠다.",
-      "note": "서로 다른 두 생일과 집을 구별해야 한다."
+      "note": "서로 다른 두 생일과 집을 구별해야 한다.",
+      "required_slots": [
+        "내 생일",
+        "집에서",
+        "은결",
+        "보드게임",
+        "시온이네 집",
+        "쿠키"
+      ]
     },
     {
       "question_id": "q-p1-birthday-plans-ordinary_chat-16",
@@ -2926,7 +3011,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p2-moving-house-single-17",
@@ -2946,7 +3032,11 @@
         }
       ],
       "expected_answer": "부엌 창문으로 들어오는 오후 햇빛이다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "부엌 창문",
+        "오후 햇빛"
+      ]
     },
     {
       "question_id": "q-p2-moving-house-single-18",
@@ -2966,7 +3056,11 @@
         }
       ],
       "expected_answer": "가온이가 자기 차로 도왔다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "가온",
+        "자기 차"
+      ]
     },
     {
       "question_id": "q-p2-dog-sitting-multi-19",
@@ -2992,7 +3086,11 @@
         }
       ],
       "expected_answer": "이름은 두부이고 철길 옆 산책로로 다녔다.",
-      "note": "맡긴 첫날과 주말 대화를 결합한다."
+      "note": "맡긴 첫날과 주말 대화를 결합한다.",
+      "required_slots": [
+        "두부",
+        "철길 옆 산책로"
+      ]
     },
     {
       "question_id": "q-p2-bread-class-multi-20",
@@ -3018,7 +3116,13 @@
         }
       ],
       "expected_answer": "새봄이 생일 선물로 예약했고 유리 볼을 먼저 사려 했다.",
-      "note": "수업 일기와 며칠 뒤 구매 계획을 결합한다."
+      "note": "수업 일기와 며칠 뒤 구매 계획을 결합한다.",
+      "required_slots": [
+        "새봄",
+        "생일 선물",
+        "예약",
+        "유리 볼"
+      ]
     },
     {
       "question_id": "q-p2-deadline-unanswerable-21",
@@ -3030,7 +3134,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "업무 시간과 수당 금액은 기록하지 않았다."
+      "note": "업무 시간과 수당 금액은 기록하지 않았다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p2-deadline-false_premise-22",
@@ -3045,12 +3150,23 @@
       "support": [
         {
           "chunk_id": "2817ef7b-63eb-52cb-aa78-d2f36e4068fb",
-          "quote": "저녁 약속은 취소하고 사무실에 남았다.",
+          "quote": "퇴근 버튼을 누르기 직전에 수정 요청이 왔다. 문장을 고치는 건 금방인데 표가 계속 밀려서 시간이 걸렸다. 결국 저녁 약속은 취소하고 사무실에 남았다.",
           "answer": "취소"
         }
       ],
       "expected_answer": "약속을 취소하고 사무실에 남아 수정했다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "저녁 약속",
+        "취소",
+        "사무실에 남아",
+        "수정"
+      ],
+      "slot_surface_forms": {
+        "사무실에 남아": [
+          "사무실에 남았다"
+        ]
+      }
     },
     {
       "question_id": "q-p2-seaside-weekends-ambiguity-23",
@@ -3061,22 +3177,37 @@
       "question": "바닷가 갔다가 뭐 먹었다는 날, 같이 간 사람이랑 어디서 먹었는지 헷갈려.",
       "gold_chunk_ids": [
         "e2148709-defb-57c6-ad43-d75179ed679c",
-        "6221ea99-fd08-5a41-a478-b29d815d40f9"
+        "6221ea99-fd08-5a41-a478-b29d815d40f9",
+        "f85fdf15-a63a-5eac-935d-c55d55100dad"
       ],
       "support": [
         {
           "chunk_id": "e2148709-defb-57c6-ad43-d75179ed679c",
-          "quote": "나래랑 간 동쪽 포구",
+          "quote": "나래랑 간 동쪽 포구는 바람이 너무 세서 돗자리도 못 폈다. 둘이 방파제 아래 작은 국숫집으로 피신했다.",
           "answer": "나래"
         },
         {
           "chunk_id": "6221ea99-fd08-5a41-a478-b29d815d40f9",
           "quote": "모래사장에 앉아서 김밥 먹었어.",
           "answer": "김밥"
+        },
+        {
+          "chunk_id": "f85fdf15-a63a-5eac-935d-c55d55100dad",
+          "quote": "아니, 이번엔 로운이랑 서쪽 해변 갔어. 날이 잔잔했어.",
+          "answer": "로운"
         }
       ],
       "expected_answer": "나래와 동쪽 포구에서는 국숫집, 로운과 서쪽 해변에서는 모래사장에서 김밥을 먹었다.",
-      "note": "바닷가 나들이 두 번이 같은 사건군이다."
+      "note": "바닷가 나들이 두 번이 같은 사건군이다.",
+      "required_slots": [
+        "나래",
+        "동쪽 포구",
+        "국숫집",
+        "로운",
+        "서쪽 해변",
+        "모래사장",
+        "김밥"
+      ]
     },
     {
       "question_id": "q-p2-seaside-weekends-ordinary_chat-24",
@@ -3088,7 +3219,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p2-film-club-single-25",
@@ -3108,7 +3240,10 @@
         }
       ],
       "expected_answer": "물속의 편지다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "물속의 편지"
+      ]
     },
     {
       "question_id": "q-p2-film-club-single-26",
@@ -3128,7 +3263,17 @@
         }
       ],
       "expected_answer": "질문 카드를 한 장씩 나눠 줬다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "질문 카드",
+        "한 장씩",
+        "나눠 줬다"
+      ],
+      "slot_surface_forms": {
+        "나눠 줬다": [
+          "돌려 줬는데"
+        ]
+      }
     },
     {
       "question_id": "q-p2-coffee-grinder-multi-27",
@@ -3154,7 +3299,17 @@
         }
       ],
       "expected_answer": "이웃에 소음이 들릴까 봐 바꿨고 코르크 매트를 밑에 댔다.",
-      "note": "구매 당시와 사용 뒤 보완을 결합한다."
+      "note": "구매 당시와 사용 뒤 보완을 결합한다.",
+      "required_slots": [
+        "이웃 소음",
+        "코르크 매트",
+        "밑에"
+      ],
+      "slot_surface_forms": {
+        "이웃 소음": [
+          "벽 너머에 들릴까 봐"
+        ]
+      }
     },
     {
       "question_id": "q-p2-food-volunteer-multi-28",
@@ -3180,7 +3335,13 @@
         }
       ],
       "expected_answer": "빈 통 확인과 뚜껑 닫기를 맡았고 다음 달 둘째 일요일에 다시 가기로 했다.",
-      "note": "봉사 당일과 후속 일정 세션을 결합한다."
+      "note": "봉사 당일과 후속 일정 세션을 결합한다.",
+      "required_slots": [
+        "빈 통",
+        "확인",
+        "뚜껑 닫",
+        "다음 달 둘째 일요일"
+      ]
     },
     {
       "question_id": "q-p2-car-repair-unanswerable-29",
@@ -3192,7 +3353,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "공임이나 청구 금액은 쓰지 않았다."
+      "note": "공임이나 청구 금액은 쓰지 않았다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p2-car-repair-false_premise-30",
@@ -3207,12 +3369,24 @@
       "support": [
         {
           "chunk_id": "ea52945c-bdc8-5930-9e26-b35fe4b89e10",
-          "quote": "부품을 바꾸지는 않고 연결만 다시 조였다.",
+          "quote": "큰 고장일까 봐 겁났는데 정비소에서는 배터리 단자가 느슨한 거라고 했다. 부품을 바꾸지는 않고 연결만 다시 조였다.",
           "answer": "연결만"
         }
       ],
       "expected_answer": "교체하지 않고 느슨한 단자 연결만 조였다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "교체하지 않음",
+        "느슨한",
+        "단자",
+        "연결",
+        "조였다"
+      ],
+      "slot_surface_forms": {
+        "교체하지 않음": [
+          "부품을 바꾸지는 않고"
+        ]
+      }
     },
     {
       "question_id": "q-p2-wedding-guests-ambiguity-31",
@@ -3223,22 +3397,36 @@
       "question": "결혼식에서 봉투 냈다는 얘기 있잖아. 어느 예식이었고 누가 맡았던 거지?",
       "gold_chunk_ids": [
         "ab87ba0e-f435-5eb2-87d3-45e3f854d913",
-        "697814a5-21b1-5634-9a7a-62a447f4c1b1"
+        "697814a5-21b1-5634-9a7a-62a447f4c1b1",
+        "f4c8aabf-8393-5e96-8405-988cac1d11e6"
       ],
       "support": [
         {
           "chunk_id": "ab87ba0e-f435-5eb2-87d3-45e3f854d913",
-          "quote": "다인이 결혼식에 갔는데",
+          "quote": "다인이 결혼식에 갔는데 아는 얼굴이 많아 대기실부터 정신없었다. 축의금 봉투는 모아가 대표로 모아서 냈다.",
           "answer": "다인"
         },
         {
           "chunk_id": "697814a5-21b1-5634-9a7a-62a447f4c1b1",
           "quote": "이번에는 각자 냈어. 나는 접수대에 직접 냈고.",
           "answer": "각자"
+        },
+        {
+          "chunk_id": "f4c8aabf-8393-5e96-8405-988cac1d11e6",
+          "quote": "응. 이번엔 회사 선배 결혼식이었어. 지난번 친구들 모인 날이랑 달라.",
+          "answer": "회사 선배 결혼식"
         }
       ],
       "expected_answer": "다인이 결혼식에서는 모아가 모아서 냈고, 회사 선배 결혼식에서는 각자 직접 냈다.",
-      "note": "두 예식의 비슷한 봉투 이야기를 구분한다."
+      "note": "두 예식의 비슷한 봉투 이야기를 구분한다.",
+      "required_slots": [
+        "다인",
+        "모아",
+        "모아서 냈",
+        "회사 선배 결혼식",
+        "각자",
+        "직접 냈"
+      ]
     },
     {
       "question_id": "q-p2-wedding-guests-ordinary_chat-32",
@@ -3250,7 +3438,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p3-grandma-birthday-single-33",
@@ -3270,7 +3459,10 @@
         }
       ],
       "expected_answer": "들깨미역국이다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "들깨미역국"
+      ]
     },
     {
       "question_id": "q-p3-grandma-birthday-single-34",
@@ -3290,7 +3482,11 @@
         }
       ],
       "expected_answer": "누리가 밤이 들어간 케이크를 사 왔다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "누리",
+        "밤이 들어간"
+      ]
     },
     {
       "question_id": "q-p3-kimchi-sharing-multi-35",
@@ -3298,7 +3494,7 @@
       "family_id": "p3-kimchi-sharing",
       "split": "dev",
       "type": "multi",
-      "question": "무가 매워서 어떻게 손봤더라? 알려 준 분한테는 뭘 담아 드렸어?",
+      "question": "무가 매워서 어떻게 손봤더라? 알려 준 분은 누구였고, 그분께 드릴 때 어떤 크기와 재질의 통에 담았어?",
       "gold_chunk_ids": [
         "dd713a5a-4fc4-5980-a22d-4906a6a07159",
         "95bc0dcd-368d-5d13-9336-afdd78fe9b16"
@@ -3306,17 +3502,22 @@
       "support": [
         {
           "chunk_id": "dd713a5a-4fc4-5980-a22d-4906a6a07159",
-          "quote": "배를 갈아 넣어 보라고 알려 줬다.",
+          "quote": "옆집 아람 씨가 배를 갈아 넣어 보라고 알려 줬다.",
           "answer": "배"
         },
         {
           "chunk_id": "95bc0dcd-368d-5d13-9336-afdd78fe9b16",
-          "quote": "작은 유리 통째로 줬어.",
+          "quote": "아람 씨한테 작은 유리 통째로 줬어.",
           "answer": "유리 통"
         }
       ],
       "expected_answer": "배를 갈아 넣었고 아람 씨에게 작은 유리 통에 담아 드렸다.",
-      "note": "조리한 날과 익은 뒤 나눔 대화를 결합한다."
+      "note": "RCA: 음식과 용기가 혼동되던 뭘 담아 드렸어를 알려 준 사람과 통의 크기·재질을 묻는 질문으로 바꿨다.",
+      "required_slots": [
+        "배를 갈아",
+        "아람 씨",
+        "작은 유리 통"
+      ]
     },
     {
       "question_id": "q-p3-balcony-plants-multi-36",
@@ -3324,7 +3525,7 @@
       "family_id": "p3-balcony-plants",
       "split": "dev",
       "type": "multi",
-      "question": "시들해 보이던 꽃은 어떤 데로 옮겼고, 물 줄 때는 뭘 보고 정해?",
+      "question": "시들해 보이던 꽃은 어떤 데로 옮겼고, 물 줄 때는 어떤 도구로 흙의 어떤 상태를 확인해?",
       "gold_chunk_ids": [
         "ca2e629f-8e02-56d2-90b8-962b76add1b9",
         "f7641556-4290-5860-a43e-74b3f90f661d"
@@ -3342,7 +3543,18 @@
         }
       ],
       "expected_answer": "흰색 긴 화분으로 옮겼고 나무젓가락으로 흙 마른 상태를 보고 물을 준다.",
-      "note": "분갈이 일기와 관리 대화가 필요하다."
+      "note": "RCA: 뭘 보고 정해를 도구와 흙의 상태를 함께 묻도록 바꿔 나무젓가락도 필수 답임을 명시했다.",
+      "required_slots": [
+        "흰색 긴 화분",
+        "나무젓가락",
+        "흙이 마른",
+        "물주기"
+      ],
+      "slot_surface_forms": {
+        "물주기": [
+          "흙이 마른 게 보일 때 줘"
+        ]
+      }
     },
     {
       "question_id": "q-p3-fridge-repair-unanswerable-37",
@@ -3354,7 +3566,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "기사 방문 시각은 기록하지 않았다."
+      "note": "기사 방문 시각은 기록하지 않았다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p3-fridge-repair-false_premise-38",
@@ -3369,12 +3582,17 @@
       "support": [
         {
           "chunk_id": "d94b1d1d-22e0-599d-bfb5-fc7c376357bb",
-          "quote": "모터는 이상 없다고 하셨다.",
+          "quote": "긴 반찬통이 문을 밀고 있었던 거였다. 모터는 이상 없다고 하셨다.",
           "answer": "이상 없"
         }
       ],
       "expected_answer": "모터는 이상 없었고 긴 반찬통이 문을 밀고 있었다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "모터는 이상 없",
+        "긴 반찬통",
+        "문을 밀고"
+      ]
     },
     {
       "question_id": "q-p3-market-visits-ambiguity-39",
@@ -3400,7 +3618,13 @@
         }
       ],
       "expected_answer": "예담 씨를 만난 날은 팥죽, 보람 씨와 간 날은 잣죽을 먹었다.",
-      "note": "시장 식사 두 번을 구별해야 한다."
+      "note": "시장 식사 두 번을 구별해야 한다.",
+      "required_slots": [
+        "예담",
+        "팥죽",
+        "보람 씨",
+        "잣죽"
+      ]
     },
     {
       "question_id": "q-p3-market-visits-ordinary_chat-40",
@@ -3412,7 +3636,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p3-sewing-apron-single-41",
@@ -3427,12 +3652,17 @@
       "support": [
         {
           "chunk_id": "c07e67b0-d5e6-5982-ae70-d0d7e313a656",
-          "quote": "끈 대신 옆에 단추 두 개를 달았다.",
+          "quote": "앞치마 끈이 자꾸 풀려서 직접 고쳐 봤다. 재봉틀은 오래 안 써서 밑실 감는 것부터 기억이 안 났다. 설명서를 한참 들여다보다 끈 대신 옆에 단추 두 개를 달았다.",
           "answer": "단추 두 개"
         }
       ],
       "expected_answer": "앞치마 끈 대신 단추 두 개를 달았다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "앞치마",
+        "끈 대신",
+        "단추 두 개"
+      ]
     },
     {
       "question_id": "q-p3-sewing-apron-single-42",
@@ -3447,12 +3677,17 @@
       "support": [
         {
           "chunk_id": "d22d1e64-4b48-5035-baa0-3805fa46ce30",
-          "quote": "줄무늬 베개 커버 잘라서 덧댔어.",
+          "quote": "너 어릴 때 쓰던 줄무늬 베개 커버 잘라서 덧댔어.",
           "answer": "베개 커버"
         }
       ],
       "expected_answer": "어릴 때 쓰던 줄무늬 베개 커버를 잘랐다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "어릴 때 쓰던",
+        "줄무늬 베개 커버",
+        "잘라"
+      ]
     },
     {
       "question_id": "q-p3-temple-walk-multi-43",
@@ -3463,7 +3698,7 @@
       "question": "절 올라가다 쉬면서 뭘 마셨고, 돌아올 때는 어떻게 내려왔어?",
       "gold_chunk_ids": [
         "371cf3b1-6028-5264-a571-61ef33812033",
-        "59d53d3f-48c5-5dd9-8f45-c9a98b7869a6"
+        "dd18b622-a06b-53ab-aafd-ec10b4a54775"
       ],
       "support": [
         {
@@ -3472,13 +3707,17 @@
           "answer": "연근차"
         },
         {
-          "chunk_id": "59d53d3f-48c5-5dd9-8f45-c9a98b7869a6",
-          "quote": "작은 마을버스 탔어.",
+          "chunk_id": "dd18b622-a06b-53ab-aafd-ec10b4a54775",
+          "quote": "8월 15일에 절 갔던 날, 돌멩이를 빼고 나서는 작은 마을버스 탔어.",
           "answer": "마을버스"
         }
       ],
       "expected_answer": "연근차를 마셨고 내려올 때 작은 마을버스를 탔다.",
-      "note": "산책 일기와 나중에 설명한 귀가 방법을 결합한다."
+      "note": "8월 19일 대화에서 8월 15일의 같은 절 방문을 회상한다고 명시했다. 일부 걸어 내려오다 돌멩이를 뺀 뒤 마을버스를 탔다.",
+      "required_slots": [
+        "연근차",
+        "작은 마을버스"
+      ]
     },
     {
       "question_id": "q-p3-phone-class-multi-44",
@@ -3499,12 +3738,17 @@
         },
         {
           "chunk_id": "931834a7-bbf4-5d2b-96a8-40c1aa622da7",
-          "quote": "네가 보내 준 손주 사진을 넣어 보려고.",
+          "quote": "다음 수업엔 네가 보내 준 손주 사진을 넣어 보려고.",
           "answer": "손주 사진"
         }
       ],
       "expected_answer": "오늘의 하늘이고 다음에는 손주 사진을 넣으려 한다.",
-      "note": "수업 당일과 준비물 대화에 나뉜다."
+      "note": "수업 당일과 준비물 대화에 나뉜다.",
+      "required_slots": [
+        "오늘의 하늘",
+        "다음",
+        "손주 사진"
+      ]
     },
     {
       "question_id": "q-p3-theatre-ticket-unanswerable-45",
@@ -3516,7 +3760,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "결제 수단이나 카드사는 없다."
+      "note": "결제 수단이나 카드사는 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p3-theatre-ticket-false_premise-46",
@@ -3531,12 +3776,18 @@
       "support": [
         {
           "chunk_id": "f27fec65-71b0-569c-920d-dc59a408cd7d",
-          "quote": "가운데 구역 뒤쪽으로 바꿨다.",
+          "quote": "앞줄이 남아 있길래 골랐다가 무대가 높다는 후기를 보고 마음이 바뀌었다. 결국 가운데 구역 뒤쪽으로 바꿨다.",
           "answer": "뒤쪽"
         }
       ],
       "expected_answer": "처음에는 앞줄을 골랐지만 가운데 구역 뒤쪽으로 바꿨다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "앞줄",
+        "골랐",
+        "가운데 구역 뒤쪽",
+        "바꿨다"
+      ]
     },
     {
       "question_id": "q-p3-coast-trips-ambiguity-47",
@@ -3547,22 +3798,34 @@
       "question": "엄마 바다 보러 갔을 때 점심 뭐 먹었지? 누구랑 간 날인지도 잘 생각 안 나.",
       "gold_chunk_ids": [
         "0ffa9177-46af-5c60-853e-fefe167102cb",
-        "bba0cfc6-ceb8-52b0-9527-7e2501ff11f6"
+        "bba0cfc6-ceb8-52b0-9527-7e2501ff11f6",
+        "fe8b00f9-2acf-5e89-bad2-85231b4d5243"
       ],
       "support": [
         {
           "chunk_id": "0ffa9177-46af-5c60-853e-fefe167102cb",
-          "quote": "언니랑 버스를 탔다.",
+          "quote": "가을 바다를 보러 언니랑 버스를 탔다. 바람이 차서 오래 서 있지는 못했다. 점심은 항구 안쪽에서 생선구이를 먹었다.",
           "answer": "언니"
         },
         {
           "chunk_id": "bba0cfc6-ceb8-52b0-9527-7e2501ff11f6",
           "quote": "이번엔 들깨칼국수 먹었어.",
           "answer": "들깨칼국수"
+        },
+        {
+          "chunk_id": "fe8b00f9-2acf-5e89-bad2-85231b4d5243",
+          "quote": "이번엔 동네 모임에서 간 거라 좀 북적였어. 언니랑 단둘이 간 때하고 달라.",
+          "answer": "동네 모임"
         }
       ],
       "expected_answer": "언니와 간 날은 생선구이, 동네 모임과 간 날은 들깨칼국수다.",
-      "note": "동행과 식사가 다른 바다 나들이 두 번이다."
+      "note": "동행과 식사가 다른 바다 나들이 두 번이다.",
+      "required_slots": [
+        "언니",
+        "생선구이",
+        "동네 모임",
+        "들깨칼국수"
+      ]
     },
     {
       "question_id": "q-p3-coast-trips-ordinary_chat-48",
@@ -3574,7 +3837,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p4-conference-single-49",
@@ -3594,7 +3858,11 @@
         }
       ],
       "expected_answer": "표본을 어떻게 뽑았는지 묻는 질문이었다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "표본",
+        "어떻게 뽑았"
+      ]
     },
     {
       "question_id": "q-p4-conference-single-50",
@@ -3609,12 +3877,16 @@
       "support": [
         {
           "chunk_id": "17ed58d4-3744-517e-9f21-e6800a004c2a",
-          "quote": "한 장짜리 흐름도로 만들려고요.",
+          "quote": "표본 추출 과정을 한 장짜리 흐름도로 만들려고요.",
           "answer": "흐름도"
         }
       ],
       "expected_answer": "표본 추출 과정을 한 장짜리 흐름도로 만들려 한다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "표본 추출 과정",
+        "한 장짜리 흐름도"
+      ]
     },
     {
       "question_id": "q-p4-mentoring-multi-51",
@@ -3635,12 +3907,22 @@
         },
         {
           "chunk_id": "40c649b7-a89c-5c8d-b3ae-789f7a7562f6",
-          "quote": "짧게 녹화해 두기로 했어요.",
+          "quote": "수정한 흐름을 짧게 녹화해 두기로 했어요.",
           "answer": "녹화"
         }
       ],
       "expected_answer": "중복 요청이 원인이었고 수정한 흐름을 녹화한 영상을 대비책으로 쓰기로 했다.",
-      "note": "원인 분석 일기와 다음 주 대비책 대화를 결합한다."
+      "note": "원인 분석 일기와 다음 주 대비책 대화를 결합한다.",
+      "required_slots": [
+        "중복 요청",
+        "수정한 흐름",
+        "녹화"
+      ],
+      "slot_surface_forms": {
+        "중복 요청": [
+          "같은 요청이 두 번 나가고"
+        ]
+      }
     },
     {
       "question_id": "q-p4-running-multi-52",
@@ -3666,7 +3948,13 @@
         }
       ],
       "expected_answer": "아린 씨가 함께했고 처음 오 분은 일부러 천천히 뛰려 한다.",
-      "note": "대회 일기와 이후 훈련 계획을 결합한다."
+      "note": "대회 일기와 이후 훈련 계획을 결합한다.",
+      "required_slots": [
+        "아린 씨",
+        "같이",
+        "처음 오 분",
+        "느리게"
+      ]
     },
     {
       "question_id": "q-p4-plant-sitting-unanswerable-53",
@@ -3678,7 +3966,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "흙 제품이나 업체는 없다."
+      "note": "흙 제품이나 업체는 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p4-plant-sitting-false_premise-54",
@@ -3697,8 +3986,11 @@
           "answer": "주지 않고"
         }
       ],
-      "expected_answer": "흙이 젖어 있어 물을 주지 않았다.",
-      "note": ""
+      "expected_answer": "물을 주지 않았다.",
+      "note": "RCA: 물을 줬다는 전제의 정정만 요구하고 gold 밖의 흙 상태는 필수 정답에서 제외했다.",
+      "required_slots": [
+        "물은 주지 않고"
+      ]
     },
     {
       "question_id": "q-p4-interview-venues-ambiguity-55",
@@ -3724,7 +4016,13 @@
         }
       ],
       "expected_answer": "은결 씨와는 카페, 윤슬 씨와는 구청 회의실이었다. 어느 면담인지 확인해야 한다.",
-      "note": "서로 다른 면담 장소를 혼동할 수 있다."
+      "note": "서로 다른 면담 장소를 혼동할 수 있다.",
+      "required_slots": [
+        "은결 씨",
+        "카페",
+        "윤슬 씨",
+        "구청 회의실"
+      ]
     },
     {
       "question_id": "q-p4-interview-venues-ordinary_chat-56",
@@ -3736,7 +4034,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p4-pottery-repair-single-57",
@@ -3756,7 +4055,10 @@
         }
       ],
       "expected_answer": "연필꽂이로 쓴다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "연필꽂이"
+      ]
     },
     {
       "question_id": "q-p4-pottery-repair-single-58",
@@ -3776,7 +4078,11 @@
         }
       ],
       "expected_answer": "안개색 유약을 골랐다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "안개색",
+        "유약"
+      ]
     },
     {
       "question_id": "q-p4-night-train-multi-59",
@@ -3792,17 +4098,23 @@
       "support": [
         {
           "chunk_id": "4d858e12-efa6-5135-9838-a1e76fd1e2dc",
-          "quote": "책은 작은 서점의 밤이었는데",
+          "quote": "밤기차를 타면 잘 줄 알았는데 창밖만 보다가 도착했다. 콘센트 있는 자리를 골랐는데 충전기를 집에 두고 왔다. 출발 전에 읽던 책을 끝내려 했던 계획도 틀어졌다. 책은 작은 서점의 밤이었는데 두 장도 못 넘겼다.",
           "answer": "작은 서점의 밤"
         },
         {
           "chunk_id": "825c2b8b-89a1-5d92-9724-c44609195d83",
-          "quote": "콩나물국밥 먹었어요.",
+          "quote": "역 건너편 시장에서 콩나물국밥 먹었어요.",
           "answer": "콩나물국밥"
         }
       ],
       "expected_answer": "작은 서점의 밤을 가져갔고 도착 후 시장에서 콩나물국밥을 먹었다.",
-      "note": "이동 일기와 귀가 뒤 식사 이야기를 결합한다."
+      "note": "이동 일기와 귀가 뒤 식사 이야기를 결합한다.",
+      "required_slots": [
+        "작은 서점의 밤",
+        "도착",
+        "시장",
+        "콩나물국밥"
+      ]
     },
     {
       "question_id": "q-p4-exhibition-multi-60",
@@ -3818,7 +4130,7 @@
       "support": [
         {
           "chunk_id": "40503d92-ac7c-5ef3-96fd-837881a2b42c",
-          "quote": "입구 맞은편 벽으로 옮겼다.",
+          "quote": "가장 큰 사진은 입구 맞은편 벽으로 옮겼다.",
           "answer": "입구 맞은편"
         },
         {
@@ -3828,7 +4140,13 @@
         }
       ],
       "expected_answer": "큰 사진은 입구 맞은편 벽이고 안내 담당은 금요일 오후다.",
-      "note": "설치 일기와 운영 일정 대화를 결합한다."
+      "note": "설치 일기와 운영 일정 대화를 결합한다.",
+      "required_slots": [
+        "큰 사진",
+        "입구 맞은편 벽",
+        "금요일 오후",
+        "안내"
+      ]
     },
     {
       "question_id": "q-p4-workshop-notebook-unanswerable-61",
@@ -3840,7 +4158,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "수첩 페이지 수는 없다."
+      "note": "수첩 페이지 수는 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p4-workshop-notebook-false_premise-62",
@@ -3855,12 +4174,23 @@
       "support": [
         {
           "chunk_id": "9acf397c-4f0f-5dab-ba74-1764a3c99cb8",
-          "quote": "인쇄물 여백에 적었다.",
+          "quote": "발표 중에는 수첩에 메모하지 않고 나눠 준 인쇄물 여백에 적었다. 수첩은 표지가 예뻐서 선물하려고 따로 뒀다.",
           "answer": "인쇄물 여백"
         }
       ],
       "expected_answer": "인쇄물 여백에 필기했고 수첩은 따로 뒀다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "인쇄물 여백",
+        "필기",
+        "수첩",
+        "따로 뒀다"
+      ],
+      "slot_surface_forms": {
+        "필기": [
+          "인쇄물 여백에 적었다"
+        ]
+      }
     },
     {
       "question_id": "q-p4-bookshop-talks-ambiguity-63",
@@ -3876,17 +4206,23 @@
       "support": [
         {
           "chunk_id": "05050f10-7a10-5f59-a7ad-a426b06e0e7f",
-          "quote": "초고를 쓸 때 결말부터 정하지 않는다고 하셨다.",
+          "quote": "모아 작가님은 초고를 쓸 때 결말부터 정하지 않는다고 하셨다.",
           "answer": "정하지 않는"
         },
         {
           "chunk_id": "870e5874-8ffb-5772-a8fb-0b3caf8a64f6",
-          "quote": "마지막 장면을 먼저 써 둔다고 하셨어요.",
+          "quote": "고운 작가님은 마지막 장면을 먼저 써 둔다고 하셨어요.",
           "answer": "먼저"
         }
       ],
       "expected_answer": "모아 작가는 결말부터 정하지 않고, 고운 작가는 마지막 장면을 먼저 쓴다.",
-      "note": "서로 반대인 두 작가의 집필 방식이라 대상 확인이 필요하다."
+      "note": "서로 반대인 두 작가의 집필 방식이라 대상 확인이 필요하다.",
+      "required_slots": [
+        "모아 작가",
+        "결말부터 정하지 않",
+        "고운 작가",
+        "마지막 장면을 먼저"
+      ]
     },
     {
       "question_id": "q-p4-bookshop-talks-ordinary_chat-64",
@@ -3898,7 +4234,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p5-school-reunion-single-65",
@@ -3918,7 +4255,10 @@
         }
       ],
       "expected_answer": "성호다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "성호"
+      ]
     },
     {
       "question_id": "q-p5-school-reunion-single-66",
@@ -3938,7 +4278,10 @@
         }
       ],
       "expected_answer": "옛 학교 담장까지 걸었다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "옛 학교 담장"
+      ]
     },
     {
       "question_id": "q-p5-old-radio-multi-67",
@@ -3964,7 +4307,14 @@
         }
       ],
       "expected_answer": "접점을 마른 천으로 닦았고 오후 세 시의 옛 노래 시간을 들었다.",
-      "note": "수리 일기와 나중에 청취한 대화를 결합한다."
+      "note": "수리 일기와 나중에 청취한 대화를 결합한다.",
+      "required_slots": [
+        "마른 천",
+        "접점",
+        "닦",
+        "오후 세 시",
+        "옛 노래 시간"
+      ]
     },
     {
       "question_id": "q-p5-kite-grandchild-multi-68",
@@ -3980,17 +4330,24 @@
       "support": [
         {
           "chunk_id": "fde06231-9a05-5a3a-bad4-5f9fae7e30c5",
-          "quote": "얼레 줄이 엉켜",
+          "quote": "얼레 줄이 엉켜 풀다 보니 손주가 먼저 지쳤다.",
           "answer": "얼레 줄"
         },
         {
           "chunk_id": "ce699401-1e21-5c16-8a31-6fe84814200e",
-          "quote": "작은 바람개비를 만들어 보자더군.",
+          "quote": "종이로 작은 바람개비를 만들어 보자더군.",
           "answer": "바람개비"
         }
       ],
       "expected_answer": "엉킨 얼레 줄을 푸느라 오래 걸렸고 종이 바람개비를 만들기로 했다.",
-      "note": "당일 일기와 손주의 다음 제안을 결합한다."
+      "note": "당일 일기와 손주의 다음 제안을 결합한다.",
+      "required_slots": [
+        "얼레 줄",
+        "엉켜",
+        "풀",
+        "종이",
+        "바람개비"
+      ]
     },
     {
       "question_id": "q-p5-book-donation-unanswerable-69",
@@ -4002,7 +4359,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "책의 가격이나 평가액은 없다."
+      "note": "책의 가격이나 평가액은 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p5-book-donation-false_premise-70",
@@ -4022,7 +4380,16 @@
         }
       ],
       "expected_answer": "다 버린 게 아니라 동네 작은 도서관에 기증했다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "동네 작은 도서관",
+        "기증"
+      ],
+      "slot_surface_forms": {
+        "기증": [
+          "도서관에서 받아 준다고 해서 직접 가져갔다"
+        ]
+      }
     },
     {
       "question_id": "q-p5-fishing-spots-ambiguity-71",
@@ -4033,7 +4400,8 @@
       "question": "친구분이랑 물가 가신 날, 어디 가셨고 뭐 좀 잡으셨어요?",
       "gold_chunk_ids": [
         "ed0ccd66-d375-5ddc-b7d1-fc5b38bf4153",
-        "c1223fd7-281a-5042-8ea2-28d817bbdab3"
+        "c1223fd7-281a-5042-8ea2-28d817bbdab3",
+        "63586786-6a1a-5728-a9db-ef661ecbe7e9"
       ],
       "support": [
         {
@@ -4043,12 +4411,31 @@
         },
         {
           "chunk_id": "c1223fd7-281a-5042-8ea2-28d817bbdab3",
-          "quote": "작은 붕어 두 마리는 잡았지.",
+          "quote": "작은 붕어 두 마리는 잡았지. 너무 작아서 바로 놓아줬네.",
           "answer": "붕어 두 마리"
+        },
+        {
+          "chunk_id": "63586786-6a1a-5728-a9db-ef661ecbe7e9",
+          "quote": "이번엔 영식이하고 강 둑 아래 갔네. 성호와 저수지 간 날하고는 달라.",
+          "answer": "영식"
         }
       ],
       "expected_answer": "성호와 저수지에서는 못 잡았고, 영식과 강 둑에서는 작은 붕어 두 마리를 잡아 놓아줬다.",
-      "note": "비슷한 낚시 나들이 두 번이다."
+      "note": "비슷한 낚시 나들이 두 번이다.",
+      "required_slots": [
+        "성호",
+        "저수지",
+        "못 잡음",
+        "영식",
+        "강 둑",
+        "작은 붕어 두 마리",
+        "놓아줬"
+      ],
+      "slot_surface_forms": {
+        "못 잡음": [
+          "빈 바구니로 돌아왔다"
+        ]
+      }
     },
     {
       "question_id": "q-p5-fishing-spots-ordinary_chat-72",
@@ -4060,7 +4447,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p5-bridge-outing-single-73",
@@ -4080,7 +4468,11 @@
         }
       ],
       "expected_answer": "지팡이를 짚고 천천히 건넜다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "지팡이",
+        "천천히"
+      ]
     },
     {
       "question_id": "q-p5-bridge-outing-single-74",
@@ -4100,7 +4492,10 @@
         }
       ],
       "expected_answer": "감자전이다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "감자전"
+      ]
     },
     {
       "question_id": "q-p5-woodwork-multi-75",
@@ -4116,7 +4511,7 @@
       "support": [
         {
           "chunk_id": "97b88856-732e-5008-b476-acdfa8cea34a",
-          "quote": "책 받치는 칸으로 쓰기로 했다.",
+          "quote": "작업실에 남은 나무를 얻어 작은 선반을 만들었다. 길이를 재 놓고도 한쪽을 짧게 잘랐다. 모자란 쪽은 책 받치는 칸으로 쓰기로 했다.",
           "answer": "책"
         },
         {
@@ -4126,7 +4521,18 @@
         }
       ],
       "expected_answer": "짧은 쪽은 책 받치는 칸으로 쓰기로 했고 선반은 현관 안쪽에 뒀다.",
-      "note": "제작 일기와 설치 뒤 대화를 결합한다."
+      "note": "제작 일기와 설치 뒤 대화를 결합한다.",
+      "required_slots": [
+        "짧은 쪽",
+        "책 받치는 칸",
+        "선반",
+        "현관 안쪽"
+      ],
+      "slot_surface_forms": {
+        "짧은 쪽": [
+          "모자란 쪽"
+        ]
+      }
     },
     {
       "question_id": "q-p5-dog-walk-multi-76",
@@ -4152,7 +4558,11 @@
         }
       ],
       "expected_answer": "밤이이고 우체통 앞에서 돌아왔다.",
-      "note": "맡은 날과 나중에 설명한 경로를 결합한다."
+      "note": "맡은 날과 나중에 설명한 경로를 결합한다.",
+      "required_slots": [
+        "밤이",
+        "우체통 앞"
+      ]
     },
     {
       "question_id": "q-p5-singing-group-unanswerable-77",
@@ -4164,7 +4574,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "회비나 납부액은 없다."
+      "note": "회비나 납부액은 없다.",
+      "required_slots": []
     },
     {
       "question_id": "q-p5-singing-group-false_premise-78",
@@ -4184,7 +4595,17 @@
         }
       ],
       "expected_answer": "앞에서 독창하지 않고 사람들 뒤에서 박자를 맞췄다.",
-      "note": ""
+      "note": "",
+      "required_slots": [
+        "독창하지 않음",
+        "사람들 뒤",
+        "박자"
+      ],
+      "slot_surface_forms": {
+        "독창하지 않음": [
+          "박자만 맞췄다"
+        ]
+      }
     },
     {
       "question_id": "q-p5-garden-meals-ambiguity-79",
@@ -4210,7 +4631,13 @@
         }
       ],
       "expected_answer": "동생과는 군고구마, 손주들과는 호떡을 먹었다.",
-      "note": "같은 장소의 다른 두 가족 방문이다."
+      "note": "같은 장소의 다른 두 가족 방문이다.",
+      "required_slots": [
+        "동생",
+        "군고구마",
+        "손주",
+        "호떡"
+      ]
     },
     {
       "question_id": "q-p5-garden-meals-ordinary_chat-80",
@@ -4222,7 +4649,8 @@
       "gold_chunk_ids": [],
       "support": [],
       "expected_answer": null,
-      "note": "개인 사실을 묻지 않는 일상 대화다."
+      "note": "개인 사실을 묻지 않는 일상 대화다.",
+      "required_slots": []
     }
   ]
 }

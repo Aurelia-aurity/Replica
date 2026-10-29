@@ -7,6 +7,7 @@ from pydantic import ConfigDict, RootModel
 import typer
 
 from corpus import Evidence, FrozenModel, ROOT, Split, load_corpus, validate
+from historical import HISTORICAL_CORPUS, historical_question, load_historical_corpus
 from retrieval import Calibration, SplitMetrics, Trace, calibrate, evaluate, select_evidence
 
 
@@ -27,7 +28,7 @@ class Export(FrozenModel):
 
 
 def main(model: Literal["kure", "e5"]) -> None:
-    corpus = load_corpus()
+    corpus = load_historical_corpus()
     chunks = validate(corpus)
     by_id = {c.chunk_id: c for c in chunks}
     questions = {q.question_id: q for q in corpus.questions}
@@ -37,16 +38,26 @@ def main(model: Literal["kure", "e5"]) -> None:
         (output / "manifest.json").read_text(encoding="utf-8")
     )
     for name, expected in manifest.sha256.items():
-        assert sha256((ROOT / name).read_bytes()).hexdigest() == expected, name
+        path = ROOT / name
+        if name == "corpus.json":
+            path = HISTORICAL_CORPUS
+        elif name in {"corpus.py", "retrieval.py", "run.py"}:
+            path = ROOT / "history/source-r1" / name
+        assert sha256(path.read_bytes()).hexdigest() == expected, name
     assert sha256((output / "calibration.json").read_bytes()).hexdigest() == (
         manifest.calibration_sha256
     )
     calibration = Calibration.model_validate_json(
         (output / "calibration.json").read_text(encoding="utf-8")
     )
-    traces = RootModel[dict[Split, list[Trace]]].model_validate_json(
-        (output / "traces.json").read_text(encoding="utf-8")
-    ).root
+    import json
+
+    raw = json.loads((output / "traces.json").read_text(encoding="utf-8"))
+    traces = {
+        split: [Trace.model_validate({**t, "question": historical_question(t["question"])})
+                for t in rows]
+        for split, rows in raw.items()
+    }
     metrics = RootModel[dict[Split, SplitMetrics]].model_validate_json(
         (output / "metrics.json").read_text(encoding="utf-8")
     ).root
@@ -108,7 +119,7 @@ def main(model: Literal["kure", "e5"]) -> None:
                 f"top5={[(h.record_alias, round(h.score, 6)) for h in trace.top5]}"
             )
     print(
-        f"AUDIT PASS {model}: 80 traces; current source hashes; DEV-only threshold; "
+        f"AUDIT PASS {model}: 80 traces; historical source hashes; DEV-only threshold; "
         "recomputed metrics; zero persona-scope leaks; exact five-field evidence"
     )
 
