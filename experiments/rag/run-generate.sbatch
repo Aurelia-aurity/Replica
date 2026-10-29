@@ -21,5 +21,24 @@ hostname
 source "$REPLICA_VENV/bin/activate"
 # Optional extra site dir for pydantic/typer when the shared venv lacks them.
 if [ -n "${REPLICA_PYDEPS:-}" ]; then export PYTHONPATH="$REPLICA_PYDEPS${PYTHONPATH:+:$PYTHONPATH}"; fi
-python experiments/rag/generate.py --model-path "$REPLICA_MODEL" --output "$REPLICA_OUTPUT" --prompt-version "$REPLICA_PROMPT_VERSION" --corpus "$REPLICA_CORPUS" --evidence "$REPLICA_EVIDENCE" --condition-set "$REPLICA_CONDITION_SET"
+if [ -n "${REPLICA_PROMPT_VERSIONS:-}" ]; then
+    read -r -a versions <<< "$REPLICA_PROMPT_VERSIONS"
+    if [ "${#versions[@]}" -eq 0 ]; then echo "No prompt versions selected" >&2; exit 1; fi
+    seen=" "
+    # Validate the complete run before generating either arm.
+    for version in "${versions[@]}"; do
+        case "$version" in r1|r2|r3|g1) ;; *) echo "Unknown prompt version: $version" >&2; exit 1 ;; esac
+        case "$seen" in *" $version "*) echo "Duplicate prompt version: $version" >&2; exit 1 ;; esac
+        seen="$seen$version "
+        if [ -e "$REPLICA_OUTPUT/$version" ]; then
+            echo "Output already exists: $REPLICA_OUTPUT/$version" >&2
+            exit 1
+        fi
+    done
+    for version in "${versions[@]}"; do
+        python experiments/rag/generate.py --model-path "$REPLICA_MODEL" --output "$REPLICA_OUTPUT/$version" --prompt-version "$version" --corpus "$REPLICA_CORPUS" --evidence "$REPLICA_EVIDENCE" --condition-set "$REPLICA_CONDITION_SET"
+    done
+else
+    python experiments/rag/generate.py --model-path "$REPLICA_MODEL" --output "$REPLICA_OUTPUT" --prompt-version "$REPLICA_PROMPT_VERSION" --corpus "$REPLICA_CORPUS" --evidence "$REPLICA_EVIDENCE" --condition-set "$REPLICA_CONDITION_SET"
+fi
 echo "EXIT 0"

@@ -11,7 +11,7 @@ import typer
 
 ROOT: Final = Path(__file__).resolve().parent
 CHUNKER_VERSION: Final = "paragraph-same-speaker-v1"
-Split = Literal["dev", "test"]
+Split = Literal["dev", "test", "heldout"]
 Role = Literal["provider", "persona", "other"]
 QuestionType = Literal[
     "single", "multi", "unanswerable", "false_premise", "ambiguity", "ordinary_chat"
@@ -322,7 +322,10 @@ def validate(corpus: Corpus) -> tuple[Chunk, ...]:
                 continue
             if (
                 chunk.persona_id != question.persona_id
-                or chunk.family_id != question.family_id
+                or (
+                    chunk.family_id != question.family_id
+                    and not (question.split == "heldout" and question.type == "ambiguity")
+                )
                 or chunk.split != question.split
             ):
                 failures.append(f"gold scope/family/split: {label}")

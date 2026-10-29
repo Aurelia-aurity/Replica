@@ -23,7 +23,7 @@ REFERENCE: Final = REPO / "experiments/results/2026-10-25-issue58-prompt-round2"
 CONDITIONS: Final = ("A", "B", "C")
 Condition = Literal["A", "B", "C", "B_old", "B_v2"]
 ConditionSet = Literal["abc", "retrieval-v2"]
-PromptVersion = Literal["r1", "r2", "r3"]
+PromptVersion = Literal["r1", "r2", "r3", "g1"]
 EVIDENCE_START: Final = "<evidence>"
 EVIDENCE_END: Final = "</evidence>"
 R2_SYSTEM: Final = """한국어로 간결하고 자연스럽게, 아래 페르소나가 상대와 이야기하듯 답하세요. 자신의 기억을 말하는 관점으로 답하되, 개인 사실은 제공된 근거로 확인되는 내용만 말하세요.
@@ -178,6 +178,7 @@ def build_schedule(
     prompt_version: PromptVersion = "r1",
     condition_set: ConditionSet = "abc",
     retrieved_v2: dict[str, Retrieved] | None = None,
+    contextual_b: bool = False,
 ) -> tuple[Prompt, ...]:
     """Validate canonical content and persona scope before constructing any prompt."""
     chunks = {chunk.chunk_id: chunk for chunk in validate(corpus)}
@@ -190,7 +191,9 @@ def build_schedule(
         # Reuse all canonical metadata/membership checks, with only the expected
         # content transformation changed for restored context.
         _validate_restored(corpus, retrieved_v2)
-    for question in corpus.questions:
+    if contextual_b:
+        _validate_restored(corpus, retrieved)
+    for question in (() if contextual_b else corpus.questions):
         row = retrieved[question.question_id]
         persona = personas[question.persona_id]
         if (
@@ -305,15 +308,36 @@ def default_schedule(
                 "'~했어요', 하게체는 '그날은 성호가 먼저 불러 주었지. 반갑더군.'처럼 말하세요. "
                 "예문의 사실은 답변에 쓰지 마세요. 이모지는 쓰지 마세요."
             )
+        case "g1":
+            system = baseline.system_prompt.replace(
+                "기록에 없는 감정·이유·세부 내용은 지어내지 말고 기록에 없다고 말한 뒤 필요하면 되물어 보세요.",
+                "기록에 없는 감정·이유·세부 내용은 지어내지 마세요. "
+                "질문에서 근거로 확인되는 부분은 답하고, 확인되지 않는 부분만 기억나지 않는다고 말하세요. "
+                "근거에 없다는 이유로 그 일이 없었다거나 하지 않았다고 단정하지 마세요. "
+                "개인 사실을 묻지 않는 인사나 일상 대화에는 기억이나 기록의 부재를 언급하지 말고 "
+                "자연스럽고 짧게 응답하세요. 사용자의 말을 그대로 되풀이하지 마세요.",
+            )
         case unreachable:
             assert_never(unreachable)
     restored = None
     if condition_set == "retrieval-v2":
         restored = load_retrieved(evidence_path)
         evidence_path = evidence_path.parent.parent / "kure_old/evidence.json"
+    # Old exports contain canonical text; v2 exports explicitly declare their
+    # source-context transformation. The chosen --evidence remains B in abc.
+    contextual_b = False
+    if condition_set == "abc":
+        manifest_path = evidence_path.parent / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            contextual_b = manifest.get("evidence_format") == "source-context-v2"
+            # Step-2 manifests predate the explicit evidence-format field.
+            contextual_b = contextual_b or (
+                "config" in manifest and "prompt_change" in manifest
+            )
     return build_schedule(
         load_input_corpus(corpus_path), load_retrieved(evidence_path), system, prompt_version,
-        condition_set, restored,
+        condition_set, restored, contextual_b,
     )
 
 
@@ -334,6 +358,7 @@ def load_generations(path: Path, schedule: tuple[Prompt, ...]) -> tuple[Generati
             or row.raw_text is None or row.persona_id != prompt.persona_id
             or row.split != prompt.split or row.type != prompt.type
             or row.evidence_ids != prompt.evidence_ids
+            or row.prompt_version != prompt.prompt_version
         ):
             raise InputError(f"Invalid generation: {row.question_id}/{row.condition}")
     return tuple(sorted(rows, key=lambda r: (r.condition, r.question_id)))
@@ -390,7 +415,8 @@ def main(
         "settings_note": "As #58: no seed or temperature override; greedy GenerationConfig",
         "model_path": str(model_path),
         "input_sha256": {
-            str(path.relative_to(REPO)): sha256(path.read_bytes()).hexdigest()
+            str(path.relative_to(REPO) if path.is_relative_to(REPO) else path):
+                sha256(path.read_bytes()).hexdigest()
             for path in (
                 corpus, ROOT / "corpus.py", ROOT / "generate.py",
                 *retrieval_inputs, ROOT / "retrieval_v2.py", REPO / "ai/configs/baseline.json",

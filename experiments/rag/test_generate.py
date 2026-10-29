@@ -30,7 +30,7 @@ def retrieved():
     return load_retrieved(ROOT / "results/kure/evidence.json")
 
 
-@pytest.fixture(params=["r1", "r2", "r3"])
+@pytest.fixture(params=["r1", "r2", "r3", "g1"])
 def schedule(request):
     return default_schedule(prompt_version=request.param)
 
@@ -248,7 +248,7 @@ def test_blind_loader_rejects_when_schedule_invalid(schedule, tmp_path, mutation
         load_generations(artifact, schedule)
 
 
-@pytest.mark.parametrize("version", ["r1", "r2", "r3"])
+@pytest.mark.parametrize("version", ["r1", "r2", "r3", "g1"])
 def test_dry_run_when_cpu_only_subprocess(tmp_path, version):
     # Given: a fresh CPU process and a new artifact directory.
     output = tmp_path / "dry-run"

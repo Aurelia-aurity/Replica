@@ -616,3 +616,92 @@ LSP diagnostics remain unavailable because `basedpyright-langserver` is not
 installed. No commits, SSH, GPU or judge calls were made. The Korean summary
 used agy drafting and the humanize-korean standard path (5.6% change, gate OK);
 private language-check evidence stays in `.cache/humanize/`.
+
+## Step 3: g1 and held-out preparation
+
+`--prompt-version g1` keeps r1's persona/user templates and changes only the
+last system instruction: answer supported question parts, abstain only on
+unknown parts, do not infer a negative event from absent evidence, and respond
+briefly to ordinary chat without memory disclaimers or echoing the user.
+It removes r1's follow-up invitation. There are no factual example sentences,
+new style examples, output filters, or decoding changes. The frozen r1/r2/r3
+renderings still have byte-equality tests; g1 also runs the condition-identity,
+scope, schedule, dry-run, persistence and blinding regression tests.
+
+The separate synthetic corpus stays at its supplied external path; loaders
+accept `split=heldout`, including ambiguity gold spanning two event families
+within the same persona/split. Main DEV/TEST family restrictions remain intact.
+No copy into this repository is needed. Run its supplied validator first.
+`run_heldout.py` runs only on CPU and refuses to replace existing exports:
+
+```bash
+HELDOUT=/Users/admin/Project/Replica/.local-work/rag/heldout/corpus-heldout.json
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B \
+  /Users/admin/Project/Replica/.local-work/rag/heldout/validate_heldout.py
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -B run_heldout.py --corpus "$HELDOUT"
+```
+
+Both `results/heldout/kure_old/` and `kure_v2/` contain `evidence.json`,
+`traces.json`, `calibration.json`, `manifest.json`, and aggregate `metrics.json`.
+They use the pinned KURE revision and the main DEV threshold
+`0.5458711981773378`, never a held-out fit. B_old retains the original
+per-hit threshold algorithm. B_v2 uses the frozen main DEV selection
+`k=3`, `window=3`, full evidence-JSON hard cap `2000` Qwen tokens.
+Gold/slot annotations are used only by validation, C rendering and offline
+coverage measurement, not embedding or selection. Do not open held-out
+per-question traces/answers for further prompt design.
+
+For `--condition-set abc`, `--evidence` selects B directly from either export;
+the manifest declares canonical or source-context-v2 content, and the renderer
+verifies that content against source chunks before using it. A remains empty,
+C remains gold, and A/B/C differ only in their evidence block. The two saved
+dry runs below use B_v2 **for plumbing verification, not an adoption decision**.
+The final B selection must follow step 2's generation/judge gate; if it fails,
+select `kure_old/evidence.json` for both arms.
+
+```bash
+for arm in r1 g1; do
+  PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B generate.py \
+    --corpus "$HELDOUT" --condition-set abc \
+    --evidence results/heldout/kure_v2/evidence.json \
+    --prompt-version "$arm" --dry-run \
+    --output "results/heldout/prompts-$arm"
+done
+```
+
+Each emits 144 prompts (48 A, 48 B, 48 C), without importing a generation
+runtime. The saved directories already exist; choose fresh output paths for
+another plumbing check. Actual generation is not part of this preparation.
+For a later authorized batch, existing single-arm environment variables still
+work. Set `REPLICA_PROMPT_VERSIONS="r1 g1"` to execute both arms sequentially
+in one job, under `$REPLICA_OUTPUT/r1` and `$REPLICA_OUTPUT/g1`. Invalid,
+duplicate or existing arm outputs fail before starting either arm.
+`REPLICA_CORPUS` must name the supplied corpus's path on the execution host;
+`REPLICA_EVIDENCE` must name the same accepted retrieval variant for both arms,
+and `REPLICA_CONDITION_SET=abc`. The wrapper does not copy inputs or submit jobs.
+External input paths are recorded with SHA-256 in generation provenance.
+
+Local preparation measured:
+
+| Variant | Complete factual questions | Covered slots | Empty factual / unanswerable / chat | Evidence tokens median / max |
+| --- | --- | --- | --- | --- |
+| B_old | 30/33 | 67/73 | 1/33, 0/10, 5/5 | 437 / 972 |
+| B_v2 | 31/33 | 67/73 | 1/33, 0/10, 5/5 | 788 / 1346 |
+
+These are literal slot-surface coverage and full pretty-printed evidence-JSON
+token counts, not semantic correctness or generated-answer quality. Neither
+variant detects any of the 10 held-out unanswerable questions at the fixed
+threshold. No setting was changed in response. The fixed local
+`ACCEPTANCE_gen.md` remains authoritative: one held-out generation per arm,
+all H1-H8 gates required, otherwise retain r1 and ask the user. Report p5
+separately; no quality gate is measured by these dry runs.
+
+Verification: entire RAG folder `133 passed, 2 warnings in 4.62s`; warnings
+are the existing Typer/Click deprecations. `bash -n run-generate.sbatch` and
+`git diff --check` passed. The supplied held-out validator passed (5 personas,
+20 families, 40 records, 80 chunks, 48 questions). LSP diagnostics could not run
+because `basedpyright-langserver` is absent. No commits, SSH, GPU generation or
+judge calls were made; tracked historical and running-job result files were
+not changed. The detailed g1 system text, r1 diff and DEV design evidence live
+in the local `.local-work/rag/gen-change/REPORT.md`.

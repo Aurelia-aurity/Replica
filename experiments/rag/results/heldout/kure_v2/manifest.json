@@ -1,0 +1,44 @@
+{
+  "corpus_path": "/Users/admin/Project/Replica/.local-work/rag/heldout/corpus-heldout.json",
+  "corpus_sha256": "ef42397c7845a377d0af6b207627d7bcecf182afcee996e5ad5b158b5567bcd8",
+  "encoder": {
+    "repository": "nlpai-lab/KURE-v1",
+    "revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+    "dimensions": 1024,
+    "query_prefix": "",
+    "passage_prefix": ""
+  },
+  "device": "cpu",
+  "seed": 59,
+  "batch_size": 8,
+  "torch_threads": 4,
+  "dtype": "float32",
+  "max_seq_length": 512,
+  "max_observed_encoder_tokens": 93,
+  "threshold": 0.5458711981773378,
+  "config": {
+    "k": 3,
+    "window": 3,
+    "budget": 2000
+  },
+  "calibration_source_sha256": "9ff44d47f829566a1b963c00e1d71d8288bab8a9d130bbd752f211a03e4100ee",
+  "dev_selection_sha256": "12994dcecb5bc32a91bc2a5862db6e2330b6401e7a9237d192be3eec99f8b63a",
+  "settings_policy": "fixed main DEV threshold/config; no held-out calibration or tuning",
+  "tokenizer": {
+    "repository": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "counting": "full pretty-printed evidence JSON; no special tokens"
+  },
+  "code_sha256": {
+    "run_heldout.py": "fefa6fc0a586ed685bb09f4fe7e01a569a0592180e8e5d2ca15a176c35b64a1f",
+    "corpus.py": "8bb075549b5e31da8f0e0d88b4b3fbfd13098217cf85d8280b8fcef3e795478c",
+    "retrieval.py": "fce0ec7f01b690090b4e7c15d1f1392cce389e4ba5c9201eb1f828554a91286f",
+    "retrieval_v2.py": "475ae5eb2d47a42da87303fa422180df223ace0ca3c45108d58b12ffc4851766",
+    "offline_v2.py": "d52a4ae575d5c76ab13860189832abde22d4b426a42482dd5d446d0677b64f9d",
+    "model-lock.json": "5bef99b3b63f75a01439aa8411a8cdff35a2922c9baf8d7e3722195d5f366a65"
+  },
+  "gpu_or_judge_run": false,
+  "variant": "kure_v2",
+  "evidence_format": "source-context-v2"
+}
