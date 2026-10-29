@@ -77,7 +77,7 @@ except DatabaseError as error:
 3. **오류**: 초안 변환표는 구현했지만 앱/백엔드 쪽 채택·리뷰는 아직이다. SQLSTATE 55000은 PostgREST에서 HTTP 500이 될 수 있으므로 도메인 충돌로 먼저 분류한다.
 4. **저장 자료**: records는 예약 메타데이터다. 실제 원본 업로드·무결성 확인·Storage 버킷·삭제 worker는 초안에서 별도/미정인 범위라 이번 DB 접근 모듈에 넣지 않았다. deletion job이 있다는 이유로 파일 삭제 성공을 반환하면 안 된다.
 5. **고도화 계약**: PR #29의 불변 source_snapshot_id, analysis_operation_id/attempt, 전체 입력 범위와 원자적 프로필 게시, RAG 인덱스 완료 상태는 첫 baseline과 분리한다. 기존 data_revision/source_ids 검사만으로 해당 요구를 완성했다고 하지 않는다.
-6. **병합**: 2026-10-28 PM 코멘트의 새 순서는 #63 선병합 → #61 base를 main으로 변경 → 누적 결과 재검증·리뷰다. #61은 #45의 SQL·검증·문서를 포함한다. #45의 대체 종료는 #61에 내용이 보존되고 담당자들이 처리 방향에 동의한 뒤 진행한다. #41/팀 합의를 자동 완료하지 않는다. #63과의 병합 충돌은 백엔드 API README·설정과 DB 사용법을 함께 보존하도록 정리한다.
+6. **병합**: #63은 `35962b5`로 main에 병합되었으며, 2026-10-29 #61의 base도 main으로 변경했다. #61은 #45의 SQL·검증·문서를 포함한다. #45의 대체 종료는 #61이 병합되고 내용 보존을 확인한 뒤 진행한다. #41/팀 합의를 자동 완료하지 않는다. #63과의 병합 충돌은 백엔드 API README·설정과 DB 사용법을 함께 보존하도록 정리했다. 실제 서버 배포 확인 전까지 후속 SQL은 적용하지 않는다.
 
 ## 실행·테스트
 
@@ -104,6 +104,15 @@ python -X utf8 -m unittest discover -s tests -v
 - 최신 main `1daaa94`도 작업 브랜치에 병합한 뒤 같은 결과를 확인했다. main의 AI·실험·협업 스크립트 파일은 그대로 유지하며 이들 전체 테스트를 재실행한 결과는 아니다.
 - `.github/workflows/backend-tests.yml`에 Python 3.12 / Ubuntu·Windows의 오프라인 pytest를 추가했다. 실제 DB 읽기·쓰기 검사는 CI에서 명시적으로 비활성화한다. GitHub 실행 결과는 별도 확인한다.
 - SQL 교체·합성 시나리오 롤백 후 persona/session/turn 각 0건, 기존 Auth 2명 유지, 후속 SQL 영구 미적용을 확인했다. 실제 앱·GPU·음성 공급자 통합이나 운영 배포 시험은 아니다.
+
+### 2026-10-29 이슈 #66 보완
+
+- 기준 main `35962b5`를 작업 브랜치에 병합했다. #61의 base를 main으로 변경했으며 기존 HTTP 500/55000 충돌 분류, 연결된 요청 ID 검증, SQL 보관본, #63 F1 호출부를 보존했다.
+- `test_auth_boundaries.py`는 FastAPI의 실제 인증 의존성과 `Database.for_user`를 유지하고 Auth/REST 전송만 합성 응답으로 대체한다. 잘못된 인증·익명·서버 역할 토큰의 거부, Auth 장애 503, 두 사용자 요청의 인증 ID/소유자 필터 분리, 사용자 편집 metadata의 권한 오용 방지, 다른 사용자 대상 조회와 클라이언트 user_id 주입 거부를 확인한다. 이는 실제 원격 RLS 검증을 대체하지 않는다.
+- `test_transport_boundaries.py`는 urllib 전송 실패 시 자동 재전송이 없고, 읽기 실패와 쓰기 결과 UNKNOWN을 구분하며, 외부 URL·경로 구분자 주입을 전송 전에 거부하는 것을 합성 검사한다. 실제 키·외부 서비스·소켓을 사용하지 않는다.
+- `test_total_timeout_is_ai_timeout`은 고정 sleep 대신 전송 진입 이벤트를 기다린 뒤 실제 `asyncio.Timeout`의 마감을 즉시 만료시킨다. 설정된 시간 예산, 취소 전달, 504 변환, 호출 1회를 확인한다. 이벤트/작업에는 유한 대기 한도를 두고 실패 시 남은 작업도 정리한다. 근거: [Python 3.12 Timeout.reschedule](https://docs.python.org/3.12/library/asyncio-task.html#asyncio.Timeout.reschedule).
+- Python 3.12.14, backend의 기본 `pytest -q`: **197개 통과·7개 skip**, subtest 29개 통과. 별도 PYTHONPATH나 실제 서비스 자격 증명을 주입하지 않았다. 기존 Starlette TestClient 안내 1개가 있다.
+- #66의 구현 완료 조건은 #61의 최종 CI·담당자 리뷰와 병합 시 확인한다. SQL의 실제 서버 배포 선행 조건과 #41의 Refs는 그대로 유지한다.
 
 데이터 변경이 있는 통합 시험은 기본 비활성이다. 개발 프로젝트의 서버 설정이 들어 있는 로컬 `.env`가 있고, 운영자가 임시 계정 생성·정리에 동의한 경우에만 실행한다. PowerShell:
 
