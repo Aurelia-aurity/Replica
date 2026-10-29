@@ -13,13 +13,16 @@ import typer
 
 from corpus import (
     ROOT, Corpus, Evidence, FrozenModel, Persona, QuestionType, Split,
-    load_corpus, validate,
+    validate,
 )
+from historical import load_input_corpus
+from retrieval_v2 import contextual_evidence, evidence_json
 
 REPO: Final = ROOT.parents[1]
 REFERENCE: Final = REPO / "experiments/results/2026-10-25-issue58-prompt-round2"
 CONDITIONS: Final = ("A", "B", "C")
-Condition = Literal["A", "B", "C"]
+Condition = Literal["A", "B", "C", "B_old", "B_v2"]
+ConditionSet = Literal["abc", "retrieval-v2"]
 PromptVersion = Literal["r1", "r2", "r3"]
 EVIDENCE_START: Final = "<evidence>"
 EVIDENCE_END: Final = "</evidence>"
@@ -135,10 +138,7 @@ def render_messages(
     prompt_version: PromptVersion = "r1",
 ) -> tuple[Message, Message]:
     """The evidence JSON is the only A/B/C-dependent part of the model input."""
-    block = json.dumps(
-        [item.model_dump(mode="json") for item in evidence],
-        ensure_ascii=False, indent=2,
-    )
+    block = evidence_json(evidence)
     if prompt_version == "r2":
         return (
             Message(role="system", content=system + "\n\n" + style_profile(persona)),
@@ -176,12 +176,20 @@ def load_retrieved(path: Path) -> dict[str, Retrieved]:
 def build_schedule(
     corpus: Corpus, retrieved: dict[str, Retrieved], system: str,
     prompt_version: PromptVersion = "r1",
+    condition_set: ConditionSet = "abc",
+    retrieved_v2: dict[str, Retrieved] | None = None,
 ) -> tuple[Prompt, ...]:
     """Validate canonical content and persona scope before constructing any prompt."""
     chunks = {chunk.chunk_id: chunk for chunk in validate(corpus)}
     personas = {p.persona_id: p for p in corpus.personas}
     if set(retrieved) != {q.question_id for q in corpus.questions}:
         raise InputError("Retrieval questions must exactly cover the corpus")
+    if condition_set == "retrieval-v2":
+        if prompt_version != "r1" or retrieved_v2 is None:
+            raise InputError("retrieval-v2 requires prompt r1 and both retrieval exports")
+        # Reuse all canonical metadata/membership checks, with only the expected
+        # content transformation changed for restored context.
+        _validate_restored(corpus, retrieved_v2)
     for question in corpus.questions:
         row = retrieved[question.question_id]
         persona = personas[question.persona_id]
@@ -204,13 +212,18 @@ def build_schedule(
         if not set(row.evidence) <= set(row.topk_evidence):
             raise InputError(f"Evidence outside top-k: {question.question_id}")
     schedule: list[Prompt] = []
-    for condition in CONDITIONS:
+    conditions: tuple[Condition, ...] = CONDITIONS if condition_set == "abc" else ("B_old", "B_v2", "C")
+    for condition in conditions:
         for question in sorted(corpus.questions, key=lambda q: q.question_id):
             match condition:
                 case "A":
                     evidence = ()
-                case "B":
+                case "B" | "B_old":
                     evidence = retrieved[question.question_id].evidence
+                case "B_v2":
+                    if retrieved_v2 is None:
+                        raise InputError("missing restored evidence")
+                    evidence = retrieved_v2[question.question_id].evidence
                 case "C":
                     evidence = tuple(chunks[cid].evidence() for cid in question.gold_chunk_ids)
                 case unreachable:
@@ -228,10 +241,45 @@ def build_schedule(
     return tuple(schedule)
 
 
+def _validate_restored(corpus: Corpus, retrieved: dict[str, Retrieved]) -> None:
+    """Validate restored strings against actual source chunks, not trusted exports."""
+    chunks = {c.chunk_id: c for c in validate(corpus)}
+    personas = {p.persona_id: p for p in corpus.personas}
+    if set(retrieved) != {q.question_id for q in corpus.questions}:
+        raise InputError("Restored retrieval must exactly cover the corpus")
+    for question in corpus.questions:
+        row = retrieved[question.question_id]
+        persona = personas[question.persona_id]
+        if (
+            row.persona_id != question.persona_id or row.message != question.question
+            or row.persona != PersonaContract(
+                display_name=persona.display_name, provider_address=persona.provider_address,
+            )
+            or row.predicted_no_evidence != (not row.evidence)
+        ):
+            raise InputError(f"Restored metadata mismatch: {question.question_id}")
+        for item in (*row.evidence, *row.topk_evidence):
+            chunk = chunks.get(item.chunk_id)
+            if (
+                chunk is None or chunk.persona_id != question.persona_id
+                or contextual_evidence(chunk) != item
+            ):
+                raise InputError(f"Foreign or modified context: {question.question_id}")
+        if len({e.chunk_id for e in row.evidence}) != len(row.evidence):
+            raise InputError(f"Duplicate context: {question.question_id}")
+        if not set(row.evidence) <= set(row.topk_evidence):
+            raise InputError(f"Context outside candidates: {question.question_id}")
+        order = [(chunks[e.chunk_id].date, str(e.record_id), chunks[e.chunk_id].ordinal)
+                 for e in row.evidence]
+        if order != sorted(order):
+            raise InputError(f"Context order mismatch: {question.question_id}")
+
+
 def default_schedule(
     corpus_path: Path = ROOT / "corpus.json",
     evidence_path: Path = ROOT / "results/kure/evidence.json",
     prompt_version: PromptVersion = "r1",
+    condition_set: ConditionSet = "abc",
 ) -> tuple[Prompt, ...]:
     baseline = Baseline.model_validate_json(
         (REPO / "ai/configs/baseline.json").read_text(encoding="utf-8")
@@ -259,8 +307,13 @@ def default_schedule(
             )
         case unreachable:
             assert_never(unreachable)
+    restored = None
+    if condition_set == "retrieval-v2":
+        restored = load_retrieved(evidence_path)
+        evidence_path = evidence_path.parent.parent / "kure_old/evidence.json"
     return build_schedule(
-        load_corpus(corpus_path), load_retrieved(evidence_path), system, prompt_version,
+        load_input_corpus(corpus_path), load_retrieved(evidence_path), system, prompt_version,
+        condition_set, restored,
     )
 
 
@@ -291,9 +344,14 @@ def main(
     output: Path = ROOT / ".cache/generation",
     model_path: Path = Path("/abr/coss40/replica-models/Qwen3-8B"),
     prompt_version: PromptVersion = "r1",
+    corpus: Path = ROOT / "corpus.json",
+    evidence: Path = ROOT / "results/kure/evidence.json",
+    condition_set: ConditionSet = "abc",
 ) -> None:
     """Create a fresh output directory; run only inside a school Slurm allocation."""
-    schedule = default_schedule(prompt_version=prompt_version)
+    corpus = corpus.resolve()
+    evidence = evidence.resolve()
+    schedule = default_schedule(corpus, evidence, prompt_version, condition_set)
     output.mkdir(parents=True, exist_ok=False)
     with (output / "prompts.jsonl").open("x", encoding="utf-8") as handle:
         for prompt in schedule:
@@ -313,11 +371,18 @@ def main(
     reference_environment = json.loads((REFERENCE / "environment.json").read_text(encoding="utf-8"))
     config = dict(reference_environment["config"])
     runtime = Runtime(str(model_path), config)
+    retrieval_inputs = [evidence, evidence.parent / "calibration.json", evidence.parent / "manifest.json"]
+    if condition_set == "retrieval-v2":
+        old = evidence.parent.parent / "kure_old"
+        retrieval_inputs.extend(old / name for name in (
+            "evidence.json", "calibration.json", "manifest.json",
+        ))
     environment = {
         "environment": runtime.environment,
         "prompt_version": prompt_version,
+        "condition_set": condition_set,
         "config": config,
-        "conditions": list(CONDITIONS),
+        "conditions": list(dict.fromkeys(p.condition for p in schedule)),
         "rounds": 1,
         "warmups_per_condition": 3,
         "seed": None,
@@ -327,9 +392,8 @@ def main(
         "input_sha256": {
             str(path.relative_to(REPO)): sha256(path.read_bytes()).hexdigest()
             for path in (
-                ROOT / "corpus.json", ROOT / "corpus.py", ROOT / "generate.py",
-                ROOT / "results/kure/evidence.json", ROOT / "results/kure/calibration.json",
-                ROOT / "results/kure/manifest.json", REPO / "ai/configs/baseline.json",
+                corpus, ROOT / "corpus.py", ROOT / "generate.py",
+                *retrieval_inputs, ROOT / "retrieval_v2.py", REPO / "ai/configs/baseline.json",
                 REPO / "experiments/baseline/runtime.py",
                 REFERENCE / "environment.json",
             )
@@ -341,7 +405,7 @@ def main(
         handle.write("\n")
     failed = 0
     with (output / "generations.jsonl").open("x", encoding="utf-8") as handle:
-        for condition in CONDITIONS:
+        for condition in dict.fromkeys(p.condition for p in schedule):
             prompts = [p for p in schedule if p.condition == condition]
             first = prompts[0]
             runtime.config = dict(config, system_prompt=first.messages[0].content)

@@ -1,0 +1,31 @@
+{
+  "corpus_sha256": "51775868750a10728f872ece4e5128a8b4f7d23aa963ca5d5be32658e0dd118c",
+  "encoder": {
+    "repository": "nlpai-lab/KURE-v1",
+    "revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+    "dimensions": 1024,
+    "query_prefix": "",
+    "passage_prefix": ""
+  },
+  "source_manifest_sha256": "9ebf2a9c6c0ae01fe4f0637da0efff1ce990496cfe4759435e7f7213a8134947",
+  "threshold": 0.5458711981773378,
+  "config": {
+    "k": 3,
+    "window": 3,
+    "budget": 2000
+  },
+  "tokenizer": {
+    "repository": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "counting": "full pretty-printed evidence JSON, including IDs/metadata; no special tokens"
+  },
+  "code_sha256": {
+    "offline_v2.py": "d52a4ae575d5c76ab13860189832abde22d4b426a42482dd5d446d0677b64f9d",
+    "retrieval_v2.py": "475ae5eb2d47a42da87303fa422180df223ace0ca3c45108d58b12ffc4851766",
+    "generate.py": "e9e6945362b69ef13e45a12e0a2a38d510ad909d2872685697cb6801d01a4c05",
+    "corpus.py": "55af80beec2b8fe13f710a96b64ffb0e541ab5d4765d2432c7386613830f8a79"
+  },
+  "prompt_change": "r1 instructions/system/persona unchanged; evidence items expanded and content lines prefixed with date | speaker (speaker_role=role) |; same five JSON fields",
+  "gpu_or_judge_run": false
+}

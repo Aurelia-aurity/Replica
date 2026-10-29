@@ -36,6 +36,7 @@ def main(
     model: Literal["kure", "e5"],
     device: Literal["mps", "cpu"] = "mps",
     batch_size: int = 8,
+    output_dir: Path | None = None,
 ) -> None:
     """All outputs stay within experiments/rag; an existing run is never replaced."""
     from sentence_transformers import SentenceTransformer
@@ -46,7 +47,9 @@ def main(
         (ROOT / "model-lock.json").read_text(encoding="utf-8")
     ).root
     spec = locks[model]
-    output = ROOT / "results" / model
+    output = (output_dir or ROOT / "results" / model).resolve()
+    if not output.is_relative_to(ROOT):
+        raise ValueError("output directory must stay within experiments/rag")
     output.mkdir(parents=True, exist_ok=False)
     torch.manual_seed(59)
     torch.set_num_threads(4)

@@ -1,0 +1,20 @@
+{
+  "dry_run": true,
+  "model_loaded": false,
+  "prompt_version": "r1",
+  "condition_set": "retrieval-v2",
+  "rows": 240,
+  "conditions": {
+    "B_old": 80,
+    "B_v2": 80,
+    "C": 80
+  },
+  "sha256": {
+    "corpus.json": "51775868750a10728f872ece4e5128a8b4f7d23aa963ca5d5be32658e0dd118c",
+    "kure_old/evidence.json": "8cee0c5d56e9dac9aa1ead5b069fc42101b95662e2dedc00bd2fa7a239dff441",
+    "kure_v2/evidence.json": "425a62ca002c8f9a6e77343f012d52db0bc67f0cb8094af4a35e5177a03b9b3d",
+    "generation-prompts/prompts.jsonl": "2a82b11ae08b3f259ece0859bdab43239535567ddf8e6054085b5a2d0d5f7867",
+    "generate.py": "e9e6945362b69ef13e45a12e0a2a38d510ad909d2872685697cb6801d01a4c05"
+  },
+  "runtime_policy": "Existing #58 Qwen3-8B greedy/bf16/eager runtime; enable_thinking=False; no GPU execution"
+}
