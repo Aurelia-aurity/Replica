@@ -15,5 +15,7 @@ REPLICA_OUTPUT="${REPLICA_OUTPUT:-$REPLICA_BASE/experiments/rag/.cache/generatio
 cd "$REPLICA_BASE"
 hostname
 source "$REPLICA_VENV/bin/activate"
+# Optional extra site dir for pydantic/typer when the shared venv lacks them.
+if [ -n "${REPLICA_PYDEPS:-}" ]; then export PYTHONPATH="$REPLICA_PYDEPS${PYTHONPATH:+:$PYTHONPATH}"; fi
 python experiments/rag/generate.py --model-path "$REPLICA_MODEL" --output "$REPLICA_OUTPUT"
 echo "EXIT 0"
