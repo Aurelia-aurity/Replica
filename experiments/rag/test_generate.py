@@ -26,9 +26,9 @@ def retrieved():
     return load_retrieved(ROOT / "results/kure/evidence.json")
 
 
-@pytest.fixture
-def schedule():
-    return default_schedule()
+@pytest.fixture(params=["r1", "r2"])
+def schedule(request):
+    return default_schedule(prompt_version=request.param)
 
 
 def evidence_of(prompt):
@@ -39,6 +39,29 @@ def without_evidence(prompt):
     before, rest = prompt.messages[1].content.split(EVIDENCE_START)
     _, after = rest.split(EVIDENCE_END)
     return prompt.messages[0], before, after
+
+
+def test_r1_rendering_when_compared_with_frozen_prompts():
+    # Given: the original r1 artifact, compared mechanically without inspecting TEST.
+    frozen = (ROOT / "results/generation/prompts.jsonl").read_bytes().splitlines()
+    # When: render the default version and remove only the new metadata field.
+    rendered = [
+        p.model_dump_json(exclude={"prompt_version"}).encode("utf-8")
+        for p in default_schedule()
+    ]
+    # Then: every original row, including message bytes, is unchanged.
+    assert len(frozen) == len(rendered) == 240
+    assert all(old == new for old, new in zip(frozen, rendered, strict=True))
+
+
+def test_prompt_metadata_when_version_selected(schedule):
+    # Given: a schedule created for one explicit version.
+    version = schedule[0].prompt_version
+    # When: serialize and parse the model-facing schedule.
+    rows = [json.loads(p.model_dump_json()) for p in schedule]
+    # Then: selection survives serialization on every scheduled prompt.
+    assert len(rows) == 240
+    assert all(row["prompt_version"] == version for row in rows)
 
 
 def test_prompt_identity_when_only_condition_changes(schedule):
@@ -202,21 +225,23 @@ def test_blind_loader_rejects_when_schedule_invalid(schedule, tmp_path, mutation
         load_generations(artifact, schedule)
 
 
-def test_dry_run_when_cpu_only_subprocess(tmp_path):
+@pytest.mark.parametrize("version", ["r1", "r2"])
+def test_dry_run_when_cpu_only_subprocess(tmp_path, version):
     # Given: a fresh CPU process and a new artifact directory.
     output = tmp_path / "dry-run"
     # When: exercise the real CLI, checking imports in the same fresh process.
     result = subprocess.run(
         [sys.executable, "-c",
          "import sys; from pathlib import Path; from generate import main; "
-         "main(dry_run=True, output=Path(sys.argv[1])); "
+         "main(dry_run=True, output=Path(sys.argv[1]), prompt_version=sys.argv[2]); "
          "assert not {'torch', 'transformers', 'runtime'} & sys.modules.keys()",
-         str(output)],
+         str(output), version],
         cwd=ROOT, text=True, capture_output=True, check=True,
     )
     # Then: all model-facing messages are available without loading a model.
     prompts = (output / "prompts.jsonl").read_text().splitlines()
     assert len(prompts) == 240
+    assert all(json.loads(line)["prompt_version"] == version for line in prompts)
     assert "DRY_RUN_DONE" in result.stdout
     assert not (output / "generations.jsonl").exists()
     assert not (output / "environment.json").exists()
@@ -247,11 +272,12 @@ def test_generation_artifacts_when_existing_runtime_adapter_supplied(tmp_path, m
     monkeypatch.setitem(sys.modules, "common", SimpleNamespace(EvaluationError=FakeEvaluationError))
     output = tmp_path / "generation"
     # When: drive the real orchestration without a GPU or an external model.
-    main(output=output)
+    main(output=output, prompt_version=schedule[0].prompt_version)
     # Then: 240 persisted replies match their rendered prompts, plus nine warmups.
     rows = load_generations(output / "generations.jsonl", schedule)
     assert len(calls) == 249
     assert len(rows) == 240
+    assert all(row.prompt_version == schedule[0].prompt_version for row in rows)
     assert all(row.raw_text == row.text == "synthetic-response" for row in rows)
     for prompt, call in zip(schedule, [c for i, c in enumerate(calls) if i % 83 >= 3], strict=True):
         config, user, cap = call
@@ -261,6 +287,7 @@ def test_generation_artifacts_when_existing_runtime_adapter_supplied(tmp_path, m
         assert config["do_sample"] is False
         assert config["chat_template_kwargs"] == {"enable_thinking": False}
     environment = json.loads((output / "environment.json").read_text())
+    assert environment["prompt_version"] == schedule[0].prompt_version
     assert environment["seed"] is None and environment["temperature"] is None
     assert len(environment["prompts_sha256"]) == 64
     assert all("evidence_used" not in json.loads(line) for line in (

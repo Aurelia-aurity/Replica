@@ -111,6 +111,36 @@ seed 59로 섞은 `blind-items.json`에는 opaque bid와 기록·질문·정답 
 
 ## 2단계 로컬 검증
 
+### Prompt revision r2 (DEV-only)
+
+`generate.py --prompt-version r1|r2` selects the prompt revision; the default is
+`r1`. Its rendered messages remain byte-identical to the frozen r1
+`results/generation/prompts.jsonl`. Prompt and generation rows now include
+`prompt_version`; older generation rows without the field load as r1.
+`environment.json` also records the selected revision.
+
+r2 replaces the baseline wording with memory-oriented conversation, explicit
+speaker/event boundaries, partial answers, gentle false-premise correction,
+in-character unknowns, and register examples including 하게체. A/B/C still differ
+only inside the evidence block. Retrieval, decoding, the 160-token response cap,
+and postprocessing are unchanged. Design used only DEV responses and labels;
+no r2 quality result is claimed before GPU generation and judging.
+
+```bash
+.venv/bin/python -m pytest -q test_rag.py test_generate.py
+.venv/bin/python generate.py --prompt-version r2 --dry-run --output .cache/r2-dry-run
+```
+
+For the parent's existing batch workflow, set `REPLICA_PROMPT_VERSION=r2`;
+`run-generate.sbatch` forwards it to `--prompt-version` and defaults to r1 when
+unset. Use a new `REPLICA_OUTPUT` directory to preserve previous runs. The worker
+does not submit the batch job or invoke a judge.
+
+Local r2 verification: `67 passed, 2 warnings in 1.70s` (existing Typer/Click
+deprecations); `bash -n` and Python compilation passed. The r2 CLI dry run emitted
+240 prompts (80 per condition) without loading a model. LSP remained unavailable
+because `basedpyright-langserver` is not installed.
+
 로컬 pytest는 `54 passed, 2 warnings in 0.99s`였다. 경고 2개는 기존 Typer/Click deprecation이다. CPU dry run은 `DRY_RUN_DONE prompts=240 conditions={'A': 80, 'B': 80, 'C': 80} model_loaded=False`로 끝났다. `bash -n run-generate.sbatch`와 새 Python 파일의 `py_compile`도 통과했다.
 
 테스트는 조건별 입력 동일성, 임계값 미만·동일·초과 경계, 저장된 KURE 결과와 임계값 재적용 결과 일치, 정확한 gold, 페르소나 격리, 240행·결정적 순서, 맹검 키·문맥 대응과 잘못된 생성물 거부를 검사한다. Runtime 대역을 사용한 생성 파일·환경 파일 검사는 GPU 실측이 아니다. LSP는 `basedpyright` 미설치로 실행하지 못했다. GPU 생성, 원격 경로·패키지, 근거성·말투 품질, 실제 hybrid judge 판정은 아직 검증하지 않았다.
