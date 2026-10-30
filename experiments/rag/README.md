@@ -705,3 +705,116 @@ because `basedpyright-langserver` is absent. No commits, SSH, GPU generation or
 judge calls were made; tracked historical and running-job result files were
 not changed. The detailed g1 system text, r1 diff and DEV design evidence live
 in the local `.local-work/rag/gen-change/REPORT.md`.
+
+## pc1 post-generation replay (prepared, not GPU-tested)
+
+`postcheck.py` checks saved r1 replies with the same Qwen3-8B resident runtime as
+`generate.py` (greedy, bf16/eager, `enable_thinking=False`). The check call has a
+1024-token JSON budget; the optional deletion repair keeps the 160-token reply
+budget. These are inference calls, not a quality judge. No GPU replay or judge
+was run during implementation.
+
+The checker sees only the saved persona register/relationship metadata, question,
+actual `<evidence>` JSON from that row's `prompts.jsonl`, and reply. It does not
+reconstruct evidence from the corpus, retrieve additional records, use gold
+question types, or expose condition/split/IDs as routing signals. Claims contain
+an exact `span`, one of `supported`, `unsupported_positive`,
+`unsupported_negation`, `not_a_fact`, and `answers_question` (whether the span
+answers the question, not a gold answerability label). Personal-fact-free chat
+with an empty claim list is unchanged, apart from the separate tail cleanup.
+Both system templates are exported verbatim in the local report and in every
+replay's `environment.json`. Neither template contains factual example sentences.
+
+Invalid JSON/schema/spans get exactly one identical-input retry. If checking
+still fails, the original text is preserved (plus optional tail cleanup), with
+`action=fallback`, `check_error_preserve_original`, raw check outputs and errors.
+This is an explicit failed check, not a safety or quality pass: the CLI finishes
+writing and exits 1 when any check remains failed. Recovered retry errors remain
+in the row audit; `failed_checks` counts only unresolved checks.
+
+If a claim is unsupported, one constrained repair call removes flagged spans.
+Validation rejects empty replies, retained unsupported spans, lost supported
+spans, omitted fixed uncertainty when an asked-for part was removed, and new
+alphanumeric/Hangul tokens absent from the original reply plus evidence
+`content`. This is a conservative punctuation-split eojeol check, not a
+morphological or semantic verifier; evidence IDs are not part of its vocabulary.
+Even the fixed unknown sentence is not exempt from this repair validation.
+Invalid repairs fall back to original sentences not overlapping unsupported
+spans. If an asked-for part was removed, the fixed register-specific uncertainty
+is appended; if nothing remains it is the entire reply:
+
+- 반말 / 다정한 반말: `그건 잘 기억이 안 나.`
+- 해요체: `그건 잘 기억이 안 나요.`
+- 하게체: `그건 잘 기억이 안 나네.`
+
+End-anchored follow-up offers are removed in a separate logged step, not by
+deleting all questions. `postcheck.steps` and `tail_removed` retain that provenance
+even when the primary action is `repaired` or `fallback`; `action=tail_trimmed`
+means tail cleanup was the only edit. All empty final replies use the fixed
+register fallback. `raw_text` is the original final reply (`source.text`), and
+`text` is pc1's final reply. Other generation metadata (including source
+timings/tokens) stays original; it does not measure postcheck inference.
+
+### Frozen DEV design replay
+
+Only these two existing **local source directories** are selected:
+
+| Source directory under `/Users/admin/Project/Replica/.local-work/worktrees/issue59/experiments/rag/` | Corpus | Conditions | DEV rows |
+| --- | --- | --- | ---: |
+| `results/retrieval-v2/generation/` | `corpus.json` | `B_v2,C` | 80 (40 each) |
+| `results/generation/` | `history/corpus-r1r3.json` | `A` | 40 |
+
+`--split dev` is explicit in both submissions below. Before constructing Runtime,
+the loader filters generation rows by split and condition, cross-checks the
+corpus's question ID/persona/split index, rejects missing/duplicate/failed rows,
+and pairs them with exact saved prompts. Corpus gold, records and type fields
+are ignored by that index. Only selected rows are processed; TEST/held-out
+responses are never used as check inputs in this DEV replay.
+The output `prompts.jsonl` is nevertheless a byte-identical copy of the **whole**
+source file, as requested; it is not a claim that every copied prompt was run.
+Output `generations.jsonl` contains only selected rows. `environment.json` records
+the selection, runtime, templates, token budgets and input/code hashes.
+
+The following are **prepared submission commands, not executed commands**.
+Stage the current code, the two source directories, the matching corpora, and
+the baseline runtime/reference environment at the declared school paths first.
+Remote file presence has not been checked. Use fresh output paths; existing
+outputs are refused.
+
+```bash
+export REPLICA_BASE=/abr/coss40/prompt-exp-002
+export REPLICA_VENV=/abr/coss40/replica-llm-venv
+export REPLICA_MODEL=/abr/coss40/replica-models/Qwen3-8B
+cd "$REPLICA_BASE"
+
+REPLICA_SOURCE_DIR="$REPLICA_BASE/experiments/rag/results/retrieval-v2/generation" \
+REPLICA_OUTPUT="$REPLICA_BASE/experiments/rag/.cache/pc1-dev-v2" \
+REPLICA_CORPUS="$REPLICA_BASE/experiments/rag/corpus.json" \
+REPLICA_SPLIT=dev REPLICA_CONDITIONS=B_v2,C \
+sbatch --export=ALL experiments/rag/run-postcheck.sbatch
+
+REPLICA_SOURCE_DIR="$REPLICA_BASE/experiments/rag/results/generation" \
+REPLICA_OUTPUT="$REPLICA_BASE/experiments/rag/.cache/pc1-dev-a" \
+REPLICA_CORPUS="$REPLICA_BASE/experiments/rag/history/corpus-r1r3.json" \
+REPLICA_SPLIT=dev REPLICA_CONDITIONS=A \
+sbatch --export=ALL experiments/rag/run-postcheck.sbatch
+```
+
+Direct CLI equivalent: `postcheck.py --source-dir DIR --output NEW_DIR --corpus
+MATCHING_CORPUS --split dev --conditions B_v2,C` (use `A` for the old corpus).
+`run-postcheck.sbatch` uses the existing p02/DIS02, one-GPU, 07:30:00 pattern;
+source/output/corpus are required environment variables, not inferred paths.
+
+The unchanged adoption criteria are
+`/Users/admin/Project/Replica/.local-work/rag/postcheck/ACCEPTANCE_postcheck.md`.
+DEV replay is design evidence only, not a P1-P9 adoption decision. The later
+single held-out decision run and any quality judging remain unperformed.
+DEV source quotations, complete templates, checks and implementation limitations
+are recorded in `/Users/admin/Project/Replica/.local-work/rag/postcheck/REPORT.md`.
+
+Local verification: entire folder `194 passed, 2 warnings in 4.22s`; only the
+existing Typer/Click deprecations remain. The real CLI parser and persistence
+path passed with a fake Runtime (including exit 1 after unrecovered JSON errors);
+the batch wrapper forwarding, shell syntax and `git diff --check` passed.
+CPU-only source selection confirmed B_v2/C = 40/40 DEV rows and old A = 40.
+LSP diagnostics remain unavailable because `basedpyright-langserver` is absent.
