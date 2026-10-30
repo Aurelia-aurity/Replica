@@ -383,7 +383,7 @@ def test_loader_when_schedule_corrupt(artifacts, mutation):
 
 
 @pytest.mark.parametrize("failed", [False, True])
-@pytest.mark.parametrize("version", ["pc1", "pc1b"])
+@pytest.mark.parametrize("version", ["pc1", "pc1b", "pc1c"])
 def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkeypatch, failed, version):
     # Given: the real CLI persistence path and a fake resident Runtime.
     source, corpus, _, _ = artifacts
@@ -420,12 +420,14 @@ def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkey
     assert environment["rows"] == 1
     assert environment["environment"] == {"test_double": True}
     assert environment["postcheck_version"] == version
-    assert (environment["repair_cap"] is None) == (version == "pc1b")
-    assert (environment["repair_system"] is None) == (version == "pc1b")
+    assert (environment["repair_cap"] is None) == (version != "pc1")
+    assert (environment["repair_system"] is None) == (version != "pc1")
+    assert environment["check_version"] == ("pc1" if version == "pc1" else "pc1b")
+    assert environment["rebuild_version"] == (2 if version == "pc1c" else 1)
     assert environment["input_sha256"][str(corpus)] == sha256(corpus.read_bytes()).hexdigest()
 
 
-@pytest.mark.parametrize("version", [None, "pc1b"])
+@pytest.mark.parametrize("version", [None, "pc1b", "pc1c"])
 def test_sbatch_when_required_paths_forwarded(tmp_path, version):
     # Given: a fake python script, with no Slurm, SSH, GPU or model runtime.
     base = tmp_path / "checkout"

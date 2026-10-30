@@ -904,3 +904,89 @@ both warnings are existing Typer/Click deprecations. CLI option parsing and
 persistence passed with a fake Runtime for both versions, and batch forwarding,
 shell syntax and `git diff --check` passed. LSP remains unavailable because
 `basedpyright-langserver` is not installed. No pc1b inference quality is claimed.
+
+## pc1c: pc1b checker plus deterministic rebuild v2
+
+`--version pc1c` keeps the pc1b check prompt, numbered input, JSON schema, retry
+and labels unchanged. It changes only rebuilding; it does not request a model
+repair. `run-postcheck.sbatch` accepts `REPLICA_POSTCHECK_VERSION=pc1c` and runs
+the pc1b checker plus rebuild v2 in the same job. Default pc1 and explicit pc1b
+remain available for historical reproduction.
+
+After removing whole trailing offers/advice, pc1c retains supported/nonfact
+sentences and drops abstention/unsupported sentences. A single fixed uncertainty
+is appended **at the end** only if a removed active sentence has
+`answers_question=true` and no retained `supported` sentence has
+`answers_question=true`. A supported answering sentence suppresses redundant
+meta abstention, even if it appeared before that answer. This is the requested
+sentence-label heuristic, not proof that every requested slot was answered.
+An empty rebuilt reply still uses the register uncertainty alone as fallback.
+Labels and answer flags are never rejudged using gold or corpus annotations.
+
+The same pc1c version also guards provider questions after semantic removals.
+If an abstention/unsupported sentence was removed and the retained text has no
+supported sentence and consists only of questions ending in `?`/`？`, it becomes
+one register uncertainty. When supported content remains, trailing nonfact
+questions that follow removed content are dropped. Saved supported questions
+are not deleted. Replies with no removed abstention/unsupported sentence never
+trigger this guard, so ordinary question-only chat is unchanged. Guard actions
+are logged as `provider_questions_replaced` or
+`provider_questions_trimmed:<sentence IDs>` without altering saved labels.
+
+The whole-sentence suffix patterns additionally cover `알려줄 수 있어요?`,
+spacing/polite variants of `필요하면 다시 확인해줄게?`, advice ending in
+`확인해 보길 권해`, `확인해 보세요`, and `또 물어볼게?`.
+Quoted/retrospective uses, factual
+reports and interior sentences are retained. The same original sentence IDs
+and labels are recorded in pc1c; the step log is recomputed for rebuild v2.
+
+### Offline saved-label mode
+
+`--rebuild-from DIR --version pc1c --output NEW_DIR` uses only successful saved
+pc1b decisions and the source's saved prompts/environment. It requires neither
+`--source-dir` nor `--corpus` and imports no model runtime. Before writing, it
+checks version/success, original `raw_text` versus numbered sentence text, exact
+ID coverage, duplicates and prompt metadata. It rejects failed checks or
+missing/tampered artifacts and refuses existing output directories.
+
+It writes pc1c `generations.jsonl`, a byte-identical copy of source
+`prompts.jsonl`, and provenance in `environment.json`, including source hashes,
+source environment, `model_calls=0`, action counts and changes versus pc1b.
+Output `raw_text` remains the original generator reply, not the modified pc1b
+text. Actions are measured against that original reply; `changed_from_source`
+separately measures changes against pc1b.
+
+Local DEV rebuild commands:
+
+```bash
+cd /Users/admin/Project/Replica/.local-work/worktrees/issue59/experiments/rag
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B postcheck.py \
+  --rebuild-from /Users/admin/Project/Replica/.local-work/rag/postcheck/pc1b-dev-v2 \
+  --version pc1c --split dev --conditions B_v2,C \
+  --output /Users/admin/Project/Replica/.local-work/rag/postcheck/pc1c-dev-v2-questions
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B postcheck.py \
+  --rebuild-from /Users/admin/Project/Replica/.local-work/rag/postcheck/pc1b-dev-a \
+  --version pc1c --split dev --conditions A \
+  --output /Users/admin/Project/Replica/.local-work/rag/postcheck/pc1c-dev-a-questions
+```
+
+Use new output paths when repeating the commands. The actual DEV action counts,
+ten verbatim before/after comparisons and test evidence are recorded in
+`/Users/admin/Project/Replica/.local-work/rag/postcheck/REPORT_pc1c.md`.
+The provider-question guard's latest run and five requested examples are in
+`/Users/admin/Project/Replica/.local-work/rag/postcheck/REPORT_pc1c_questions.md`;
+the prior `*-final/` directories remain unchanged as the comparison baseline.
+The fixed acceptance criteria are unchanged. No held-out file was opened and
+no decision job was submitted during this change.
+
+Final local verification: `320 passed, 2 warnings in 4.53s` (existing Typer/Click
+deprecations), shell syntax and diff checks passed. Both offline DEV commands
+completed with `failed_checks=0 model_calls=0`, changing 8/80 B_v2/C replies and
+7/40 A replies relative to pc1b. All 120 saved labels, check outputs and original
+raw replies were preserved. LSP remains unavailable because its server is absent.
+
+Provider-question guard verification: `343 passed, 2 warnings in 4.58s`; syntax,
+diff and both offline rebuilds passed with zero model calls. Relative to the
+previous pc1c output, four A replies and one C reply changed; all 15 DEV ordinary
+chat replies and all 120 saved labels/check outputs remained unchanged.
+The latest output directories end in `-questions/`.

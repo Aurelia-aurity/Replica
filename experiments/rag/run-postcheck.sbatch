@@ -15,6 +15,7 @@ REPLICA_MODEL="${REPLICA_MODEL:-/abr/coss40/replica-models/Qwen3-8B}"
 REPLICA_SPLIT="${REPLICA_SPLIT:-dev}"
 REPLICA_CONDITIONS="${REPLICA_CONDITIONS:-}"
 REPLICA_POSTCHECK_VERSION="${REPLICA_POSTCHECK_VERSION:-pc1}"
+# pc1c reuses the pc1b checker and applies deterministic rebuild v2 in the same job.
 cd "$REPLICA_BASE"
 hostname
 source "$REPLICA_VENV/bin/activate"

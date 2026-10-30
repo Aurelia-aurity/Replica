@@ -1,5 +1,6 @@
 """pc1: replay saved replies against only their actual generation-time evidence."""
 
+from collections import Counter
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -24,7 +25,7 @@ SENTENCE_CHECK_SYSTEM: Final = """답변의 번호 붙은 문장만 근거와 �
 label은 supported(개인 사실이 근거로 뒷받침됨), unsupported_positive(근거 없는 긍정 사실), unsupported_negation(근거 없는 사건·존재 부정), abstain(묻는 내용을 기억하지 못하거나 모르거나 기록되지 않았다고 말함), not_a_fact(개인 사실 없는 인사·일상 대화·질문·제안) 중 하나입니다. 기억·지식·기록의 부재를 말하는 abstain과 사건 자체의 부정은 구별하세요. 근거 부재만으로 사건을 부정하지 마세요. 명시적 근거가 있는 부정은 supported입니다. 한 문장에 근거 없는 개인 사실이 섞이면 긍정은 unsupported_positive, 부정은 unsupported_negation으로 분류하세요."""
 CHECK_CAP: Final = 1024
 REPAIR_CAP: Final = 160
-Version = Literal["pc1", "pc1b"]
+Version = Literal["pc1", "pc1b", "pc1c"]
 Register = Literal["반말", "다정한 반말", "해요체", "하게체"]
 Label = Literal["supported", "unsupported_positive", "unsupported_negation", "not_a_fact"]
 SentenceLabel = Literal[
@@ -54,6 +55,13 @@ TAIL: Final = re.compile(
 )
 # pc1b matches whole terminal sentences, before inserting any uncertainty.
 HELP_OFFER: Final = re.compile(r"알려\s*주시면\s*도와\s*드릴게요[.!?。！？]*")
+REBUILD_TAIL: Final = re.compile(
+    r"(?:알려\s*줄\s*수\s*있어(?:요)?"
+    r"|또\s*물어볼(?:까|게)(?:요)?"
+    r"|(?:(?:필요하면|필요하시면)[,\s]*)?다시\s*확인해\s*(?:줄게(?:요)?|드릴게요)"
+    r"|[^.!?。！？\n\"'“”‘’]*확인해\s*(?:보길\s*권해(?:요)?|보세요))"
+    r"[.!?。！？]*"
+)
 UNCERTAINTY: Final = re.compile(
     r"(?:기억(?:이|은|도)?\s*(?:잘\s*)?(?:"
     r"(?:나지|나질)\s*않(?:아(?:요)?|네(?:요)?|습니다|소|는다)"
@@ -127,7 +135,7 @@ class SentenceDecisions(FrozenModel):
 
 
 class SentencePostcheck(FrozenModel):
-    version: Literal["pc1b"] = "pc1b"
+    version: Literal["pc1b", "pc1c"] = "pc1b"
     numbered_sentences: tuple[NumberedSentence, ...]
     sentences: tuple[SentenceDecision, ...]
     uncertainty_ids: tuple[int, ...]
@@ -140,6 +148,10 @@ class SentencePostcheck(FrozenModel):
 
 class CheckedGeneration(Generation):
     postcheck: Postcheck | SentencePostcheck = Field(discriminator="version")
+
+
+class SentenceGeneration(Generation):
+    postcheck: SentencePostcheck
 
 
 class Completion(Protocol):
@@ -448,6 +460,86 @@ def process_pc1b(item: CheckInput, complete: Completion) -> tuple[str, SentenceP
     )
 
 
+def rebuild_pc1c(item: CheckInput, checked: SentencePostcheck) -> tuple[str, SentencePostcheck]:
+    """Reuse pc1b labels; put necessary uncertainty only after retained answering text."""
+    sentences = checked.numbered_sentences
+    end = len(sentences)
+    while end and (
+        TAIL.fullmatch(sentences[end - 1].text.strip())
+        or HELP_OFFER.fullmatch(sentences[end - 1].text.strip())
+        or REBUILD_TAIL.fullmatch(sentences[end - 1].text.strip())
+    ):
+        end -= 1
+    removed = "".join(s.text for s in sentences[end:])
+    steps = ["check"]
+    if removed:
+        steps.append("tail_trimmed")
+    active = sentences[:end]
+    action: Action = "pass"
+    if "check_error_preserve_original" in checked.steps:
+        reply = "".join(s.text for s in active)
+        action = "fallback"
+        steps.append("check_error_preserve_original")
+    else:
+        by_id = {s.id: s for s in checked.sentences}
+        retained: list[NumberedSentence] = []
+        removed_ids: list[int] = []
+        lost_answer = False
+        supported_answer = False
+        edited = False
+        for sentence in active:
+            decision = by_id[sentence.id]
+            match decision.label:
+                case "supported":
+                    retained.append(sentence)
+                    supported_answer |= decision.answers_question
+                case "not_a_fact":
+                    retained.append(sentence)
+                case "abstain" | "unsupported_positive" | "unsupported_negation":
+                    lost_answer |= decision.answers_question
+                    removed_ids.append(sentence.id)
+                    edited = True
+                case unreachable:
+                    assert_never(unreachable)
+        if removed_ids and retained:
+            has_supported = any(by_id[s.id].label == "supported" for s in retained)
+            if not has_supported and all(
+                s.text.rstrip().endswith(("?", "？")) for s in retained
+            ):
+                retained.clear()
+                steps.append("provider_questions_replaced")
+            elif has_supported:
+                trimmed_ids: list[int] = []
+                while (
+                    retained
+                    and by_id[retained[-1].id].label == "not_a_fact"
+                    and retained[-1].text.rstrip().endswith(("?", "？"))
+                    and any(i < retained[-1].id for i in removed_ids)
+                ):
+                    trimmed_ids.append(retained.pop().id)
+                if trimmed_ids:
+                    steps.append("provider_questions_trimmed:" + ",".join(
+                        str(i) for i in reversed(trimmed_ids)
+                    ))
+        reply = "".join(s.text for s in retained)
+        if lost_answer and not supported_answer and reply.strip():
+            reply = reply.rstrip() + " " + UNKNOWN[item.persona.speech_register]
+            steps.append("uncertainty_appended")
+        if edited:
+            steps.append("deterministic_rebuild_v2")
+        if reply != item.reply:
+            action = "repaired" if edited else "tail_trimmed"
+    if not reply.strip():
+        reply = UNKNOWN[item.persona.speech_register]
+        action = "fallback"
+        steps.append("empty_rebuild_fallback")
+    elif reply != item.reply:
+        reply = reply.strip()
+    return reply, checked.model_copy(update={
+        "version": "pc1c", "action": action, "tail_removed": removed, "steps": tuple(steps),
+    })
+
+
 def load_replay(
     source: Path, corpus: Path, split: Split, conditions: tuple[str, ...],
 ) -> tuple[tuple[Generation, Prompt], ...]:
@@ -520,6 +612,9 @@ def replay(
                     text, result = process(item, complete)
                 case "pc1b":
                     text, result = process_pc1b(item, complete)
+                case "pc1c":
+                    _, checked_sentences = process_pc1b(item, complete)
+                    text, result = rebuild_pc1c(item, checked_sentences)
                 case unreachable:
                     assert_never(unreachable)
             failed += int("check_error_preserve_original" in result.steps)
@@ -532,20 +627,115 @@ def replay(
     return failed
 
 
+def rebuild_saved(source: Path, output: Path, split: Split, conditions: tuple[str, ...]) -> None:
+    """Validate and rebuild saved pc1b decisions without importing the model runtime."""
+    selected: dict[tuple[str, str], SentenceGeneration] = {}
+    for line in (source / "generations.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if payload["split"] != split or (conditions and payload["condition"] not in conditions):
+            continue
+        row = SentenceGeneration.model_validate(payload)
+        if (
+            row.status != "success" or not row.raw_text or not row.raw_text.strip()
+            or row.postcheck.version != "pc1b"
+            or "check_error_preserve_original" in row.postcheck.steps
+        ):
+            raise InputError("Offline rebuild requires successful pc1b sentence decisions")
+        if row.postcheck.numbered_sentences != numbered_sentences(row.raw_text):
+            raise InputError("Saved sentence text/IDs differ from the original reply")
+        parse_sentences(
+            SentenceDecisions(sentences=row.postcheck.sentences).model_dump_json(),
+            row.postcheck.numbered_sentences,
+        )
+        key = row.question_id, row.condition
+        if key in selected:
+            raise InputError("Duplicate saved generation")
+        selected[key] = row
+    if not selected or (conditions and {c for _, c in selected} != set(conditions)):
+        raise InputError("Empty offline selection or missing requested condition")
+    prompts: dict[tuple[str, str], Prompt] = {}
+    for line in (source / "prompts.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        key = payload["question_id"], payload["condition"]
+        if key not in selected:
+            continue
+        if key in prompts:
+            raise InputError("Duplicate saved prompt")
+        prompt = Prompt.model_validate(payload)
+        if selected[key].model_dump(
+            include=set(Prompt.model_fields) - {"messages"},
+        ) != prompt.model_dump(exclude={"messages"}):
+            raise InputError("Saved generation/prompt metadata mismatch")
+        check_input(prompt, selected[key].raw_text)
+        prompts[key] = prompt
+    if selected.keys() != prompts.keys():
+        raise InputError("Missing saved prompt")
+    source_environment = json.loads((source / "environment.json").read_text(encoding="utf-8"))
+    if source_environment["postcheck_version"] != "pc1b":
+        raise InputError("Offline source environment must declare pc1b")
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(source / "prompts.jsonl", output / "prompts.jsonl")
+    actions: dict[str, Counter[str]] = {}
+    changed = 0
+    with (output / "generations.jsonl").open("x", encoding="utf-8") as handle:
+        for key, row in selected.items():
+            item = check_input(prompts[key], row.raw_text)
+            text, result = rebuild_pc1c(item, row.postcheck)
+            rebuilt = CheckedGeneration(
+                **row.model_dump(exclude={"text", "postcheck"}), text=text, postcheck=result,
+            )
+            handle.write(rebuilt.model_dump_json() + "\n")
+            actions.setdefault(row.condition, Counter())[result.action] += 1
+            changed += int(text != row.text)
+    inputs = (
+        source / "generations.jsonl", source / "prompts.jsonl", source / "environment.json",
+        Path(__file__), ROOT / "generate.py", ROOT / "corpus.py",
+    )
+    environment = {
+        "postcheck_version": "pc1c", "check_version": "pc1b", "rebuild_version": 2,
+        "execution_kind": "offline_saved_labels", "model_calls": 0,
+        "source_dir": str(source), "source_environment": source_environment,
+        "split": split, "conditions": sorted(actions), "rows": len(selected),
+        "failed_checks": 0, "action_counts": actions, "changed_from_source": changed,
+        "action_reference": "original raw_text, not source pc1b text",
+        "check_system": source_environment.get("check_system"),
+        "input_sha256": {str(p): sha256(p.read_bytes()).hexdigest() for p in inputs},
+        "prompts_copy_scope": "byte-identical full source; only selected rows processed",
+    }
+    with (output / "environment.json").open("x", encoding="utf-8") as handle:
+        json.dump(environment, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    print(f"POSTCHECK_REBUILD_DONE rows={len(selected)} failed_checks=0 model_calls=0")
+    print(json.dumps({"actions": actions, "changed_from_source": changed}, ensure_ascii=False))
+
+
 def main(
-    source_dir: Path = typer.Option(...),
+    source_dir: Path | None = typer.Option(None),
     output: Path = typer.Option(...),
-    corpus: Path = typer.Option(...),
+    corpus: Path | None = typer.Option(None),
     split: Split = "dev",
     conditions: str = "",
     model_path: Path = Path("/abr/coss40/replica-models/Qwen3-8B"),
     version: Version = "pc1",
+    rebuild_from: Path | None = typer.Option(None),
 ) -> None:
-    """Replay a complete selected split/arm subset inside a school allocation."""
-    source_dir, output, corpus = source_dir.resolve(), output.resolve(), corpus.resolve()
+    """Run a resident checker, or rebuild saved pc1b labels entirely offline."""
+    output = output.resolve()
     selected_conditions = tuple(conditions.split(",")) if conditions else ()
     if len(set(selected_conditions)) != len(selected_conditions):
         raise InputError("Duplicate requested conditions")
+    if rebuild_from is not None:
+        if version != "pc1c" or source_dir is not None or corpus is not None:
+            raise InputError("--rebuild-from requires pc1c without --source-dir/--corpus")
+        rebuild_saved(rebuild_from.resolve(), output, split, selected_conditions)
+        return
+    if source_dir is None or corpus is None:
+        raise InputError("Online replay requires --source-dir and --corpus")
+    source_dir, corpus = source_dir.resolve(), corpus.resolve()
     rows = load_replay(source_dir, corpus, split, selected_conditions)
     if output.exists():
         raise InputError("Output already exists")
@@ -573,6 +763,8 @@ def main(
     )
     environment = {
         "postcheck_version": version, "source_dir": str(source_dir), "corpus": str(corpus),
+        "check_version": "pc1" if version == "pc1" else "pc1b",
+        "rebuild_version": 2 if version == "pc1c" else 1,
         "split": split, "conditions": sorted({r.condition for r, _ in rows}),
         "rows": len(rows), "failed_checks": failed, "environment": runtime.environment,
         "config": config, "model_path": str(model_path),
