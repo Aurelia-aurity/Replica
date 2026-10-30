@@ -14,6 +14,7 @@ REPLICA_MODEL="${REPLICA_MODEL:-/abr/coss40/replica-models/Qwen3-8B}"
 : "${REPLICA_CORPUS:?Set the corpus matching the source}"
 REPLICA_SPLIT="${REPLICA_SPLIT:-dev}"
 REPLICA_CONDITIONS="${REPLICA_CONDITIONS:-}"
+REPLICA_POSTCHECK_VERSION="${REPLICA_POSTCHECK_VERSION:-pc1}"
 cd "$REPLICA_BASE"
 hostname
 source "$REPLICA_VENV/bin/activate"
@@ -21,5 +22,6 @@ if [ -n "${REPLICA_PYDEPS:-}" ]; then export PYTHONPATH="$REPLICA_PYDEPS${PYTHON
 python experiments/rag/postcheck.py \
     --source-dir "$REPLICA_SOURCE_DIR" --output "$REPLICA_OUTPUT" \
     --corpus "$REPLICA_CORPUS" --split "$REPLICA_SPLIT" \
-    --conditions "$REPLICA_CONDITIONS" --model-path "$REPLICA_MODEL"
+    --conditions "$REPLICA_CONDITIONS" --model-path "$REPLICA_MODEL" \
+    --version "$REPLICA_POSTCHECK_VERSION"
 echo "EXIT 0"

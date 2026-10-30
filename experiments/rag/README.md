@@ -706,7 +706,7 @@ judge calls were made; tracked historical and running-job result files were
 not changed. The detailed g1 system text, r1 diff and DEV design evidence live
 in the local `.local-work/rag/gen-change/REPORT.md`.
 
-## pc1 post-generation replay (prepared, not GPU-tested)
+## pc1 post-generation replay (legacy implementation record)
 
 `postcheck.py` checks saved r1 replies with the same Qwen3-8B resident runtime as
 `generate.py` (greedy, bf16/eager, `enable_thinking=False`). The check call has a
@@ -818,3 +818,89 @@ path passed with a fake Runtime (including exit 1 after unrecovered JSON errors)
 the batch wrapper forwarding, shell syntax and `git diff --check` passed.
 CPU-only source selection confirmed B_v2/C = 40/40 DEV rows and old A = 40.
 LSP diagnostics remain unavailable because `basedpyright-langserver` is absent.
+
+## pc1b sentence-ID replay
+
+Select `postcheck.py --version pc1b`; the default remains `pc1`, whose span check,
+repair call and output path are preserved for historical reproduction. The
+school batch wrapper forwards `REPLICA_POSTCHECK_VERSION` (default `pc1`).
+No pc1b GPU/checker/judge call was made during this change.
+
+pc1b numbers the original reply's punctuation/newline-delimited sentences and
+sends only persona/question/actual saved evidence/`sentences[{id,text}]`. The
+checker returns `{"sentences":[{"id":1,"label":"supported","answers_question":true}]}`
+covering every input ID exactly once, with no spans or copied text. Missing,
+duplicate, foreign/noninteger IDs, unknown labels, nonboolean flags, extra fields
+and malformed JSON trigger one identical-input retry. Response order does not
+control reply order. The 1024-token check cap and runtime are unchanged.
+
+Labels are `supported`, `unsupported_positive`, `unsupported_negation`, `abstain`,
+and `not_a_fact`. `abstain` means the asked detail is not remembered/known/recorded;
+it is separate from denial that an event happened or something exists. Personal
+fact-free chat sentences use `not_a_fact`, without gold question-type routing.
+A mixed sentence with an unsupported fact is classified unsupported; this
+sentence-level design can lose supported clauses in that same sentence.
+
+There is **no pc1b model repair call**. Rebuilding is deterministic:
+
+1. Remove repeated whole trailing offer sentences from the original reply,
+   before adding any uncertainty. Existing offer patterns plus
+   `필요하시면 다시 확인해 드릴 수 있어요`, `알려주시면 도와드릴게요`, and
+   `다시 물어볼게?` are covered. Interior offers and factual report sentences
+   such as `추가로 확인해 본 결과 카드가 있었어.` are not tail offers.
+2. Keep `supported`/`not_a_fact` sentence text verbatim. Drop unsupported positive
+   and negative sentences. Replace all `abstain` sentences with exactly one fixed
+   register uncertainty, at the first abstention position.
+3. A deterministic terminal-uncertainty recognizer also treats existing
+   `기억이 나지 않아`, `기억이 안 나`, `모르겠어` and their common register
+   endings as `abstain`, regardless of the model label. This prevents duplicates
+   when a memory disclaimer was mislabeled `not_a_fact` or even `supported`.
+   The model handles other paraphrases; the regex is not a semantic classifier.
+4. If an unsupported sentence answered the question and no uncertainty remains,
+   append the fixed register uncertainty. An empty result uses it alone.
+
+Unchanged chat remains byte-identical, including whitespace. After edits, outer
+whitespace is trimmed while retained sentence text is preserved. `postcheck`
+records version, numbered originals, effective sentence labels, deterministic
+`uncertainty_ids`, raw check outputs/errors, exact `tail_removed`, action and
+ordered steps. Raw outputs retain any model labels overridden to `abstain`.
+No claim spans or model repair output are produced for pc1b.
+On an unresolved check error, preserve original content after safe whole-sentence
+tail removal, mark fallback, and exit 1 as in pc1; no unsupported/abstention
+decisions are inferred from an invalid response. Environment declares pc1b,
+the exact new prompt, and null repair cap/system.
+
+For DEV replay, use the same two original generation sources/corpora documented
+above, **not the already modified pc1 output**. Prepared commands (not submitted):
+
+```bash
+export REPLICA_BASE=/abr/coss40/prompt-exp-002
+export REPLICA_VENV=/abr/coss40/replica-llm-venv
+export REPLICA_MODEL=/abr/coss40/replica-models/Qwen3-8B
+cd "$REPLICA_BASE"
+
+REPLICA_POSTCHECK_VERSION=pc1b \
+REPLICA_SOURCE_DIR="$REPLICA_BASE/experiments/rag/results/retrieval-v2/generation" \
+REPLICA_OUTPUT="$REPLICA_BASE/experiments/rag/.cache/pc1b-dev-v2" \
+REPLICA_CORPUS="$REPLICA_BASE/experiments/rag/corpus.json" \
+REPLICA_SPLIT=dev REPLICA_CONDITIONS=B_v2,C \
+sbatch --export=ALL experiments/rag/run-postcheck.sbatch
+
+REPLICA_POSTCHECK_VERSION=pc1b \
+REPLICA_SOURCE_DIR="$REPLICA_BASE/experiments/rag/results/generation" \
+REPLICA_OUTPUT="$REPLICA_BASE/experiments/rag/.cache/pc1b-dev-a" \
+REPLICA_CORPUS="$REPLICA_BASE/experiments/rag/history/corpus-r1r3.json" \
+REPLICA_SPLIT=dev REPLICA_CONDITIONS=A \
+sbatch --export=ALL experiments/rag/run-postcheck.sbatch
+```
+
+The fixed `ACCEPTANCE_postcheck.md` remains unchanged. User-supplied pc1 DEV jobs
+29865/29866 motivate this redesign, not a held-out decision. The pc1b prompt,
+five DEV reply walkthroughs and the two additional DEV-A regressions are recorded
+in `/Users/admin/Project/Replica/.local-work/rag/postcheck/REPORT_pc1b.md`.
+
+pc1b local verification: entire folder `269 passed, 2 warnings in 4.34s`;
+both warnings are existing Typer/Click deprecations. CLI option parsing and
+persistence passed with a fake Runtime for both versions, and batch forwarding,
+shell syntax and `git diff --check` passed. LSP remains unavailable because
+`basedpyright-langserver` is not installed. No pc1b inference quality is claimed.

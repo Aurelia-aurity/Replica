@@ -383,7 +383,8 @@ def test_loader_when_schedule_corrupt(artifacts, mutation):
 
 
 @pytest.mark.parametrize("failed", [False, True])
-def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkeypatch, failed):
+@pytest.mark.parametrize("version", ["pc1", "pc1b"])
+def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkeypatch, failed, version):
     # Given: the real CLI persistence path and a fake resident Runtime.
     source, corpus, _, _ = artifacts
 
@@ -393,7 +394,10 @@ def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkey
             self.environment = {"test_double": True}
 
         def generate(self, user, cap):
-            return {"text": "bad" if failed else answer()}
+            value = answer() if version == "pc1" else json.dumps({
+                "sentences": [{"id":1, "label":"not_a_fact", "answers_question":False}],
+            })
+            return {"text": "bad" if failed else value}
 
     class FakeEvaluationError(RuntimeError):
         pass
@@ -407,6 +411,7 @@ def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkey
     result = CliRunner().invoke(app, [
         "--source-dir", str(source), "--output", str(output),
         "--corpus", str(corpus), "--split", "dev", "--conditions", "A",
+        "--version", version,
     ])
     assert result.exit_code == int(failed), result.output
     # Then: final failed checks differ from recovered attempts; provenance is reproducible.
@@ -414,10 +419,14 @@ def test_main_when_fake_runtime_persists_environment(artifacts, tmp_path, monkey
     assert environment["failed_checks"] == int(failed)
     assert environment["rows"] == 1
     assert environment["environment"] == {"test_double": True}
+    assert environment["postcheck_version"] == version
+    assert (environment["repair_cap"] is None) == (version == "pc1b")
+    assert (environment["repair_system"] is None) == (version == "pc1b")
     assert environment["input_sha256"][str(corpus)] == sha256(corpus.read_bytes()).hexdigest()
 
 
-def test_sbatch_when_required_paths_forwarded(tmp_path):
+@pytest.mark.parametrize("version", [None, "pc1b"])
+def test_sbatch_when_required_paths_forwarded(tmp_path, version):
     # Given: a fake python script, with no Slurm, SSH, GPU or model runtime.
     base = tmp_path / "checkout"
     script = base / "experiments/rag/postcheck.py"
@@ -433,6 +442,8 @@ def test_sbatch_when_required_paths_forwarded(tmp_path):
         REPLICA_SOURCE_DIR="/source", REPLICA_OUTPUT="/fresh",
         REPLICA_CORPUS="/matching/corpus", REPLICA_CONDITIONS="B_v2,C",
     )
+    if version is not None:
+        env["REPLICA_POSTCHECK_VERSION"] = version
     # When: execute the actual wrapper, not sbatch.
     result = subprocess.run(
         ["bash", str(ROOT / "run-postcheck.sbatch")], env=env,
@@ -445,5 +456,6 @@ def test_sbatch_when_required_paths_forwarded(tmp_path):
         ("--source-dir", "/source"), ("--output", "/fresh"),
         ("--corpus", "/matching/corpus"), ("--split", "dev"),
         ("--conditions", "B_v2,C"),
+        ("--version", version or "pc1"),
     ]:
         assert args[args.index(flag) + 1] == expected
