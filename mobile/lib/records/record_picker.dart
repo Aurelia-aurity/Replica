@@ -4,17 +4,23 @@ import 'record_models.dart';
 
 typedef RecordPicker = Future<RecordFile?> Function();
 
-Future<RecordFile?> pickRecordFile() async {
+Future<RecordFile?> pickRecordFile({RecordKind? kind}) async {
   final file = await openFile(
-    acceptedTypeGroups: const [
+    acceptedTypeGroups: [
       XTypeGroup(
         label: '텍스트·음성 기록',
-        extensions: ['txt', 'wav', 'mp3', 'm4a'],
+        extensions: kind == RecordKind.text
+            ? ['txt']
+            : kind == RecordKind.audio
+            ? ['wav', 'mp3', 'm4a']
+            : ['txt', 'wav', 'mp3', 'm4a'],
         uniformTypeIdentifiers: [
-          'public.plain-text',
-          'com.microsoft.waveform-audio',
-          'public.mp3',
-          'com.apple.m4a-audio',
+          if (kind != RecordKind.audio) 'public.plain-text',
+          if (kind != RecordKind.text) ...[
+            'com.microsoft.waveform-audio',
+            'public.mp3',
+            'com.apple.m4a-audio',
+          ],
         ],
       ),
     ],

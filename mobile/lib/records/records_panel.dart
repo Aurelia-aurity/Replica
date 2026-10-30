@@ -63,6 +63,11 @@ class _RecordsPanelState extends State<RecordsPanel> {
                       ),
                       FilledButton.icon(
                         onPressed: _upload,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: replicaGreen,
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
                         icon: const Icon(Icons.add),
                         label: const Text('올리기'),
                       ),
@@ -83,6 +88,13 @@ class _RecordsPanelState extends State<RecordsPanel> {
                                 : '음성'} ${controller.entries.where((e) => kind == null || e.kind == kind).length}',
                           ),
                           selected: _filter == kind,
+                          backgroundColor: Colors.white,
+                          shape: const StadiumBorder(),
+                          side: BorderSide(
+                            color: _filter == kind
+                                ? const Color(0xFF19241F)
+                                : replicaBorder,
+                          ),
                           showCheckmark: false,
                           selectedColor: const Color(0xFF19241F),
                           labelStyle: TextStyle(
@@ -95,17 +107,6 @@ class _RecordsPanelState extends State<RecordsPanel> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  if (controller.service.isPreview) ...[
-                    const Text(
-                      '미리보기 · 파일은 서버로 전송되지 않으며 로그아웃하면 목록이 초기화돼요.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF68766F),
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
                   if (controller.loading) const LinearProgressIndicator(),
                   if (controller.listError != null)
                     _message(
@@ -169,6 +170,18 @@ class _RecordsPanelState extends State<RecordsPanel> {
                       ),
                     ],
                   ),
+                  if (controller.service.isPreview)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text(
+                        '미리보기 · 파일은 서버로 전송되지 않으며 로그아웃하면 목록이 초기화돼요.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.5,
+                          color: Color(0xFF75817B),
+                        ),
+                      ),
+                    ),
                   if (!controller.service.canRetryProcessing &&
                       records.any((e) => e.status == RecordStatus.failed))
                     const Padding(
@@ -214,24 +227,71 @@ class _RecordsPanelState extends State<RecordsPanel> {
   Widget _record(RecordEntry entry) {
     final failed = entry.status == RecordStatus.failed;
     final audio = entry.kind == RecordKind.audio;
-    final color = failed
-        ? const Color(0xFFB3261E)
-        : audio
-        ? aiAmber
-        : replicaGreen;
-    final background = failed
-        ? const Color(0xFFFCE8E6)
-        : audio
-        ? aiAmberBackground
-        : const Color(0xFFE3EFEB);
     final date = entry.createdAt.toLocal();
     final seconds = entry.durationSeconds;
     final metadata = [
       audio ? '음성' : '텍스트',
       if (seconds != null) '${seconds ~/ 60}분 ${seconds % 60}초',
-      if (entry.sizeBytes != null) formatBytes(entry.sizeBytes!),
       '${date.month}월 ${date.day}일',
     ].join(' · ');
+    final iconColor = failed
+        ? const Color(0xFFBF3328)
+        : audio
+        ? aiAmber
+        : replicaGreen;
+    final iconBackground = failed
+        ? const Color(0xFFFCE5E2)
+        : audio
+        ? aiAmberBackground
+        : const Color(0xFFE2EEE9);
+    final needsReview = entry.status == RecordStatus.ready && !entry.confirmed;
+    final reflected = entry.status == RecordStatus.ready && entry.confirmed;
+    final badgeColor = failed
+        ? const Color(0xFFBF3328)
+        : needsReview
+        ? aiAmber
+        : reflected
+        ? replicaGreen
+        : const Color(0xFF56645D);
+    final badgeBackground = failed
+        ? const Color(0xFFFCE5E2)
+        : needsReview
+        ? aiAmberBackground
+        : reflected
+        ? const Color(0xFFDCEEE5)
+        : const Color(0xFFE5EAE7);
+    final status = failed
+        ? OutlinedButton.icon(
+            onPressed:
+                widget.controller.service.canRetryProcessing &&
+                    !widget.controller.retrying.contains(entry.id)
+                ? () => widget.controller.retry(entry)
+                : null,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('다시 시도', style: TextStyle(fontSize: 12)),
+          )
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: badgeBackground,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              entry.statusLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: badgeColor,
+              ),
+            ),
+          );
     return InkWell(
       onTap: () => showModalBottomSheet<void>(
         context: context,
@@ -260,88 +320,64 @@ class _RecordsPanelState extends State<RecordsPanel> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                failed
-                    ? Icons.warning_amber_rounded
-                    : audio
-                    ? Icons.graphic_eq
-                    : Icons.description_outlined,
-                color: color,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked =
+                constraints.maxWidth < 280 ||
+                MediaQuery.textScalerOf(context).scale(14) > 19;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: iconBackground,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    failed ? '기록 처리에 실패했어요' : metadata,
-                    style: TextStyle(
-                      color: failed ? color : const Color(0xFF68766F),
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
+                  child: Icon(
+                    failed
+                        ? Icons.warning_amber_rounded
+                        : audio
+                        ? Icons.graphic_eq
+                        : Icons.description_outlined,
+                    color: iconColor,
+                    size: 22,
                   ),
-                  const SizedBox(height: 8),
-                  if (failed && widget.controller.service.canRetryProcessing)
-                    OutlinedButton.icon(
-                      onPressed: widget.controller.retrying.contains(entry.id)
-                          ? null
-                          : () => widget.controller.retry(entry),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('다시 시도'),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            entry.status == RecordStatus.ready &&
-                                !entry.confirmed
-                            ? aiAmberBackground
-                            : background,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        entry.statusLabel,
-                        style: TextStyle(
-                          fontSize: 12,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
-                          color:
-                              entry.status == RecordStatus.ready &&
-                                  !entry.confirmed
-                              ? aiAmber
-                              : color,
+                          fontSize: 15,
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+                      const SizedBox(height: 6),
+                      Text(
+                        failed
+                            ? (audio ? '전사에 실패했어요' : '기록 처리에 실패했어요')
+                            : metadata,
+                        style: TextStyle(
+                          color: failed ? iconColor : const Color(0xFF75817B),
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                      if (stacked) ...[const SizedBox(height: 8), status],
+                    ],
+                  ),
+                ),
+                if (!stacked) ...[const SizedBox(width: 10), status],
+              ],
+            );
+          },
         ),
       ),
     );

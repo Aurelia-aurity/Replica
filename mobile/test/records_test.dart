@@ -265,7 +265,10 @@ void main() {
       final button = find.byKey(const ValueKey('record-upload'));
       await tester.scrollUntilVisible(button, 150);
       expect(tester.widget<FilledButton>(button).onPressed, isNull);
-      await tester.ensureVisible(find.byKey(const ValueKey('record-consent')));
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('record-consent')),
+        150,
+      );
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
       await tester.ensureVisible(button);
@@ -315,6 +318,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'upload can return without a file and after picker cancellation',
+    (tester) async {
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RecordsPanel(
+              controller: controller,
+              picker: () async => null,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('첫 기록 올리기'));
+      await tester.pumpAndSettle();
+      expect(controller.selected, isNull);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('아직 올린 기록이 없어요.'), findsOneWidget);
+
+      await tester.tap(find.text('첫 기록 올리기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('파일 선택'));
+      await tester.pumpAndSettle();
+      expect(controller.selected, isNull);
+      await tester.scrollUntilVisible(find.text('취소하고 돌아가기'), 150);
+      await tester.tap(find.text('취소하고 돌아가기'));
+      await tester.pumpAndSettle();
+      expect(find.text('기록 올리기'), findsNothing);
+      expect(find.text('아직 올린 기록이 없어요.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('record drafts and list clear on logout and account switch', (
     tester,
   ) async {
@@ -327,7 +366,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('올리기'));
     await tester.pumpAndSettle();
-    expect(find.text('자료 사용 동의·권한 확인'), findsOneWidget);
+    expect(find.text('어떤 기록인가요?'), findsOneWidget);
     await auth.signOut();
     await tester.pumpAndSettle();
     expect(find.text('기록 올리기'), findsNothing);
