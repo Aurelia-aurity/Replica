@@ -11,6 +11,10 @@ import 'package:mobile/records/record_service.dart';
 import 'package:mobile/records/record_upload_screen.dart';
 import 'package:mobile/records/records_panel.dart';
 import 'package:mobile/shared/conversation_widgets.dart';
+import 'package:mobile/records/record_review_screen.dart';
+
+import 'record_review_test.dart' show ReviewFixture;
+import 'record_deletion_test.dart' show DeletionFixture;
 
 void main() {
   const capture = bool.fromEnvironment('RECORD_UI_CAPTURES');
@@ -157,6 +161,54 @@ void main() {
       await save(tester, key, 'record-list');
     },
   );
+
+  for (final confirmed in [false, true]) {
+    testWidgets('SC05 and SC06 review layout confirmed=$confirmed', (
+      tester,
+    ) async {
+      final service = ReviewFixture()..confirmed = confirmed;
+      service.body = '밥은 먹었나? 요즘 날이 추워서 걱정이다.\n주말에 내려오면 김치 좀 싸 줄게.\n아빠가 너 보고 싶다 카더라.\n감기 조심하고 따뜻하게 챙겨 입어라.';
+      final records = RecordController(service);
+      addTearDown(records.dispose);
+      final key = GlobalKey();
+      await show(
+        tester,
+        RecordReviewScreen(records: records, entry: service.entry),
+        key,
+      );
+      expect(find.text(confirmed ? '기록 상세' : '전사 확인'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await save(
+        tester,
+        key,
+        confirmed ? 'record-detail' : 'transcript-review',
+      );
+    });
+  }
+
+  testWidgets('SC06 deletion confirmation and partial failure', (tester) async {
+    final service = DeletionFixture()..confirmed = true;
+    final records = RecordController(service);
+    addTearDown(records.dispose);
+    final key = GlobalKey();
+    await show(
+      tester,
+      RecordReviewScreen(records: records, entry: service.entry),
+      key,
+    );
+    await tester.tap(find.byTooltip('기록 삭제'));
+    await tester.pumpAndSettle();
+    expect(find.text('이 기록을 삭제할까요?'), findsOneWidget);
+    await save(tester, key, 'record-delete-confirm');
+    await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('상태 다시 확인'));
+    await tester.pumpAndSettle();
+    expect(find.text('남은 항목: 검색 색인'), findsOneWidget);
+    expect(tester.getBottomRight(find.byKey(const ValueKey('delete-confirm'))).dy, lessThanOrEqualTo(844));
+    await save(tester, key, 'record-delete-partial-failure');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('SC04 kind cards clear file consent and upload stays fixed', (
     tester,

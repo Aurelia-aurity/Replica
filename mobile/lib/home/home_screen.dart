@@ -7,6 +7,7 @@ import '../shared/conversation_widgets.dart';
 import '../records/record_controller.dart';
 import '../records/record_service.dart';
 import '../records/records_panel.dart';
+import '../records/deletion_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -16,8 +17,10 @@ class HomeScreen extends StatefulWidget {
     this.onSignOut,
     this.onExpireSession,
     this.recordService,
+    this.onAccountDeleted,
   });
   final RecordService? recordService;
+  final VoidCallback? onAccountDeleted;
   final ChatService service;
   final String? accountEmail;
   final VoidCallback? onSignOut;
@@ -67,6 +70,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   widget.onSignOut?.call();
                 },
                 child: const Text('로그아웃'),
+              ),
+              TextButton.icon(
+                onPressed: widget.onAccountDeleted == null
+                    ? null
+                    : () async {
+                        Navigator.of(sheetContext).pop();
+                        final deletion = _records.deletionFor(
+                          '#account',
+                          account: true,
+                        );
+                        final complete = await showDeletionSheet(
+                          context,
+                          deletion,
+                          preview: _records.service.isPreview,
+                        );
+                        if (mounted && complete == true) {
+                          widget.onAccountDeleted?.call();
+                        }
+                      },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('계정 삭제'),
               ),
               if (widget.onExpireSession != null)
                 TextButton(
@@ -127,7 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
     body: _tab == 1
-        ? RecordsPanel(controller: _records)
+        ? RecordsPanel(
+            controller: _records,
+            onAccountDeleted: widget.onAccountDeleted,
+          )
         : Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),

@@ -5,15 +5,19 @@ import 'record_controller.dart';
 import 'record_models.dart';
 import 'record_picker.dart';
 import 'record_upload_screen.dart';
+import 'record_review_screen.dart';
+import 'deletion_sheet.dart';
 
 class RecordsPanel extends StatefulWidget {
   const RecordsPanel({
     super.key,
     required this.controller,
     this.picker = pickRecordFile,
+    this.onAccountDeleted,
   });
   final RecordController controller;
   final RecordPicker picker;
+  final VoidCallback? onAccountDeleted;
   @override
   State<RecordsPanel> createState() => _RecordsPanelState();
 }
@@ -108,6 +112,46 @@ class _RecordsPanelState extends State<RecordsPanel> {
                   ),
                   const SizedBox(height: 20),
                   if (controller.loading) const LinearProgressIndicator(),
+                  if (controller.deletionLoadError != null)
+                    Text(controller.deletionLoadError!),
+                  for (final deletion in controller.deletions.values.where(
+                    (d) => d.job != null || d.error != null,
+                  ))
+                    Card(
+                      child: ListTile(
+                        leading: Icon(
+                          deletion.complete
+                              ? Icons.check_circle_outline
+                              : Icons.delete_outline,
+                        ),
+                        title: Text(
+                          deletion.account
+                              ? '계정 삭제'
+                              : '${deletion.label ?? '기록'} 삭제 요청',
+                        ),
+                        subtitle: Text(
+                          deletion.complete
+                              ? '삭제 완료'
+                              : deletion.job?.status == 'failed'
+                              ? '일부 삭제 실패'
+                              : '삭제 상태 확인 필요',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          final complete = await showDeletionSheet(
+                            context,
+                            deletion,
+                            preview: controller.service.isPreview,
+                          );
+                          if (!mounted) return;
+                          if (deletion.account && complete == true) {
+                            widget.onAccountDeleted?.call();
+                          } else {
+                            await controller.refresh();
+                          }
+                        },
+                      ),
+                    ),
                   if (controller.listError != null)
                     _message(
                       controller.listError!,
@@ -293,32 +337,15 @@ class _RecordsPanelState extends State<RecordsPanel> {
             ),
           );
     return InkWell(
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        builder: (_) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Text(entry.statusLabel),
-                const SizedBox(height: 12),
-                Text(
-                  entry.status == RecordStatus.ready
-                      ? '전사 확인·확정 화면은 이슈 #10에서 제공할 예정이에요.'
-                      : '처리 상태는 목록 새로고침으로 확인할 수 있어요.',
-                ),
-              ],
-            ),
+      onTap: () async {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) =>
+                RecordReviewScreen(records: widget.controller, entry: entry),
           ),
-        ),
-      ),
+        );
+        if (mounted) await widget.controller.refresh();
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         child: LayoutBuilder(

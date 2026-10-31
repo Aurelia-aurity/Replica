@@ -14,6 +14,7 @@ class RecordEntry {
     this.sizeBytes,
     this.durationSeconds,
     this.confirmed = false,
+    this.textConfirmed = false,
   });
   final String id;
   final String name;
@@ -25,6 +26,18 @@ class RecordEntry {
   // The draft record object has no confirmation/profile-index evidence.
   // `ready` alone must never be interpreted as reflected personalization.
   final bool confirmed;
+  final bool textConfirmed;
+  RecordEntry withTextConfirmed() => RecordEntry(
+    id: id,
+    name: name,
+    kind: kind,
+    status: status,
+    createdAt: createdAt,
+    sizeBytes: sizeBytes,
+    durationSeconds: durationSeconds,
+    confirmed: confirmed,
+    textConfirmed: true,
+  );
 
   factory RecordEntry.fromJson(Map<String, dynamic> json) => RecordEntry(
     id: json['id'] as String,
@@ -39,7 +52,12 @@ class RecordEntry {
     RecordStatus.uploading => '업로드 중',
     RecordStatus.uploaded => '처리 대기',
     RecordStatus.processing => kind == RecordKind.audio ? '전사 중' : '처리 중',
-    RecordStatus.ready => confirmed ? '반영됨' : '확인 필요',
+    RecordStatus.ready =>
+      confirmed
+          ? '반영됨'
+          : textConfirmed
+          ? '확정됨'
+          : '확인 필요',
     RecordStatus.failed => '실패',
     RecordStatus.deleting => '삭제 중',
   };

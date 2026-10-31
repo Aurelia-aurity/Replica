@@ -3,11 +3,68 @@ import 'package:flutter/foundation.dart';
 import '../services/backend_service.dart';
 import 'record_models.dart';
 import 'record_service.dart';
+import 'record_deletion.dart';
 
 class RecordController extends ChangeNotifier {
   RecordController(this.service);
   final RecordService service;
   List<RecordEntry> entries = [];
+  final reviewDrafts = <String, String>{};
+  final deletions = <String, RecordDeletionController>{};
+  String? deletionLoadError;
+  RecordDeletionController deletionFor(
+    String recordId, {
+    bool account = false,
+  }) {
+    final key = account ? '#account' : recordId;
+    return deletions.putIfAbsent(key, () {
+      final controller = RecordDeletionController(
+        service: service,
+        targetId: key,
+        account: account,
+      );
+      controller.addListener(_deletionChanged);
+      return controller;
+    });
+  }
+
+  void _deletionChanged() {
+    if (_disposed) return;
+    for (final controller in deletions.values) {
+      if (controller.job == null) continue;
+      if (controller.account && controller.complete) {
+        entries.clear();
+        reviewDrafts.clear();
+      }
+      if (!controller.account) {
+        entries.removeWhere((entry) => entry.id == controller.targetId);
+        if (controller.complete) reviewDrafts.remove(controller.targetId);
+      }
+    }
+    _changed();
+  }
+
+  Future<void> syncDeletionJobs() async {
+    deletionLoadError = null;
+    try {
+      final jobs = await service.deletionJobs();
+      if (_disposed) return;
+      for (final job in jobs.where(
+        (j) => j.targetType == 'record' || j.targetType == 'account',
+      )) {
+        final controller = deletionFor(
+          job.targetId,
+          account: job.targetType == 'account',
+        );
+        if (!controller.busy) controller.job = job;
+      }
+      _deletionChanged();
+    } catch (_) {
+      deletionLoadError = '삭제 요청 목록을 불러오지 못했어요. 새로고침해 주세요.';
+    }
+    _changed();
+  }
+
   bool loading = false;
   String? listError;
   RecordFile? selected;
@@ -28,6 +85,11 @@ class RecordController extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final deletion in deletions.values) {
+      deletion.removeListener(_deletionChanged);
+      deletion.dispose();
+    }
+    reviewDrafts.clear();
     _disposed = true;
     super.dispose();
   }
@@ -45,6 +107,7 @@ class RecordController extends ChangeNotifier {
           final date = b.createdAt.compareTo(a.createdAt);
           return date != 0 ? date : b.id.compareTo(a.id);
         });
+      await syncDeletionJobs();
     } catch (_) {
       listError = '기록을 불러오지 못했어요. 다시 시도해 주세요.';
     } finally {

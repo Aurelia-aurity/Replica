@@ -69,17 +69,23 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) widget.auth.checkSessionExpiry();
   }
 
+  VoidCallback _endDeletedAccountSession(int generation) => () {
+    widget.auth.invalidateSession(requestGeneration: generation);
+  };
   @override
   Widget build(BuildContext context) {
     if (widget.auth.identity == null) return AuthScreen(service: widget.auth);
     return ScaffoldMessenger(
       key: ValueKey(_generation),
       child: NavigatorPopHandler<Object?>(
-        onPopWithResult: (_) => _navigator.currentState!.pop(),
+        onPopWithResult: (_) => _navigator.currentState!.maybePop(),
         child: Navigator(
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) => HomeScreen(
+              onAccountDeleted: _endDeletedAccountSession(
+                widget.auth.generation,
+              ),
               recordService: SessionRecordService(
                 backend: BackendService(widget.auth),
                 delegate:

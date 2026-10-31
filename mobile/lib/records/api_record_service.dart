@@ -7,6 +7,8 @@ import '../auth/auth_service.dart';
 import '../services/backend_service.dart';
 import 'record_models.dart';
 import 'record_service.dart';
+import 'record_review.dart';
+import 'record_deletion.dart';
 
 /// Supply only after agreeing the upload protocol. Must reconcile an ambiguous
 /// previous transfer, preserve record ID and never overwrite an existing original.
@@ -33,8 +35,144 @@ class ApiRecordService extends RecordService {
   final RecordPolicy policy;
   final RecordFileTransport fileTransport;
   final BackendService _backend;
+  final _confirmedIds = <String>{};
   @override
   bool get isPreview => false;
+  @override
+  Future<DeletionJob> deleteRecord(String recordId) async =>
+      DeletionJob.fromJson(
+        jsonDecode((await _request('DELETE', '/records/$recordId')).body)
+            as Map<String, dynamic>,
+      );
+  @override
+  Future<DeletionJob> deletionJob(String jobId) async => DeletionJob.fromJson(
+    jsonDecode((await _request('GET', '/deletion-jobs/$jobId')).body)
+        as Map<String, dynamic>,
+  );
+  @override
+  Future<List<DeletionJob>> deletionJobs() async {
+    final jobs = <String, DeletionJob>{};
+    for (var offset = 0; ; offset += 100) {
+      final response = await _request(
+        'GET',
+        '/deletion-jobs',
+        query: {'limit': '100', 'offset': '$offset'},
+      );
+      final items =
+          (jsonDecode(response.body) as Map<String, dynamic>)['items'] as List;
+      for (final item in items) {
+        final job = DeletionJob.fromJson(item as Map<String, dynamic>);
+        jobs[job.id] = job;
+      }
+      if (items.length < 100) return jobs.values.toList();
+    }
+  }
+
+  @override
+  Future<RecordReview> review(String recordId) async {
+    final record = await _find(recordId);
+    if (record == null || record.status == RecordStatus.deleting) {
+      throw StateError('Record missing');
+    }
+    if (record.status != RecordStatus.ready) {
+      return RecordReview(record: record);
+    }
+    final response = await _request('GET', '/records/$recordId/text-versions');
+    final versions =
+        ((jsonDecode(response.body) as Map<String, dynamic>)['items'] as List)
+            .map((e) => TextVersion.fromJson(e as Map<String, dynamic>))
+            .where(
+              (e) =>
+                  e.recordId == recordId &&
+                  (e.status == 'draft' || e.status == 'confirmed'),
+            )
+            .toList()
+          ..sort((a, b) => b.revision.compareTo(a.revision));
+    var profile = ReviewProfileState.unknown;
+    if (versions.isNotEmpty && versions.first.status == 'draft') {
+      _confirmedIds.remove(recordId);
+    }
+    if (versions.isNotEmpty && versions.first.status == 'confirmed') {
+      _confirmedIds.add(recordId);
+      // A ready persona profile does not prove this record has been indexed.
+      try {
+        final result = await _request(
+          'GET',
+          '/personas/$personaId/style-profile',
+        );
+        final body = jsonDecode(result.body);
+        if (body is Map && body['status'] == 'ready') {
+          profile = ReviewProfileState.available;
+        }
+      } on BackendFailure catch (failure) {
+        if (failure.kind == BackendFailureKind.unauthenticated ||
+            failure.kind == BackendFailureKind.staleSession) {
+          rethrow;
+        }
+      } on FormatException {
+        /* Keep confirmed text available if profile response is malformed. */
+      }
+    }
+    return RecordReview(
+      record: versions.isNotEmpty && versions.first.status == 'confirmed'
+          ? record.withTextConfirmed()
+          : record,
+      version: versions.isEmpty ? null : versions.first,
+      profile: profile,
+    );
+  }
+
+  @override
+  Future<TextVersion> saveText(TextVersion version, String content) async {
+    if (version.status != 'draft' || content.trim().isEmpty) {
+      throw StateError('Invalid draft');
+    }
+    final response = await _request(
+      'PATCH',
+      '/text-versions/${version.id}',
+      body: {
+        'content': content,
+        'expected_updated_at': version.updatedAt.toUtc().toIso8601String(),
+      },
+    );
+    final saved = TextVersion.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+    if (saved.id != version.id ||
+        saved.recordId != version.recordId ||
+        saved.status != 'draft') {
+      throw StateError('Invalid version');
+    }
+    return saved;
+  }
+
+  @override
+  Future<TextVersion> confirmText(TextVersion version) async {
+    // Reconcile a previous confirmation whose response was lost.
+    final latest = await review(version.recordId);
+    if (latest.version?.id != version.id) {
+      throw const BackendFailure(BackendFailureKind.generic, code: 'CONFLICT');
+    }
+    if (latest.version!.status == 'confirmed') return latest.version!;
+    if (latest.version!.updatedAt != version.updatedAt) {
+      throw const BackendFailure(BackendFailureKind.generic, code: 'CONFLICT');
+    }
+    final response = await _request(
+      'POST',
+      '/text-versions/${version.id}/confirm',
+    );
+    final confirmed = TextVersion.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+    if (confirmed.id != version.id ||
+        confirmed.recordId != version.recordId ||
+        confirmed.status != 'confirmed' ||
+        confirmed.confirmedAt == null) {
+      throw StateError('Invalid confirmation');
+    }
+    _confirmedIds.add(version.recordId);
+    return confirmed;
+  }
 
   Future<http.Response> _request(
     String method,
@@ -90,7 +228,10 @@ class ApiRecordService extends RecordService {
       final page = jsonDecode(response.body) as Map<String, dynamic>;
       final items = page['items'] as List;
       for (final item in items) {
-        final record = RecordEntry.fromJson(item as Map<String, dynamic>);
+        var record = RecordEntry.fromJson(item as Map<String, dynamic>);
+        if (_confirmedIds.contains(record.id)) {
+          record = record.withTextConfirmed();
+        }
         if (record.status != RecordStatus.deleting) records[record.id] = record;
       }
       if (items.length < 100) return records.values.toList();
