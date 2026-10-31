@@ -1,0 +1,16 @@
+{
+  "kure": {
+    "repository": "nlpai-lab/KURE-v1",
+    "revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+    "dimensions": 1024,
+    "query_prefix": "",
+    "passage_prefix": ""
+  },
+  "e5": {
+    "repository": "intfloat/multilingual-e5-small",
+    "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+    "dimensions": 384,
+    "query_prefix": "query: ",
+    "passage_prefix": "passage: "
+  }
+}

@@ -1,0 +1,578 @@
+{
+  "split": "dev",
+  "policy": "median<=1500; max complete questions; max slots; min median/max tokens; min k/window/budget",
+  "chosen": {
+    "k": 3,
+    "window": 3,
+    "budget": 2000
+  },
+  "candidates": [
+    {
+      "config": {
+        "k": 3,
+        "window": 1,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 25,
+        "slot_hits": 85,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1111.0,
+        "max_evidence_tokens": 1475
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 1,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 25,
+        "slot_hits": 85,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1111.0,
+        "max_evidence_tokens": 1475
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 1,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 25,
+        "slot_hits": 85,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1111.0,
+        "max_evidence_tokens": 1475
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 2,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 26,
+        "slot_hits": 88,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1124.0,
+        "max_evidence_tokens": 1490
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 2,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 89,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1263.5,
+        "max_evidence_tokens": 1726
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 2,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 89,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1346.5,
+        "max_evidence_tokens": 1843
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 3,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1133.5,
+        "max_evidence_tokens": 1492
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 3,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1189.5,
+        "max_evidence_tokens": 1543
+      }
+    },
+    {
+      "config": {
+        "k": 3,
+        "window": 3,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1432.5,
+        "max_evidence_tokens": 1971
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 1,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 26,
+        "slot_hits": 87,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1231.0,
+        "max_evidence_tokens": 1480
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 1,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 88,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1308.0,
+        "max_evidence_tokens": 1732
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 1,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 88,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1465.5,
+        "max_evidence_tokens": 1942
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 2,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1249.5,
+        "max_evidence_tokens": 1492
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 2,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1289.0,
+        "max_evidence_tokens": 1735
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 2,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1483.5,
+        "max_evidence_tokens": 1943
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 3,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1189.5,
+        "max_evidence_tokens": 1492
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 3,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1381.5,
+        "max_evidence_tokens": 1728
+      }
+    },
+    {
+      "config": {
+        "k": 4,
+        "window": 3,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1458.0,
+        "max_evidence_tokens": 1971
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 1,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 89,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1270.0,
+        "max_evidence_tokens": 1480
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 1,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1409.0,
+        "max_evidence_tokens": 1733
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 1,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1684.5,
+        "max_evidence_tokens": 1954
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 2,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1249.5,
+        "max_evidence_tokens": 1492
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 2,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1340.0,
+        "max_evidence_tokens": 1735
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 2,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1491.0,
+        "max_evidence_tokens": 1971
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 3,
+        "budget": 1500
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 27,
+        "slot_hits": 90,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1189.5,
+        "max_evidence_tokens": 1492
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 3,
+        "budget": 1750
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 91,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1429.0,
+        "max_evidence_tokens": 1728
+      }
+    },
+    {
+      "config": {
+        "k": 5,
+        "window": 3,
+        "budget": 2000
+      },
+      "metrics": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1458.0,
+        "max_evidence_tokens": 1971
+      }
+    }
+  ]
+}

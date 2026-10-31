@@ -1,0 +1,14 @@
+{
+  "questions": 48,
+  "factual": 33,
+  "all_slots_covered": 30,
+  "slot_hits": 67,
+  "required_slots": 73,
+  "unanswerable": 10,
+  "unanswerable_empty": 0,
+  "ordinary": 5,
+  "ordinary_empty": 5,
+  "factual_empty": 1,
+  "median_evidence_tokens": 437.0,
+  "max_evidence_tokens": 972
+}
