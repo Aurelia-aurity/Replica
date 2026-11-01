@@ -111,7 +111,9 @@ API 키 등 비밀 값은 `.env`에만 기록하고 커밋하지 않습니다.
 - DB 모듈은 표준 라이브러리를 사용합니다. FastAPI 서버·전체 테스트는 Python 3.12와 `requirements-dev.txt`가 필요합니다.
 - 서버 시작 시 설정 팩토리를 만들고, 각 요청의 JWT를 `await database.for_user(access_token)`으로 확인합니다. 사용자 객체를 다른 요청과 공유하지 않습니다.
 - DB 모듈 자체는 `.env`를 자동 탐색하지 않습니다. API의 `load_db_settings()`가 실행 폴더의 `.env`를 명시적으로 읽고 환경변수를 우선 적용합니다. DB만 사용할 때는 `Settings.from_env()` 또는 명시적 `Settings.from_env_file(path)`를 사용합니다.
+- `.env.example`의 Supabase 항목은 기본적으로 주석입니다. 실제 프로젝트 값으로 채우고 주석을 해제해야 인증·DB API를 사용할 수 있습니다. 미설정 상태에서는 DB로 요청하지 않습니다.
 - LLM은 `start_chat_stage(..., request_id=...)`에 쓴 ID를 성공·실패의 `finish_chat_stage`에도 전달합니다. 누락 시 충돌로 거부하며, ID 없이 시작한 기존 호출은 호환됩니다.
 - PR 병합은 원격 DB를 초기화하지 않습니다. 기존 적용 이력을 확인하고 새 환경은 스키마 순서에 맞춰 초기화합니다. 이미 적용한 SQL은 재실행하지 않습니다. `guard_llm_request_id.sql`은 #63 실패 호출부 수정 반영 후 적용합니다.
 - DB 테스트만 실행: `python -m unittest discover -s tests -p "test_db*.py" -v`. 전체 백엔드 테스트는 `pytest`이며 `PYTHONPATH=.:tests`는 필요하지 않습니다.
+- 테스트는 저장소의 `contracts/`, `docs/`, `infra/supabase/`도 읽어 함수 계약·사용법·SQL 인자를 대조합니다. `backend/`만 복사한 환경에서는 전체 검사가 실행되지 않으며, 이 문서나 명세·SQL을 수정할 때도 백엔드 테스트를 실행해야 합니다.
 - 실제 읽기 검사는 `REPLICA_DB_LIVE_TEST=1`일 때만, 합성 계정 생성·정리는 `REPLICA_DB_MUTATING_TEST=1`일 때만 실행합니다. 기본 테스트와 CI는 둘 다 비활성입니다. 쓰기 시험은 통합 인계 문서의 동의·정리 절차를 따릅니다.

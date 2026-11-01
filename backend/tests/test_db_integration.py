@@ -148,24 +148,42 @@ class ErrorAdapterTests(unittest.TestCase):
 
 
 class EnvFileTests(unittest.TestCase):
-    def test_teammate_draft_all_thirty_functions_and_arguments_remain_supported(self):
+    def test_contract_covers_all_public_functions_and_call_signatures(self):
         doc = (Path(__file__).resolve().parents[2] / "contracts/backend-db/api-spec.md").read_text(encoding="utf-8")
+        public = {name: method for name, method in inspect.getmembers(UserDatabase, inspect.iscoroutinefunction)
+                  if not name.startswith("_")}
         seen = set()
         for line in doc.splitlines():
             match = re.match(r"^\| `([a-z][a-z_]*)` \|", line)
-            if match is None or not re.search(r"\| `(?:Row|list\[Row\]|dict|None|int)(?:`| )", line):
+            # Split escaped union-type pipes correctly; do not filter by return
+            # type, which previously omitted get_recent_history's list[dict].
+            cells = re.split(r"(?<!\\)\|", line)
+            if match is None or len(cells) != 6 or not re.search(r"`[a-z][a-z_]*\s*:", cells[2]):
                 continue
             name = match[1]
-            if not hasattr(UserDatabase, name):
-                self.fail("Missing draft function: " + name)
-            params = inspect.signature(getattr(UserDatabase, name)).parameters
-            expected = re.findall(r"`([a-z][a-z_]*)\s*:", line)
-            self.assertTrue(set(expected) <= set(params), name)
-            for param in params.values():
-                if param.name not in {"self", *expected}:
-                    self.assertNotEqual(param.default, inspect.Parameter.empty, name)
+            self.assertNotIn(name, seen, "Duplicate contract function: " + name)
+            self.assertIn(name, public, "Missing public function: " + name)
+            params = inspect.signature(public[name]).parameters
+            expected, keyword_only = [], False
+            for spec in re.findall(r"`([^`]+)`", cells[2]):
+                if spec == "*":
+                    keyword_only = True
+                    continue
+                param_name = spec.split(":", 1)[0].strip()
+                expected.append(param_name)
+                self.assertIn(param_name, params, name)
+                param = params[param_name]
+                self.assertEqual(keyword_only, param.kind is inspect.Parameter.KEYWORD_ONLY,
+                                 f"{name}.{param_name}: keyword-only")
+                _, separator, default = spec.partition("=")
+                self.assertEqual(bool(separator), param.default is not inspect.Parameter.empty,
+                                 f"{name}.{param_name}: required/default")
+                if separator:
+                    self.assertEqual(ast.literal_eval(default.strip()), param.default,
+                                     f"{name}.{param_name}: default value")
+            self.assertEqual(expected, [n for n in params if n != "self"], name)
             seen.add(name)
-        self.assertEqual(len(seen), 30)
+        self.assertEqual(seen, set(public))
 
     def test_live_scenario_exercises_every_public_user_function(self):
         source = (Path(__file__).parent / "test_db_full_live.py").read_text(encoding="utf-8")
