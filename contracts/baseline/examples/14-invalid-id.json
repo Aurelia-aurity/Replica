@@ -1,0 +1,20 @@
+{
+  "description": "14-invalid-id",
+  "request": {
+    "request_id": "not-a-uuid",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": false,
+  "conditions": {},
+  "http_status": 400,
+  "response": {
+    "request_id": null,
+    "error": {
+      "code": "INVALID_REQUEST",
+      "message": "요청 형식이 올바르지 않습니다."
+    }
+  },
+  "transport_outcome": "received"
+}

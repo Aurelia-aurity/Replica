@@ -1,0 +1,23 @@
+{
+  "description": "08-duplicate-before-busy",
+  "request": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": true,
+  "conditions": {
+    "active_duplicate": true,
+    "slot_occupied": true
+  },
+  "http_status": 409,
+  "response": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "error": {
+      "code": "REQUEST_IN_PROGRESS",
+      "message": "동일 요청이 처리 중입니다."
+    }
+  },
+  "transport_outcome": "received"
+}
