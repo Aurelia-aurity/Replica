@@ -1,8 +1,8 @@
 # 레플리카 API 명세서: 앱 ↔ 백엔드
 
-기준일 2026-10-13 · 팀이 올린 이슈·PR·브랜치를 바탕으로 정리한 초안이며 합의된 규격이 아닙니다.
+기준일 2026-11-01 · 팀이 올린 이슈·PR과 `main`(`35962b5`, 챗 API #63 병합)의 구현을 바탕으로 정리했습니다. 팀 검토를 거쳐 병합하기 전까지는 합의된 규격이 아닙니다.
 
-**[구현]** 코드가 있고 동작함   **[제안]** 이슈를 근거로 이 문서가 제안한 규격   **[미정]** 아직 정해지지 않음   (표에서 `필수`는 필수 여부)
+**[구현]** `main`에 코드가 있고 동작함   **[제안]** 이슈를 근거로 이 문서가 제안한 규격   **[미정]** 아직 정해지지 않음   (표에서 `필수`는 필수 여부)
 
 - [1. 백엔드가 앱에 제공하는 API](#s1)
 - [2. 앱 관련 오류 메시지](#s2)
@@ -20,7 +20,7 @@
 |---|---|
 | 기본 주소 | 앱 빌드 설정 `BACKEND_BASE_URL`. 개발: 에뮬레이터 `http://10.0.2.2:8000`, 로컬 `http://localhost:8000`. staging·prod는 HTTPS 필수 |
 | 요청 형식 | JSON은 `Content-Type: application/json`, 파일은 `multipart/form-data` |
-| 인증 | `Authorization: Bearer <Supabase JWT>`. 현재 구현된 5개 API는 인증이 없고, 제안 API는 `/health`를 제외하고 모두 필요. 로그인·회원가입은 앱이 Supabase Auth로 직접 하므로 백엔드에 로그인 API는 없음 |
+| 인증 | `Authorization: Bearer <Supabase JWT>`. `/health`와 개발 점검용 `/stt`·`/tts`를 제외한 모든 API에 필요. **로그인·회원가입은 앱이 Supabase Auth와 직접 하며 백엔드에는 로그인 API가 없음.** 백엔드는 받은 토큰을 Supabase Auth로 확인해 사용자 id를 얻고, 앱은 DB에 직접 접근하지 않음 |
 | 식별자·시간 | id는 소문자 UUID 문자열. 시간은 ISO 8601 (시간대 포함) |
 | 목록 응답 | `{items, limit, offset}`. `limit` 기본 50 · 최대 100, `offset` 0 이상. (턴 목록은 `after_turn_no` 사용) |
 | AI 표시 | AI 답변이 담긴 응답에는 `is_ai_generated: true`를 항상 포함 (FR-08) |
@@ -34,12 +34,12 @@
 | GET | [`/health`](#a-health) | 서버 상태 확인 | 구현 | baseline · #21 |
 | POST | [`/chat/text`](#a-chat-text) | 텍스트 대화 | 구현 | baseline · #6 |
 | POST | [`/chat/voice`](#a-chat-voice) | 음성 대화 | 구현 | baseline · #7 |
-| POST | [`/stt`](#a-stt) | 음성 → 텍스트 | 구현 | baseline · #7 |
-| POST | [`/tts`](#a-tts) | 텍스트 → 음성 | 구현 | baseline · #7 |
-| POST | [`/chat/turns/{turn_id}/tts`](#a-turn-tts) | 완료된 답변을 음성으로 합성·재시도 | 제안 | baseline · #7, UC-02 ("원하면 음성 재생") |
-| POST | [`/personas`](#a-persona-create) | 대화 상대 생성 | 제안 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
-| GET | [`/personas · /personas/{persona_id}`](#a-persona-get) | 대화 상대 목록·상세 | 제안 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
-| POST | [`/sessions`](#a-session-create) | 대화방 생성 | 제안 | baseline · #5, #6 |
+| POST | [`/stt`](#a-stt) | 음성 → 텍스트 (개발 점검용) | 구현 | baseline · #7 |
+| POST | [`/tts`](#a-tts) | 텍스트 → 음성 (개발 점검용) | 구현 | baseline · #7 |
+| POST | [`/chat/turns/{turn_id}/tts`](#a-turn-tts) | 완료된 답변을 음성으로 합성·재시도 | 구현 | baseline · #7, UC-02 ("원하면 음성 재생") |
+| POST | [`/personas`](#a-persona-create) | 대화 상대 생성 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
+| GET | [`/personas · /personas/{persona_id}`](#a-persona-get) | 대화 상대 목록·상세 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
+| POST | [`/sessions`](#a-session-create) | 대화방 생성 | 구현 | baseline · #5, #6 |
 | GET | [`/sessions · /sessions/{session_id}`](#a-session-get) | 대화 이력 목록·상세 | 제안 | 고도화 2 · #12 |
 | GET | [`/sessions/{session_id}/turns`](#a-turns) | 대화방의 턴 목록 | 제안 | 고도화 2 · #12 |
 | DELETE | [`/sessions/{session_id}`](#a-session-del) | 대화 삭제 | 제안 | 고도화 2 · #12 |
@@ -182,34 +182,17 @@
 
 <a id="a-chat-text"></a>
 
-#### `POST /chat/text` (구현) — 텍스트 대화 (현재 Mock) · DB 연동 후 규격은 아래 '제안'
+#### `POST /chat/text` (구현) — 텍스트 대화
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 현재 없음 / 제안: 필수 |
+| 인증 | 필수 |
 | 단계·이슈 | baseline · #6 |
-| 내부 호출 | 제안: DB `create_chat_turn`·`start_chat_stage`·`finish_chat_stage`·`list_turns`, AI `POST /v1/baseline/generate` (호출 순서는 DB 규격 문서의 '텍스트 턴의 호출 순서') |
+| 내부 호출 | DB `create_chat_turn`·`start_chat_stage`·`get_recent_history`·`finish_chat_stage`·`record_turn_total_ms`, AI `POST /v1/baseline/generate` (호출 순서는 DB 규격 문서의 '텍스트 턴의 호출 순서') |
 
-같은 `turn_id`로 다시 보내면(제안) 이미 완료된 턴은 저장된 답변을 돌려주고 새로 AI를 호출하지 않으며, 실패한 단계는 새 시도로 다시 실행합니다.
+대화 이력은 앱이 보내지 않습니다. 백엔드가 같은 대화방의 최근 완결 질문·답변 20쌍을 DB에서 조회해 AI에 전달합니다. 같은 `turn_id`로 다시 보내면 이미 완료된 턴은 저장된 답변을 돌려주고 새로 AI를 호출하지 않으며, 실패한 단계는 새 시도로 다시 실행합니다. 제한 시간 안에 처리 중인 턴을 다시 보내면 409입니다.
 
-##### 요청 · 현재 구현 (JSON)
-
-| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
-|---|---|---|---|---|
-| message | body | string | 필수 | 질문. 1~2000자 (앱도 같은 한도) |
-| persona_id | body | string | 선택 | 대화 상대 id. 현재 Mock은 사용하지 않음 |
-| history | body | array | 선택 | 이전 대화 `[{role: "user" \| "assistant", content: string}]`. 기본 `[]`. 현재는 앱이 보냄 |
-
-##### 응답 · 현재 구현 (200)
-
-| 필드 | 형식 | 설명 |
-|---|---|---|
-| answer | string | AI 답변 (현재는 `(Mock 응답) 받은 메시지: …`) |
-| is_ai_generated | boolean | 항상 `true` (FR-08) |
-| model_name | string | 사용 모델 이름 (현재 `mock-llm`) |
-| timings | object | `{stt_ms, llm_ms, tts_ms, total_ms}` 구간별 소요 시간(ms). 거치지 않은 구간은 `null`, `total_ms`는 항상 있음 |
-
-##### 요청 · 제안 (DB 연동 후, JSON)
+##### 요청 (JSON)
 
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
 |---|---|---|---|---|
@@ -217,20 +200,20 @@
 | session_id | body | uuid | 필수 | 대화방 id |
 | turn_id | body | uuid | 필수 | 앱이 **전송마다** 만드는 UUID. 같은 질문을 재전송할 때는 같은 값을 유지. 같은 `turn_id`에 다른 내용을 보내면 거부 |
 | message | body | string | 필수 | 질문. 1~2000자, 공백만 있는 값 불가 |
-| persona_id, history | body | - | 삭제 | 이력은 백엔드가 DB에서 조회하므로 앱이 보내지 않음 |
+| (그 밖의 필드) | body | - | 보내지 않음 | `persona_id`, `history` 등 정의되지 않은 필드를 보내면 422 `INVALID_INPUT` |
 
-##### 응답 · 제안 (200)
+##### 응답 (200)
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | turn_id | uuid | 요청한 턴 id |
 | answer | string | AI 답변 |
-| is_ai_generated | boolean | 항상 `true` |
+| is_ai_generated | boolean | 항상 `true` (FR-08) |
 | finish_reason | string | `stop`(정상 종료) 또는 `length`(길이 한도로 잘림). 둘 다 성공 |
 | model_name | string | 답변을 만든 모델 이름 |
 | timings | object | `{stt_ms, llm_ms, tts_ms, total_ms}` 구간별 소요 시간(ms). 거치지 않은 구간은 `null`, `total_ms`는 항상 있음 |
 
-##### 요청 예 (제안)
+##### 요청 예
 
 ```json
 {
@@ -240,7 +223,7 @@
 }
 ```
 
-##### 응답 예 (제안)
+##### 응답 예
 
 ```json
 {
@@ -264,45 +247,28 @@
 
 <a id="a-chat-voice"></a>
 
-#### `POST /chat/voice` (구현) — 음성 대화 (현재 Mock) · DB 연동 후 규격은 아래 '제안'
+#### `POST /chat/voice` (구현) — 음성 대화
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 현재 없음 / 제안: 필수 |
+| 인증 | 필수 |
 | 단계·이슈 | baseline · #7 |
-| 내부 호출 | 제안: 음성 바이트의 SHA-256 계산, DB `create_chat_turn`·`start_chat_stage`·`finish_chat_stage`, STT·AI·TTS 호출 (호출 순서는 DB 규격 문서의 '음성 턴의 호출 순서') |
+| 내부 호출 | 음성 바이트의 SHA-256 계산, DB `create_chat_turn`·`start_chat_stage`·`get_recent_history`·`finish_chat_stage`·`record_turn_total_ms`, STT·AI·TTS 호출 (호출 순서는 DB 규격 문서의 '음성 턴의 호출 순서') |
 
 STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, 오류 본문의 `stage`로 실패한 단계를 알립니다 (2장).
 
-##### 요청 · 현재 구현 (multipart/form-data)
+같은 `turn_id`와 같은 음성으로 다시 보내면 끝난 단계는 건너뛰고, 실패했거나 시작 전인 단계부터 새 시도로 이어서 실행합니다. 같은 `turn_id`에 다른 음성을 보내면 409 `TURN_ID_CONFLICT`입니다. 응답 음성은 저장하지 않으므로, TTS까지 끝난 턴을 다시 보내면 저장된 답변 텍스트로 음성만 다시 합성해 돌려줍니다 (DB 상태는 바꾸지 않음).
 
-| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
-|---|---|---|---|---|
-| file | form | file | 필수 | 녹음 파일. 확장자 `.wav .mp3 .m4a .webm .ogg .mp4 .aac`, 최대 25MB, 비어 있지 않음 |
-| persona_id | form | string | 선택 | 대화 상대 id. 현재 Mock은 사용하지 않음 |
-
-##### 응답 · 현재 구현 (200)
-
-| 필드 | 형식 | 설명 |
-|---|---|---|
-| transcript | string | STT로 바꾼 질문 텍스트 |
-| answer | string | AI 답변 |
-| is_ai_generated | boolean | 항상 `true` |
-| model_name | string | 사용 모델 이름 |
-| audio_base64 | string | 응답 음성(TTS)을 base64로 인코딩한 값 |
-| audio_format | string | `audio_base64`의 형식 (현재 `wav`) |
-| timings | object | `{stt_ms, llm_ms, tts_ms, total_ms}` 구간별 소요 시간(ms). 거치지 않은 구간은 `null`, `total_ms`는 항상 있음 |
-
-##### 요청 · 제안 (multipart/form-data)
+##### 요청 (multipart/form-data)
 
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
 |---|---|---|---|---|
 | Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
-| file | form | file | 필수 | 녹음 파일 (형식·크기 제한은 위와 동일). 음성 형식은 STT·TTS 담당과 확정 필요 |
+| file | form | file | 필수 | 녹음 파일. 확장자 `.wav .mp3 .m4a .webm .ogg .mp4 .aac`, 최대 25MB, 비어 있지 않음. 음성 형식은 STT·TTS 담당과 확정 필요 |
 | session_id | form | uuid | 필수 | 대화방 id |
 | turn_id | form | uuid | 필수 | 앱이 전송마다 만드는 UUID. 재전송 시 유지 |
 
-##### 응답 · 제안 (200)
+##### 응답 (200)
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
@@ -314,7 +280,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | model_name | string | 모델 이름 |
 | tts_status | string | `ready` 또는 `failed`. **TTS가 실패해도 답변 텍스트는 유지**하고 HTTP 200으로 응답 |
 | audio_base64 | string \| null | 응답 음성 base64. `tts_status`가 `failed`면 `null` |
-| audio_format | string \| null | 음성 형식. `failed`면 `null` |
+| audio_format | string \| null | 음성 형식(현재 Mock은 `wav`). `failed`면 `null` |
 | tts_error | object \| null | `{code, message}`. TTS 실패 시에만 |
 | timings | object | `{stt_ms, llm_ms, tts_ms, total_ms}` 구간별 소요 시간(ms). 거치지 않은 구간은 `null`, `total_ms`는 항상 있음 |
 
@@ -328,7 +294,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 현재 없음 |
+| 인증 | 없음. Mock 개발 경로이며 `APP_ENV`와 관계없이 로그인 없이 열려 있음. 실제 음성 제공자 연동·운영 노출 전에 접근 제어를 적용할 예정 (#67). 앱 기능에서는 사용하지 않음 |
 | 단계·이슈 | baseline · #7 |
 
 ##### 요청 (multipart/form-data)
@@ -350,7 +316,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 현재 없음 |
+| 인증 | 없음. `/stt`와 같은 개발 점검 경로 (#67). 앱 기능에서는 사용하지 않음 |
 | 단계·이슈 | baseline · #7 |
 
 ##### 요청 (JSON)
@@ -367,15 +333,17 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-turn-tts"></a>
 
-#### `POST /chat/turns/{turn_id}/tts` (제안) — 완료된 답변을 음성으로 합성·재시도
+#### `POST /chat/turns/{turn_id}/tts` (구현) — 완료된 답변을 음성으로 합성·재시도
 
 | 항목 | 내용 |
 |---|---|
 | 인증 | 필수 |
 | 단계·이슈 | baseline · #7, UC-02 ("원하면 음성 재생") |
-| 내부 호출 | DB `start_chat_stage(turn_id, 'tts')` → TTS → `finish_chat_stage('tts')` |
+| 내부 호출 | DB `start_chat_stage(turn_id, 'tts')` → TTS → `finish_chat_stage('tts')` → `record_turn_total_ms` |
 
-이미 합성 중이거나 완료된 턴에 다시 요청하면 409를 돌려줍니다. TTS가 실패해도 답변 텍스트는 그대로 남습니다.
+텍스트 대화의 "음성 재생"과, 음성 대화에서 TTS만 실패한 뒤의 재시도에 씁니다. 합성 중이거나 이미 완료(`tts_status = ready`)된 턴, 답변이 아직 없는 턴에 요청하면 409를 돌려줍니다. 합성이 실패하면 200이 아니라 502 `TTS_FAILED`를 돌려주고, 답변 텍스트는 그대로 남습니다.
+
+이미 완료된 턴의 음성을 DB 상태를 바꾸지 않고 다시 합성해 줄지는 정해지지 않았습니다. 현재는 409이며 팀 합의가 필요합니다 (#64 F5).
 
 ##### 요청
 
@@ -389,9 +357,9 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | turn_id | uuid | 턴 id |
-| tts_status | string | `ready` 또는 `failed` |
-| audio_base64 | string \| null | 응답 음성 base64 |
-| audio_format | string \| null | 음성 형식 |
+| tts_status | string | 항상 `ready` (실패하면 502 오류) |
+| audio_base64 | string | 응답 음성 base64 |
+| audio_format | string | 음성 형식 |
 | timings | object | `{tts_ms, total_ms}` |
 
 ##### 발생 가능한 오류
@@ -400,7 +368,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-persona-create"></a>
 
-#### `POST /personas` (제안) — 대화 상대 생성
+#### `POST /personas` (구현) — 대화 상대 생성
 
 | 항목 | 내용 |
 |---|---|
@@ -424,7 +392,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-persona-get"></a>
 
-#### `GET /personas · /personas/{persona_id}` (제안) — 대화 상대 목록·상세
+#### `GET /personas · /personas/{persona_id}` (구현) — 대화 상대 목록·상세
 
 | 항목 | 내용 |
 |---|---|
@@ -457,7 +425,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-session-create"></a>
 
-#### `POST /sessions` (제안) — 대화방 생성
+#### `POST /sessions` (구현) — 대화방 생성
 
 | 항목 | 내용 |
 |---|---|
@@ -903,9 +871,9 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 ## 2. 앱 관련 오류에 대해 백엔드가 보내는 오류 메시지
 
-### 오류 응답 본문 (제안)
+### 오류 응답 본문 (구현)
 
-현재 구현은 FastAPI 기본 형식 `{"detail": …}`입니다. 앱이 단계와 재시도 가능 여부를 알 수 있도록 아래 형식을 제안합니다.
+백엔드가 직접 만드는 오류는 모두 아래 형식입니다. 앱이 단계와 재시도 가능 여부를 알 수 있습니다.
 
 ```json
 {
@@ -929,21 +897,23 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | error.retryable | boolean | 사용자가 같은 요청을 다시 시도해도 되는지 |
 | error.field | string \| null | 입력 오류일 때 문제가 된 필드 이름 |
 
+알려진 예외 두 가지입니다 (#67에서 정리 예정). 존재하지 않는 경로(404)와 허용되지 않는 메서드(405)는 프레임워크 기본 형식 `{"detail": …}`로 응답하므로, 앱은 `error` 키가 없으면 HTTP 상태만으로 처리해야 합니다. 요청 본문이 JSON이 아닐 때의 `INVALID_INPUT`은 `field`에 `"0"` 같은 값이 올 수 있습니다.
+
 ### 오류 목록
 
-| 상황 | HTTP | `code` (제안) | `message` (앱에 보내는 문구) | 현재 구현 | 발생 API | `retryable` |
+| 상황 | HTTP | `code` | `message` (앱에 보내는 문구) | 현재 구현 | 발생 API | `retryable` |
 |---|---|---|---|---|---|---|
-| 지원하지 않는 음성 형식 | 415 | `UNSUPPORTED_AUDIO_FORMAT` | `지원하지 않는 음성 형식입니다(.확장자). 지원 형식: .aac, .m4a, .mp3, .mp4, .ogg, .wav, .webm`<br>확장자가 없으면 `(확장자 없음)` | 구현됨. 같은 HTTP와 문구를 `{"detail": 문구}`로 반환 (`code` 필드 없음) | `/chat/voice` `/stt` | false |
+| 지원하지 않는 음성 형식 | 415 | `UNSUPPORTED_AUDIO_FORMAT` | `지원하지 않는 음성 형식입니다(.확장자). 지원 형식: .aac, .m4a, .mp3, .mp4, .ogg, .wav, .webm`<br>확장자가 없으면 `(확장자 없음)` | 구현됨. 본문은 위 형식이며 `field`는 `file` | `/chat/voice` `/stt` | false |
 | 음성 파일이 25MB 초과 | 413 | `FILE_TOO_LARGE` | `파일이 너무 큽니다. 최대 25MB` | 구현됨 (위와 같음) | `/chat/voice` `/stt` | false |
 | 빈 음성 파일 | 400 | `EMPTY_FILE` | `빈 파일입니다.` | 구현됨 (위와 같음) | `/chat/voice` `/stt` | false |
-| 요청 형식·값 오류 (필수 필드 누락, 형식 오류 등) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | FastAPI 기본 본문 `{"detail": [{"type", "loc", "msg", "input"}]}`. 일부 오류는 `ctx`도 포함하며 문구는 영문 | 모든 API | false |
-| 메시지가 비었음 | 422 | `MESSAGE_EMPTY` | `메시지를 입력해 주세요.` | 빈 문자열은 422(기본 본문). **공백만 있는 메시지는 현재 통과(200)** 하므로 공백만 있는 경우도 이 오류로 막는 것을 제안 | `/chat/text` | false |
-| 메시지가 2000자 초과 | 422 | `MESSAGE_TOO_LONG` | `질문이 너무 길어요. 더 짧게 입력해 주세요.` | 422(기본 본문) | `/chat/text` | false |
-| 음성 인식 결과가 비어 있음 (무음 녹음 등). AI를 호출하기 전에 차단 | 422 | `EMPTY_TRANSCRIPT` | `음성을 인식하지 못했어요. 다시 말씀해 주세요.` | 미구현 | `/chat/voice` | true |
-| STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 미구현 | `/chat/voice` `/stt` | true |
-| TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요.` | 미구현 | `/chat/turns/{turn_id}/tts` `/tts` | true |
-| 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 미구현 (현재 인증 없음) | 인증 필요 API 전부 | false |
-| 서버 내부 오류 (원인 상세는 서버 로그에만) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | FastAPI 기본 `Internal Server Error` (본문은 문자열. 예: `LLM_MODE=remote`인데 미구현) | 모든 API | false |
+| 요청 형식·값 오류 (필수 필드 누락, 형식 오류 등) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | 구현됨. `field`에 문제 필드 | 모든 API | false |
+| 메시지가 비었음 | 422 | `MESSAGE_EMPTY` | `메시지를 입력해 주세요.` | 구현됨. 공백만 있는 메시지도 이 오류 | `/chat/text` | false |
+| 메시지가 2000자 초과 | 422 | `MESSAGE_TOO_LONG` | `질문이 너무 길어요. 더 짧게 입력해 주세요.` | 구현됨 | `/chat/text` | false |
+| 음성 인식 결과가 비어 있음 (무음 녹음 등). AI를 호출하기 전에 차단 | 422 | `EMPTY_TRANSCRIPT` | `음성을 인식하지 못했어요. 다시 말씀해 주세요.` | 구현됨 | `/chat/voice` | true |
+| STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 구현됨 (`/chat/voice`) | `/chat/voice` | true |
+| TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
+| 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health`, `/stt`, `/tts` 제외) | false |
+| 서버 내부 오류 (원인 상세는 서버 로그에만) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | 구현됨. 본문은 위 형식 | 모든 API | false |
 
 ### 오류가 아닌 부분 실패
 
@@ -980,7 +950,7 @@ AI 서버의 요청·응답·오류 규격 원본은 `contracts/baseline`(PR #29
 | 400 | `INVALID_REQUEST` | `요청 형식이 올바르지 않습니다.` | JSON 파싱, 필수 필드, 형태·타입·UUID·범위·공백·미정의 필드 오류 | 백엔드의 요청 생성 오류로 보고 로그만 남김. 자동 재시도 없음 | `llm_invalid_request` |
 | 401 | `SERVICE_UNAUTHENTICATED` | `서비스 인증이 필요합니다.` | 서비스 인증 실패 (본문 파싱 전에 판정) | 서버 설정·토큰 문제로 보고 경보. 앱에는 연결 오류로 안내 | `llm_service_auth` |
 | 403 | `SERVICE_FORBIDDEN` | `서비스 호출 권한이 없습니다.` | 인증된 서비스 호출자에게 권한이 없음 | 위와 같음 | `llm_service_auth` |
-| 413 | `PAYLOAD_TOO_LARGE` | `요청 크기가 한도를 초과했습니다.` | 원시 본문 256 KiB, 질문·이력 텍스트 16000자, 이력 20쌍 중 하나 초과 | 앱 입력 한도(2000자)와 이력 20쌍 제한 때문에 정상이면 발생하지 않음. 발생하면 백엔드 오류 | `llm_payload_too_large` |
+| 413 | `PAYLOAD_TOO_LARGE` | `요청 크기가 한도를 초과했습니다.` | 원시 본문 256 KiB, 질문·이력 텍스트 16000자, 이력 20쌍 중 하나 초과 | 앱 질문 2000자·이력 20쌍 이내라도 UTF-8 JSON 본문이 256 KiB를 초과할 수 있음. 백엔드는 문자열별 한도와 직렬화한 본문 바이트 수를 별도로 검사하고, 한도를 넘는 본문은 전송하지 않음. 개수·글자 수 제한만으로 413을 배제하지 않으며 질문 원문·출력 예산은 임의로 줄이지 않음 | `llm_payload_too_large` |
 | 422 | `CONTEXT_LIMIT_EXCEEDED` | `질문이 모델 문맥 한도를 초과했습니다.` | 이력을 모두 빼도 모델 문맥을 초과 | 질문 자체가 너무 긺 | `llm_context_limit` |
 | 503 | `MODEL_NOT_READY` | `모델이 아직 준비되지 않았습니다.` | 모델이 준비되지 않음 | 재시도 없이 사용자에게 안내 | `llm_not_ready` |
 | 409 | `REQUEST_IN_PROGRESS` | `동일 요청이 처리 중입니다.` | 같은 인스턴스에서 같은 ID가 실행 중 | 같은 요청의 중복 전송. 새로 호출하지 않고 해당 턴 상태 확인을 안내 | `llm_in_progress` |

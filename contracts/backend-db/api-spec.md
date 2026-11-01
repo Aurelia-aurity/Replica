@@ -1,8 +1,8 @@
 # 레플리카 API 명세서: 백엔드 ↔ DB
 
-기준일 2026-10-13 · DB 담당이 올린 이슈 #25·#26을 바탕으로 정리한 초안이며 합의된 규격이 아닙니다.
+기준일 2026-11-01 · DB 담당의 이슈 #25·#26, PR #45·#61과 `main`의 백엔드 구현(#63)을 바탕으로 정리했습니다. 팀 검토를 거쳐 병합하기 전까지는 합의된 규격이 아닙니다.
 
-**[구현]** 코드가 있고 동작함   **[제안]** 이슈를 근거로 이 문서가 제안한 규격   **[미정]** 아직 정해지지 않음   (표에서 `필수`는 필수 여부)
+**[구현]** `main`에 코드가 있고 동작함   **[제안]** 이슈를 근거로 이 문서가 제안한 규격   **[미정]** 아직 정해지지 않음   (표에서 `필수`는 필수 여부)
 
 - [1. 백엔드 ↔ DB API](#s1)
 - [2. DB 오류 메시지](#s2)
@@ -13,7 +13,7 @@
 
 ## 1. 백엔드 ↔ DB API (백엔드가 호출하는 DB 함수)
 
-&lt;span class="badge draft"&gt;초안&lt;/span&gt; DB 담당의 이슈 #25(스키마·SQL 함수)와 #26(Python 함수 명세)입니다. 브랜치 `jaesung_26-db-access`, 문서 `docs/architecture/db-python-api.md`. PR은 아직 없고, 정상 로그인 사용자의 실제 읽기·쓰기 검증은 남아 있습니다.
+DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR #45·#61입니다. 모듈 위치는 `backend/app/db/`이고 설명 문서는 `docs/architecture/db-python-api.md`(PR #61)입니다. 현재 `main`에는 챗 API(#63)가 쓰는 사본이 들어 있으며 PR #61 병합 뒤 정리할 예정입니다. 실제 Supabase 연결에서 정상 로그인 사용자의 읽기·쓰기를 확인한 결과는 PR #61에서 검토합니다.
 
 ### 연결과 사용 방식
 
@@ -49,11 +49,13 @@
 | `list_sessions` | `*`, `persona_id: UUID \| None = None`, `limit: int = 50`, `offset: int = 0` | `list[Row]` |  |
 | `delete_session_rows` | `session_id: UUID` | `None` | DB의 대화방과 턴만 삭제. 파일·계정 삭제 아님. 대화방이 없거나 남의 것이면 `NotFoundError` |
 | `create_chat_turn` | `session_id: UUID`, `turn_id: UUID`, `*`, `input_mode: "text" \| "voice"`, `question: str \| None = None`, `audio_sha256: str \| None = None` | `Row` | 텍스트는 `question` 필수(공백만 불가)이고 `audio_sha256`을 함께 주면 `ValidationError`. **음성은 업로드한 원본 바이트의 SHA-256(소문자 64자리 hex)이 필수**이고 `question`을 함께 주면 `ValidationError`. 대화방이 없거나 남의 것이면 `NotFoundError`. 같은 ID·같은 입력의 재전송은 기존 턴을 재사용하고, **같은 ID에 다른 입력은 `ConflictError`** |
-| `start_chat_stage` | `turn_id: UUID`, `stage: "stt" \| "llm" \| "tts"`, `*`, `model_name: str \| None = None`, `with_audio: bool = False` | `Row` | 단계 실행권 확보. 해당 `*_attempt`(시도 번호)를 반환하며 **확보에 성공한 요청만 외부 호출**. 재시작은 새 시도 번호. **`stage`가 `llm`이면 `model_name`이 필수**(비어 있지 않은 문자열)이고 `stt`·`tts`에서 `model_name`을 넘기면 `ValidationError`. `with_audio`는 음성도 요청할 때 |
-| `finish_chat_stage` | `turn_id: UUID`, `stage: "stt" \| "llm" \| "tts"`, `*`, `attempt: int`, `ok: bool`, `text: str \| None = None`, `elapsed_ms: int \| None = None`, `error_code: str \| None = None` | `Row` | 해당 시도의 `pending` 결과만 저장. 이전 시도의 늦은 결과는 `ConflictError`. `attempt`는 1 이상, `elapsed_ms`는 0 이상, **`ok`가 true인 `stt`·`llm` 단계는 `text`가 비어 있지 않아야 함**. TTS 실패는 완료된 답변 텍스트를 지우지 않음 |
+| `start_chat_stage` | `turn_id: UUID`, `stage: "stt" \| "llm" \| "tts"`, `*`, `model_name: str \| None = None`, `with_audio: bool = False`, `request_id: UUID \| None = None` | `Row` | 단계 실행권 확보. 해당 `*_attempt`(시도 번호)를 반환하며 **확보에 성공한 요청만 외부 호출**. 재시작은 새 시도 번호. **`stage`가 `llm`이면 `model_name`이 필수**(비어 있지 않은 문자열)이고 `stt`·`tts`에서 `model_name`을 넘기면 `ValidationError`. `with_audio`는 음성도 요청할 때. **`request_id`는 `llm`에서만** 줄 수 있고(다른 단계에서 주면 `ValidationError`), 이 시도의 AI 요청 ID를 AI 호출 전에 DB에 먼저 기록해 연결함 |
+| `finish_chat_stage` | `turn_id: UUID`, `stage: "stt" \| "llm" \| "tts"`, `*`, `attempt: int`, `ok: bool`, `text: str \| None = None`, `elapsed_ms: int \| None = None`, `error_code: str \| None = None`, `total_ms: int \| None = None`, `finish_reason: "stop" \| "length" \| None = None`, `request_id: UUID \| None = None` | `Row` | 해당 시도의 `pending` 결과만 저장. 이전 시도의 늦은 결과는 `ConflictError`. `attempt`는 1 이상, `elapsed_ms`는 0 이상, **`ok`가 true인 `stt`·`llm` 단계는 `text`가 비어 있지 않아야 함**. TTS 실패는 완료된 답변 텍스트를 지우지 않음. `finish_reason`은 성공한 `llm`에서만, `request_id`는 `llm`에서만 줄 수 있음. **`request_id`로 연결된 LLM 시도는 성공할 때도 실패할 때도 같은 `request_id`로 마무리해야 하며, 없이 마무리하면 `ConflictError`(`55000`)** (이 검사는 PR #61의 코드와 `infra/supabase/guard_llm_request_id.sql`에 있음) |
 | `expire_chat_stages` | `*`, `started_before: datetime` | `int` | 기준 시각보다 오래 실행 중인 단계를 실패 처리하고 처리한 단계 수를 반환 (예: `tts_timeout`) |
+| `record_turn_total_ms` | `turn_id: UUID`, `stage: "stt" \| "llm" \| "tts"`, `*`, `attempt: int`, `total_ms: int` | `Row` | 요청 전체 소요 시간(NFR-01)을 마지막으로 끝난 단계에 기록. 끝난 최신 시도에만 쓸 수 있고, 이전 시도의 늦은 기록은 `ConflictError`(덮어쓰지 않음) |
 | `get_turn` | `turn_id: UUID` | `Row` |  |
 | `list_turns` | `session_id: UUID`, `*`, `after_turn_no: int = 0`, `limit: int = 50` | `list[Row]` | `turn_no` 오름차순 커서 조회. 대화방이 없거나 남의 것이면 `NotFoundError` |
+| `get_recent_history` | `session_id: UUID`, `*`, `limit: int = 20`, `before_turn_id: UUID \| None = None` | `list[dict]` | AI에 보낼 이력. 질문·답변이 모두 `done`인 턴만 최근 `limit`(1~20)쌍을 오래된 순으로 `{user, assistant}`로 반환. `before_turn_id`가 있으면 그 턴보다 앞선 것만. 대화방이 없거나 남의 것이면 `NotFoundError` |
 
 ### 기록·전사문 함수 (이슈 #9 · #10)
 
@@ -95,7 +97,7 @@
 | `get_deletion_job` | `job_id: UUID` | `Row` |  |
 | `list_deletion_jobs` | `*`, `limit: int = 50`, `offset: int = 0` | `list[Row]` |  |
 
-SQL 함수 8개(`create_chat_turn`, `start_chat_stage`, `finish_chat_stage`, `expire_chat_stages`, `confirm_record_text`, `publish_style_profile`, `search_record_chunks`, `request_record_deletion`)는 위 표의 같은 이름의 Python 함수가 호출하고, 나머지 함수는 테이블을 직접 읽고 씁니다.
+SQL 함수(`create_chat_turn`, `start_chat_stage`, `finish_chat_stage`, `record_turn_total_ms`, `expire_chat_stages`, `confirm_record_text`, `publish_style_profile`, `search_record_chunks`, `request_record_deletion`)는 위 표의 같은 이름의 Python 함수가 호출하고, 나머지 함수는 테이블을 직접 읽고 씁니다.
 
 ### 호출 규칙
 
@@ -113,9 +115,12 @@ SQL 함수 8개(`create_chat_turn`, `start_chat_stage`, `finish_chat_stage`, `ex
 
 ```
 create_chat_turn(session_id, turn_id, input_mode="text", question=…)
-→ start_chat_stage(turn_id, "llm", model_name=…)      # 실행권 확보에 성공한 경우에만 AI 호출
-→ (AI 호출)
-→ finish_chat_stage(turn_id, "llm", attempt=claimed["llm_attempt"], ok=True, text=…, elapsed_ms=…)
+→ start_chat_stage(turn_id, "llm", model_name=…, request_id=…)   # 실행권 확보에 성공한 경우에만 AI 호출. request_id는 AI 호출 전에 DB에 먼저 기록
+→ get_recent_history(session_id, before_turn_id=turn_id)         # AI에 보낼 최근 완결 20쌍
+→ (AI 호출, 같은 request_id)
+→ finish_chat_stage(turn_id, "llm", attempt=claimed["llm_attempt"], ok=True, text=…, elapsed_ms=…, finish_reason=…, request_id=…)
+   # AI가 실패하면 ok=False, error_code=…로, 같은 request_id를 넣어 마무리
+→ record_turn_total_ms(turn_id, "llm", attempt, total_ms)
 ```
 
 #### 음성 턴의 호출 순서
@@ -123,8 +128,9 @@ create_chat_turn(session_id, turn_id, input_mode="text", question=…)
 ```
 create_chat_turn(session_id, turn_id, input_mode="voice", audio_sha256=…)
 → start_chat_stage(turn_id, "stt") → (STT) → finish_chat_stage(turn_id, "stt", attempt, ok, text=전사문, elapsed_ms)
-→ start_chat_stage(turn_id, "llm", model_name=…, with_audio=True) → (AI 호출) → finish_chat_stage(…, "llm", …)
+→ start_chat_stage(turn_id, "llm", model_name=…, with_audio=True, request_id=…) → get_recent_history(…) → (AI 호출, 같은 request_id) → finish_chat_stage(…, "llm", …, request_id=…)
 → start_chat_stage(turn_id, "tts") → (TTS) → finish_chat_stage(…, "tts", …)    # 실패해도 답변 텍스트 유지
+→ record_turn_total_ms(turn_id, 마지막으로 실행한 단계, attempt, total_ms)
 ```
 
 #### 기록 상태 전이 (`update_record_status`)
@@ -301,7 +307,7 @@ DB 모듈이 어떤 조건에서 어떤 예외를 던지는지 코드 기준으�
 | `ConflictError` | `22023` (`create_chat_turn`만) | **같은 `turn_id`에 다른 입력**을 보냄 (요청 ID 재사용) | 409 | `TURN_ID_CONFLICT` | `같은 요청 번호로 다른 내용을 보낼 수 없어요. 새로 전송해 주세요.` | false | 새 `turn_id`를 만들어 다시 전송 |
 | `AuthenticationError` | - | 토큰이 없거나 잘못됨·만료 (`for_user`) | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | false | 로그인 화면으로 이동 |
 | `NotFoundError` | `P0002` | 대상이 없거나, 다른 사용자 소유이거나, 삭제 중이라 보이지 않음. `get_*`, `create_session`의 대화 상대, `create_chat_turn`·`list_turns`·`delete_session_rows`의 대화방, 삭제 중인 기록(`get_record`). **없음과 남의 것을 구분하지 않음** | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | false | 목록 새로고침 |
-| `ConflictError` | `55000` | 이미 실행 중이거나 끝난 단계를 다시 시작 (`start_chat_stage`), 이전 시도의 늦은 결과 저장 (`finish_chat_stage`) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 턴 상태 다시 조회 |
+| `ConflictError` | `55000` | 이미 실행 중이거나 끝난 단계를 다시 시작 (`start_chat_stage`), 이전 시도의 늦은 결과 저장 (`finish_chat_stage`), `request_id`로 연결된 LLM 시도를 `request_id` 없이 마무리 (`finish_chat_stage`, 백엔드 호출 오류) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 턴 상태 다시 조회 |
 | `ConflictError` | 코드 없음 (수정 대상 행이 비어 있음) | 기록의 현재 상태가 `expected_status`와 다름 (`update_record_status`), 삭제하려던 대화방이 이미 사라짐 (`delete_session_rows`) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 기록·대화 상태 다시 조회 |
 | `ConflictError` | 코드 없음 | 전사문 수정 시 `draft`가 아니거나 수정 시각이 다름 (`edit_text_draft`) | 409 | `EDIT_CONFLICT` | `다른 곳에서 먼저 수정되었거나 이미 확정된 내용이에요. 최신 내용을 불러와 확인해 주세요.` | false | 최신 내용을 불러오고 입력한 내용은 유지 |
 | `ConflictError` | `23505` (`23503`) | 이미 있는 `revision` 또는 ID로 생성 (`create_text_draft`, 일반 생성 함수의 중복 INSERT) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 ID로 먼저 조회 |
@@ -312,7 +318,7 @@ DB 모듈이 어떤 조건에서 어떤 예외를 던지는지 코드 기준으�
 
 `ValidationError`는 DB 문서에서 "400 또는 422 매핑 후보"로 적혀 있어, 앱 입력이 원인이면 422, 백엔드가 만든 인자가 원인이면 500으로 정리했습니다. `NotFoundError`는 404, `ConflictError`는 409로 문서에 명시되어 있습니다.
 
-같은 `turn_id`에 다른 입력은 DB가 `22023`으로 알리지만 모듈이 `ConflictError`로 바꿔 던집니다. 같은 `ConflictError`라도 코드가 `22023`이면 앱에는 `TURN_ID_CONFLICT`로 구분해 보냅니다 (제안).
+같은 `turn_id`에 다른 입력은 DB가 `22023`으로 알리지만 모듈이 `ConflictError`로 바꿔 던집니다. 같은 `ConflictError`라도 코드가 `22023`이면 앱에는 `TURN_ID_CONFLICT`로 구분해 보냅니다.
 
 `INVALID_INPUT`, `INTERNAL_ERROR`, `UNAUTHENTICATED`는 앱↔백엔드 규격 문서 2장의 정의와 같고, 나머지 `code`는 이 장에서 정의합니다. AI 오류를 앱에 전달할 때 쓰는 `CONFLICT`도 이 장의 정의를 따릅니다.
 
