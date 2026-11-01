@@ -404,6 +404,7 @@ class ConversationChatService implements VoiceChatService {
   final ConversationService service;
   final String id;
   String? _pendingId, _pendingMessage;
+  Object? _pendingTextAttempt;
   VoiceRecording? _pendingRecording;
   String? _pendingVoiceId;
   @override
@@ -417,18 +418,25 @@ class ConversationChatService implements VoiceChatService {
   Future<ChatReply> replyDetailed(String message) async {
     if (_pendingMessage != message) _pendingId = newConversationId();
     _pendingMessage = message;
+    final turnId = _pendingId!;
+    final attempt = Object();
+    _pendingTextAttempt = attempt;
     final answer = service is DetailedConversationService
         ? await (service as DetailedConversationService).sendDetailed(
             id,
-            _pendingId!,
+            turnId,
             message,
           )
         : ChatReply(
-            text: await service.send(id, _pendingId!, message),
-            turnId: _pendingId,
+            text: await service.send(id, turnId, message),
+            turnId: turnId,
           );
-    _pendingId = null;
-    _pendingMessage = null;
+    // Retries share a turn ID, but only the latest attempt owns its cleanup.
+    if (identical(_pendingTextAttempt, attempt)) {
+      _pendingId = null;
+      _pendingMessage = null;
+      _pendingTextAttempt = null;
+    }
     return answer;
   }
 

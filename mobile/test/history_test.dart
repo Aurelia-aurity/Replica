@@ -74,6 +74,32 @@ class TestHistory implements ConversationService {
   }
 }
 
+class DeferredHistory extends TestHistory {
+  final responses = <Completer<String>>[];
+
+  @override
+  Future<String> send(String id, String turnId, String message) {
+    sends.add((session: id, turn: turnId, message: message));
+    final response = Completer<String>();
+    responses.add(response);
+    return response.future;
+  }
+}
+
+class DetailedDeferredHistory extends DeferredHistory
+    implements DetailedConversationService {
+  @override
+  Future<ChatReply> sendDetailed(
+    String id,
+    String turnId,
+    String message,
+  ) async => ChatReply(text: await send(id, turnId, message), turnId: turnId);
+
+  @override
+  Future<SpeechAudio> synthesize(ChatReply reply) =>
+      throw UnsupportedError('No speech in retry tests');
+}
+
 Conversation conversation({
   String id = 'session-1',
   DateTime? date,
@@ -340,6 +366,67 @@ void main() {
     await chat.reply('합성 질문');
     expect(service.sends.single.session, 'same-session');
   });
+
+  for (final detailed in [false, true]) {
+    test(
+      'late text success preserves retry UUID (detailed: $detailed)',
+      () async {
+        final service = detailed
+            ? DetailedDeferredHistory()
+            : DeferredHistory();
+        final chat = ConversationChatService(service, 'same-session');
+        final first = chat.replyDetailed('질문');
+        // The caller times out, while the underlying request remains in flight.
+        await expectLater(
+          first.timeout(Duration.zero),
+          throwsA(isA<TimeoutException>()),
+        );
+        final second = chat.replyDetailed('질문');
+        final secondCheck = expectLater(second, throwsA(isA<StateError>()));
+        service.responses[0].complete('늦은 합성 답변');
+        expect((await first).turnId, service.sends[0].turn);
+        service.responses[1].completeError(StateError('retry failed'));
+        await secondCheck;
+
+        final third = chat.replyDetailed('질문');
+        expect(service.sends.map((send) => send.turn).toSet(), hasLength(1));
+        expect(
+          service.sends.every((send) => send.session == 'same-session'),
+          true,
+        );
+        service.responses[2].complete('재시도 합성 답변');
+        expect((await third).turnId, service.sends[0].turn);
+
+        // Once the current attempt succeeds, even identical text is a new turn.
+        final next = chat.replyDetailed('질문');
+        expect(service.sends[3].turn, isNot(service.sends[0].turn));
+        service.responses[3].complete('다음 합성 답변');
+        expect((await next).turnId, service.sends[3].turn);
+      },
+    );
+
+    test(
+      'late text success cannot clear an edited message (detailed: $detailed)',
+      () async {
+        final service = detailed
+            ? DetailedDeferredHistory()
+            : DeferredHistory();
+        final chat = ConversationChatService(service, 'same-session');
+        final first = chat.replyDetailed('원래 질문');
+        final edited = chat.replyDetailed('수정한 질문');
+        final editedCheck = expectLater(edited, throwsA(isA<StateError>()));
+        service.responses[0].complete('늦은 합성 답변');
+        expect((await first).turnId, service.sends[0].turn);
+        expect(service.sends[0].turn, isNot(service.sends[1].turn));
+        service.responses[1].completeError(StateError('edited request failed'));
+        await editedCheck;
+        final retry = chat.replyDetailed('수정한 질문');
+        expect(service.sends[2].turn, service.sends[1].turn);
+        service.responses[2].complete('수정한 합성 답변');
+        expect((await retry).turnId, service.sends[1].turn);
+      },
+    );
+  }
 
   test('delayed response from old account is discarded and 401 invalidates session', () async {
     final auth = TestAuth();
