@@ -155,8 +155,13 @@ def notify_run(run: dict, api: Client, env, *, send=deliver) -> None:
     name = workflow_name(run)
     heading = f"Replica · {escape(name)}"
     url = f"https://github.com/{REPO}/actions/runs/{run['id']}"
-    history = earlier_runs(api, run, selected)
-    previous = next(history, None)
+    for attempt in range(run["run_attempt"] - 1, 0, -1):
+        previous = api.get(f"/repos/{REPO}/actions/runs/{run['id']}/attempts/{attempt}")
+        if (previous["status"] == "completed" and
+                previous["conclusion"] not in {"cancelled", "skipped"}):
+            break
+    else:
+        previous = next(earlier_runs(api, run, selected), None)
     was_failure = previous is not None and previous["conclusion"] in FAILURES
     if conclusion in FAILURES and not was_failure:
         recipients = pr_authors(api, run) if selected == "pr" else [pm]

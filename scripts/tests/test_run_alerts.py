@@ -47,11 +47,12 @@ def zipped(value, *, filename=nr.FILE_NAME):
 class API:
     """In-memory read-only counterpart of the API endpoints used by run alerts."""
 
-    def __init__(self, history=(), reports=None, *, pulls=(), author="author"):
+    def __init__(self, history=(), reports=None, *, pulls=(), author="author", attempts=None):
         self.history = list(history)
         self.reports = reports or {}
         self.pulls = pulls
         self.author = author
+        self.attempts = attempts or {}
         self.calls = []
 
     def pages(self, path, key=None):
@@ -70,6 +71,8 @@ class API:
 
     def get(self, path):
         self.calls.append(("GET", path))
+        if "/attempts/" in path:
+            return self.attempts[int(path.rsplit("/", 1)[1])]
         if "/pulls/" not in path:
             raise AssertionError(path)
         return {"user": {"login": self.author}}
@@ -109,6 +112,55 @@ class RunAlerts(unittest.TestCase):
     def test_failure_streak_is_suppressed(self):
         self.assertEqual(self.send_run(run(conclusion="failure"), [
             run(9, conclusion="timed_out"), run(8)]), [])
+
+    def test_failed_first_attempt_then_success_sends_one_recovery(self):
+        for make_run, pm in ((run, False), (sync, True)):
+            with self.subTest(scope="sync" if pm else "main"):
+                api = API([make_run(9)], attempts={1: make_run(conclusion="failure")})
+                messages = self.send_run(make_run(run_attempt=2), api=api)
+                self.assertEqual(len(messages), 1)
+                self.assertEqual(messages[0][0]["content"].splitlines()[1], "실행 오류 복구")
+                self.assertEqual(messages[0][1], pm)
+                self.assertEqual(messages[0][0]["allowed_mentions"]["users"], [])
+                self.assertEqual(api.calls[0],
+                                 ("GET", f"/repos/{da.REPO}/actions/runs/10/attempts/1"))
+
+    def test_failed_first_attempt_then_failure_does_not_repeat_alert(self):
+        api = API([run(9)], attempts={1: run(conclusion="failure")})
+        messages = self.send_run(run(run_attempt=2, conclusion="failure"), api=api)
+        self.assertEqual(messages, [])
+        self.assertEqual(api.calls, [
+            ("GET", f"/repos/{da.REPO}/actions/runs/10/attempts/1")])
+
+    def test_cancelled_attempt_falls_back_to_previous_run(self):
+        api = API([run(9, conclusion="failure")],
+                  attempts={1: run(conclusion="cancelled")})
+        messages = self.send_run(run(run_attempt=2), api=api)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0][0]["content"].splitlines()[1], "실행 오류 복구")
+        self.assertIn("/workflows/", api.calls[1][1])
+
+    def test_cancelled_and_skipped_attempts_walk_back_before_run_history(self):
+        api = API([run(9)], attempts={
+            3: run(run_attempt=3, conclusion="cancelled"),
+            2: run(run_attempt=2, conclusion="skipped"),
+            1: run(conclusion="failure")})
+        messages = self.send_run(run(run_attempt=4), api=api)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(api.calls, [
+            ("GET", f"/repos/{da.REPO}/actions/runs/10/attempts/{attempt}")
+            for attempt in (3, 2, 1)])
+
+    def test_successful_previous_attempt_overrides_older_run_failure(self):
+        api = API([run(9, conclusion="failure")], attempts={1: run()})
+        self.assertEqual(self.send_run(run(run_attempt=2), api=api), [])
+        self.assertEqual(len(api.calls), 1)
+
+    def test_pr_rerun_still_does_not_send_recovery(self):
+        current = run(event="pull_request", branch="feature", run_attempt=2)
+        api = API(attempts={1: run(event="pull_request", branch="feature",
+                                   conclusion="failure")})
+        self.assertEqual(self.send_run(current, api=api), [])
 
     def test_recovery_only_after_failure_not_after_ignored_runs(self):
         messages = self.send_run(run(), [
