@@ -96,11 +96,23 @@ def report_holds(api: Client, run: dict) -> set[tuple[int, str]] | None:
         return None
 
 
-def hold_changes(current: set, previous: set) -> list[str]:
-    descriptions = [f"동기화 보류 발생 · #{n} ({code})"
-                    for n, code in sorted(current - previous)]
-    descriptions.extend(f"동기화 보류 해제 · #{n}" for n in
-                        sorted({n for n, _ in previous - current}))
+def hold_changes(current: set[tuple[int, str]], previous: set[tuple[int, str]]) -> list[str]:
+    current_by_issue, previous_by_issue = {}, {}
+    for holds, by_issue in ((current, current_by_issue), (previous, previous_by_issue)):
+        for number, code in holds:
+            by_issue.setdefault(number, set()).add(code)
+    descriptions = []
+    for number in sorted(current_by_issue.keys() | previous_by_issue.keys()):
+        old = previous_by_issue.get(number, set())
+        new = current_by_issue.get(number, set())
+        if not old:
+            descriptions.append(f"동기화 보류 발생 · #{number} ({', '.join(sorted(new))})")
+        elif not new:
+            descriptions.append(f"동기화 보류 해제 · #{number}")
+        elif old != new:
+            descriptions.append(
+                f"동기화 보류 사유 변경 · #{number} "
+                f"({', '.join(sorted(old))} -> {', '.join(sorted(new))})")
     return descriptions
 
 
@@ -172,7 +184,7 @@ def notify_run(run: dict, api: Client, env, *, send=deliver) -> None:
     if (selected != "sync" or name != "GitHub → Notion" or conclusion != "success"):
         return
     for description in hold_notifications(api, run):
-        recipients = [pm] if description.startswith("동기화 보류 발생") else []
+        recipients = [] if description.startswith("동기화 보류 해제") else [pm]
         send(payload(heading, description, url, mapping, recipients=recipients),
              env, pm=True)
 

@@ -269,12 +269,36 @@ class RunAlerts(unittest.TestCase):
         self.assertEqual(messages[1][0]["allowed_mentions"]["users"], [MAP["just-simple0"]])
         self.assertEqual(messages[2][0]["allowed_mentions"]["users"], [])
 
-    def test_hold_diff_tracks_issue_reason_pairs_and_stable_sets_are_silent(self):
-        current = {(1, "NEW"), (3, "SAME")}
-        previous = {(1, "OLD"), (2, "GONE"), (3, "SAME")}
-        self.assertEqual(ra.hold_changes(current, previous), [
-            "동기화 보류 발생 · #1 (NEW)", "동기화 보류 해제 · #1", "동기화 보류 해제 · #2"])
-        self.assertEqual(ra.hold_changes(current, current), [])
+    def test_hold_diff_compares_issue_reason_sets(self):
+        cases = [
+            ({(1, "NEW"), (3, "SAME"), (4, "B"), (4, "A")},
+             {(1, "OLD"), (2, "GONE"), (3, "SAME")},
+             ["동기화 보류 사유 변경 · #1 (OLD -> NEW)", "동기화 보류 해제 · #2",
+              "동기화 보류 발생 · #4 (A, B)"]),
+            ({(1, "A")}, {(1, "A"), (1, "B")},
+             ["동기화 보류 사유 변경 · #1 (A, B -> A)"]),
+            ({(1, "A"), (1, "B")}, {(1, "A")},
+             ["동기화 보류 사유 변경 · #1 (A -> A, B)"]),
+            ({(1, "A")}, {(1, "A")}, []),
+            (set(), {(1, "A"), (1, "B")}, ["동기화 보류 해제 · #1"]),
+        ]
+        for current, previous, expected in cases:
+            with self.subTest(current=current, previous=previous):
+                self.assertEqual(ra.hold_changes(current, previous), expected)
+
+    def test_new_and_changed_holds_mention_pm_but_clearance_does_not(self):
+        reports = {10: report(10, [(1, "NEW"), (3, "B"), (3, "A")]),
+                   9: report(9, [(1, "OLD"), (2, "GONE")])}
+        messages = self.send_run(sync(), [sync(9)], reports)
+        self.assertEqual(len(messages), 3)
+        for (message, pm), description, mentions in zip(messages, [
+                "동기화 보류 사유 변경 · #1 (OLD -> NEW)",
+                "동기화 보류 해제 · #2", "동기화 보류 발생 · #3 (A, B)"],
+                [[MAP["just-simple0"]], [], [MAP["just-simple0"]]]):
+            with self.subTest(description=description):
+                self.assertTrue(pm)
+                self.assertIn(description, message["content"].splitlines())
+                self.assertEqual(message["allowed_mentions"]["users"], mentions)
 
     def test_missing_previous_or_current_report_never_guesses(self):
         for reports in ({10: report(10, [(1, "NEW")])}, {9: report(9)}, {}):
