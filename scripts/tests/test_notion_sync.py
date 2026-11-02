@@ -786,12 +786,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(self._evaluate_actions_expression(
             sync_enabled, {**base, "event_name": "schedule", "enabled": "true"}), "true")
 
-        verify_index = content.index("- name: Verify sync implementation")
+        checkout_index = content.index("- uses: actions/checkout@")
         sync_index = content.index("- name: Sync current GitHub state")
         secrets_index = content.index("NOTION_TOKEN:")
-        self.assertLess(verify_index, sync_index)
+        self.assertLess(checkout_index, sync_index)
         self.assertLess(sync_index, secrets_index)
-        self.assertNotIn("secrets.", content[:verify_index])
+        self.assertNotIn("secrets.", content[:sync_index])
 
     def test_workflow_permissions_and_event_inputs_remain_fixed(self):
         import re
