@@ -1,4 +1,5 @@
 """Synthetic payload and HTTP boundary tests; no external calls or real sleeps."""
+import html
 import io
 import json
 import sys
@@ -187,7 +188,8 @@ class Events(unittest.TestCase):
 class Delivery(unittest.TestCase):
     def setUp(self):
         self.message = da.payload("title", "description",
-                                  f"https://github.com/{da.REPO}/issues/79", MAP)
+                                  f"https://github.com/{da.REPO}/issues/79", MAP,
+                                  recipients=("reviewer",))
         self.requests = []
 
     def opener(self, request, timeout):
@@ -203,6 +205,27 @@ class Delivery(unittest.TestCase):
             env["DISCORD_EVENTS_MODE"] = "shadow"
             da.deliver(self.message, env, opener=self.opener)
             self.assertIn("&quot;allowed_mentions&quot;", summary.read_text())
+            self.assertEqual(self.requests, [])
+
+    def test_public_shadow_summary_hides_mention_and_allowed_user_ids(self):
+        other_uid = "222222222222222222"
+        message = da.payload("title " + UID, "description",
+                             f"https://github.com/{da.REPO}/issues/79",
+                             {**MAP, "other": other_uid}, recipients=("reviewer", "other"))
+        original = json.dumps(message)
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary"
+            env = {"DISCORD_EVENTS_MODE": "shadow", "GITHUB_STEP_SUMMARY": str(summary)}
+            da.deliver(message, env, opener=self.opener)
+            rendered = summary.read_text()
+            self.assertNotIn(UID, rendered)
+            self.assertNotIn(other_uid, rendered)
+            decoded = json.loads(html.unescape(rendered).removeprefix("<pre>").removesuffix("</pre>\n"))
+            self.assertEqual(decoded["allowed_mentions"]["users"],
+                             ["[Discord user]", "[Discord user]"])
+            self.assertNotIn("<@", decoded["content"])
+            self.assertIn("[Discord user]", decoded["content"])
+            self.assertEqual(json.dumps(message), original)
             self.assertEqual(self.requests, [])
 
     def test_live_team_pm_fallback_and_shadow_routes(self):
