@@ -81,7 +81,7 @@ def main(env=None, *, client=None, send=deliver) -> int:
     except Error as exc:
         print(f"Discord event alert failed: {exc}")
         return 1
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+    except Exception as exc:  # CLI boundary: raw exception details must not reach workflow logs.
         print(f"Discord event alert failed: {type(exc).__name__}")
         return 1
 

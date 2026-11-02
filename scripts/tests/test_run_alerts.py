@@ -353,7 +353,8 @@ class RunAlerts(unittest.TestCase):
                    "DISCORD_WEBHOOK_URL": webhook, "GITHUB_TOKEN": token}
             for failure in (da.Error("Safe delivery failure"), ValueError(f"{webhook} {token}"),
                             KeyError(f"{webhook} {token}"), OSError(f"{webhook} {token}"),
-                            TypeError(f"{webhook} {token}")):
+                            TypeError(f"{webhook} {token}"), RuntimeError(f"{webhook} {token}"),
+                            AttributeError(f"{webhook} {token}")):
                 with self.subTest(exception=type(failure).__name__):
                     output = io.StringIO()
 

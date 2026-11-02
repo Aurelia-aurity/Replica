@@ -167,7 +167,8 @@ class Events(unittest.TestCase):
                    "DISCORD_WEBHOOK_URL": WEBHOOK, "GITHUB_TOKEN": token}
             for failure in (da.Error("Safe delivery failure"), ValueError(f"{WEBHOOK} {token}"),
                             KeyError(f"{WEBHOOK} {token}"), OSError(f"{WEBHOOK} {token}"),
-                            TypeError(f"{WEBHOOK} {token}")):
+                            TypeError(f"{WEBHOOK} {token}"), RuntimeError(f"{WEBHOOK} {token}"),
+                            AttributeError(f"{WEBHOOK} {token}")):
                 with self.subTest(exception=type(failure).__name__):
                     output = io.StringIO()
 
