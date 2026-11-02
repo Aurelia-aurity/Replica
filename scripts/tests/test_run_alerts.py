@@ -23,6 +23,8 @@ def run(number=10, *, conclusion="success", name="CI", event="push",
     return {"id": number, "run_number": number, "run_attempt": 1, "workflow_id": 100,
             "status": "completed", "conclusion": conclusion, "name": name,
             "event": event, "head_branch": branch, "head_sha": SHA, "path": path,
+            "repository": {"id": nr.REPO_ID, "full_name": da.REPO},
+            "head_repository": {"id": nr.REPO_ID, "full_name": da.REPO},
             "pull_requests": [], **extra}
 
 
@@ -248,6 +250,103 @@ class RunAlerts(unittest.TestCase):
         messages = self.send_run(current, [sync(9, conclusion="success")])
         self.assertTrue(messages[0][1])
         self.assertEqual(messages[0][0]["allowed_mentions"]["users"], [MAP["just-simple0"]])
+
+    def test_forged_current_pr_sync_producer_cannot_publish_its_report(self):
+        current = sync()
+        current.update(event="pull_request", head_branch="fork-branch",
+                       head_repository={"id": 42, "full_name": "attacker/Replica"})
+        messages = self.send_run(current, [sync(9)], {
+            10: report(10, [(888, "FORGED_HOLD")]),
+            9: report(9, [(79, "REAL_HOLD")])})
+        self.assertEqual(messages, [])
+        self.assertEqual(self.api.calls, [])
+
+    def test_unknown_path_with_sync_name_is_not_a_trusted_producer(self):
+        current = sync(conclusion="failure")
+        current["path"] = ".github/workflows/attacker.yml"
+        self.assertEqual(self.send_run(current), [])
+        self.assertEqual(self.api.calls, [])
+
+    def test_untrusted_failure_cannot_suppress_a_trusted_sync_failure(self):
+        forged = sync(10, conclusion="failure")
+        forged.update(event="pull_request", head_branch="fork-branch",
+                      head_repository={"id": 42, "full_name": "attacker/Replica"})
+        messages = self.send_run(sync(11, conclusion="failure"), [forged, sync(9)])
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages[0][1])
+        self.assertEqual(messages[0][0]["allowed_mentions"]["users"], [MAP["just-simple0"]])
+
+    def test_untrusted_report_is_ignored_between_trusted_hold_reports(self):
+        forged = sync(10)
+        forged.update(event="pull_request", head_branch="fork-branch",
+                      head_repository={"id": 42, "full_name": "attacker/Replica"})
+        messages = self.send_run(sync(11), [forged, sync(9)], {
+            11: report(11, [(79, "REAL_HOLD")]), 10: report(10),
+            9: report(9, [(79, "REAL_HOLD")])})
+        self.assertEqual(messages, [])
+        self.assertNotIn(("GET", f"/repos/{da.REPO}/actions/runs/10/artifacts"), self.api.calls)
+        self.assertIn(("GET", f"/repos/{da.REPO}/actions/runs/9/artifacts"), self.api.calls)
+
+    def test_sync_rejects_foreign_or_missing_repository_identity(self):
+        for field in ("repository", "head_repository"):
+            for identity in (None, {}, {"id": 42, "full_name": da.REPO},
+                             {"id": nr.REPO_ID, "full_name": "attacker/Replica"}):
+                with self.subTest(field=field, identity=identity):
+                    current = sync(conclusion="failure")
+                    current[field] = identity
+                    self.assertEqual(self.send_run(current), [])
+                    self.assertEqual(self.api.calls, [])
+
+    def test_sync_producer_event_and_dispatch_ref_allowlist(self):
+        for path in (".github/workflows/notion-sync.yml",
+                     ".github/workflows/notion-sync-request.yml"):
+            for event_name, branch in (("pull_request", "main"), ("push", "main"),
+                                       ("workflow_run", "main"),
+                                       ("workflow_dispatch", "feature")):
+                with self.subTest(path=path, event=event_name, branch=branch):
+                    current = sync(conclusion="failure")
+                    current.update(path=path, event=event_name, head_branch=branch)
+                    self.assertEqual(self.send_run(current), [])
+                    self.assertEqual(self.api.calls, [])
+        current = sync(conclusion="failure")
+        current["path"] = ".github/workflows/notion-sync-request.yml"
+        self.assertEqual(self.send_run(current), [])
+
+    def test_trusted_sync_paths_accept_ref_suffix_and_allowed_main_events(self):
+        for event_name in ("schedule", "issues", "workflow_dispatch"):
+            with self.subTest(event=event_name):
+                current = sync(conclusion="failure")
+                current.update(event=event_name,
+                               path=".github/workflows/notion-sync.yml@refs/heads/main")
+                messages = self.send_run(current)
+                self.assertEqual(len(messages), 1)
+                self.assertTrue(messages[0][1])
+
+    def test_untrusted_attempt_cannot_suppress_failure_on_trusted_rerun(self):
+        forged = sync(conclusion="failure")
+        forged["event"] = "pull_request"
+        api = API([sync(9)], attempts={1: forged})
+        messages = self.send_run(sync(run_attempt=2, conclusion="failure"), api=api)
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages[0][1])
+
+    def test_main_ci_rejects_foreign_head_repository_in_current_and_history(self):
+        foreign = {"id": 42, "full_name": "attacker/Replica"}
+        self.assertEqual(self.send_run(run(conclusion="failure", head_repository=foreign)), [])
+        self.assertEqual(self.api.calls, [])
+        messages = self.send_run(run(conclusion="failure"), [
+            run(9, conclusion="failure", head_repository=foreign), run(8)])
+        self.assertEqual(len(messages), 1)
+        self.assertFalse(messages[0][1])
+
+    def test_pr_ci_still_accepts_fork_head_repository(self):
+        current = run(event="pull_request", branch="fork-branch", conclusion="failure",
+                      head_repository={"id": 42, "full_name": "attacker/Replica"},
+                      pull_requests=[{"number": 61, "base": {"ref": "main"}}])
+        messages = self.send_run(current)
+        self.assertEqual(len(messages), 1)
+        self.assertFalse(messages[0][1])
+        self.assertEqual(messages[0][0]["allowed_mentions"]["users"], [MAP["author"]])
 
     def test_dynamic_ordinary_request_run_name_uses_workflow_path(self):
         current = run(name="replica-sync-request:uuid:1",

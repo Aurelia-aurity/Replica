@@ -26,13 +26,36 @@ def workflow_name(run: dict) -> str:
     return SYNC_PATHS.get(path) or CI_PATHS.get(path) or run["name"]
 
 
+def repository_identity(repo) -> bool:
+    return (isinstance(repo, dict) and repo.get("id") == notification_report.REPO_ID and
+            repo.get("full_name") == REPO)
+
+
+def trusted_sync_producer(run: dict) -> bool:
+    """Display names and report JSON cannot authenticate a privileged producer."""
+    path = run.get("path", "").split("@", 1)[0]
+    if (path not in SYNC_PATHS or not repository_identity(run.get("repository")) or
+            not repository_identity(run.get("head_repository"))):
+        return False
+    event = run["event"]
+    if path == ".github/workflows/notion-sync.yml":
+        # This API metadata describes the PR head, not the base-code checkout.
+        if event == "pull_request_target":
+            return True
+        return event in {"schedule", "issues", "workflow_dispatch"} and run["head_branch"] == "main"
+    return event == "workflow_dispatch" and run["head_branch"] == "main"
+
+
 def scope(run: dict, ci_names: list[str]) -> str | None:
+    if not repository_identity(run.get("repository")):
+        return None
     name = workflow_name(run)
     if name in SYNC_PATHS.values():
-        return "sync"
+        return "sync" if trusted_sync_producer(run) else None
     if name not in ci_names:
         return None
-    if run["event"] == "push" and run["head_branch"] == "main":
+    if (run["event"] == "push" and run["head_branch"] == "main" and
+            repository_identity(run.get("head_repository"))):
         return "main"
     if run["event"] == "pull_request":
         return "pr"
@@ -47,14 +70,11 @@ def earlier_runs(api: Client, run: dict, selected: str):
     for previous in api.pages(path, "workflow_runs"):
         if (previous["id"] == run["id"] or
                 previous["run_number"] >= run["run_number"] or
-                previous["status"] != "completed"):
+                previous["status"] != "completed" or
+                previous["workflow_id"] != run["workflow_id"] or
+                scope(previous, [workflow_name(run)]) != selected):
             continue
-        if selected == "main" and not (
-                previous["head_branch"] == "main" and previous["event"] == "push"):
-            continue
-        if selected == "pr" and not (
-                previous["head_branch"] == run["head_branch"] and
-                previous["event"] == "pull_request"):
+        if selected == "pr" and previous["head_branch"] != run["head_branch"]:
             continue
         if previous["conclusion"] in {"cancelled", "skipped"}:
             continue
@@ -170,7 +190,10 @@ def notify_run(run: dict, api: Client, env, *, send=deliver) -> None:
     for attempt in range(run["run_attempt"] - 1, 0, -1):
         previous = api.get(f"/repos/{REPO}/actions/runs/{run['id']}/attempts/{attempt}")
         if (previous["status"] == "completed" and
-                previous["conclusion"] not in {"cancelled", "skipped"}):
+                previous["conclusion"] not in {"cancelled", "skipped"} and
+                previous["id"] == run["id"] and
+                previous["workflow_id"] == run["workflow_id"] and
+                scope(previous, ci_names) == selected):
             break
     else:
         previous = next(earlier_runs(api, run, selected), None)
