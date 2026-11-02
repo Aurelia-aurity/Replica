@@ -1,4 +1,4 @@
-"""Offline, Slurm GPU-only Qwen baseline. No API or automatic downloads."""
+"""Offline, Slurm GPU-only baseline. No API or automatic downloads."""
 import argparse
 import json
 import os
@@ -37,6 +37,12 @@ def read_settings(config_path, prompt, model_path, max_new_tokens=None):
     try:
         config = json.loads(Path(config_path).read_text(encoding="utf-8"))
         system = config["system_prompt"]
+        model_id = os.environ.get("REPLICA_MODEL_ID", config.get("model_id"))
+        revision = os.environ.get("REPLICA_MODEL_REVISION", config.get("model_revision"))
+        if model_id is not None and (not isinstance(model_id, str) or not model_id.strip()):
+            raise ValueError
+        if revision is not None and (not isinstance(revision, str) or not revision.strip()):
+            raise ValueError
         limit = config["max_new_tokens"] if max_new_tokens is None else max_new_tokens
         if not isinstance(system, str) or not system.strip():
             raise ValueError
@@ -55,7 +61,7 @@ def read_settings(config_path, prompt, model_path, max_new_tokens=None):
     except (OSError, ValueError, RuntimeError):
         raise BaselineError("MODEL_PATH") from None
     settings = {"model_path": str(path), "system_prompt": system, "prompt": prompt,
-                "max_new_tokens": limit}
+                "max_new_tokens": limit, "model_id": model_id, "model_revision": revision}
     if "enable_thinking" in config:
         if type(config["enable_thinking"]) is not bool:
             raise BaselineError("CONFIG")
@@ -90,12 +96,15 @@ def load_runtime(settings):
     except Exception:
         raise BaselineError("CUDA") from None
     try:
+        revision_options = ({"revision": settings["model_revision"]}
+                            if settings["model_revision"] is not None else {})
         tokenizer = AutoTokenizer.from_pretrained(
-            settings["model_path"], local_files_only=True, trust_remote_code=False)
+            settings["model_path"], local_files_only=True, trust_remote_code=False,
+            **revision_options)
         model = AutoModelForCausalLM.from_pretrained(
             settings["model_path"], dtype=torch.bfloat16, device_map={"": 0},
             local_files_only=True, trust_remote_code=False, use_safetensors=True,
-            attn_implementation="eager")
+            attn_implementation="eager", **revision_options)
         model.eval()
     except Exception:
         raise BaselineError("LOAD") from None

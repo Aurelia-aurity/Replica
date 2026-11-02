@@ -272,8 +272,7 @@ def main(argv=None) -> int:
                 args.context_limit is not None and args.context_limit < 1):
             raise ValueError
         settings = baseline.read_settings(args.config, "startup", args.model_path)
-        config = json.loads(args.config.read_text(encoding="utf-8"))
-        if not isinstance(config.get("model_id"), str) or not config["model_id"].strip():
+        if settings["model_id"] is None:
             raise ValueError
         service = Service(deadline_seconds=args.deadline_seconds)
         baseline.os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
