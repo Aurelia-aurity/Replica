@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -316,6 +317,32 @@ class RunAlerts(unittest.TestCase):
             self.assertEqual(ra.main(env, client=API(), send=broken_send), 1)
             self.assertEqual(ra.main({}), 0)
             self.assertEqual(ra.main({"DISCORD_EVENTS_MODE": "unknown"}), 1)
+
+    def test_main_diagnostics_show_safe_errors_and_hide_raw_exception_details(self):
+        webhook = "https://discord.com/api/webhooks/123/fake"
+        token = "FAKE_RUN_TOKEN"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "event.json"
+            source.write_text(json.dumps({"repository": {"full_name": da.REPO},
+                                          "workflow_run": run(conclusion="failure")}))
+            env = {**ENV, "GITHUB_EVENT_PATH": str(source), "GITHUB_REPOSITORY": da.REPO,
+                   "DISCORD_WEBHOOK_URL": webhook, "GITHUB_TOKEN": token}
+            for failure in (da.Error("Safe delivery failure"), ValueError(f"{webhook} {token}"),
+                            KeyError(f"{webhook} {token}"), OSError(f"{webhook} {token}"),
+                            TypeError(f"{webhook} {token}")):
+                with self.subTest(exception=type(failure).__name__):
+                    output = io.StringIO()
+
+                    def send(message, environment, *, pm=False):
+                        raise failure
+
+                    with redirect_stdout(output):
+                        status = ra.main(env, client=API(), send=send)
+                    self.assertEqual(status, 1)
+                    detail = str(failure) if isinstance(failure, da.Error) else type(failure).__name__
+                    self.assertIn(f"Discord run alert failed: {detail}", output.getvalue())
+                    self.assertNotIn(webhook, output.getvalue())
+                    self.assertNotIn(token, output.getvalue())
 
 
 class Reports(unittest.TestCase):

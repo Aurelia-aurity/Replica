@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import urllib.error
 import urllib.request
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -156,6 +157,31 @@ class Events(unittest.TestCase):
             env["DISCORD_EVENTS_MODE"] = "typo"
             self.assertEqual(de.main(env), 1)
 
+    def test_main_diagnostics_show_safe_errors_and_hide_raw_exception_details(self):
+        token = "FAKE_EVENT_TOKEN"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "event.json"
+            source.write_text(json.dumps(event()), encoding="utf-8")
+            env = {"DISCORD_EVENTS_MODE": "live", "GITHUB_EVENT_PATH": str(source),
+                   "GITHUB_REPOSITORY": da.REPO, "GITHUB_EVENT_NAME": "pull_request_target",
+                   "DISCORD_WEBHOOK_URL": WEBHOOK, "GITHUB_TOKEN": token}
+            for failure in (da.Error("Safe delivery failure"), ValueError(f"{WEBHOOK} {token}"),
+                            KeyError(f"{WEBHOOK} {token}"), OSError(f"{WEBHOOK} {token}"),
+                            TypeError(f"{WEBHOOK} {token}")):
+                with self.subTest(exception=type(failure).__name__):
+                    output = io.StringIO()
+
+                    def send(message, environment):
+                        raise failure
+
+                    with redirect_stdout(output):
+                        status = de.main(env, send=send)
+                    self.assertEqual(status, 1)
+                    detail = str(failure) if isinstance(failure, da.Error) else type(failure).__name__
+                    self.assertIn(f"Discord event alert failed: {detail}", output.getvalue())
+                    self.assertNotIn(WEBHOOK, output.getvalue())
+                    self.assertNotIn(token, output.getvalue())
+
 
 class Delivery(unittest.TestCase):
     def setUp(self):
@@ -276,13 +302,16 @@ class GitHubClient(unittest.TestCase):
             da.ArtifactRedirect().redirect_request(request, None, 302, "", {}, "http://example.com")
 
     def test_api_http_failure_never_exposes_token_or_response_text(self):
+        body = io.BytesIO(b"SECRET")
+
         def opener(request, timeout):
             raise urllib.error.HTTPError(request.full_url, 403, "SECRET", {},
-                                         io.BytesIO(b"SECRET"))
+                                         body)
 
         with self.assertRaises(da.Error) as error:
             da.Client("SECRET", opener=opener).get(f"/repos/{da.REPO}/pulls/79")
         self.assertNotIn("SECRET", str(error.exception))
+        self.assertTrue(body.closed)
 
 
 class Workflows(unittest.TestCase):

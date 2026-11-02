@@ -187,8 +187,11 @@ def main(env=None, *, client=None, send=deliver) -> int:
         notify_run(event["workflow_run"], client or Client(env.get("GITHUB_TOKEN", "")),
                    env, send=send)
         return 0
-    except (Error, OSError, ValueError, KeyError, TypeError):
-        print("Discord run alert failed; check payload, API access and configuration")
+    except Error as exc:
+        print(f"Discord run alert failed: {exc}")
+        return 1
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"Discord run alert failed: {type(exc).__name__}")
         return 1
 
 

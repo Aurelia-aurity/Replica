@@ -89,6 +89,9 @@ class Client:
         try:
             with self.opener(request, timeout=30) as response:
                 data = response.read(MAX_DOWNLOAD + 1)
+        except urllib.error.HTTPError as exc:
+            exc.close()
+            raise Error("GitHub API request failed") from None
         except (urllib.error.URLError, OSError):
             raise Error("GitHub API request failed") from None
         if len(data) > MAX_DOWNLOAD:

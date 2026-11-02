@@ -78,8 +78,11 @@ def main(env=None, *, client=None, send=deliver) -> int:
         else:
             print("No actionable event notification")
         return 0
-    except (Error, OSError, ValueError, KeyError, TypeError):
-        print("Discord event alert failed; check payload, API access and configuration")
+    except Error as exc:
+        print(f"Discord event alert failed: {exc}")
+        return 1
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"Discord event alert failed: {type(exc).__name__}")
         return 1
 
 
