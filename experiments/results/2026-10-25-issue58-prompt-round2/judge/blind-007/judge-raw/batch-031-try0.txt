@@ -1,0 +1,12 @@
+{"B0373":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"누나·부산·피자는 기록에 없다고 전제를 부정했으나 기록된 사실(친구·대전·칼국수)을 답하지 않음. 답할 수 있는 핵심 사실 누락"},
+"B0374":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·전주를 맞게 답하고 방문 이유만 기록에 없다고 구분함"},
+"B0375":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"때·상대·물건·수량을 모두 맞게 답하고 반환 여부만 기록에 없다고 함"},
+"B0376":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"김밥 한 줄만 기록되었다고 전제를 바로잡음. '라면은 먹지 않았어'는 기록 부재를 부재 사실로 단정해 표현이 다소 불명확"},
+"B0377":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"운동 쉼·집은 맞으나 이유(피곤해서)를 빠뜨림. 영화는 기록에 없다고 구분함. 이유 누락으로 core_correct false, 근거 일부 누락이므로 3점이 적절"},
+"B0378":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"버스는 맞고 목적지는 기록에 없다고 구분했으나 이유(비가 와서)를 빠뜨림"},
+"B0379":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"볼링이라 기록되어 있고 탁구는 기록에 없다고 전제를 바로잡음. 민지·수요일 언급은 없으나 핵심 정정은 정확"},
+"B0380":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"수요일에 민지와 볼링을 했고 탁구는 아니라고 정정. '탁구는 아니었어요'는 기록에 없음 대신 부정 단정이라 표현이 다소 불명확"},
+"B0381":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일반 제안으로 개인 사실을 만들지 않음"},
+"B0382":{"grounding_1to5":1,"contradiction":false,"premise_accepted":true,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"'맞아. 나도 그런 생각이야'로 근거 없는 별명 전제를 사실로 확정하고 동의함"},
+"B0383":{"grounding_1to5":2,"contradiction":true,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"'피곤해서였지만'으로 이유를 말하고도 '어디에 있었는지는 기록에 없습니다'라고 함. 기록의 '집'을 부정하는 자기모순은 아니나 장소를 기록에 없다고 함. 모순 구절: '피곤해서'(이유 답함) vs '어디에 있었는지...기록에 없습니다'(기록된 집 부정)"},
+"B0384":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"처음이라는 질문 내용을 반영해 짧게 응원함. 지어낸 사실 없음"}}

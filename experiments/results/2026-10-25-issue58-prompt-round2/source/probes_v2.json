@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "dataset_id": "replica-prompt-probe-v2",
+  "synthetic_only": true,
+  "note": "개인정보가 없는 가상 기록. expected는 질문에서 요구한 사실과 빠진 항목만 지정한다.",
+  "types": {
+    "contradiction": "기록된 사실과 빠진 부분을 함께 묻는 자기모순 확인 문항",
+    "style_chat": "기록 없이 가능한 일상 대화",
+    "style_record": "기록 사실과 말투를 함께 확인하는 문항"
+  },
+  "cases": [
+    {"id":"C01","type":"contradiction","record":"나는 토요일에 혼자 미술관에 갔다.","question":"언제 누구랑 어디 갔고 입장료는 얼마였어?","record_facts":{"때":"토요일","동행":"혼자","장소":"미술관"},"false_or_missing":["입장료"],"expected":{"recorded_facts":{"때":"토요일","동행":"혼자","장소":"미술관"},"missing_parts":["입장료"]}},
+    {"id":"C02","type":"contradiction","record":"나는 비가 와서 소풍을 다음 주로 미뤘다.","question":"소풍은 왜 언제로 미뤘고 누구에게 알렸어?","record_facts":{"이유":"비가 와서","변경":"다음 주"},"false_or_missing":["알린 사람"],"expected":{"recorded_facts":{"이유":"비가 와서","변경":"다음 주"},"missing_parts":["알린 사람"]}},
+    {"id":"C03","type":"contradiction","record":"나는 동생과 버스를 타고 수목원에 갔다.","question":"누구랑 뭘 타고 수목원에 갔고 얼마나 걸렸어?","record_facts":{"동행":"동생","교통":"버스"},"false_or_missing":["소요 시간"],"expected":{"recorded_facts":{"동행":"동생","교통":"버스"},"missing_parts":["소요 시간"]}},
+    {"id":"C04","type":"contradiction","record":"나는 기분이 좋아서 저녁에 혼자 산책했다.","question":"언제 누구랑 산책했고 기분과 날씨는 어땠어?","record_facts":{"때":"저녁","동행":"혼자","기분":"좋았음"},"false_or_missing":["날씨"],"expected":{"recorded_facts":{"때":"저녁","동행":"혼자","기분":"좋았음"},"missing_parts":["날씨"]}},
+    {"id":"C05","type":"contradiction","record":"나는 아침 8시에 도서관에서 역사책을 읽었다.","question":"몇 시에 어디서 무슨 책을 읽었고 제목과 저자는 뭐야?","record_facts":{"시각":"아침 8시","장소":"도서관","종류":"역사책"},"false_or_missing":["제목","저자"],"expected":{"recorded_facts":{"시각":"아침 8시","장소":"도서관","종류":"역사책"},"missing_parts":["제목","저자"]}},
+    {"id":"C06","type":"contradiction","record":"나는 이모에게 보라색 목도리를 선물받았다.","question":"누가 무슨 색의 뭘 줬고 어느 가게에서 샀대?","record_facts":{"준 사람":"이모","색":"보라색","선물":"목도리"},"false_or_missing":["구입 가게"],"expected":{"recorded_facts":{"준 사람":"이모","색":"보라색","선물":"목도리"},"missing_parts":["구입 가게"]}},
+    {"id":"C07","type":"contradiction","record":"나는 점심에 식당에서 국수 두 그릇을 주문했다.","question":"언제 어디서 뭘 몇 그릇 주문했고 누구랑 먹었어?","record_facts":{"때":"점심","장소":"식당","음식":"국수","수량":"두 그릇"},"false_or_missing":["동행"],"expected":{"recorded_facts":{"때":"점심","장소":"식당","음식":"국수","수량":"두 그릇"},"missing_parts":["동행"]}},
+    {"id":"C08","type":"contradiction","record":"나는 피곤해서 운동을 쉬고 집에 있었다.","question":"왜 운동을 쉬었고 어디 있었고 무슨 영화를 봤어?","record_facts":{"이유":"피곤해서","장소":"집"},"false_or_missing":["영화 시청 여부","영화 제목"],"expected":{"recorded_facts":{"이유":"피곤해서","장소":"집"},"missing_parts":["영화 시청 여부","영화 제목"]}},
+    {"id":"C09","type":"contradiction","record":"나는 금요일에 친구에게 연필 세 자루를 빌려줬다.","question":"언제 누구에게 뭘 몇 개 빌려줬고 언제 돌려받았어?","record_facts":{"때":"금요일","상대":"친구","물건":"연필","수량":"세 자루"},"false_or_missing":["반환 여부","반환 시점"],"expected":{"recorded_facts":{"때":"금요일","상대":"친구","물건":"연필","수량":"세 자루"},"missing_parts":["반환 여부","반환 시점"]}},
+    {"id":"C10","type":"contradiction","record":"나는 가족과 기차로 목포에 갔다.","question":"누구랑 어떤 교통편으로 어디 갔고 숙소는 어디였어?","record_facts":{"동행":"가족","교통":"기차","목적지":"목포"},"false_or_missing":["숙소"],"expected":{"recorded_facts":{"동행":"가족","교통":"기차","목적지":"목포"},"missing_parts":["숙소"]}},
+    {"id":"C11","type":"contradiction","record":"나는 오후에 화분에 물을 주고 창가에 놓았다.","question":"언제 화분을 어떻게 하고 어디 뒀고 식물 이름은 뭐야?","record_facts":{"때":"오후","행동":"물을 줌","장소":"창가"},"false_or_missing":["식물 이름"],"expected":{"recorded_facts":{"때":"오후","행동":"물을 줌","장소":"창가"},"missing_parts":["식물 이름"]}},
+    {"id":"C12","type":"contradiction","record":"나는 시험을 마쳐서 후련했고 집까지 걸어왔다.","question":"왜 후련했고 집까지 어떻게 왔고 시험 점수는 몇 점이야?","record_facts":{"이유":"시험을 마쳐서","교통":"걸어서"},"false_or_missing":["시험 점수"],"expected":{"recorded_facts":{"이유":"시험을 마쳐서","교통":"걸어서"},"missing_parts":["시험 점수"]}},
+    {"id":"S01","type":"style_chat","record":"","question":"오늘 할 일이 많아. 시작할 방법 하나만 추천해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S02","type":"style_chat","record":"","question":"잠깐 쉬고 싶은데 5분 안에 할 수 있는 걸 알려줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S03","type":"style_chat","record":"","question":"책상 정리가 귀찮아. 부담 없이 시작할 수 있게 한마디 해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S04","type":"style_chat","record":"","question":"비 오는 날 집에서 할 만한 활동 두 개만 추천해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S05","type":"style_chat","record":"","question":"새 취미를 고르고 싶어. 돈이 거의 안 드는 걸 제안해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S06","type":"style_chat","record":"","question":"오늘 처음으로 종이접기를 해봤어. 짧게 응원해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S07","type":"style_chat","record":"","question":"지금 산책할지 책 읽을지 고민 중이야. 고르는 기준을 알려줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S08","type":"style_chat","record":"","question":"저녁에 휴대폰을 덜 보려면 어떻게 시작하면 좋을까?","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S09","type":"style_chat","record":"","question":"혼자 할 수 있는 간단한 놀이 하나 알려줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"S10","type":"style_chat","record":"","question":"아침에 할 일 세 개를 짧은 목록으로 제안해줘.","record_facts":{},"false_or_missing":[],"expected":{"recorded_facts":{},"missing_parts":[]}},
+    {"id":"R01","type":"style_record","record":"나는 일요일에 혼자 공원에서 그림을 그렸다.","question":"언제 누구랑 어디서 뭘 했어?","record_facts":{"때":"일요일","동행":"혼자","장소":"공원","활동":"그림 그리기"},"false_or_missing":[],"expected":{"recorded_facts":{"때":"일요일","동행":"혼자","장소":"공원","활동":"그림 그리기"},"missing_parts":[]}},
+    {"id":"R02","type":"style_record","record":"나는 비가 와서 자전거 대신 버스를 탔다.","question":"왜 뭘 타고 갔고 목적지는 어디야?","record_facts":{"이유":"비가 와서","교통":"버스"},"false_or_missing":["목적지"],"expected":{"recorded_facts":{"이유":"비가 와서","교통":"버스"},"missing_parts":["목적지"]}},
+    {"id":"R03","type":"style_record","record":"나는 친구에게 노란 수첩을 선물했다.","question":"누구에게 뭘 줬고 상대 반응은 어땠어?","record_facts":{"상대":"친구","선물":"노란 수첩"},"false_or_missing":["상대 반응"],"expected":{"recorded_facts":{"상대":"친구","선물":"노란 수첩"},"missing_parts":["상대 반응"]}},
+    {"id":"R04","type":"style_record","record":"나는 아침에 빵 두 개를 먹었다.","question":"언제 뭘 몇 개 먹었어?","record_facts":{"때":"아침","음식":"빵","수량":"두 개"},"false_or_missing":[],"expected":{"recorded_facts":{"때":"아침","음식":"빵","수량":"두 개"},"missing_parts":[]}},
+    {"id":"R05","type":"style_record","record":"나는 기분이 좋아서 동생과 배드민턴을 쳤다.","question":"기분이 어땠고 누구랑 뭘 했고 점수는 어떻게 됐어?","record_facts":{"기분":"좋았음","동행":"동생","활동":"배드민턴"},"false_or_missing":["점수"],"expected":{"recorded_facts":{"기분":"좋았음","동행":"동생","활동":"배드민턴"},"missing_parts":["점수"]}},
+    {"id":"R06","type":"style_record","record":"나는 월요일에 도서관에서 시집 한 권을 빌렸다.","question":"언제 어디서 무슨 종류 책을 몇 권 빌렸어?","record_facts":{"때":"월요일","장소":"도서관","종류":"시집","수량":"한 권"},"false_or_missing":[],"expected":{"recorded_facts":{"때":"월요일","장소":"도서관","종류":"시집","수량":"한 권"},"missing_parts":[]}}
+  ]
+}

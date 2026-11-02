@@ -1,0 +1,23 @@
+{
+  "description": "15-raw-cap-before-auth",
+  "request": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": true,
+  "conditions": {
+    "raw_body_bytes": 262145,
+    "service_auth": "unauthenticated"
+  },
+  "http_status": 413,
+  "response": {
+    "request_id": null,
+    "error": {
+      "code": "PAYLOAD_TOO_LARGE",
+      "message": "요청 크기가 한도를 초과했습니다."
+    }
+  },
+  "transport_outcome": "received"
+}

@@ -1,0 +1,8 @@
+{"B0277":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"고민 내용이 기록에 없음을 정확히 밝히고 지어내지 않음. 다만 통화 사실은 언급하지 않았고 이어가는 질문도 없어 5점은 아님"},
+"B0278":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화에서 일반적 추천 두 개만 제시함. 개인 사실 생성 없음"},
+"B0279":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·대구를 맞게 답하고 방문 목적은 기록에 없다고 구분함. 단서를 묻는 이어가기는 없음"},
+"B0280":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"음식이 기록에 없음을 밝히고 지어내지 않음. 할머니 댁 방문 사실은 언급하지 않았고 확인 질문도 없음"},
+"B0281":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"저녁 요리 사실과 빠진 항목(요리 종류, 같이 먹은 사람)을 구분함. 마무리 질문이 막연함"},
+"B0282":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"시험 결과 확인 사실은 인정하고 실망 전제는 기록에 없다며 수용하지 않음. 문장이 다소 어색하고 확인 질문 없음"},
+"B0283":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"7시 기상과 요가 20분을 정확히 답함. 추가 사실 없음"},
+"B0284":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"고민 내용이 기록에 없음을 밝히고 지어내지 않음. 통화 사실 언급과 이어가는 질문은 없음"}}

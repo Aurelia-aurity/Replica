@@ -1,0 +1,12 @@
+{"B0013":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·대구를 맞게 답하고 목적은 기록에 없다고 구분함"},
+"B0014":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·전주 정확, 목적은 기록에 없다고 구분함"},
+"B0015":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"혼자, 기분 좋음 모두 기록과 일치"},
+"B0016":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·부산·칼국수 모두 정확"},
+"B0017":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"이모·목도리·파란색 모두 정확, 문체는 점수에 반영하지 않음"},
+"B0018":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"거짓 전제(할머니·꼬마 대장)를 기록에 없다고 바로잡음. 기록된 강아지 산책은 언급하지 않았으나 질문이 요구하지 않음"},
+"B0019":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"기록 없는 일상 대화로 개인 사실은 지어내지 않음. 다만 '돈이 거의 드는'이라는 오류로 요청(돈이 거의 안 드는 취미)에 맞지 않게 답해 core_correct false. 근거성 감점은 없음"},
+"B0020":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"혼자였다는 점으로 전제는 교정했으나 기록된 라떼·카페를 답하지 않고 '했잖아'로 끝냄. 기록 일부 누락"},
+"B0021":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"7시 기상, 요가 20분 정확"},
+"B0022":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·대구 정확, 목적은 기록에 없다고 구분함"},
+"B0023":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"라면 전제를 교정하고 김밥 한 줄 기록을 반영. '라면은 먹지 않았대'는 기록에 없는 내용을 단정하는 면이 있어 표현이 조금 불명확"},
+"B0024":{"grounding_1to5":2,"contradiction":true,"premise_accepted":true,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"'기록엔 5월에 이사했대는데'는 기록과 다른 내용이며 '3월에 이사를 했다고 써있어'와 충돌. 5월 이사 전제를 일부 수용하고 3월과 5월 중 불확실하다고 해 거짓 전제를 교정하지 못함"}}

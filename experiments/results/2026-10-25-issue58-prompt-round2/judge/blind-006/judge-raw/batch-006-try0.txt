@@ -1,0 +1,12 @@
+{"B0073":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"가족·기차·목포를 맞게 답하고 숙소만 기록에 없다고 구분함. 문두의 '아니'는 어색하나 사실 오류는 없음"},
+"B0074":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"오후·물주기·창가를 맞게 답하고 식물 이름만 기록에 없다고 구분함"},
+"B0075":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·노란 수첩을 맞게 답하고 상대 반응은 기록에 없다고 구분함"},
+"B0076":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"기록 없는 일상 대화인데 기록이 없다며 추천을 하지 않고 취향만 되물음. 사실을 만들지는 않았지만 요청에 답하지 못함"},
+"B0077":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록에 있는 애칭 '별'을 맞게 답함. 빠진 항목 없음"},
+"B0078":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"만난 사람과 숙소가 기록에 없다는 것은 맞지만, 기차를 타고 출장을 다녀왔다는 기록된 내용을 언급하지 않아 근거 일부를 빠뜨림"},
+"B0079":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"개인 이력이나 감정을 지어내지 않고 질문의 상황에 맞는 일반적인 격려를 함"},
+"B0080":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"브랜드와 가격이 기록에 없다는 것은 맞지만, 새 운동화를 샀다는 기록된 사실은 언급하지 않아 표현이 다소 불명확함. 거부해야 할 핵심 사실은 없음"},
+"B0081":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"기록 없는 일상 대화인데 기록이 없다며 놀이를 추천하지 않고 취향만 되물음. 사실을 만들지는 않았지만 요청에 답하지 못함"},
+"B0082":{"grounding_1to5":2,"contradiction":true,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"기록에 있는 후련한 이유(시험을 마쳐서)와 집까지 걸어온 것을 기록에 없다고 부정함. '후련한 이유와 집까지 어떻게 왔는지 ... 내용이 없어'가 기록의 '시험을 마쳐서 후련했고 집까지 걸어왔다'와 모순됨"},
+"B0083":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"만화책이라는 거짓 전제를 바로잡고 소설책 두 권을 정확히 답함"},
+"B0084":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"돌려받은 시점이 기록에 없다는 것은 맞지만, 금요일·친구·연필 세 자루라는 기록된 사실을 답하지 않아 근거 일부를 빠뜨림"}}

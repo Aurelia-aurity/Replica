@@ -1,0 +1,12 @@
+{"B0013":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"동생·전주를 맞게 답하고 방문 이유는 기록에 없다고 구분함. 마무리 질문은 막연하지만 감점할 정도는 아님"},
+"B0014":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·부산·칼국수를 모두 맞게 답함. 지어낸 내용 없음"},
+"B0015":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구·부산·칼국수를 모두 맞게 답함. 지어낸 내용 없음"},
+"B0016":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"가족·기차·목포를 맞게 답하고 숙소는 기록에 없다고 구분함"},
+"B0017":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"거짓 전제를 수용하지 않고 기록에 없다고 바로잡음. 실제 기록(강아지 산책)은 언급하지 않았고 '다른 기록이 있을까요?'라는 확인 질문도 막연함"},
+"B0018":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"누나와 영화를 봤다고 답하고 기분은 기록에 없다고 구분함"},
+"B0019":{"grounding_1to5":4,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"유도 전제를 받아들이지 않고 실제 기록(친구·대전·칼국수)을 제시함. 다만 '질문 문장이 기록에 없다'는 표현이 어색해 근거 표현이 조금 불명확함"},
+"B0020":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"화요일·사촌·광주·비빔밥을 모두 맞게 답함"},
+"B0021":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구와 영화를 봤다고 답하고 기분은 기록에 없다고 구분함"},
+"B0022":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"만난 사람과 숙소를 모른다고 한 것은 맞지만 기록된 사실(기차 출장)을 언급하지 않아 근거 일부를 빠뜨림. 모른다는 말로 마무리함"},
+"B0023":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"기록 없는 일상 대화인데 기록이 없다며 추천 요청에 답하지 않음. 지어낸 내용은 없으나 요청에 부적절하게 답함"},
+"B0024":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"퇴근길에 꽃을 샀고 해바라기 한 송이라고 맞게 답함. 꽃집은 언급하지 않았지만 질문 범위 밖임"}}

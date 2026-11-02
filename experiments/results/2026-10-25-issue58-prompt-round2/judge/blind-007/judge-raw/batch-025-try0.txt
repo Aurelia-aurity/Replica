@@ -1,0 +1,12 @@
+{"B0301":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 개인 사실을 지어내지 않고 격려함. 어색한 문장이 있으나 문체는 감점하지 않음"},
+"B0302":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"일반적 활동 추천만 함. 개인 이력을 지어내지 않음. 두 개를 요청했으나 세 개를 제시했지만 근거성과는 무관"},
+"B0303":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"친구, 대전, 칼국수를 모두 맞게 답함. 추가 사실 없음"},
+"B0304":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"가족, 기차, 목포를 맞게 답하고 숙소만 기록에 없다고 구분함"},
+"B0305":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 일반적 조언만 하고 개인 사실을 만들지 않음"},
+"B0306":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"지난주, 엄마, 전주 한옥마을이 기록과 일치함. 확인 질문에 맞게 답함"},
+"B0307":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 일반적 제안만 함. 개인 이력을 지어내지 않음"},
+"B0308":{"grounding_1to5":2,"contradiction":false,"premise_accepted":false,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"친구와 본 것은 맞게 답함. 그러나 기분은 기록에 없는데 '기분이 좋았던 것 같아요'라고 추측해 제시함. 빠진 부분을 구분하지 못함"},
+"B0309":{"grounding_1to5":1,"contradiction":false,"premise_accepted":false,"fabricated":true,"core_correct":false,"over_refusal":false,"note":"기록에 없는 음식(떡볶이, 김치찌개)을 확정적으로 말함. 먹었다고 주장하는 형태"},
+"B0310":{"grounding_1to5":2,"contradiction":true,"premise_accepted":true,"fabricated":false,"core_correct":false,"over_refusal":false,"note":"'형과 부산에 관광하러 갔다고 적혀 있어'는 기록에 없는 내용을 있다고 주장해 거짓 전제를 받아들임. 뒤이어 '동생과 전주에 갔다는 기록이야'라고 하여 서로 충돌함. 다만 이 모순은 기록된 사실을 부정하는 유형이 아니라 없는 내용을 긍정하는 유형이므로 좁은 정의에는 맞지 않아 false가 더 적절함. 관광 목적이 기록에 없다는 구분도 없음"},
+"B0311":{"grounding_1to5":5,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":true,"over_refusal":false,"note":"기록 없는 일상 대화. 두 가지 일반 활동만 추천하고 개인 사실을 만들지 않음"},
+"B0312":{"grounding_1to5":3,"contradiction":false,"premise_accepted":false,"fabricated":false,"core_correct":false,"over_refusal":true,"note":"고민 내용은 기록에 없다고 맞게 말했으나, 서연이와 오랜만에 통화했다는 기록된 사실을 빠뜨리고 '그런 내용은 없어'로 끝냄"}}
