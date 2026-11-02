@@ -404,10 +404,44 @@ class RunAlerts(unittest.TestCase):
             with self.subTest(reports=reports):
                 self.assertEqual(self.send_run(sync(), [sync(9)], reports), [])
 
-    def test_missing_download_is_skipped_not_cleared(self):
+    def test_download_error_propagates_without_using_older_snapshot(self):
         reports = {10: report(10), 9: da.Error("download failed"),
                    8: report(8, [(1, "OLD")])}
-        self.assertEqual(self.send_run(sync(), [sync(9), sync(8)], reports), [])
+        with self.assertRaises(da.Error):
+            self.send_run(sync(), [sync(9), sync(8)], reports)
+        self.assertNotIn(("GET", f"/repos/{da.REPO}/actions/runs/8/artifacts"), self.api.calls)
+
+    def test_hold_api_listing_error_propagates(self):
+        class BrokenArtifactsAPI(API):
+            def pages(self, path, key=None):
+                if "/artifacts" in path:
+                    raise da.Error("GitHub API request failed")
+                return super().pages(path, key)
+
+        with self.assertRaises(da.Error):
+            self.send_run(sync(), api=BrokenArtifactsAPI([sync(9)]))
+
+    def test_transient_hold_download_failure_exits_nonzero_even_after_recovery(self):
+        cases = [
+            ([sync(9)], {10: da.Error("download failed")}, 0),
+            ([sync(9)], {10: report(10), 9: da.Error("download failed")}, 0),
+            ([sync(9, conclusion="failure"), sync(8)],
+             {10: report(10), 8: da.Error("download failed")}, 1),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "event.json"
+            source.write_text(json.dumps({"repository": {"full_name": da.REPO},
+                                          "workflow_run": sync()}))
+            env = {**ENV, "GITHUB_EVENT_PATH": str(source), "GITHUB_REPOSITORY": da.REPO}
+            for history, reports, notices in cases:
+                with self.subTest(report_ids=list(reports), notices=notices):
+                    sent = []
+                    status = ra.main(env, client=API(history, reports),
+                                     send=lambda message, env, pm=False: sent.append(message))
+                    self.assertEqual(status, 1)
+                    self.assertEqual(len(sent), notices)
+                    if notices:
+                        self.assertEqual(sent[0]["content"].splitlines()[1], "실행 오류 복구")
 
     def test_previous_report_search_is_bounded(self):
         history = [sync(n) for n in range(29, 0, -1)]
@@ -470,6 +504,14 @@ class RunAlerts(unittest.TestCase):
 
 
 class Reports(unittest.TestCase):
+    def test_invalid_report_skip_log_includes_exception_class_not_raw_data(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            holds = ra.report_holds(API(reports={10: b"RAW_RESPONSE_SECRET"}), sync())
+        self.assertIsNone(holds)
+        self.assertIn("BadZipFile", output.getvalue())
+        self.assertNotIn("RAW_RESPONSE_SECRET", output.getvalue())
+
     def test_report_rejects_wrong_run_attempt_and_repository(self):
         for change in ({"run_id": 9}, {"attempt": 2}, {"repository_id": 1},
                        {"scan_complete": False}, {"dry_run": True},

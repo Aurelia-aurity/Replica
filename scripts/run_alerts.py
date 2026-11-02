@@ -111,8 +111,9 @@ def report_holds(api: Client, run: dict) -> set[tuple[int, str]] | None:
             return None
         return {(item["issue_number"], item["reason_code"]) for item in report["holds"]}
     except (OSError, ValueError, KeyError, TypeError,
-            zipfile.BadZipFile, NotImplementedError):
-        print("Notification report unavailable or invalid; hold comparison skipped")
+            zipfile.BadZipFile, NotImplementedError) as exc:
+        print(f"Notification report unavailable or invalid ({type(exc).__name__}); "
+              "hold comparison skipped")
         return None
 
 
@@ -137,22 +138,19 @@ def hold_changes(current: set[tuple[int, str]], previous: set[tuple[int, str]]) 
 
 
 def hold_notifications(api: Client, run: dict) -> list[str]:
-    try:
-        current = report_holds(api, run)
-        if current is None:
-            print("Current valid report missing; hold comparison skipped")
-            return []
-        for checked, candidate in enumerate(earlier_runs(api, run, "sync"), 1):
-            if checked > REPORT_LOOKBACK:
-                break
-            if candidate["conclusion"] != "success":
-                continue
-            old = report_holds(api, candidate)
-            if old is not None:
-                return hold_changes(current, old)
-        print("Previous valid report missing within lookback; hold comparison skipped")
-    except Error:
-        print("Report history could not be downloaded; hold comparison skipped")
+    current = report_holds(api, run)
+    if current is None:
+        print("Current valid report missing; hold comparison skipped")
+        return []
+    for checked, candidate in enumerate(earlier_runs(api, run, "sync"), 1):
+        if checked > REPORT_LOOKBACK:
+            break
+        if candidate["conclusion"] != "success":
+            continue
+        old = report_holds(api, candidate)
+        if old is not None:
+            return hold_changes(current, old)
+    print("Previous valid report missing within lookback; hold comparison skipped")
     return []
 
 
