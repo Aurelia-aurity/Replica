@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import inference
 import server
 
-FIXTURES = Path(__file__).parent / "fixtures" / "contract_baseline"
+FIXTURES = Path(__file__).resolve().parents[2] / "contracts" / "baseline" / "examples"
 REQUEST_ID = "11111111-1111-4111-8111-111111111111"
 OTHER_ID = "22222222-2222-4222-8222-222222222222"
 

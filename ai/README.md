@@ -98,14 +98,16 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 ## 학교 GPU baseline HTTP API (#43)
 
-`src/server.py`는 표준 라이브러리 `ThreadingHTTPServer`로 `POST /v1/baseline/generate`를 제공합니다. `src/inference.py`가 이력 축소와 생성을 맡으며 CLI의 환경 검사·로더를 재사용합니다. 새 런타임 의존성은 없습니다. 계약 원본은 `origin/docs/15-baseline-call-contract`의 `contracts/baseline/`(커밋 `9d91972ecc52a250f778fb9099bd2372cc958e26`)입니다. 계약 예제 18개는 출처와 함께 `tests/fixtures/contract_baseline/`에 보관했습니다.
+`src/server.py`는 표준 라이브러리 `ThreadingHTTPServer`로 `POST /v1/baseline/generate`를 제공합니다. `src/inference.py`가 이력 축소와 생성을 맡으며 CLI의 환경 검사·로더를 재사용합니다. 새 런타임 의존성은 없습니다.
+
+계약의 기준 소스는 병합된 `contracts/baseline` 및 `contracts/backend-ai/api-spec.md`의 섹션 1입니다. HTTP 테스트는 병합된 정식 예제를 사용하며 기존에 복사해 두었던 픽스처는 과거 기록용으로만 유지됩니다.
 
 **2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`).** 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 아래 운영 명령은 실행 예시입니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
 
 ### 모델·요청·수락 규칙
 
-- 공유 설정 `configs/baseline.json`의 모델 라벨은 `Qwen/Qwen3-8B`입니다. `--config`로 바꿀 수 있고, 실제 가중치는 `--model-path` 또는 `REPLICA_MODEL_PATH`의 로컬 디렉터리에서만 읽습니다. 라벨은 다운로드 주소나 가중치 일치 검증 수단이 아닙니다. 운영자가 해당 경로에 선택한 모델을 준비해야 합니다. 기존 system prompt는 그대로 사용하며 최종 프롬프트가 아닙니다.
-- HTTP 템플릿은 `enable_thinking=False`, 생성은 greedy(`do_sample=False`, 새 `GenerationConfig`, `use_model_defaults=False`)입니다. 공유 설정의 `enable_thinking: false`는 CLI에도 적용됩니다. 이 필드가 없는 기존 CLI 설정은 기존 템플릿 호출을 유지합니다.
+- 베이스라인 API의 대상 모델은 아직 최종 선정되거나 확정되지 않았습니다. `ai/configs/baseline.json`은 메인 브랜치의 설정값을 유지하며 가드된 시스템 프롬프트도 이 파일에서 읽어옵니다. `model_id` 메타데이터는 `REPLICA_MODEL_ID`로, 선택적 `model_revision`은 `REPLICA_MODEL_REVISION` 환경 변수로 재정의할 수 있으나 실제 가중치는 항상 로컬 경로인 `--model-path` 또는 `REPLICA_MODEL_PATH`에서 로드됩니다. 선택적 리비전 값은 오프라인 로더에 전달되지만 로컬 스냅샷을 선택하거나 검증하지 않으므로 운영자가 정확한 리비전 디렉터리를 직접 제공해야 합니다.
+- HTTP 템플릿은 `enable_thinking=False`, 생성은 greedy(`do_sample=False`, 새 `GenerationConfig`, `use_model_defaults=False`)입니다. CLI의 `enable_thinking`은 선택적 설정이며, 이 필드가 없는 기존 CLI 설정은 기존 템플릿 호출을 유지합니다.
 - 요청은 `Content-Type: application/json`인 비압축 UTF-8 JSON이며, `Content-Length`가 필요합니다. 압축·chunked 전송은 지원하지 않고 400으로 거부합니다. 모든 요청에 `request_id`, `message`, `history`, `max_new_tokens`가 필요하며 임의 필드는 거부합니다.
 - 판정 순서는 원시 바이트 413 → 서비스 인증 401/403 → 파싱·구조·타입·UUID·범위·공백·미정의 필드 400 → 파싱된 문자·이력 쌍 수 413 → 모델 준비 503 → 축소 후 문맥 422 → 원자적 수락 409/429입니다. 원시 본문은 262144바이트, 각 텍스트는 16000 Unicode code point, 이력은 20쌍, 출력 예산은 1~1024입니다. 오류 코드는 계약 예제의 고정 메시지를 사용하며 안전하게 검증한 요청 ID를 반환합니다. 인증 거부·파싱 전 원시 거부·깨진 JSON·잘못되거나 누락된 ID는 `null`입니다.
 - 실제 tokenizer로 system·이력·현재 질문·generation prompt를 렌더링하고 출력 예산까지 합산합니다. 넘으면 가장 오래된 쌍 전체부터 제거합니다. 질문과 출력 예산은 줄이지 않으며 이력이 없어도 넘으면 422입니다. `context`의 사용/제외 쌍 수 합은 제출한 이력 길이입니다. 유효 문맥은 모델의 `max_position_embeddings`, tokenizer의 유효 양수 `model_max_length`, 선택적 `--context-limit` 중 최솟값입니다.
@@ -122,13 +124,13 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 ### 준비·실행·종료
 
-앞 절과 같은 Python 3.12 GPU venv 및 `requirements.txt` 환경을 사용합니다. Slurm GPU 할당·CUDA·네이티브 BF16·GPU 배치를 검사하고 CPU fallback이나 Hub 다운로드는 하지 않습니다. Qwen3 로컬 모델은 별도로 준비해야 합니다. 새 환경 설치는 검증하지 않았습니다. 기존 GPU venv(`transformers==4.57.1`)에서 Qwen3-8B 로딩과 생성은 위 smoke로 확인했습니다.
+앞 절과 같은 Python 3.12 GPU venv 및 `requirements.txt` 환경을 사용합니다. Slurm GPU 할당·CUDA·네이티브 BF16·GPU 배치를 검사하고 CPU fallback이나 Hub 다운로드는 하지 않습니다. 로컬 모델 스냅샷은 별도로 준비해야 합니다. 새 GPU 환경 설치는 검증하지 않았습니다. 기존 GPU venv(`transformers==4.57.1`)에서 Qwen3-8B 로딩과 생성은 위 과거 smoke로 확인했습니다.
 
 할당받은 GPU 작업 셸의 저장소 루트에서 직접 실행하는 예시입니다. 포트 `18043`은 운영자가 고르는 예시값이며 운영 포트 합의가 아닙니다.
 
 ```bash
 export REPLICA_PYTHON="$HOME/replica-llm-venv/bin/python"
-export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+export REPLICA_MODEL_PATH="$HOME/replica-models/local-snapshot"
 "$REPLICA_PYTHON" ai/src/server.py --port 18043
 ```
 
@@ -136,7 +138,7 @@ Slurm 배치 실행은 저장소 루트에서 제출합니다. partition·node·
 
 ```bash
 export REPLICA_PYTHON="$HOME/replica-llm-venv/bin/python"
-export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+export REPLICA_MODEL_PATH="$HOME/replica-models/local-snapshot"
 export REPLICA_PORT=18043
 mkdir -p "$HOME/replica-logs/issue43"
 sbatch --partition p02 --nodelist DIS02 --time 00:30:00 \
@@ -155,6 +157,8 @@ python3 ai/scripts/smoke_baseline.py --port 18043
 ```
 
 smoke는 준비 상태를 한 번 확인한 뒤 합성 요청으로 정상·이력 보존/축소·length·문자/원시 크기 초과·문맥 초과·중복 409·슬롯 점유 429를 시도합니다. `--history-chars`, `--context-chars`로 합성 텍스트 길이를 조절할 수 있습니다. 실제 tokenizer와 생성 시간에 따라 축소·length·422·경합 조건이 생기지 않을 수 있어 해당 결과는 `INCONCLUSIVE`로 표시합니다. 종료 코드는 0(전부 통과), 1(실패/전송 UNKNOWN), 2(실패 없이 미확정 항목 존재)입니다. 본문 전송 완료는 수락 확인이 아니므로 실모델 경합 결과를 확정적으로 보장하지 않습니다. 프롬프트나 답변 원문은 출력하지 않습니다.
+
+CPU 통합 테스트는 백엔드의 `RemoteLLMClient`와 가짜 엔진이 연결된 실제 루프백 서버를 사용하여 성공 응답뿐만 아니라 `503`, `422`, `500` 오류 및 `401` null-ID 케이스를 검증합니다. 이 테스트는 `backend/requirements-dev.txt`와 `contracts/requirements-test.txt`가 설치된 환경에서 `PYTHONPATH=backend:ai/tests python -m pytest -q ai/tests/test_backend_client.py` 명령으로 실행할 수 있습니다.
 
 직접 실행은 `Ctrl+C`로 HTTP 수신을 멈추며 실행 중 생성 스레드는 계산 종료까지 유지됩니다. 배치 작업은 `sbatch`가 반환한 ID로 `scancel JOBID`를 실행해 종료합니다. 작업 종료는 요청 취소 API가 아니며, 실행 중 요청의 정상 응답을 보장하지 않습니다. 로드 실패 시 작업을 종료하고 모델 경로·환경을 확인한 뒤 새 작업을 제출하여 `/readyz`를 다시 확인합니다.
 
