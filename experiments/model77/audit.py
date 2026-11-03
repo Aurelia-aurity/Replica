@@ -36,7 +36,9 @@ def pack_stress(tokenizer, row, profile):
         rendered = serialize(tokenizer, messages, profile)
         return messages, rendered, token_ids(tokenizer, rendered)
 
-    for separator in ("\n", "\n \n", "\n  \n"):
+    # Native BPE merges can skip the target with short space-only delimiters.
+    # Keep the original candidates first so existing packs remain identical.
+    for separator in ("\n", "\n \n", "\n  \n", "\n\t\n", "\n\n", "\n \t\n", "\n\t \n"):
         low, high = 0, len(repeated)
         while low < high:
             middle = (low + high) // 2

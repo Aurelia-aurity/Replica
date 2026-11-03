@@ -4,8 +4,10 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 
+from audit import pack_stress
 from decision import authorize, completed, nearest_rank, nvml_uuid, validate_bundle
 from prepare import content_hash, digest, save
 
@@ -105,6 +107,30 @@ class ScheduleTests(unittest.TestCase):
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_stress_packing_handles_token_count_gaps(self):
+        # Given: a tokenizer with two-token character steps except for a tab.
+        class GappedTokenizer:
+            def encode(self, text, **kwargs):
+                return [1] * sum(1 if char == "\t" else 2 for char in text)
+
+            def apply_chat_template(self, messages, **kwargs):
+                return "\n".join(message["content"] for message in messages)
+
+        tokenizer = GappedTokenizer()
+        row = {
+            "id": "stress", "condition": "B", "persona_id": "p",
+            "messages": [{"role": "system", "content": "s"},
+                         {"role": "user", "content": "u"}],
+            "context_cycle": "abc", "target_input_tokens": 101,
+        }
+        profile = SimpleNamespace(chat_template_kwargs={}, empty_think_required=False)
+        # When
+        result = pack_stress(tokenizer, row, profile)
+        # Then
+        self.assertEqual(result["input_tokens"], 101)
+        self.assertEqual(result["messages"][0], row["messages"][0])
+        self.assertTrue(result["messages"][1]["content"].startswith("u\n<dev_memory_context>\n"))
+
     def test_no_heldout_generation_without_authorization(self):
         # Given
         bundle = {**fixture(), "split": "heldout"}
