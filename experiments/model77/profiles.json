@@ -1,0 +1,37 @@
+{
+  "Qwen3-8B": {
+    "model_id": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "model_type": "qwen3",
+    "chat_template_kwargs": {"enable_thinking": false},
+    "empty_think_required": true
+  },
+  "kanana-2-3b-instruct": {
+    "model_id": "kakaocorp/kanana-2-3b-instruct",
+    "revision": "6a5d7889964c4c590299d16e309eabab1f73f8a9",
+    "model_type": "qwen3",
+    "chat_template_kwargs": {"thinking_mode": "no_think"},
+    "empty_think_required": true
+  },
+  "Midm-2.0-Base-Instruct": {
+    "model_id": "K-intelligence/Midm-2.0-Base-Instruct",
+    "revision": "35479c5fc9a18a5db7cc6dbadcf1db68db7beab0",
+    "model_type": "llama",
+    "chat_template_kwargs": {"date_string": "03 Nov 2026"},
+    "empty_think_required": false
+  },
+  "Qwen3-14B": {
+    "model_id": "Qwen/Qwen3-14B",
+    "revision": "40c069824f4251a91eefaf281ebe4c544efd3e18",
+    "model_type": "qwen3",
+    "chat_template_kwargs": {"enable_thinking": false},
+    "empty_think_required": true
+  },
+  "kanana-1.5-15.7b-a3b-instruct": {
+    "model_id": "kakaocorp/kanana-1.5-15.7b-a3b-instruct",
+    "revision": "df9d415c38e198149a65957cb4dec6cf2a7ba162",
+    "model_type": "mixtral",
+    "chat_template_kwargs": {},
+    "empty_think_required": false
+  }
+}
