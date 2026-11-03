@@ -131,6 +131,7 @@ def run(name: str, result: dict) -> None:
         if profile.empty_think_required and not empty_think:
             raise RuntimeError("Template did not produce an empty think suffix")
         inputs = tokenizer(rendered, add_special_tokens=False, return_tensors="pt").to("cuda:0")
+        inputs.pop("token_type_ids", None)
         count = inputs["input_ids"].shape[1]
         generation = GenerationConfig(
             max_new_tokens=CAP, do_sample=False, eos_token_id=eos_ids,
