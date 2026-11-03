@@ -228,6 +228,29 @@ class Delivery(unittest.TestCase):
             self.assertEqual(json.dumps(message), original)
             self.assertEqual(self.requests, [])
 
+    def test_shadow_summary_masks_prefix_overlapping_ids_as_complete_values(self):
+        short_uid, long_uid = "11111111111111111", "11111111111111111222"
+        mapping = {"short": short_uid, "long": long_uid}
+        for recipients in (("short", "long"), ("long", "short")):
+            with self.subTest(recipients=recipients), tempfile.TemporaryDirectory() as directory:
+                message = da.payload("title", f"{short_uid} {long_uid}",
+                                     f"https://github.com/{da.REPO}/issues/79",
+                                     mapping, recipients=recipients)
+                original = json.dumps(message)
+                summary = Path(directory) / "summary"
+                env = {"DISCORD_EVENTS_MODE": "shadow", "GITHUB_STEP_SUMMARY": str(summary)}
+                da.deliver(message, env, opener=self.opener)
+                decoded = json.loads(html.unescape(summary.read_text())
+                                     .removeprefix("<pre>").removesuffix("</pre>\n"))
+                self.assertEqual(decoded["allowed_mentions"]["users"],
+                                 ["[Discord user]", "[Discord user]"])
+                self.assertEqual(decoded["content"].splitlines()[0],
+                                 "[Discord user] [Discord user]")
+                self.assertEqual(decoded["content"].splitlines()[2],
+                                 "[Discord user] [Discord user]")
+                self.assertEqual(json.dumps(message), original)
+                self.assertEqual(self.requests, [])
+
     def test_live_team_pm_fallback_and_shadow_routes(self):
         for pm, extra, expected in [
             (False, {}, WEBHOOK), (True, {}, WEBHOOK),

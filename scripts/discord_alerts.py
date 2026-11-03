@@ -185,12 +185,18 @@ def deliver(message: dict, env, *, pm: bool = False,
             summary = env.get("GITHUB_STEP_SUMMARY")
             if not summary:
                 raise Error("Shadow summary path missing")
-            summary_message = re.sub(r"<@!?[0-9]+>", "[Discord user]",
-                                     json.dumps(message, ensure_ascii=False))
-            for uid in message["allowed_mentions"]["users"]:
-                summary_message = summary_message.replace(uid, "[Discord user]")
+            users = message["allowed_mentions"]["users"]
+            summary_message = {**message, "allowed_mentions": {
+                **message["allowed_mentions"], "users": ["[Discord user]"] * len(users)}}
+            pattern = r"<@!?[0-9]+>"
+            if users:
+                pattern += (r"|(?<![0-9])(?:" +
+                            "|".join(re.escape(uid) for uid in sorted(users, key=len, reverse=True)) +
+                            r")(?![0-9])")
+            summary_message["content"] = re.sub(pattern, "[Discord user]", message["content"])
             with Path(summary).open("a", encoding="utf-8") as stream:
-                stream.write("<pre>" + html.escape(summary_message) + "</pre>\n")
+                stream.write("<pre>" + html.escape(json.dumps(summary_message, ensure_ascii=False)) +
+                             "</pre>\n")
             print("Shadow message written to step summary")
             return
     else:
