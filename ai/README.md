@@ -100,6 +100,26 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 공식 참고: [Transformers 오프라인 설치](https://huggingface.co/docs/transformers/v4.57.1/installation), [모델 카드](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct).
 
+## 개인화 API 준비 (#78)
+
+기존 표준 라이브러리 기반 loopback 서버에 `POST /v1/persona/generate` 경로를 추가했습니다. 현재 운영용 생성기는 의도적으로 제외되어 있어 유효한 개인화 요청에는 `503 MODEL_NOT_READY`를 반환합니다. 기존 baseline 경로는 그대로 동작하며 개인화 요청 실패 시 baseline으로 자동 전환(fallback)하지 않습니다. `PersonaGenerator` 명시적 주입은 로컬 테스트용 접점(seam)일 뿐 CLI를 통한 운영 활성화 수단이 아닙니다. 모델 ID와 리비전은 기존 `REPLICA_MODEL_ID` 및 `REPLICA_MODEL_REVISION` 환경 변수 재정의 방식을 유지합니다.
+
+주요 구성과 미결 사항은 다음과 같습니다.
+
+- `persona_contract.py`: PR #75 초안의 개인화 필드명과 근거 발화자(speaker) 역할을 분리해 관리합니다.
+- `rag/retrieval_v2.py`: #59의 호출자 측 순수 이식 버전으로, 사전 인가된 청크와 외부에서 주입된 정규화 `float32` 배열 및 토큰 카운터만 사용하며 인코더나 DB 연동은 포함하지 않습니다.
+- `persona.json`: KURE 리비전, 임계값 `0.5458711981773378`, `k=3`·`window=3`·`budget=2000` 설정 및 참조 예산 토크나이저를 기록하며 이는 서비스 모델 확정과는 무관합니다.
+- 미결 사항: Q1(가드 정체성 입력), Q2/Q13(모델 출력 프로토콜 및 토큰 예산), Q14(가드 치환과 종료 사유)는 아직 확정되지 않았으며 이슈 전체가 완료된 것은 아닙니다.
+
+### 검증
+
+```bash
+python3 -m unittest discover -s ai/tests -v
+```
+
+- 고정 벡터 검색 테스트에서만 기존 설치된 NumPy를 사용하며 서버 코드는 NumPy를 임포트하지 않습니다.
+- 테스트는 가짜(fake) 생성기와 실제 로컬 HTTP 호출로 동작을 검증하며 GPU 실행·신규 의존성 설치·DB 및 인코더 상태나 실제 배포를 증명하지는 않습니다.
+
 ## 학교 GPU baseline HTTP API (#43)
 
 `src/server.py`는 표준 라이브러리 `ThreadingHTTPServer`로 `POST /v1/baseline/generate`를 제공합니다. `src/inference.py`가 이력 축소와 생성을 맡으며 CLI의 환경 검사·로더를 재사용합니다. 새 런타임 의존성은 없습니다.
