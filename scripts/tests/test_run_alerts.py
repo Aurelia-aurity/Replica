@@ -50,13 +50,23 @@ def zipped(value, *, filename=nr.FILE_NAME):
 class API:
     """In-memory read-only counterpart of the API endpoints used by run alerts."""
 
-    def __init__(self, history=(), reports=None, *, pulls=(), author="author", attempts=None):
+    def __init__(self, history=(), reports=None, *, pulls=(), author="author", attempts=None,
+                 tag_main=False):
         self.history = list(history)
         self.reports = reports or {}
         self.pulls = pulls
         self.author = author
         self.attempts = attempts or {}
+        self.tag_main = tag_main
         self.calls = []
+
+    def exists(self, path):
+        self.calls.append(("GET", path))
+        if path != f"/repos/{da.REPO}/git/ref/tags/main":
+            raise AssertionError(path)
+        if isinstance(self.tag_main, da.Error):
+            raise self.tag_main
+        return self.tag_main
 
     def pages(self, path, key=None):
         self.calls.append(("GET", path))
@@ -321,6 +331,100 @@ class RunAlerts(unittest.TestCase):
                 messages = self.send_run(current)
                 self.assertEqual(len(messages), 1)
                 self.assertTrue(messages[0][1])
+
+    def test_tag_qualified_current_producer_cannot_alert_or_use_its_report(self):
+        for path in (".github/workflows/notion-sync.yml",
+                     ".github/workflows/notion-sync-request.yml"):
+            for conclusion in ("failure", "success"):
+                with self.subTest(path=path, conclusion=conclusion):
+                    current = sync(conclusion=conclusion)
+                    current.update(event="workflow_dispatch", path=path + "@refs/tags/main")
+                    messages = self.send_run(current, [sync(9)], {
+                        10: report(10, [(888, "FORGED_HOLD")]),
+                        9: report(9, [(79, "REAL_HOLD")])})
+                    self.assertEqual(messages, [])
+                    self.assertEqual(self.api.calls, [])
+
+    def test_nonmain_qualified_ref_is_rejected_for_main_only_sync_events(self):
+        for event_name in ("schedule", "issues", "workflow_dispatch"):
+            for ref in ("refs/tags/main", "refs/heads/feature", ""):
+                with self.subTest(event=event_name, ref=ref):
+                    current = sync(conclusion="failure")
+                    current.update(event=event_name,
+                                   path=".github/workflows/notion-sync.yml@" + ref)
+                    self.assertEqual(self.send_run(current), [])
+                    self.assertEqual(self.api.calls, [])
+
+    def test_tag_qualified_failure_does_not_suppress_trusted_failure(self):
+        tagged = sync(10, conclusion="failure")
+        tagged.update(event="workflow_dispatch",
+                      path=".github/workflows/notion-sync.yml@refs/tags/main")
+        messages = self.send_run(sync(11, conclusion="failure"), [tagged, sync(9)])
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages[0][1])
+
+    def test_tag_qualified_report_is_not_a_hold_baseline(self):
+        tagged = sync(10)
+        tagged.update(event="workflow_dispatch",
+                      path=".github/workflows/notion-sync.yml@refs/tags/main")
+        messages = self.send_run(sync(11), [tagged, sync(9)], {
+            11: report(11, [(79, "REAL_HOLD")]), 10: report(10),
+            9: report(9, [(79, "REAL_HOLD")])})
+        self.assertEqual(messages, [])
+        self.assertNotIn(("GET", f"/repos/{da.REPO}/actions/runs/10/artifacts"), self.api.calls)
+        self.assertIn(("GET", f"/repos/{da.REPO}/actions/runs/9/artifacts"), self.api.calls)
+
+    def test_tag_qualified_attempt_cannot_establish_failure_streak(self):
+        tagged = sync(conclusion="failure")
+        tagged.update(event="workflow_dispatch",
+                      path=".github/workflows/notion-sync.yml@refs/tags/main")
+        api = API([sync(9)], attempts={1: tagged})
+        messages = self.send_run(sync(run_attempt=2, conclusion="failure"), api=api)
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages[0][1])
+
+    def test_bare_dispatch_requires_absence_of_tag_named_main(self):
+        for path in (".github/workflows/notion-sync.yml",
+                     ".github/workflows/notion-sync-request.yml"):
+            for tag_main in (True, False):
+                with self.subTest(path=path, tag_main=tag_main):
+                    current = sync(conclusion="failure")
+                    current.update(event="workflow_dispatch", path=path)
+                    api = API(tag_main=tag_main)
+                    messages = self.send_run(current, api=api)
+                    self.assertEqual(len(messages), 0 if tag_main else 1)
+                    self.assertEqual(api.calls[0],
+                                     ("GET", f"/repos/{da.REPO}/git/ref/tags/main"))
+
+    def test_explicit_main_branch_dispatch_needs_no_tag_lookup(self):
+        current = sync(conclusion="failure")
+        current.update(event="workflow_dispatch",
+                       path=".github/workflows/notion-sync.yml@refs/heads/main")
+        api = API(tag_main=True)
+        self.assertEqual(len(self.send_run(current, api=api)), 1)
+        self.assertNotIn(("GET", f"/repos/{da.REPO}/git/ref/tags/main"), api.calls)
+
+    def test_pull_request_target_retains_qualified_pr_head_exception(self):
+        current = sync(conclusion="failure")
+        current.update(event="pull_request_target", head_branch="feature", head_sha="b" * 40,
+                       path=".github/workflows/notion-sync.yml@refs/heads/feature")
+        api = API(tag_main=True)
+        self.assertEqual(len(self.send_run(current, api=api)), 1)
+        self.assertNotIn(("GET", f"/repos/{da.REPO}/git/ref/tags/main"), api.calls)
+
+    def test_transient_tag_lookup_error_fails_run_without_a_notice(self):
+        current = sync(conclusion="failure")
+        current["event"] = "workflow_dispatch"
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "event.json"
+            source.write_text(json.dumps({"repository": {"full_name": da.REPO},
+                                          "workflow_run": current}))
+            env = {**ENV, "GITHUB_EVENT_PATH": str(source), "GITHUB_REPOSITORY": da.REPO}
+            sent = []
+            status = ra.main(env, client=API(tag_main=da.Error("GitHub API request failed")),
+                             send=lambda message, env, pm=False: sent.append(message))
+            self.assertEqual(status, 1)
+            self.assertEqual(sent, [])
 
     def test_untrusted_attempt_cannot_suppress_failure_on_trusted_rerun(self):
         forged = sync(conclusion="failure")

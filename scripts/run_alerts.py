@@ -31,9 +31,9 @@ def repository_identity(repo) -> bool:
             repo.get("full_name") == REPO)
 
 
-def trusted_sync_producer(run: dict) -> bool:
+def trusted_sync_producer(run: dict, api: Client) -> bool:
     """Display names and report JSON cannot authenticate a privileged producer."""
-    path = run.get("path", "").split("@", 1)[0]
+    path, qualified, ref = run.get("path", "").partition("@")
     if (path not in SYNC_PATHS or not repository_identity(run.get("repository")) or
             not repository_identity(run.get("head_repository"))):
         return False
@@ -42,16 +42,25 @@ def trusted_sync_producer(run: dict) -> bool:
         # This API metadata describes the PR head, not the base-code checkout.
         if event == "pull_request_target":
             return True
-        return event in {"schedule", "issues", "workflow_dispatch"} and run["head_branch"] == "main"
-    return event == "workflow_dispatch" and run["head_branch"] == "main"
+        if event not in {"schedule", "issues", "workflow_dispatch"}:
+            return False
+    elif event != "workflow_dispatch":
+        return False
+    if run["head_branch"] != "main":
+        return False
+    if qualified:
+        return ref == "refs/heads/main"
+    if event == "workflow_dispatch":
+        return not api.exists(f"/repos/{REPO}/git/ref/tags/main")
+    return True
 
 
-def scope(run: dict, ci_names: list[str]) -> str | None:
+def scope(run: dict, ci_names: list[str], api: Client) -> str | None:
     if not repository_identity(run.get("repository")):
         return None
     name = workflow_name(run)
     if name in SYNC_PATHS.values():
-        return "sync" if trusted_sync_producer(run) else None
+        return "sync" if trusted_sync_producer(run, api) else None
     if name not in ci_names:
         return None
     if (run["event"] == "push" and run["head_branch"] == "main" and
@@ -72,7 +81,7 @@ def earlier_runs(api: Client, run: dict, selected: str):
                 previous["run_number"] >= run["run_number"] or
                 previous["status"] != "completed" or
                 previous["workflow_id"] != run["workflow_id"] or
-                scope(previous, [workflow_name(run)]) != selected):
+                scope(previous, [workflow_name(run)], api) != selected):
             continue
         if selected == "pr" and previous["head_branch"] != run["head_branch"]:
             continue
@@ -175,7 +184,7 @@ def notify_run(run: dict, api: Client, env, *, send=deliver) -> None:
     ci_names = json.loads(env.get("DISCORD_CI_WORKFLOWS") or '["CI", "Backend tests"]')
     if not isinstance(ci_names, list) or any(not isinstance(n, str) for n in ci_names):
         raise Error("Invalid CI workflow names")
-    selected = scope(run, ci_names)
+    selected = scope(run, ci_names, api)
     conclusion = run["conclusion"]
     if selected is None or conclusion not in FAILURES | {"success"}:
         print("Workflow outcome or scope ignored")
@@ -191,7 +200,7 @@ def notify_run(run: dict, api: Client, env, *, send=deliver) -> None:
                 previous["conclusion"] not in {"cancelled", "skipped"} and
                 previous["id"] == run["id"] and
                 previous["workflow_id"] == run["workflow_id"] and
-                scope(previous, ci_names) == selected):
+                scope(previous, ci_names, api) == selected):
             break
     else:
         previous = next(earlier_runs(api, run, selected), None)

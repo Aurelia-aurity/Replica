@@ -8,6 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from functools import cache
 
 REPO = "Aurelia-aurity/Replica"
 PROJECT_URL = "https://github.com/users/Just-Simple0/projects/4/views/1"
@@ -16,6 +17,10 @@ MAX_DOWNLOAD = 4_000_000
 
 class Error(RuntimeError):
     """A safe-to-log notification error (never contains a credential or URL)."""
+
+
+class NotFound(Error):
+    """The GitHub API explicitly returned HTTP 404."""
 
 
 def escape(text: str, limit: int = 200) -> str:
@@ -90,7 +95,10 @@ class Client:
             with self.opener(request, timeout=30) as response:
                 data = response.read(MAX_DOWNLOAD + 1)
         except urllib.error.HTTPError as exc:
+            status = exc.code
             exc.close()
+            if status == 404:
+                raise NotFound("GitHub API request failed") from None
             raise Error("GitHub API request failed") from None
         except (urllib.error.URLError, OSError):
             raise Error("GitHub API request failed") from None
@@ -100,6 +108,15 @@ class Client:
 
     def get(self, path: str):
         return json.loads(self.download(path))
+
+    @cache
+    def exists(self, path: str) -> bool:
+        """Cache existence for this process's client; only a real 404 means absent."""
+        try:
+            self.download(path)
+        except NotFound:
+            return False
+        return True
 
     def pages(self, path: str, key: str | None = None):
         page = 1

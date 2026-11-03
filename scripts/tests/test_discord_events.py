@@ -301,6 +301,46 @@ class Delivery(unittest.TestCase):
 
 
 class GitHubClient(unittest.TestCase):
+    def test_ref_existence_distinguishes_404_and_caches_completed_results(self):
+        path = f"/repos/{da.REPO}/git/ref/tags/main"
+        for status, expected in ((404, False), (200, True)):
+            with self.subTest(status=status):
+                calls, bodies = [], []
+
+                def opener(request, timeout):
+                    calls.append(request)
+                    body = io.BytesIO(b'{"ref":"refs/tags/main"}')
+                    bodies.append(body)
+                    if status == 404:
+                        raise urllib.error.HTTPError(request.full_url, status, "SECRET", {}, body)
+                    return body
+
+                client = da.Client("synthetic-token", opener=opener)
+                results = [client.exists(path), client.exists(path)]
+                self.assertEqual(results, [expected, expected])
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0].full_url, "https://api.github.com" + path)
+                self.assertEqual(calls[0].get_method(), "GET")
+                self.assertTrue(all(body.closed for body in bodies))
+
+    def test_ref_lookup_errors_raise_safe_error_instead_of_implying_absence(self):
+        path = f"/repos/{da.REPO}/git/ref/tags/main"
+        for status in (403, 429, 503, None):
+            with self.subTest(status=status):
+                body = io.BytesIO(b"SECRET")
+                self.addCleanup(body.close)
+
+                def opener(request, timeout):
+                    if status is None:
+                        raise urllib.error.URLError("SECRET")
+                    raise urllib.error.HTTPError(request.full_url, status, "SECRET", {}, body)
+
+                with self.assertRaises(da.Error) as error:
+                    da.Client("SECRET", opener=opener).exists(path)
+                self.assertNotIn("SECRET", str(error.exception))
+                if status is not None:
+                    self.assertTrue(body.closed)
+
     def test_paginated_reviews_and_authenticated_get_only(self):
         calls = []
 
