@@ -13,6 +13,7 @@ from functools import cache
 REPO = "Aurelia-aurity/Replica"
 PROJECT_URL = "https://github.com/users/Just-Simple0/projects/4/views/1"
 MAX_DOWNLOAD = 4_000_000
+USER_AGENT = "Replica-notifications"
 
 
 class Error(RuntimeError):
@@ -88,6 +89,7 @@ class Client:
         if not path.startswith(f"/repos/{REPO}/"):
             raise Error("Invalid GitHub API path")
         request = urllib.request.Request("https://api.github.com" + path, headers={
+            "User-Agent": USER_AGENT,
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28"})
@@ -151,7 +153,8 @@ def post(url: str, message: dict, *, opener=urllib.request.urlopen,
     for attempt in range(3):
         request = urllib.request.Request(target, method="POST",
                                          data=json.dumps(message).encode(),
-                                         headers={"Content-Type": "application/json"})
+                                         headers={"Content-Type": "application/json",
+                                                  "User-Agent": USER_AGENT})
         try:
             with opener(request, timeout=30) as response:
                 response.read()

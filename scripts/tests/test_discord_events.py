@@ -146,6 +146,27 @@ class Events(unittest.TestCase):
         with self.assertRaises(da.Error):
             self.message(event("synchronize"), api=API(error=True))
 
+    def test_github_api_request_has_explicit_user_agent(self):
+        requests = []
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, limit):
+                return b"{}"
+
+        def opener(request, timeout):
+            requests.append(request)
+            return Response()
+
+        client = da.Client("token", opener=opener)
+        self.assertEqual(client.download(f"/repos/{da.REPO}/pulls/79"), b"{}")
+        self.assertEqual(requests[0].get_header("User-agent"), da.USER_AGENT)
+
     def test_main_modes_and_failure_exit(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "event.json"
@@ -263,6 +284,7 @@ class Delivery(unittest.TestCase):
                 request, timeout = self.requests[-1]
                 self.assertEqual(request.full_url, expected + "?wait=true")
                 self.assertEqual(json.loads(request.data), self.message)
+                self.assertEqual(request.get_header("User-agent"), da.USER_AGENT)
                 self.assertEqual(timeout, 30)
 
     def test_retry_429_and_5xx_bounded_with_injected_sleep(self):
