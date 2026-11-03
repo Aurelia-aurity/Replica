@@ -1,0 +1,36 @@
+name: GitHub → Discord events
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  pull_request_target:
+    branches: [main]
+    types: [opened, closed, reopened, ready_for_review, review_requested, synchronize]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  notify:
+    if: github.repository == 'Aurelia-aurity/Replica'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Never check out or execute the PR head.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Send payload notification
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DISCORD_USER_MAP: ${{ vars.DISCORD_USER_MAP }}
+          DISCORD_EVENTS_MODE: ${{ vars.DISCORD_EVENTS_MODE }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_SHADOW_WEBHOOK_URL: ${{ secrets.DISCORD_SHADOW_WEBHOOK_URL }}
+        run: python3 -B scripts/discord_events.py
