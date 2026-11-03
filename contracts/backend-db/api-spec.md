@@ -77,7 +77,7 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 |---|---|---|---|
 | `get_personalization_input` | `persona_id: UUID` | `dict` | `{source_revision: int, sources: list[Row]}`. 현재 확정·`ready` 자료만 포함 |
 | `get_current_style_profile` | `persona_id: UUID` | `Row \| None` | `ready` 프로필만 |
-| `publish_style_profile` | `persona_id: UUID`, `*`, `source_revision: int`, `content: dict`, `model_name: str`, `source_ids: Sequence[UUID]` | `Row` | 자료 수집 때 얻은 `source_revision`과 출처를 함께 검증. 입력이 바뀌었으면 거부하고 다시 생성. 자료 변경 시 이전 프로필은 `stale` |
+| `publish_style_profile` | `persona_id: UUID`, `*`, `source_revision: int`, `content: dict`, `model_name: str`, `source_ids: Sequence[UUID]` | `Row` | 자료 수집 때 얻은 `source_revision`과 출처를 함께 검증. 입력이 바뀌었으면 `ConflictError`로 거부하며, 이전 분석 결과를 새 자료 개정으로 바꿔 저장하지 않음. 자동으로 다시 분석하지 않고 사용자 재요청으로 새로 시작함 (`contracts/backend-ai/api-spec.md` 2장). 자료 변경 시 이전 프로필은 `stale` |
 | `save_record_chunks` | `text_version_id: UUID`, `*`, `embedding_model: str`, `chunks: Sequence[ChunkInput]` | `list[Row]` | 확정 자료의 조각을 일괄 INSERT. 1회 요청으로 원자적 저장. 미확정 자료는 거부 |
 | `search_record_chunks` | `persona_id: UUID`, `*`, `embedding_model: str`, `query_embedding: Sequence[float]`, `limit: int = 10`, `min_similarity: float = 0.5` | `list[Row]` | 사용자·대화 상대·모델·차원을 먼저 제한한 뒤 유사도 검색. 반환 행: `chunk_id`, `record_id`, `text_version_id`, `content`, `similarity`. 이전 확정본·삭제 중 기록은 제외 |
 
@@ -201,6 +201,8 @@ DB 함수가 돌려주는 JSON dict의 키입니다. 앱에 보내는 필드는 
 | stt_attempt, llm_attempt, tts_attempt | integer | 단계별 시도 번호 |
 | stt_started_at, llm_started_at, tts_started_at | datetime \| null | 단계 시작 시각 |
 | model_name | string \| null | 모델 이름 |
+| llm_request_id | uuid \| null | 가장 최근 LLM 시도의 AI 요청 ID. `start_chat_stage(request_id)`로 AI 호출 전에 기록하고 같은 값으로 마무리함. 다른 턴과 겹칠 수 없고, 새 LLM 시도를 시작하면 비워지며, 답변이 완료되면 바꿀 수 없음. **앱에 보내지 않음** |
+| finish_reason | string \| null | LLM 성공 때 저장하는 종료 사유 `stop` · `length`(둘 다 성공). 답변이 완료(`done`)된 턴에만 값이 있고, 새 LLM 시도를 시작하면 비워짐. 앱 턴 객체의 `finish_reason`으로 **제공(제안)** |
 | stt_ms, llm_ms, tts_ms, total_ms | integer \| null | 소요 시간(ms). `stt_ms`는 음성 턴에서만 |
 | error_message | string \| null | 실패 코드 |
 | created_at, updated_at | datetime | 생성·수정 시각 |
@@ -300,23 +302,29 @@ DB 모듈이 어떤 조건에서 어떤 예외를 던지는지 코드 기준으�
 
 ### 앱에 보내는 오류
 
-| DB 예외 | DB 코드 | 발생 상황 (발생 함수) | 앱에 보내는 HTTP | 앱 `code` | 앱 `message` | `retryable` | 앱 동작 |
-|---|---|---|---|---|---|---|---|
-| `ValidationError` | 위 규칙 | **앱이 보낸 값**이 잘못됨: UUID·시간 형식, 비어 있는 문자열, 길이·개수 한도 초과, 미래 시각 등 (모든 함수) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | false | 입력 수정 후 다시 전송 |
-| `ValidationError` | 위 규칙 | **백엔드가 만든 인자**가 잘못됨: 허용되지 않는 상태 전이, 잘못된 단계 이름 등 호출 오류 | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록 |
-| `ConflictError` | `22023` (`create_chat_turn`만) | **같은 `turn_id`에 다른 입력**을 보냄 (요청 ID 재사용) | 409 | `TURN_ID_CONFLICT` | `같은 요청 번호로 다른 내용을 보낼 수 없어요. 새로 전송해 주세요.` | false | 새 `turn_id`를 만들어 다시 전송 |
-| `AuthenticationError` | - | 토큰이 없거나 잘못됨·만료 (`for_user`) | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | false | 로그인 화면으로 이동 |
-| `NotFoundError` | `P0002` | 대상이 없거나, 다른 사용자 소유이거나, 삭제 중이라 보이지 않음. `get_*`, `create_session`의 대화 상대, `create_chat_turn`·`list_turns`·`delete_session_rows`의 대화방, 삭제 중인 기록(`get_record`). **없음과 남의 것을 구분하지 않음** | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | false | 목록 새로고침 |
-| `ConflictError` | `55000` | 이미 실행 중이거나 끝난 단계를 다시 시작 (`start_chat_stage`), 이전 시도의 늦은 결과 저장 (`finish_chat_stage`), `request_id`로 연결된 LLM 시도를 `request_id` 없이 마무리 (`finish_chat_stage`, 백엔드 호출 오류) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 턴 상태 다시 조회 |
-| `ConflictError` | 코드 없음 (수정 대상 행이 비어 있음) | 기록의 현재 상태가 `expected_status`와 다름 (`update_record_status`), 삭제하려던 대화방이 이미 사라짐 (`delete_session_rows`) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 기록·대화 상태 다시 조회 |
-| `ConflictError` | 코드 없음 | 전사문 수정 시 `draft`가 아니거나 수정 시각이 다름 (`edit_text_draft`) | 409 | `EDIT_CONFLICT` | `다른 곳에서 먼저 수정되었거나 이미 확정된 내용이에요. 최신 내용을 불러와 확인해 주세요.` | false | 최신 내용을 불러오고 입력한 내용은 유지 |
-| `ConflictError` | `23505` (`23503`) | 이미 있는 `revision` 또는 ID로 생성 (`create_text_draft`, 일반 생성 함수의 중복 INSERT) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 ID로 먼저 조회 |
-| `ConflictError` | `55000` | 입력이 바뀐 뒤 프로필 발행 (`publish_style_profile`의 `source_revision` 불일치) | - | - | 앱에 전달하지 않음 | - | 서버가 프로필을 다시 생성 |
-| `PermissionDeniedError` | HTTP 403, `42501` | DB 권한 설정과 서버 설정 불일치 | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록, 경보 |
-| `DatabaseUnavailableError` | HTTP 429·5xx 등 | 연결 실패, 타임아웃(기본 10초), 일시적 서비스 오류. **쓰기 성공 여부가 불명확할 수 있음** (`outcome_unknown`) | 503 | `DB_UNAVAILABLE` | `일시적으로 저장소에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.` | true | 같은 ID(`turn_id` 등)로 재조회해 저장 여부를 확인한 뒤 판단 |
-| `DatabaseError` | 그 밖 | 그 밖의 DB·응답 오류 (SQL 원문·개인 데이터·비밀 값 대신 안전한 메시지와 코드만 제공) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록 |
+아래 표는 DB 오류 어댑터(`backend/app/db/http_errors.py`의 `to_http_error`)가 따르는 규칙과 이 문서가 제안하는 변환을 함께 적은 것입니다. 마지막 열은 **현재 HTTP API**(`main`의 `backend/app/core/errors.py`)가 실제로 그렇게 변환하는지를 구분합니다.
 
-`ValidationError`는 DB 문서에서 "400 또는 422 매핑 후보"로 적혀 있어, 앱 입력이 원인이면 422, 백엔드가 만든 인자가 원인이면 500으로 정리했습니다. `NotFoundError`는 404, `ConflictError`는 409로 문서에 명시되어 있습니다.
+- **구현**: 현재 HTTP API가 표의 변환대로 응답함
+- **규칙 구현, API 미구현**: 변환은 적용되지만 그 오류를 내는 API가 아직 없음
+- **미연결**: 어댑터에는 규칙이 있거나 이 문서가 제안하지만 HTTP API에는 연결하지 않음. 제안·후속 연동
+
+| DB 예외 | DB 코드 | 발생 상황 (발생 함수) | 앱에 보내는 HTTP | 앱 `code` | 앱 `message` | `retryable` | 앱 동작 | 현재 HTTP API |
+|---|---|---|---|---|---|---|---|---|
+| `ValidationError` | 위 규칙 | **앱이 보낸 값**이 잘못됨: UUID·시간 형식, 비어 있는 문자열, 길이·개수 한도 초과, 미래 시각 등 (모든 함수) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | false | 입력 수정 후 다시 전송 | 구현 (현재는 모든 `ValidationError`를 이 행처럼 422로 보냄) |
+| `ValidationError` | 위 규칙 | **백엔드가 만든 인자**가 잘못됨: 허용되지 않는 상태 전이, 잘못된 단계 이름 등 호출 오류 | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록 | 미연결 (HTTP API는 이 경우도 422로 보냄. 500으로 나누는 규칙은 어댑터에만 있음. 후속 연동) |
+| `ConflictError` | `22023` (`create_chat_turn`만) | **같은 `turn_id`에 다른 입력**을 보냄 (요청 ID 재사용) | 409 | `TURN_ID_CONFLICT` | `같은 요청 번호로 다른 내용을 보낼 수 없어요. 새로 전송해 주세요.` | false | 새 `turn_id`를 만들어 다시 전송 | 구현 |
+| `AuthenticationError` | - | 토큰이 없거나 잘못됨·만료 (`for_user`) | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | false | 로그인 화면으로 이동 | 구현 |
+| `NotFoundError` | `P0002` | 대상이 없거나, 다른 사용자 소유이거나, 삭제 중이라 보이지 않음. `get_*`, `create_session`의 대화 상대, `create_chat_turn`·`list_turns`·`delete_session_rows`의 대화방, 삭제 중인 기록(`get_record`). **없음과 남의 것을 구분하지 않음** | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | false | 목록 새로고침 | 구현 |
+| `ConflictError` | `55000` | 이미 실행 중이거나 끝난 단계를 다시 시작 (`start_chat_stage`), 이전 시도의 늦은 결과 저장 (`finish_chat_stage`), `request_id`로 연결된 LLM 시도를 `request_id` 없이 마무리 (`finish_chat_stage`, 백엔드 호출 오류) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 턴 상태 다시 조회 | 구현 |
+| `ConflictError` | 코드 없음 (수정 대상 행이 비어 있음) | 기록의 현재 상태가 `expected_status`와 다름 (`update_record_status`), 삭제하려던 대화방이 이미 사라짐 (`delete_session_rows`) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 기록·대화 상태 다시 조회 | 규칙 구현, API 미구현 (`update_record_status`·`delete_session_rows`를 쓰는 API 없음) |
+| `ConflictError` | 코드 없음 | 전사문 수정 시 `draft`가 아니거나 수정 시각이 다름 (`edit_text_draft`) | 409 | `EDIT_CONFLICT` | `다른 곳에서 먼저 수정되었거나 이미 확정된 내용이에요. 최신 내용을 불러와 확인해 주세요.` | false | 최신 내용을 불러오고 입력한 내용은 유지 | 미연결 (`EDIT_CONFLICT`는 HTTP API에 없음. `edit_text_draft`를 쓰는 API도 없음. 제안·후속 연동) |
+| `ConflictError` | `23505` (`23503`) | 이미 있는 `revision` 또는 ID로 생성 (`create_text_draft`, 일반 생성 함수의 중복 INSERT) | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | false | 해당 ID로 먼저 조회 | 구현 (예: 같은 `persona_id`로 대화 상대 생성은 409 `CONFLICT`) |
+| `ConflictError` | `55000` | 입력이 바뀐 뒤 프로필 발행 (`publish_style_profile`의 `source_revision` 불일치) | - | - | 미정 | - | 프로필을 발행하지 않음. 자동 재분석 없이 사용자 재요청으로 새 자료 개정에서 처음부터 분석 (`contracts/backend-ai/api-spec.md` 2장). 앱에 알리는 방식은 미정이며 #10(전사문 확정·프로필 생성 상태 표시) 구현 때 앱·백엔드 담당이 정함 | 미연결 (`publish_style_profile`을 쓰는 API 없음. 고도화 1) |
+| `PermissionDeniedError` | HTTP 403, `42501` | DB 권한 설정과 서버 설정 불일치 | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록, 경보 | 구현 |
+| `DatabaseUnavailableError` | HTTP 429·5xx 등 | 연결 실패, 타임아웃(기본 10초), 일시적 서비스 오류. **쓰기 성공 여부가 불명확할 수 있음** (`outcome_unknown`) | 503 | `DB_UNAVAILABLE` | `일시적으로 저장소에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.` | true | 같은 ID(`turn_id` 등)로 재조회해 저장 여부를 확인한 뒤 판단 | 구현 |
+| `DatabaseError` | 그 밖 | 그 밖의 DB·응답 오류 (SQL 원문·개인 데이터·비밀 값 대신 안전한 메시지와 코드만 제공) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | false | 원인은 서버 로그에만 기록 | 구현 |
+
+`ValidationError`는 DB 문서에서 "400 또는 422 매핑 후보"로 적혀 있어, 앱 입력이 원인이면 422, 백엔드가 만든 인자가 원인이면 500으로 정리했습니다. 다만 현재 HTTP API는 둘을 나누지 않고 모두 422로 보냅니다(위 표의 마지막 열). `NotFoundError`는 404, `ConflictError`는 409로 문서에 명시되어 있습니다.
 
 같은 `turn_id`에 다른 입력은 DB가 `22023`으로 알리지만 모듈이 `ConflictError`로 바꿔 던집니다. 같은 `ConflictError`라도 코드가 `22023`이면 앱에는 `TURN_ID_CONFLICT`로 구분해 보냅니다.
 
