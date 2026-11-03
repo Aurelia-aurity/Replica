@@ -11,6 +11,7 @@ import 'package:mobile/chat/voice_screen.dart';
 import 'package:mobile/history/conversation.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/history/history_screen.dart';
+import 'package:mobile/home/home_screen.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/backend_service.dart';
 
@@ -100,6 +101,42 @@ class DetailedDeferredHistory extends DeferredHistory
       throw UnsupportedError('No speech in retry tests');
 }
 
+class PersonaHistory extends TestHistory implements PersonaConversationService {
+  final availablePersonas = const [
+    ConversationPersona(id: 'persona-1', name: '엄마'),
+    ConversationPersona(id: 'persona-2', name: '아빠'),
+  ];
+  String? selectedPersonaId;
+
+  @override
+  Future<List<ConversationPersona>> personas() async => availablePersonas;
+
+  @override
+  Future<Conversation> createForPersona(
+    String personaId,
+    DateTime acknowledgedAt, {
+    bool voice = false,
+  }) async {
+    selectedPersonaId = personaId;
+    creates++;
+    createdVoice = voice;
+    final persona = availablePersonas.singleWhere(
+      (item) => item.id == personaId,
+    );
+    final item = Conversation(
+      id: 'selected-$creates',
+      personaId: persona.id,
+      personaName: persona.name,
+      createdAt: acknowledgedAt,
+      updatedAt: acknowledgedAt,
+      acknowledgedAt: acknowledgedAt,
+      initialVoice: voice,
+    );
+    items.add(item);
+    return item;
+  }
+}
+
 Conversation conversation({
   String id = 'session-1',
   DateTime? date,
@@ -127,13 +164,17 @@ Conversation conversation({
   );
 }
 
-Map<String, dynamic> sessionJson(String id) => {
+Map<String, dynamic> sessionJson(
+  String id, {
+  String acknowledgedAt = '2026-10-28T01:00:00Z',
+  String personaId = 'persona-1',
+}) => {
   'id': id,
-  'persona_id': 'persona-1',
+  'persona_id': personaId,
   'title': null,
   'created_at': '2026-10-28T01:00:00Z',
   'updated_at': '2026-10-28T02:00:00Z',
-  'ai_notice_ack_at': '2026-10-28T01:00:00Z',
+  'ai_notice_ack_at': acknowledgedAt,
 };
 Map<String, dynamic> turnJson(int number) => {
   'turn_id': 'turn-$number',
@@ -203,6 +244,26 @@ void main() {
     },
   );
 
+  testWidgets('selected persona id and display name stay connected', (
+    tester,
+  ) async {
+    final service = PersonaHistory();
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(history: service)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('persona-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('아빠').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('텍스트로 대화'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('대화 시작'));
+    await tester.pumpAndSettle();
+    expect(service.selectedPersonaId, 'persona-2');
+    expect(find.text('아빠'), findsOneWidget);
+  });
+
   test('HTTP empty sessions retain their initial mode without adding draft API fields', () async {
     final auth = TestAuth();
     addTearDown(auth.dispose);
@@ -214,8 +275,10 @@ void main() {
       if (request.url.path == '/personas') {
         return jsonResponse({
           'items': [
-            {'id': 'persona-1', 'status': 'active'},
+            {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
           ],
+          'limit': 100,
+          'offset': 0,
         });
       }
       if (request.method == 'POST') {
@@ -225,7 +288,13 @@ void main() {
           'session_id',
           'ai_notice_ack_at',
         });
-        return jsonResponse(sessionJson('voice-session'), status: 201);
+        return jsonResponse(
+          sessionJson(
+            'voice-session',
+            acknowledgedAt: body['ai_notice_ack_at'] as String,
+          ),
+          status: 201,
+        );
       }
       if (request.url.path.endsWith('/turns')) {
         return jsonResponse({'items': [], 'limit': 100, 'after_turn_no': 0});
@@ -258,6 +327,68 @@ void main() {
     expect((await memory.get(voice.id)).lastVoice, true);
   });
 
+  test(
+    'HTTP session uses selected persona and confirms stored AI notice time',
+    () async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      var mismatch = false;
+      final client = MockClient((request) async {
+        if (request.url.path == '/personas') {
+          return jsonResponse({
+            'items': [
+              {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
+              {'id': 'persona-2', 'name': '아빠', 'status': 'active'},
+            ],
+            'limit': 100,
+            'offset': 0,
+          });
+        }
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['persona_id'], 'persona-2');
+        final acknowledgedAt = DateTime.parse(
+          body['ai_notice_ack_at'] as String,
+        );
+        return jsonResponse(
+          sessionJson(
+            'selected-session',
+            personaId: 'persona-2',
+            acknowledgedAt:
+                (mismatch
+                        ? acknowledgedAt.add(const Duration(seconds: 1))
+                        : acknowledgedAt)
+                    .toIso8601String(),
+          ),
+          status: 201,
+        );
+      });
+      addTearDown(client.close);
+      final service = HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+      );
+      final acknowledgedAt = DateTime.parse('2026-11-04T01:23:45+09:00');
+      final created = await service.createForPersona(
+        'persona-2',
+        acknowledgedAt,
+      );
+      expect(created.personaId, 'persona-2');
+      expect(created.personaName, '아빠');
+      expect(created.acknowledgedAt.isAtSameMomentAs(acknowledgedAt), true);
+
+      mismatch = true;
+      await expectLater(
+        service.createForPersona('persona-2', acknowledgedAt),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('date groups cover day, week, month and previous years', () {
     final now = DateTime(2026, 10, 28);
     expect(conversationDateGroup(now, now), '오늘');
@@ -281,6 +412,15 @@ void main() {
         expect(request.headers['Authorization'], 'Bearer synthetic-token');
         expect(request.url.queryParameters.containsKey('user_id'), false);
         paths.add(request.url.toString());
+        if (request.url.path == '/personas') {
+          return jsonResponse({
+            'items': [
+              {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
+            ],
+            'limit': 100,
+            'offset': 0,
+          });
+        }
         if (request.url.path == '/sessions') {
           final offset = request.url.queryParameters['offset'];
           return jsonResponse({

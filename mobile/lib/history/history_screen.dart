@@ -15,7 +15,8 @@ Future<void> openConversation(
   MaterialPageRoute(
     builder: (_) => ChatScreen(
       service: ConversationChatService(service, conversation.id),
-      conversationName: service.isDemo ? '엄마' : '대화',
+      conversationName:
+          conversation.personaName ?? (service.isDemo ? '엄마' : '대화 상대'),
       initialVoiceMode: voice ?? conversation.lastVoice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
@@ -34,13 +35,23 @@ Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
+  ConversationPersona? persona,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
     isDemo: service.isDemo,
   );
   if (acknowledgedAt == null || !context.mounted) return;
-  final conversation = await service.create(acknowledgedAt, voice: voice);
+  final personaService = service is PersonaConversationService
+      ? service as PersonaConversationService
+      : null;
+  final conversation = persona != null && personaService != null
+      ? await personaService.createForPersona(
+          persona.id,
+          acknowledgedAt,
+          voice: voice,
+        )
+      : await service.create(acknowledgedAt, voice: voice);
   if (!context.mounted) return;
   await openConversation(context, service, conversation, voice: voice);
 }
@@ -50,9 +61,11 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     required this.service,
     this.bottomNavigationBar,
+    this.selectedPersona,
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
+  final ConversationPersona? selectedPersona;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -148,7 +161,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       );
       if (voice == null || !mounted) return;
-      await startConversation(context, widget.service, voice: voice);
+      await startConversation(
+        context,
+        widget.service,
+        voice: voice,
+        persona: widget.selectedPersona,
+      );
       if (mounted) await _load();
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');

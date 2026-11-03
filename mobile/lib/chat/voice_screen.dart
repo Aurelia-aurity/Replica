@@ -296,16 +296,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       setState(() {
         _phase = VoicePhase.failed;
         _failedStage = failure.stage;
-        _retryable =
-            failure.retryable || failure.kind == BackendFailureKind.network;
-        _error = switch (failure.code) {
-          'EMPTY_TRANSCRIPT' || 'STT_FAILED' => '잘 들리지 않았어요. 다시 말씀해 주세요.',
-          'AI_BUSY' => '지금 다른 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'AI_NOT_READY' => 'AI를 준비하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'FILE_TOO_LARGE' => '녹음이 너무 커요. 25MB 이내로 다시 녹음해 주세요.',
-          'CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력에서 새로고침해 주세요.',
-          _ => '응답을 받지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.',
-        };
+        _retryable = failure.canRetry;
+        _error = failure.userMessage;
       });
     } catch (_) {
       if (mounted) {

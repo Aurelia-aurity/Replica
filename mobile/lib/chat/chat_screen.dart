@@ -192,21 +192,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       setState(() {
         _failedMessage = text;
-        _retryable = failure.code == null
-            ? failure.kind != BackendFailureKind.forbidden
-            : failure.retryable;
-        _failureNotice = switch (failure.code) {
-          'AI_BUSY' => '지금 다른 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'AI_NOT_READY' => 'AI를 준비하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'AI_TIMEOUT' => '답변을 만드는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
-          'AI_UNAVAILABLE' => 'AI 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
-          'MESSAGE_TOO_LONG' => '질문이 너무 길어요. 더 짧게 입력해 주세요.',
-          'CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력에서 새로고침 후 확인해 주세요.',
-          _ =>
-            failure.kind == BackendFailureKind.forbidden
-                ? '이 대화에 접근할 수 없어요.'
-                : '응답을 받지 못했어요.',
-        };
+        _retryable = failure.canRetry;
+        _failureNotice = failure.userMessage;
       });
     } catch (_) {
       if (!mounted) return;

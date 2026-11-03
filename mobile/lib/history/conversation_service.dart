@@ -30,13 +30,26 @@ abstract class VoiceConversationService implements DetailedConversationService {
   );
 }
 
+/// Persona-aware operations used by the real home/history flow. Kept separate
+/// from [ConversationService] so focused screen fakes do not need persona APIs.
+abstract class PersonaConversationService {
+  Future<List<ConversationPersona>> personas();
+  Future<Conversation> createForPersona(
+    String personaId,
+    DateTime acknowledgedAt, {
+    bool voice = false,
+  });
+}
+
 /// Owned by one login generation, never shared between accounts or persisted.
-class MemoryConversationService implements VoiceConversationService {
+class MemoryConversationService
+    implements VoiceConversationService, PersonaConversationService {
   MemoryConversationService({required this.backend, required this.chat});
   final BackendService backend;
   final ChatService chat;
   final _items = <String, Conversation>{};
   final _voiceReplies = <String, VoiceReply>{};
+  static const previewPersona = ConversationPersona(id: 'preview', name: '엄마');
   @override
   bool get isDemo => true;
   @override
@@ -46,19 +59,34 @@ class MemoryConversationService implements VoiceConversationService {
   Future<Conversation> get(String id) => backend.run(() async => _items[id]!);
   @override
   Future<Conversation> create(DateTime acknowledgedAt, {bool voice = false}) =>
-      backend.run(() async {
-        final now = DateTime.now();
-        final item = Conversation(
-          id: newConversationId(),
-          personaId: 'preview',
-          createdAt: now,
-          updatedAt: now,
-          acknowledgedAt: acknowledgedAt,
-          initialVoice: voice,
-        );
-        _items[item.id] = item;
-        return item;
-      });
+      createForPersona(previewPersona.id, acknowledgedAt, voice: voice);
+
+  @override
+  Future<List<ConversationPersona>> personas() =>
+      backend.run(() async => const [previewPersona]);
+
+  @override
+  Future<Conversation> createForPersona(
+    String personaId,
+    DateTime acknowledgedAt, {
+    bool voice = false,
+  }) => backend.run(() async {
+    if (personaId != previewPersona.id) {
+      throw const BackendFailure(BackendFailureKind.generic, code: 'NOT_FOUND');
+    }
+    final now = DateTime.now();
+    final item = Conversation(
+      id: newConversationId(),
+      personaId: previewPersona.id,
+      personaName: previewPersona.name,
+      createdAt: now,
+      updatedAt: now,
+      acknowledgedAt: acknowledgedAt,
+      initialVoice: voice,
+    );
+    _items[item.id] = item;
+    return item;
+  });
   @override
   Future<String> send(String id, String turnId, String message) async =>
       (await sendDetailed(id, turnId, message)).text;
@@ -85,6 +113,7 @@ class MemoryConversationService implements VoiceConversationService {
         _items[id] = Conversation(
           id: id,
           personaId: before.personaId,
+          personaName: before.personaName,
           createdAt: before.createdAt,
           updatedAt: now,
           acknowledgedAt: before.acknowledgedAt,
@@ -125,6 +154,7 @@ class MemoryConversationService implements VoiceConversationService {
     _items[id] = Conversation(
       id: id,
       personaId: current.personaId,
+      personaName: current.personaName,
       createdAt: before.createdAt,
       updatedAt: current.updatedAt,
       acknowledgedAt: before.acknowledgedAt,
@@ -161,7 +191,8 @@ class MemoryConversationService implements VoiceConversationService {
 }
 
 /// Adapter for the supplied draft API. No preview credentials are sent here.
-class HttpConversationService implements VoiceConversationService {
+class HttpConversationService
+    implements VoiceConversationService, PersonaConversationService {
   HttpConversationService({
     required this.backend,
     required this.baseUrl,
@@ -173,6 +204,7 @@ class HttpConversationService implements VoiceConversationService {
   // The draft session API has no initial input mode field. Keep it for this login.
   final _initialVoiceModes = <String, bool>{};
   final _replyDetails = <String, Map<String, ChatReply>>{};
+  final _personaNames = <String, String>{};
   @override
   bool get isDemo => false;
 
@@ -198,9 +230,24 @@ class HttpConversationService implements VoiceConversationService {
     // Check generation again after asynchronous token acquisition.
     return backend.run(() async {
       request.headers.addAll(headers);
-      final response = await (() async => http.Response.fromStream(
-        await client.send(request),
-      ))().timeout(const Duration(seconds: 30));
+      late http.Response response;
+      try {
+        response = await (() async => http.Response.fromStream(
+          await client.send(request),
+        ))().timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        throw const BackendFailure(
+          BackendFailureKind.network,
+          code: 'AI_TIMEOUT',
+          retryable: true,
+        );
+      } on http.ClientException {
+        throw const BackendFailure(
+          BackendFailureKind.network,
+          code: 'AI_UNAVAILABLE',
+          retryable: true,
+        );
+      }
       Object? json;
       if (response.bodyBytes.isNotEmpty) {
         try {
@@ -253,7 +300,45 @@ class HttpConversationService implements VoiceConversationService {
   }
 
   @override
+  Future<List<ConversationPersona>> personas() async {
+    final result = <ConversationPersona>[];
+    var offset = 0;
+    while (true) {
+      final json = await _request(
+        'GET',
+        '/personas',
+        query: {'limit': '100', 'offset': '$offset'},
+      ) as Map<String, dynamic>;
+      final page = (json['items'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(ConversationPersona.fromJson)
+          .toList();
+      final limit = json['limit'] as int? ?? 100;
+      if (limit < 1) throw const FormatException('Invalid limit');
+      result.addAll(page.where((persona) => persona.status == 'active'));
+      if (page.length < limit) break;
+      offset += page.length;
+    }
+    for (final persona in result) {
+      _personaNames[persona.id] = persona.name;
+    }
+    return result;
+  }
+
+  Future<String?> _personaName(String id) async {
+    if (_personaNames.containsKey(id)) return _personaNames[id];
+    final json = await _request(
+      'GET',
+      '/personas/${Uri.encodeComponent(id)}',
+    ) as Map<String, dynamic>;
+    final persona = ConversationPersona.fromJson(json);
+    _personaNames[persona.id] = persona.name;
+    return persona.name;
+  }
+
+  @override
   Future<List<Conversation>> list() async {
+    await personas();
     final sessions = <Map<String, dynamic>>[];
     var offset = 0;
     while (true) {
@@ -282,6 +367,7 @@ class HttpConversationService implements VoiceConversationService {
                   json,
                   await _turns(json['id'] as String),
                   initialVoice: _initialVoiceModes[json['id']] ?? false,
+                  personaName: _personaNames[json['persona_id']],
                 ),
               ),
         ),
@@ -296,10 +382,12 @@ class HttpConversationService implements VoiceConversationService {
       'GET',
       '/sessions/${Uri.encodeComponent(id)}',
     ) as Map<String, dynamic>;
+    final personaId = json['persona_id'] as String;
     return Conversation.fromJson(
       json,
       await _turns(id),
       initialVoice: _initialVoiceModes[id] ?? false,
+      personaName: await _personaName(personaId),
     );
   }
 
@@ -308,30 +396,46 @@ class HttpConversationService implements VoiceConversationService {
     DateTime acknowledgedAt, {
     bool voice = false,
   }) async {
-    final personas = await _request(
-      'GET',
-      '/personas',
-      query: {'limit': '100', 'offset': '0'},
-    ) as Map<String, dynamic>;
-    final active = (personas['items'] as List)
-        .cast<Map<String, dynamic>>()
-        .where((p) => p['status'] == 'active');
+    final active = await personas();
     if (active.isEmpty) {
       throw const BackendFailure(
         BackendFailureKind.generic,
         code: 'NO_PERSONA',
       );
     }
+    return createForPersona(active.first.id, acknowledgedAt, voice: voice);
+  }
+
+  @override
+  Future<Conversation> createForPersona(
+    String personaId,
+    DateTime acknowledgedAt, {
+    bool voice = false,
+  }) async {
+    final active = await personas();
+    final selected = active.where((persona) => persona.id == personaId);
+    if (selected.isEmpty) {
+      throw const BackendFailure(BackendFailureKind.generic, code: 'NOT_FOUND');
+    }
     final json = await _request(
       'POST',
       '/sessions',
       body: {
-        'persona_id': active.first['id'],
+        'persona_id': personaId,
         'session_id': newConversationId(),
         'ai_notice_ack_at': acknowledgedAt.toUtc().toIso8601String(),
       },
     ) as Map<String, dynamic>;
-    final conversation = Conversation.fromJson(json, [], initialVoice: voice);
+    final conversation = Conversation.fromJson(
+      json,
+      [],
+      initialVoice: voice,
+      personaName: selected.single.name,
+    );
+    if (conversation.personaId != personaId ||
+        !conversation.acknowledgedAt.isAtSameMomentAs(acknowledgedAt)) {
+      throw const FormatException('Session acknowledgement mismatch');
+    }
     _initialVoiceModes[conversation.id] = voice;
     return conversation;
   }

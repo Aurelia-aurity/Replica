@@ -12,6 +12,64 @@ class EvidenceRecord {
   });
   final String fileName, excerpt;
   final DateTime date;
+
+  factory EvidenceRecord.fromJson(Map<String, dynamic> json) {
+    final fileName = json['file_name'];
+    final date = json['date'];
+    final excerpt = json['excerpt'];
+    final parsedDate = date is String ? DateTime.tryParse(date) : null;
+    if (fileName is! String ||
+        fileName.trim().isEmpty ||
+        parsedDate == null ||
+        excerpt is! String ||
+        excerpt.trim().isEmpty) {
+      throw const FormatException('Invalid evidence source');
+    }
+    return EvidenceRecord(
+      fileName: fileName.trim(),
+      date: parsedDate,
+      excerpt: excerpt.trim(),
+    );
+  }
+}
+
+class ReplyEvidence {
+  const ReplyEvidence(this.state, this.sources);
+  final EvidenceState state;
+  final List<EvidenceRecord> sources;
+
+  /// Missing evidence is deliberately different from an explicit `none`.
+  /// The backend must send `{status, items}` to make an evidence claim.
+  factory ReplyEvidence.fromJson(Map<String, dynamic> json) {
+    if (!json.containsKey('evidence') || json['evidence'] == null) {
+      return const ReplyEvidence(EvidenceState.unknown, []);
+    }
+    final payload = json['evidence'];
+    if (payload is! Map) throw const FormatException('Invalid evidence');
+    final status = payload['status'];
+    final rawItems = payload['items'];
+    if (status == 'unavailable' || status == 'unknown') {
+      return const ReplyEvidence(EvidenceState.unknown, []);
+    }
+    if (rawItems != null && rawItems is! List) {
+      throw const FormatException('Invalid evidence items');
+    }
+    final items = <EvidenceRecord>[];
+    for (final item in rawItems ?? const <Object>[]) {
+      if (item is! Map) throw const FormatException('Invalid evidence item');
+      items.add(EvidenceRecord.fromJson(item.cast<String, dynamic>()));
+    }
+    if (status == 'none') {
+      if (items.isNotEmpty) {
+        throw const FormatException('No-evidence response has sources');
+      }
+      return const ReplyEvidence(EvidenceState.none, []);
+    }
+    if (status == 'available' && items.isNotEmpty) {
+      return ReplyEvidence(EvidenceState.available, List.unmodifiable(items));
+    }
+    throw const FormatException('Invalid evidence status');
+  }
 }
 
 class ChatReply {
@@ -52,12 +110,15 @@ class ChatReply {
         timings[key] = value as int?;
       }
     }
+    final evidence = ReplyEvidence.fromJson(json);
     return ChatReply(
       text: json['answer'] as String,
       turnId: expectedTurnId,
       modelName: json['model_name'] as String?,
       finishReason: json['finish_reason'] as String?,
       timings: Map.unmodifiable(timings),
+      evidence: evidence.state,
+      sources: evidence.sources,
     );
   }
 

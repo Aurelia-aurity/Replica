@@ -2,6 +2,31 @@ import 'dart:math';
 
 import '../chat/chat_reply.dart';
 
+class ConversationPersona {
+  const ConversationPersona({
+    required this.id,
+    required this.name,
+    this.status = 'active',
+  });
+
+  final String id, name, status;
+
+  factory ConversationPersona.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final name = json['name'];
+    final status = json['status'];
+    if (id is! String ||
+        id.isEmpty ||
+        name is! String ||
+        name.trim().isEmpty ||
+        status is! String ||
+        !['active', 'deleting'].contains(status)) {
+      throw const FormatException('Invalid persona');
+    }
+    return ConversationPersona(id: id, name: name.trim(), status: status);
+  }
+}
+
 String newConversationId() {
   final random = Random.secure();
   final bytes = List.generate(16, (_) => random.nextInt(256));
@@ -39,6 +64,7 @@ class ConversationTurn {
     if (json['answer'] != null && json['is_ai_generated'] != true) {
       throw const FormatException('Missing AI disclosure');
     }
+    final evidence = ReplyEvidence.fromJson(json);
     return ConversationTurn(
       id: json['turn_id'] as String,
       number: json['turn_no'] as int,
@@ -64,6 +90,8 @@ class ConversationTurn {
                     ])
                       key: json[key] is int ? json[key] as int : null,
                   },
+                  evidence: evidence.state,
+                  sources: evidence.sources,
                 )
               : null),
     );
@@ -80,13 +108,14 @@ class Conversation {
     required this.updatedAt,
     required this.acknowledgedAt,
     this.title,
+    this.personaName,
     this.initialVoice = false,
     List<ConversationTurn> turns = const [],
   }) : turns = List.unmodifiable(
          [...turns]..sort((a, b) => a.number.compareTo(b.number)),
        );
   final String id, personaId;
-  final String? title;
+  final String? title, personaName;
   final bool initialVoice;
   final DateTime createdAt, updatedAt, acknowledgedAt;
   final List<ConversationTurn> turns;
@@ -95,10 +124,12 @@ class Conversation {
     Map<String, dynamic> json,
     List<ConversationTurn> turns, {
     bool initialVoice = false,
+    String? personaName,
   }) => Conversation(
     id: json['id'] as String,
     personaId: json['persona_id'] as String,
     title: json['title'] as String?,
+    personaName: personaName,
     initialVoice: initialVoice,
     createdAt: DateTime.parse(json['created_at'] as String),
     updatedAt: DateTime.parse(json['updated_at'] as String),

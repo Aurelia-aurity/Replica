@@ -368,6 +368,13 @@ void main() {
           'after_turn_no': 0,
         });
       }
+      if (request.url.path == '/personas/persona-1') {
+        return fixtures.jsonResponse({
+          'id': 'persona-1',
+          'name': '엄마',
+          'status': 'active',
+        });
+      }
       return fixtures.jsonResponse(fixtures.sessionJson('session-1'));
     });
     addTearDown(client.close);
@@ -425,6 +432,53 @@ void main() {
       );
     }
   });
+
+  test(
+    'explicit evidence maps file, date and excerpt while absence stays unknown',
+    () {
+      final base = {
+        'turn_id': 'turn-evidence',
+        'answer': '기록을 바탕으로 만든 합성 답변',
+        'is_ai_generated': true,
+        'finish_reason': 'stop',
+      };
+      final available = ChatReply.fromJson({
+        ...base,
+        'evidence': {
+          'status': 'available',
+          'items': [
+            {
+              'file_name': '합성-기록.txt',
+              'date': '2026-10-31T00:00:00+09:00',
+              'excerpt': '선택된 합성 원문 조각',
+            },
+          ],
+        },
+      }, expectedTurnId: 'turn-evidence');
+      expect(available.evidence, EvidenceState.available);
+      expect(available.sources.single.fileName, '합성-기록.txt');
+      expect(available.sources.single.excerpt, '선택된 합성 원문 조각');
+
+      final none = ChatReply.fromJson({
+        ...base,
+        'evidence': {'status': 'none', 'items': <Object>[]},
+      }, expectedTurnId: 'turn-evidence');
+      expect(none.evidence, EvidenceState.none);
+      expect(none.sources, isEmpty);
+
+      expect(
+        ChatReply.fromJson(base, expectedTurnId: 'turn-evidence').evidence,
+        EvidenceState.unknown,
+      );
+      expect(
+        () => ChatReply.fromJson({
+          ...base,
+          'evidence': {'status': 'available', 'items': <Object>[]},
+        }, expectedTurnId: 'turn-evidence'),
+        throwsFormatException,
+      );
+    },
+  );
 
   test('memory history retains evidence metadata when reopening', () async {
     final auth = fixtures.TestAuth();
