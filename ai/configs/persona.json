@@ -1,0 +1,21 @@
+{
+  "embedding": {
+    "model_id": "nlpai-lab/KURE-v1",
+    "revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+    "dimensions": 1024,
+    "max_seq_length": 512,
+    "normalize_embeddings": true,
+    "dtype": "float32",
+    "prompt": ""
+  },
+  "retrieval": {
+    "threshold": 0.5458711981773378,
+    "k": 3,
+    "window": 3,
+    "budget": 2000
+  },
+  "budget_tokenizer": {
+    "model_id": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218"
+  }
+}

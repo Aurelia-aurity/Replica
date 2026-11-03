@@ -1,0 +1,32 @@
+{
+  "source": "experiments/rag/corpus.json at f40cbd4 (#59), first two DEV records",
+  "persona_id": "p1",
+  "persona_speaker": "가람",
+  "records": [
+    {
+      "record_id": "3e108504-16a1-5b31-a8d3-1689c3bc4009",
+      "text_version_id": "c7f9e4bf-a8b3-587f-9e02-57f207624bf6",
+      "kind": "diary",
+      "date": "2025-03-14",
+      "speaker": "가람",
+      "text": "학예회 끝나고 집에 오니 다리에 힘이 풀렸다. 조명이 켜지니까 객석은 하나도 안 보였다. 박자를 놓쳤을 때 소담이가 옆에서 발로 박자를 맞춰 줬다. 혼자였으면 끝까지 못 쳤을 것 같다.\n\n잘했다는 말은 들었는데 녹화본은 아직 못 보겠다. 굳은 얼굴로 서 있을 내가 좀 창피하다.",
+      "turns": []
+    },
+    {
+      "record_id": "6e150d0f-1090-5e69-8e58-5182035f1add",
+      "text_version_id": "2255fe8d-05ba-5257-a496-2c28efd2e6f6",
+      "kind": "chat",
+      "date": "2025-03-15",
+      "speaker": "",
+      "text": "",
+      "turns": [
+        {"speaker": "나", "text": "공연 끝나니까 이제 좀 살겠어?"},
+        {"speaker": "가람", "text": "응. 소담이 없었으면 중간에 멈췄을걸."},
+        {"speaker": "나", "text": "첫 곡은 원래 하려던 거 했어?"},
+        {"speaker": "가람", "text": "느린 왈츠를 치려다가 마지막 연습 때 봄소풍으로 바꿨어. 그게 손에 익더라."},
+        {"speaker": "소담", "text": "네가 객석보다 더 떨고 있던데."},
+        {"speaker": "가람", "text": "야 그걸 봤어? 누나한테 영상은 아직 보내지 마."}
+      ]
+    }
+  ]
+}
