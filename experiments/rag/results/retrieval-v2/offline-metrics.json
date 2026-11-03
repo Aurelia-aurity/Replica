@@ -1,0 +1,1872 @@
+{
+  "corpus_sha256": "51775868750a10728f872ece4e5128a8b4f7d23aa963ca5d5be32658e0dd118c",
+  "encoder": {
+    "repository": "nlpai-lab/KURE-v1",
+    "revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+    "dimensions": 1024,
+    "query_prefix": "",
+    "passage_prefix": ""
+  },
+  "source_manifest_sha256": "9ebf2a9c6c0ae01fe4f0637da0efff1ce990496cfe4759435e7f7213a8134947",
+  "threshold": 0.5458711981773378,
+  "config": {
+    "k": 3,
+    "window": 3,
+    "budget": 2000
+  },
+  "tokenizer": {
+    "repository": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "counting": "full pretty-printed evidence JSON, including IDs/metadata; no special tokens"
+  },
+  "code_sha256": {
+    "offline_v2.py": "d52a4ae575d5c76ab13860189832abde22d4b426a42482dd5d446d0677b64f9d",
+    "retrieval_v2.py": "475ae5eb2d47a42da87303fa422180df223ace0ca3c45108d58b12ffc4851766",
+    "generate.py": "e9e6945362b69ef13e45a12e0a2a38d510ad909d2872685697cb6801d01a4c05",
+    "corpus.py": "55af80beec2b8fe13f710a96b64ffb0e541ab5d4765d2432c7386613830f8a79"
+  },
+  "prompt_change": "r1 instructions/system/persona unchanged; evidence items expanded and content lines prefixed with date | speaker (speaker_role=role) |; same five JSON fields",
+  "gpu_or_judge_run": false,
+  "conditions": {
+    "B_old": {
+      "dev": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 23,
+        "slot_hits": 79,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 378.0,
+        "max_evidence_tokens": 889,
+        "per_question": {
+          "q-p1-school-stage-single-1": {
+            "missing_slots": [],
+            "tokens": 223,
+            "empty": false
+          },
+          "q-p1-school-stage-single-2": {
+            "missing_slots": [],
+            "tokens": 324,
+            "empty": false
+          },
+          "q-p1-robot-club-multi-3": {
+            "missing_slots": [
+              "마루",
+              "느슨한",
+              "왼쪽 센서 선",
+              "납땜"
+            ],
+            "tokens": 344,
+            "empty": false
+          },
+          "q-p1-bus-card-multi-4": {
+            "missing_slots": [
+              "편의점 아저씨",
+              "계산대 서랍"
+            ],
+            "tokens": 658,
+            "empty": false
+          },
+          "q-p1-umbrella-unanswerable-5": {
+            "missing_slots": [],
+            "tokens": 363,
+            "empty": false
+          },
+          "q-p1-umbrella-false_premise-6": {
+            "missing_slots": [],
+            "tokens": 221,
+            "empty": false
+          },
+          "q-p1-study-spots-ambiguity-7": {
+            "missing_slots": [
+              "보람",
+              "빵집 이층"
+            ],
+            "tokens": 673,
+            "empty": false
+          },
+          "q-p1-study-spots-ordinary_chat-8": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-moving-house-single-17": {
+            "missing_slots": [],
+            "tokens": 215,
+            "empty": false
+          },
+          "q-p2-moving-house-single-18": {
+            "missing_slots": [],
+            "tokens": 623,
+            "empty": false
+          },
+          "q-p2-dog-sitting-multi-19": {
+            "missing_slots": [
+              "철길 옆 산책로"
+            ],
+            "tokens": 367,
+            "empty": false
+          },
+          "q-p2-bread-class-multi-20": {
+            "missing_slots": [],
+            "tokens": 637,
+            "empty": false
+          },
+          "q-p2-deadline-unanswerable-21": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-deadline-false_premise-22": {
+            "missing_slots": [],
+            "tokens": 845,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ambiguity-23": {
+            "missing_slots": [],
+            "tokens": 801,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ordinary_chat-24": {
+            "missing_slots": [],
+            "tokens": 314,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-33": {
+            "missing_slots": [],
+            "tokens": 851,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-34": {
+            "missing_slots": [],
+            "tokens": 631,
+            "empty": false
+          },
+          "q-p3-kimchi-sharing-multi-35": {
+            "missing_slots": [],
+            "tokens": 881,
+            "empty": false
+          },
+          "q-p3-balcony-plants-multi-36": {
+            "missing_slots": [],
+            "tokens": 592,
+            "empty": false
+          },
+          "q-p3-fridge-repair-unanswerable-37": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p3-fridge-repair-false_premise-38": {
+            "missing_slots": [],
+            "tokens": 727,
+            "empty": false
+          },
+          "q-p3-market-visits-ambiguity-39": {
+            "missing_slots": [],
+            "tokens": 810,
+            "empty": false
+          },
+          "q-p3-market-visits-ordinary_chat-40": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-conference-single-49": {
+            "missing_slots": [],
+            "tokens": 216,
+            "empty": false
+          },
+          "q-p4-conference-single-50": {
+            "missing_slots": [],
+            "tokens": 328,
+            "empty": false
+          },
+          "q-p4-mentoring-multi-51": {
+            "missing_slots": [
+              "수정한 흐름",
+              "녹화"
+            ],
+            "tokens": 379,
+            "empty": false
+          },
+          "q-p4-running-multi-52": {
+            "missing_slots": [],
+            "tokens": 881,
+            "empty": false
+          },
+          "q-p4-plant-sitting-unanswerable-53": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-plant-sitting-false_premise-54": {
+            "missing_slots": [],
+            "tokens": 549,
+            "empty": false
+          },
+          "q-p4-interview-venues-ambiguity-55": {
+            "missing_slots": [],
+            "tokens": 704,
+            "empty": false
+          },
+          "q-p4-interview-venues-ordinary_chat-56": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-school-reunion-single-65": {
+            "missing_slots": [],
+            "tokens": 226,
+            "empty": false
+          },
+          "q-p5-school-reunion-single-66": {
+            "missing_slots": [],
+            "tokens": 889,
+            "empty": false
+          },
+          "q-p5-old-radio-multi-67": {
+            "missing_slots": [
+              "오후 세 시",
+              "옛 노래 시간"
+            ],
+            "tokens": 529,
+            "empty": false
+          },
+          "q-p5-kite-grandchild-multi-68": {
+            "missing_slots": [
+              "종이",
+              "바람개비"
+            ],
+            "tokens": 377,
+            "empty": false
+          },
+          "q-p5-book-donation-unanswerable-69": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-book-donation-false_premise-70": {
+            "missing_slots": [],
+            "tokens": 819,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ambiguity-71": {
+            "missing_slots": [],
+            "tokens": 828,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ordinary_chat-72": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          }
+        }
+      },
+      "test": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 19,
+        "slot_hits": 78,
+        "required_slots": 92,
+        "unanswerable": 5,
+        "unanswerable_empty": 2,
+        "ordinary": 5,
+        "ordinary_empty": 1,
+        "factual_empty": 0,
+        "median_evidence_tokens": 477.5,
+        "max_evidence_tokens": 950,
+        "per_question": {
+          "q-p1-watercolor-single-9": {
+            "missing_slots": [],
+            "tokens": 369,
+            "empty": false
+          },
+          "q-p1-watercolor-single-10": {
+            "missing_slots": [
+              "바람 쉬는 섬"
+            ],
+            "tokens": 141,
+            "empty": false
+          },
+          "q-p1-library-helper-multi-11": {
+            "missing_slots": [
+              "화요일 오후"
+            ],
+            "tokens": 847,
+            "empty": false
+          },
+          "q-p1-camp-multi-12": {
+            "missing_slots": [
+              "정리상"
+            ],
+            "tokens": 346,
+            "empty": false
+          },
+          "q-p1-skateboard-unanswerable-13": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-skateboard-false_premise-14": {
+            "missing_slots": [],
+            "tokens": 367,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ambiguity-15": {
+            "missing_slots": [
+              "시온이네 집"
+            ],
+            "tokens": 673,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ordinary_chat-16": {
+            "missing_slots": [],
+            "tokens": 465,
+            "empty": false
+          },
+          "q-p2-film-club-single-25": {
+            "missing_slots": [],
+            "tokens": 359,
+            "empty": false
+          },
+          "q-p2-film-club-single-26": {
+            "missing_slots": [],
+            "tokens": 490,
+            "empty": false
+          },
+          "q-p2-coffee-grinder-multi-27": {
+            "missing_slots": [],
+            "tokens": 868,
+            "empty": false
+          },
+          "q-p2-food-volunteer-multi-28": {
+            "missing_slots": [],
+            "tokens": 950,
+            "empty": false
+          },
+          "q-p2-car-repair-unanswerable-29": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-car-repair-false_premise-30": {
+            "missing_slots": [],
+            "tokens": 657,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ambiguity-31": {
+            "missing_slots": [
+              "회사 선배 결혼식"
+            ],
+            "tokens": 698,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ordinary_chat-32": {
+            "missing_slots": [],
+            "tokens": 848,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-41": {
+            "missing_slots": [],
+            "tokens": 593,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-42": {
+            "missing_slots": [
+              "어릴 때 쓰던",
+              "줄무늬 베개 커버",
+              "잘라"
+            ],
+            "tokens": 517,
+            "empty": false
+          },
+          "q-p3-temple-walk-multi-43": {
+            "missing_slots": [],
+            "tokens": 390,
+            "empty": false
+          },
+          "q-p3-phone-class-multi-44": {
+            "missing_slots": [],
+            "tokens": 682,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-unanswerable-45": {
+            "missing_slots": [],
+            "tokens": 144,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-false_premise-46": {
+            "missing_slots": [],
+            "tokens": 211,
+            "empty": false
+          },
+          "q-p3-coast-trips-ambiguity-47": {
+            "missing_slots": [
+              "동네 모임",
+              "들깨칼국수"
+            ],
+            "tokens": 936,
+            "empty": false
+          },
+          "q-p3-coast-trips-ordinary_chat-48": {
+            "missing_slots": [],
+            "tokens": 780,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-57": {
+            "missing_slots": [],
+            "tokens": 383,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-58": {
+            "missing_slots": [],
+            "tokens": 526,
+            "empty": false
+          },
+          "q-p4-night-train-multi-59": {
+            "missing_slots": [],
+            "tokens": 851,
+            "empty": false
+          },
+          "q-p4-exhibition-multi-60": {
+            "missing_slots": [
+              "금요일 오후"
+            ],
+            "tokens": 514,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-unanswerable-61": {
+            "missing_slots": [],
+            "tokens": 370,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-false_premise-62": {
+            "missing_slots": [],
+            "tokens": 211,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ambiguity-63": {
+            "missing_slots": [],
+            "tokens": 533,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ordinary_chat-64": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-bridge-outing-single-73": {
+            "missing_slots": [],
+            "tokens": 683,
+            "empty": false
+          },
+          "q-p5-bridge-outing-single-74": {
+            "missing_slots": [
+              "감자전"
+            ],
+            "tokens": 847,
+            "empty": false
+          },
+          "q-p5-woodwork-multi-75": {
+            "missing_slots": [
+              "현관 안쪽"
+            ],
+            "tokens": 219,
+            "empty": false
+          },
+          "q-p5-dog-walk-multi-76": {
+            "missing_slots": [
+              "우체통 앞"
+            ],
+            "tokens": 368,
+            "empty": false
+          },
+          "q-p5-singing-group-unanswerable-77": {
+            "missing_slots": [],
+            "tokens": 146,
+            "empty": false
+          },
+          "q-p5-singing-group-false_premise-78": {
+            "missing_slots": [],
+            "tokens": 195,
+            "empty": false
+          },
+          "q-p5-garden-meals-ambiguity-79": {
+            "missing_slots": [],
+            "tokens": 694,
+            "empty": false
+          },
+          "q-p5-garden-meals-ordinary_chat-80": {
+            "missing_slots": [],
+            "tokens": 343,
+            "empty": false
+          }
+        }
+      },
+      "all": {
+        "questions": 80,
+        "factual": 60,
+        "all_slots_covered": 42,
+        "slot_hits": 157,
+        "required_slots": 186,
+        "unanswerable": 10,
+        "unanswerable_empty": 6,
+        "ordinary": 10,
+        "ordinary_empty": 5,
+        "factual_empty": 0,
+        "median_evidence_tokens": 427.5,
+        "max_evidence_tokens": 950,
+        "per_question": {
+          "q-p1-school-stage-single-1": {
+            "missing_slots": [],
+            "tokens": 223,
+            "empty": false
+          },
+          "q-p1-school-stage-single-2": {
+            "missing_slots": [],
+            "tokens": 324,
+            "empty": false
+          },
+          "q-p1-robot-club-multi-3": {
+            "missing_slots": [
+              "마루",
+              "느슨한",
+              "왼쪽 센서 선",
+              "납땜"
+            ],
+            "tokens": 344,
+            "empty": false
+          },
+          "q-p1-bus-card-multi-4": {
+            "missing_slots": [
+              "편의점 아저씨",
+              "계산대 서랍"
+            ],
+            "tokens": 658,
+            "empty": false
+          },
+          "q-p1-umbrella-unanswerable-5": {
+            "missing_slots": [],
+            "tokens": 363,
+            "empty": false
+          },
+          "q-p1-umbrella-false_premise-6": {
+            "missing_slots": [],
+            "tokens": 221,
+            "empty": false
+          },
+          "q-p1-study-spots-ambiguity-7": {
+            "missing_slots": [
+              "보람",
+              "빵집 이층"
+            ],
+            "tokens": 673,
+            "empty": false
+          },
+          "q-p1-study-spots-ordinary_chat-8": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-moving-house-single-17": {
+            "missing_slots": [],
+            "tokens": 215,
+            "empty": false
+          },
+          "q-p2-moving-house-single-18": {
+            "missing_slots": [],
+            "tokens": 623,
+            "empty": false
+          },
+          "q-p2-dog-sitting-multi-19": {
+            "missing_slots": [
+              "철길 옆 산책로"
+            ],
+            "tokens": 367,
+            "empty": false
+          },
+          "q-p2-bread-class-multi-20": {
+            "missing_slots": [],
+            "tokens": 637,
+            "empty": false
+          },
+          "q-p2-deadline-unanswerable-21": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-deadline-false_premise-22": {
+            "missing_slots": [],
+            "tokens": 845,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ambiguity-23": {
+            "missing_slots": [],
+            "tokens": 801,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ordinary_chat-24": {
+            "missing_slots": [],
+            "tokens": 314,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-33": {
+            "missing_slots": [],
+            "tokens": 851,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-34": {
+            "missing_slots": [],
+            "tokens": 631,
+            "empty": false
+          },
+          "q-p3-kimchi-sharing-multi-35": {
+            "missing_slots": [],
+            "tokens": 881,
+            "empty": false
+          },
+          "q-p3-balcony-plants-multi-36": {
+            "missing_slots": [],
+            "tokens": 592,
+            "empty": false
+          },
+          "q-p3-fridge-repair-unanswerable-37": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p3-fridge-repair-false_premise-38": {
+            "missing_slots": [],
+            "tokens": 727,
+            "empty": false
+          },
+          "q-p3-market-visits-ambiguity-39": {
+            "missing_slots": [],
+            "tokens": 810,
+            "empty": false
+          },
+          "q-p3-market-visits-ordinary_chat-40": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-conference-single-49": {
+            "missing_slots": [],
+            "tokens": 216,
+            "empty": false
+          },
+          "q-p4-conference-single-50": {
+            "missing_slots": [],
+            "tokens": 328,
+            "empty": false
+          },
+          "q-p4-mentoring-multi-51": {
+            "missing_slots": [
+              "수정한 흐름",
+              "녹화"
+            ],
+            "tokens": 379,
+            "empty": false
+          },
+          "q-p4-running-multi-52": {
+            "missing_slots": [],
+            "tokens": 881,
+            "empty": false
+          },
+          "q-p4-plant-sitting-unanswerable-53": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-plant-sitting-false_premise-54": {
+            "missing_slots": [],
+            "tokens": 549,
+            "empty": false
+          },
+          "q-p4-interview-venues-ambiguity-55": {
+            "missing_slots": [],
+            "tokens": 704,
+            "empty": false
+          },
+          "q-p4-interview-venues-ordinary_chat-56": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-school-reunion-single-65": {
+            "missing_slots": [],
+            "tokens": 226,
+            "empty": false
+          },
+          "q-p5-school-reunion-single-66": {
+            "missing_slots": [],
+            "tokens": 889,
+            "empty": false
+          },
+          "q-p5-old-radio-multi-67": {
+            "missing_slots": [
+              "오후 세 시",
+              "옛 노래 시간"
+            ],
+            "tokens": 529,
+            "empty": false
+          },
+          "q-p5-kite-grandchild-multi-68": {
+            "missing_slots": [
+              "종이",
+              "바람개비"
+            ],
+            "tokens": 377,
+            "empty": false
+          },
+          "q-p5-book-donation-unanswerable-69": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-book-donation-false_premise-70": {
+            "missing_slots": [],
+            "tokens": 819,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ambiguity-71": {
+            "missing_slots": [],
+            "tokens": 828,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ordinary_chat-72": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-watercolor-single-9": {
+            "missing_slots": [],
+            "tokens": 369,
+            "empty": false
+          },
+          "q-p1-watercolor-single-10": {
+            "missing_slots": [
+              "바람 쉬는 섬"
+            ],
+            "tokens": 141,
+            "empty": false
+          },
+          "q-p1-library-helper-multi-11": {
+            "missing_slots": [
+              "화요일 오후"
+            ],
+            "tokens": 847,
+            "empty": false
+          },
+          "q-p1-camp-multi-12": {
+            "missing_slots": [
+              "정리상"
+            ],
+            "tokens": 346,
+            "empty": false
+          },
+          "q-p1-skateboard-unanswerable-13": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-skateboard-false_premise-14": {
+            "missing_slots": [],
+            "tokens": 367,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ambiguity-15": {
+            "missing_slots": [
+              "시온이네 집"
+            ],
+            "tokens": 673,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ordinary_chat-16": {
+            "missing_slots": [],
+            "tokens": 465,
+            "empty": false
+          },
+          "q-p2-film-club-single-25": {
+            "missing_slots": [],
+            "tokens": 359,
+            "empty": false
+          },
+          "q-p2-film-club-single-26": {
+            "missing_slots": [],
+            "tokens": 490,
+            "empty": false
+          },
+          "q-p2-coffee-grinder-multi-27": {
+            "missing_slots": [],
+            "tokens": 868,
+            "empty": false
+          },
+          "q-p2-food-volunteer-multi-28": {
+            "missing_slots": [],
+            "tokens": 950,
+            "empty": false
+          },
+          "q-p2-car-repair-unanswerable-29": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-car-repair-false_premise-30": {
+            "missing_slots": [],
+            "tokens": 657,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ambiguity-31": {
+            "missing_slots": [
+              "회사 선배 결혼식"
+            ],
+            "tokens": 698,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ordinary_chat-32": {
+            "missing_slots": [],
+            "tokens": 848,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-41": {
+            "missing_slots": [],
+            "tokens": 593,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-42": {
+            "missing_slots": [
+              "어릴 때 쓰던",
+              "줄무늬 베개 커버",
+              "잘라"
+            ],
+            "tokens": 517,
+            "empty": false
+          },
+          "q-p3-temple-walk-multi-43": {
+            "missing_slots": [],
+            "tokens": 390,
+            "empty": false
+          },
+          "q-p3-phone-class-multi-44": {
+            "missing_slots": [],
+            "tokens": 682,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-unanswerable-45": {
+            "missing_slots": [],
+            "tokens": 144,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-false_premise-46": {
+            "missing_slots": [],
+            "tokens": 211,
+            "empty": false
+          },
+          "q-p3-coast-trips-ambiguity-47": {
+            "missing_slots": [
+              "동네 모임",
+              "들깨칼국수"
+            ],
+            "tokens": 936,
+            "empty": false
+          },
+          "q-p3-coast-trips-ordinary_chat-48": {
+            "missing_slots": [],
+            "tokens": 780,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-57": {
+            "missing_slots": [],
+            "tokens": 383,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-58": {
+            "missing_slots": [],
+            "tokens": 526,
+            "empty": false
+          },
+          "q-p4-night-train-multi-59": {
+            "missing_slots": [],
+            "tokens": 851,
+            "empty": false
+          },
+          "q-p4-exhibition-multi-60": {
+            "missing_slots": [
+              "금요일 오후"
+            ],
+            "tokens": 514,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-unanswerable-61": {
+            "missing_slots": [],
+            "tokens": 370,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-false_premise-62": {
+            "missing_slots": [],
+            "tokens": 211,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ambiguity-63": {
+            "missing_slots": [],
+            "tokens": 533,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ordinary_chat-64": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-bridge-outing-single-73": {
+            "missing_slots": [],
+            "tokens": 683,
+            "empty": false
+          },
+          "q-p5-bridge-outing-single-74": {
+            "missing_slots": [
+              "감자전"
+            ],
+            "tokens": 847,
+            "empty": false
+          },
+          "q-p5-woodwork-multi-75": {
+            "missing_slots": [
+              "현관 안쪽"
+            ],
+            "tokens": 219,
+            "empty": false
+          },
+          "q-p5-dog-walk-multi-76": {
+            "missing_slots": [
+              "우체통 앞"
+            ],
+            "tokens": 368,
+            "empty": false
+          },
+          "q-p5-singing-group-unanswerable-77": {
+            "missing_slots": [],
+            "tokens": 146,
+            "empty": false
+          },
+          "q-p5-singing-group-false_premise-78": {
+            "missing_slots": [],
+            "tokens": 195,
+            "empty": false
+          },
+          "q-p5-garden-meals-ambiguity-79": {
+            "missing_slots": [],
+            "tokens": 694,
+            "empty": false
+          },
+          "q-p5-garden-meals-ordinary_chat-80": {
+            "missing_slots": [],
+            "tokens": 343,
+            "empty": false
+          }
+        }
+      }
+    },
+    "B_v2": {
+      "dev": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 29,
+        "slot_hits": 92,
+        "required_slots": 94,
+        "unanswerable": 5,
+        "unanswerable_empty": 4,
+        "ordinary": 5,
+        "ordinary_empty": 4,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1432.5,
+        "max_evidence_tokens": 1971,
+        "per_question": {
+          "q-p1-school-stage-single-1": {
+            "missing_slots": [],
+            "tokens": 1482,
+            "empty": false
+          },
+          "q-p1-school-stage-single-2": {
+            "missing_slots": [],
+            "tokens": 1487,
+            "empty": false
+          },
+          "q-p1-robot-club-multi-3": {
+            "missing_slots": [],
+            "tokens": 1459,
+            "empty": false
+          },
+          "q-p1-bus-card-multi-4": {
+            "missing_slots": [],
+            "tokens": 1434,
+            "empty": false
+          },
+          "q-p1-umbrella-unanswerable-5": {
+            "missing_slots": [],
+            "tokens": 1434,
+            "empty": false
+          },
+          "q-p1-umbrella-false_premise-6": {
+            "missing_slots": [],
+            "tokens": 1239,
+            "empty": false
+          },
+          "q-p1-study-spots-ambiguity-7": {
+            "missing_slots": [],
+            "tokens": 1933,
+            "empty": false
+          },
+          "q-p1-study-spots-ordinary_chat-8": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-moving-house-single-17": {
+            "missing_slots": [],
+            "tokens": 1925,
+            "empty": false
+          },
+          "q-p2-moving-house-single-18": {
+            "missing_slots": [],
+            "tokens": 1047,
+            "empty": false
+          },
+          "q-p2-dog-sitting-multi-19": {
+            "missing_slots": [],
+            "tokens": 1823,
+            "empty": false
+          },
+          "q-p2-bread-class-multi-20": {
+            "missing_slots": [],
+            "tokens": 1971,
+            "empty": false
+          },
+          "q-p2-deadline-unanswerable-21": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-deadline-false_premise-22": {
+            "missing_slots": [],
+            "tokens": 1467,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ambiguity-23": {
+            "missing_slots": [],
+            "tokens": 1936,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ordinary_chat-24": {
+            "missing_slots": [],
+            "tokens": 1783,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-33": {
+            "missing_slots": [],
+            "tokens": 1490,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-34": {
+            "missing_slots": [],
+            "tokens": 1053,
+            "empty": false
+          },
+          "q-p3-kimchi-sharing-multi-35": {
+            "missing_slots": [],
+            "tokens": 1461,
+            "empty": false
+          },
+          "q-p3-balcony-plants-multi-36": {
+            "missing_slots": [],
+            "tokens": 1492,
+            "empty": false
+          },
+          "q-p3-fridge-repair-unanswerable-37": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p3-fridge-repair-false_premise-38": {
+            "missing_slots": [],
+            "tokens": 1543,
+            "empty": false
+          },
+          "q-p3-market-visits-ambiguity-39": {
+            "missing_slots": [],
+            "tokens": 1431,
+            "empty": false
+          },
+          "q-p3-market-visits-ordinary_chat-40": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-conference-single-49": {
+            "missing_slots": [],
+            "tokens": 1140,
+            "empty": false
+          },
+          "q-p4-conference-single-50": {
+            "missing_slots": [],
+            "tokens": 1932,
+            "empty": false
+          },
+          "q-p4-mentoring-multi-51": {
+            "missing_slots": [],
+            "tokens": 1487,
+            "empty": false
+          },
+          "q-p4-running-multi-52": {
+            "missing_slots": [],
+            "tokens": 1480,
+            "empty": false
+          },
+          "q-p4-plant-sitting-unanswerable-53": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-plant-sitting-false_premise-54": {
+            "missing_slots": [],
+            "tokens": 1288,
+            "empty": false
+          },
+          "q-p4-interview-venues-ambiguity-55": {
+            "missing_slots": [],
+            "tokens": 1303,
+            "empty": false
+          },
+          "q-p4-interview-venues-ordinary_chat-56": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-school-reunion-single-65": {
+            "missing_slots": [],
+            "tokens": 1138,
+            "empty": false
+          },
+          "q-p5-school-reunion-single-66": {
+            "missing_slots": [],
+            "tokens": 1894,
+            "empty": false
+          },
+          "q-p5-old-radio-multi-67": {
+            "missing_slots": [],
+            "tokens": 1109,
+            "empty": false
+          },
+          "q-p5-kite-grandchild-multi-68": {
+            "missing_slots": [
+              "종이",
+              "바람개비"
+            ],
+            "tokens": 1336,
+            "empty": false
+          },
+          "q-p5-book-donation-unanswerable-69": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-book-donation-false_premise-70": {
+            "missing_slots": [],
+            "tokens": 1427,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ambiguity-71": {
+            "missing_slots": [],
+            "tokens": 1287,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ordinary_chat-72": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          }
+        }
+      },
+      "test": {
+        "questions": 40,
+        "factual": 30,
+        "all_slots_covered": 28,
+        "slot_hits": 89,
+        "required_slots": 92,
+        "unanswerable": 5,
+        "unanswerable_empty": 2,
+        "ordinary": 5,
+        "ordinary_empty": 1,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1451.5,
+        "max_evidence_tokens": 1997,
+        "per_question": {
+          "q-p1-watercolor-single-9": {
+            "missing_slots": [],
+            "tokens": 1254,
+            "empty": false
+          },
+          "q-p1-watercolor-single-10": {
+            "missing_slots": [],
+            "tokens": 1077,
+            "empty": false
+          },
+          "q-p1-library-helper-multi-11": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p1-camp-multi-12": {
+            "missing_slots": [],
+            "tokens": 1485,
+            "empty": false
+          },
+          "q-p1-skateboard-unanswerable-13": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-skateboard-false_premise-14": {
+            "missing_slots": [],
+            "tokens": 1285,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ambiguity-15": {
+            "missing_slots": [],
+            "tokens": 1441,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ordinary_chat-16": {
+            "missing_slots": [],
+            "tokens": 1267,
+            "empty": false
+          },
+          "q-p2-film-club-single-25": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p2-film-club-single-26": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p2-coffee-grinder-multi-27": {
+            "missing_slots": [],
+            "tokens": 1462,
+            "empty": false
+          },
+          "q-p2-food-volunteer-multi-28": {
+            "missing_slots": [
+              "다음 달 둘째 일요일"
+            ],
+            "tokens": 1176,
+            "empty": false
+          },
+          "q-p2-car-repair-unanswerable-29": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-car-repair-false_premise-30": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ambiguity-31": {
+            "missing_slots": [],
+            "tokens": 1505,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ordinary_chat-32": {
+            "missing_slots": [],
+            "tokens": 1993,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-41": {
+            "missing_slots": [],
+            "tokens": 1551,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-42": {
+            "missing_slots": [],
+            "tokens": 1466,
+            "empty": false
+          },
+          "q-p3-temple-walk-multi-43": {
+            "missing_slots": [],
+            "tokens": 1297,
+            "empty": false
+          },
+          "q-p3-phone-class-multi-44": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-unanswerable-45": {
+            "missing_slots": [],
+            "tokens": 1689,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-false_premise-46": {
+            "missing_slots": [],
+            "tokens": 1813,
+            "empty": false
+          },
+          "q-p3-coast-trips-ambiguity-47": {
+            "missing_slots": [
+              "동네 모임",
+              "들깨칼국수"
+            ],
+            "tokens": 1832,
+            "empty": false
+          },
+          "q-p3-coast-trips-ordinary_chat-48": {
+            "missing_slots": [],
+            "tokens": 1997,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-57": {
+            "missing_slots": [],
+            "tokens": 1303,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-58": {
+            "missing_slots": [],
+            "tokens": 1481,
+            "empty": false
+          },
+          "q-p4-night-train-multi-59": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p4-exhibition-multi-60": {
+            "missing_slots": [],
+            "tokens": 1279,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-unanswerable-61": {
+            "missing_slots": [],
+            "tokens": 1727,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-false_premise-62": {
+            "missing_slots": [],
+            "tokens": 1713,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ambiguity-63": {
+            "missing_slots": [],
+            "tokens": 1490,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ordinary_chat-64": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-bridge-outing-single-73": {
+            "missing_slots": [],
+            "tokens": 1296,
+            "empty": false
+          },
+          "q-p5-bridge-outing-single-74": {
+            "missing_slots": [],
+            "tokens": 1772,
+            "empty": false
+          },
+          "q-p5-woodwork-multi-75": {
+            "missing_slots": [],
+            "tokens": 1470,
+            "empty": false
+          },
+          "q-p5-dog-walk-multi-76": {
+            "missing_slots": [],
+            "tokens": 1478,
+            "empty": false
+          },
+          "q-p5-singing-group-unanswerable-77": {
+            "missing_slots": [],
+            "tokens": 1100,
+            "empty": false
+          },
+          "q-p5-singing-group-false_premise-78": {
+            "missing_slots": [],
+            "tokens": 1100,
+            "empty": false
+          },
+          "q-p5-garden-meals-ambiguity-79": {
+            "missing_slots": [],
+            "tokens": 1301,
+            "empty": false
+          },
+          "q-p5-garden-meals-ordinary_chat-80": {
+            "missing_slots": [],
+            "tokens": 1240,
+            "empty": false
+          }
+        }
+      },
+      "all": {
+        "questions": 80,
+        "factual": 60,
+        "all_slots_covered": 57,
+        "slot_hits": 181,
+        "required_slots": 186,
+        "unanswerable": 10,
+        "unanswerable_empty": 6,
+        "ordinary": 10,
+        "ordinary_empty": 5,
+        "factual_empty": 0,
+        "median_evidence_tokens": 1449.0,
+        "max_evidence_tokens": 1997,
+        "per_question": {
+          "q-p1-school-stage-single-1": {
+            "missing_slots": [],
+            "tokens": 1482,
+            "empty": false
+          },
+          "q-p1-school-stage-single-2": {
+            "missing_slots": [],
+            "tokens": 1487,
+            "empty": false
+          },
+          "q-p1-robot-club-multi-3": {
+            "missing_slots": [],
+            "tokens": 1459,
+            "empty": false
+          },
+          "q-p1-bus-card-multi-4": {
+            "missing_slots": [],
+            "tokens": 1434,
+            "empty": false
+          },
+          "q-p1-umbrella-unanswerable-5": {
+            "missing_slots": [],
+            "tokens": 1434,
+            "empty": false
+          },
+          "q-p1-umbrella-false_premise-6": {
+            "missing_slots": [],
+            "tokens": 1239,
+            "empty": false
+          },
+          "q-p1-study-spots-ambiguity-7": {
+            "missing_slots": [],
+            "tokens": 1933,
+            "empty": false
+          },
+          "q-p1-study-spots-ordinary_chat-8": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-moving-house-single-17": {
+            "missing_slots": [],
+            "tokens": 1925,
+            "empty": false
+          },
+          "q-p2-moving-house-single-18": {
+            "missing_slots": [],
+            "tokens": 1047,
+            "empty": false
+          },
+          "q-p2-dog-sitting-multi-19": {
+            "missing_slots": [],
+            "tokens": 1823,
+            "empty": false
+          },
+          "q-p2-bread-class-multi-20": {
+            "missing_slots": [],
+            "tokens": 1971,
+            "empty": false
+          },
+          "q-p2-deadline-unanswerable-21": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-deadline-false_premise-22": {
+            "missing_slots": [],
+            "tokens": 1467,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ambiguity-23": {
+            "missing_slots": [],
+            "tokens": 1936,
+            "empty": false
+          },
+          "q-p2-seaside-weekends-ordinary_chat-24": {
+            "missing_slots": [],
+            "tokens": 1783,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-33": {
+            "missing_slots": [],
+            "tokens": 1490,
+            "empty": false
+          },
+          "q-p3-grandma-birthday-single-34": {
+            "missing_slots": [],
+            "tokens": 1053,
+            "empty": false
+          },
+          "q-p3-kimchi-sharing-multi-35": {
+            "missing_slots": [],
+            "tokens": 1461,
+            "empty": false
+          },
+          "q-p3-balcony-plants-multi-36": {
+            "missing_slots": [],
+            "tokens": 1492,
+            "empty": false
+          },
+          "q-p3-fridge-repair-unanswerable-37": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p3-fridge-repair-false_premise-38": {
+            "missing_slots": [],
+            "tokens": 1543,
+            "empty": false
+          },
+          "q-p3-market-visits-ambiguity-39": {
+            "missing_slots": [],
+            "tokens": 1431,
+            "empty": false
+          },
+          "q-p3-market-visits-ordinary_chat-40": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-conference-single-49": {
+            "missing_slots": [],
+            "tokens": 1140,
+            "empty": false
+          },
+          "q-p4-conference-single-50": {
+            "missing_slots": [],
+            "tokens": 1932,
+            "empty": false
+          },
+          "q-p4-mentoring-multi-51": {
+            "missing_slots": [],
+            "tokens": 1487,
+            "empty": false
+          },
+          "q-p4-running-multi-52": {
+            "missing_slots": [],
+            "tokens": 1480,
+            "empty": false
+          },
+          "q-p4-plant-sitting-unanswerable-53": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p4-plant-sitting-false_premise-54": {
+            "missing_slots": [],
+            "tokens": 1288,
+            "empty": false
+          },
+          "q-p4-interview-venues-ambiguity-55": {
+            "missing_slots": [],
+            "tokens": 1303,
+            "empty": false
+          },
+          "q-p4-interview-venues-ordinary_chat-56": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-school-reunion-single-65": {
+            "missing_slots": [],
+            "tokens": 1138,
+            "empty": false
+          },
+          "q-p5-school-reunion-single-66": {
+            "missing_slots": [],
+            "tokens": 1894,
+            "empty": false
+          },
+          "q-p5-old-radio-multi-67": {
+            "missing_slots": [],
+            "tokens": 1109,
+            "empty": false
+          },
+          "q-p5-kite-grandchild-multi-68": {
+            "missing_slots": [
+              "종이",
+              "바람개비"
+            ],
+            "tokens": 1336,
+            "empty": false
+          },
+          "q-p5-book-donation-unanswerable-69": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-book-donation-false_premise-70": {
+            "missing_slots": [],
+            "tokens": 1427,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ambiguity-71": {
+            "missing_slots": [],
+            "tokens": 1287,
+            "empty": false
+          },
+          "q-p5-fishing-spots-ordinary_chat-72": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-watercolor-single-9": {
+            "missing_slots": [],
+            "tokens": 1254,
+            "empty": false
+          },
+          "q-p1-watercolor-single-10": {
+            "missing_slots": [],
+            "tokens": 1077,
+            "empty": false
+          },
+          "q-p1-library-helper-multi-11": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p1-camp-multi-12": {
+            "missing_slots": [],
+            "tokens": 1485,
+            "empty": false
+          },
+          "q-p1-skateboard-unanswerable-13": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p1-skateboard-false_premise-14": {
+            "missing_slots": [],
+            "tokens": 1285,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ambiguity-15": {
+            "missing_slots": [],
+            "tokens": 1441,
+            "empty": false
+          },
+          "q-p1-birthday-plans-ordinary_chat-16": {
+            "missing_slots": [],
+            "tokens": 1267,
+            "empty": false
+          },
+          "q-p2-film-club-single-25": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p2-film-club-single-26": {
+            "missing_slots": [],
+            "tokens": 1449,
+            "empty": false
+          },
+          "q-p2-coffee-grinder-multi-27": {
+            "missing_slots": [],
+            "tokens": 1462,
+            "empty": false
+          },
+          "q-p2-food-volunteer-multi-28": {
+            "missing_slots": [
+              "다음 달 둘째 일요일"
+            ],
+            "tokens": 1176,
+            "empty": false
+          },
+          "q-p2-car-repair-unanswerable-29": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p2-car-repair-false_premise-30": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ambiguity-31": {
+            "missing_slots": [],
+            "tokens": 1505,
+            "empty": false
+          },
+          "q-p2-wedding-guests-ordinary_chat-32": {
+            "missing_slots": [],
+            "tokens": 1993,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-41": {
+            "missing_slots": [],
+            "tokens": 1551,
+            "empty": false
+          },
+          "q-p3-sewing-apron-single-42": {
+            "missing_slots": [],
+            "tokens": 1466,
+            "empty": false
+          },
+          "q-p3-temple-walk-multi-43": {
+            "missing_slots": [],
+            "tokens": 1297,
+            "empty": false
+          },
+          "q-p3-phone-class-multi-44": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-unanswerable-45": {
+            "missing_slots": [],
+            "tokens": 1689,
+            "empty": false
+          },
+          "q-p3-theatre-ticket-false_premise-46": {
+            "missing_slots": [],
+            "tokens": 1813,
+            "empty": false
+          },
+          "q-p3-coast-trips-ambiguity-47": {
+            "missing_slots": [
+              "동네 모임",
+              "들깨칼국수"
+            ],
+            "tokens": 1832,
+            "empty": false
+          },
+          "q-p3-coast-trips-ordinary_chat-48": {
+            "missing_slots": [],
+            "tokens": 1997,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-57": {
+            "missing_slots": [],
+            "tokens": 1303,
+            "empty": false
+          },
+          "q-p4-pottery-repair-single-58": {
+            "missing_slots": [],
+            "tokens": 1481,
+            "empty": false
+          },
+          "q-p4-night-train-multi-59": {
+            "missing_slots": [],
+            "tokens": 1454,
+            "empty": false
+          },
+          "q-p4-exhibition-multi-60": {
+            "missing_slots": [],
+            "tokens": 1279,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-unanswerable-61": {
+            "missing_slots": [],
+            "tokens": 1727,
+            "empty": false
+          },
+          "q-p4-workshop-notebook-false_premise-62": {
+            "missing_slots": [],
+            "tokens": 1713,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ambiguity-63": {
+            "missing_slots": [],
+            "tokens": 1490,
+            "empty": false
+          },
+          "q-p4-bookshop-talks-ordinary_chat-64": {
+            "missing_slots": [],
+            "tokens": 1,
+            "empty": true
+          },
+          "q-p5-bridge-outing-single-73": {
+            "missing_slots": [],
+            "tokens": 1296,
+            "empty": false
+          },
+          "q-p5-bridge-outing-single-74": {
+            "missing_slots": [],
+            "tokens": 1772,
+            "empty": false
+          },
+          "q-p5-woodwork-multi-75": {
+            "missing_slots": [],
+            "tokens": 1470,
+            "empty": false
+          },
+          "q-p5-dog-walk-multi-76": {
+            "missing_slots": [],
+            "tokens": 1478,
+            "empty": false
+          },
+          "q-p5-singing-group-unanswerable-77": {
+            "missing_slots": [],
+            "tokens": 1100,
+            "empty": false
+          },
+          "q-p5-singing-group-false_premise-78": {
+            "missing_slots": [],
+            "tokens": 1100,
+            "empty": false
+          },
+          "q-p5-garden-meals-ambiguity-79": {
+            "missing_slots": [],
+            "tokens": 1301,
+            "empty": false
+          },
+          "q-p5-garden-meals-ordinary_chat-80": {
+            "missing_slots": [],
+            "tokens": 1240,
+            "empty": false
+          }
+        }
+      }
+    }
+  },
+  "criteria": {
+    "R1": {
+      "actual": 57,
+      "minimum": 54,
+      "pass": true
+    },
+    "R2": {
+      "actual": 28,
+      "minimum": 27,
+      "pass": true
+    },
+    "R3": {
+      "actual": 2,
+      "minimum": 2,
+      "pass": true
+    },
+    "R4": {
+      "actual": 5,
+      "minimum": 5,
+      "pass": true
+    },
+    "R5": {
+      "actual": 1449.0,
+      "maximum": 1500,
+      "pass": true
+    }
+  },
+  "offline_pass": true,
+  "generation_criteria": "G1–G5 unmeasured; no adoption decision"
+}

@@ -1,0 +1,270 @@
+{
+  "dev": {
+    "questions": 40,
+    "ranking": {
+      "count": 30,
+      "recall_all": {
+        "1": 0.3333333333333333,
+        "3": 0.6666666666666666,
+        "5": 0.7666666666666667
+      },
+      "recall_any": {
+        "1": 0.6333333333333333,
+        "3": 0.9666666666666667,
+        "5": 1.0
+      },
+      "mrr": 0.7972222222222223
+    },
+    "multi_chunk": {
+      "count": 15,
+      "recall_all": {
+        "1": 0.0,
+        "3": 0.3333333333333333,
+        "5": 0.5333333333333333
+      },
+      "recall_any": {
+        "1": 0.6,
+        "3": 0.9333333333333333,
+        "5": 1.0
+      },
+      "mrr": 0.7833333333333333
+    },
+    "by_type": {
+      "ambiguity": {
+        "count": 5,
+        "recall_all": {
+          "1": 0.0,
+          "3": 0.2,
+          "5": 0.6
+        },
+        "recall_any": {
+          "1": 0.4,
+          "3": 0.8,
+          "5": 1.0
+        },
+        "mrr": 0.65
+      },
+      "false_premise": {
+        "count": 5,
+        "recall_all": {
+          "1": 0.4,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "recall_any": {
+          "1": 0.4,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.6666666666666667
+      },
+      "multi": {
+        "count": 10,
+        "recall_all": {
+          "1": 0.0,
+          "3": 0.4,
+          "5": 0.5
+        },
+        "recall_any": {
+          "1": 0.7,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.85
+      },
+      "ordinary_chat": {
+        "count": 0,
+        "recall_all": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "recall_any": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "mrr": null
+      },
+      "single": {
+        "count": 10,
+        "recall_all": {
+          "1": 0.8,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "recall_any": {
+          "1": 0.8,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.8833333333333334
+      },
+      "unanswerable": {
+        "count": 0,
+        "recall_all": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "recall_any": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "mrr": null
+      }
+    },
+    "no_evidence": {
+      "eligible": 35,
+      "unanswerable": 5,
+      "answerable": 30,
+      "true_positive": 4,
+      "false_positive": 0,
+      "false_negative": 1,
+      "true_negative": 30,
+      "precision": 1.0,
+      "recall": 0.8,
+      "f1": 0.888888888888889,
+      "false_empty_rate": 0.0,
+      "unsupported_acceptance_rate": 0.2
+    },
+    "selected_all_gold_recall": 0.7,
+    "ordinary_chat_count": 5,
+    "ordinary_chat_empty_rate": 0.8
+  },
+  "test": {
+    "questions": 40,
+    "ranking": {
+      "count": 30,
+      "recall_all": {
+        "1": 0.3333333333333333,
+        "3": 0.7,
+        "5": 0.8
+      },
+      "recall_any": {
+        "1": 0.7,
+        "3": 0.9,
+        "5": 0.9333333333333333
+      },
+      "mrr": 0.8148692810457516
+    },
+    "multi_chunk": {
+      "count": 15,
+      "recall_all": {
+        "1": 0.0,
+        "3": 0.6,
+        "5": 0.7333333333333333
+      },
+      "recall_any": {
+        "1": 0.7333333333333333,
+        "3": 1.0,
+        "5": 1.0
+      },
+      "mrr": 0.8666666666666667
+    },
+    "by_type": {
+      "ambiguity": {
+        "count": 5,
+        "recall_all": {
+          "1": 0.0,
+          "3": 0.8,
+          "5": 0.8
+        },
+        "recall_any": {
+          "1": 0.8,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.9
+      },
+      "false_premise": {
+        "count": 5,
+        "recall_all": {
+          "1": 0.6,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "recall_any": {
+          "1": 0.6,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.8
+      },
+      "multi": {
+        "count": 10,
+        "recall_all": {
+          "1": 0.0,
+          "3": 0.5,
+          "5": 0.7
+        },
+        "recall_any": {
+          "1": 0.7,
+          "3": 1.0,
+          "5": 1.0
+        },
+        "mrr": 0.85
+      },
+      "ordinary_chat": {
+        "count": 0,
+        "recall_all": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "recall_any": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "mrr": null
+      },
+      "single": {
+        "count": 10,
+        "recall_all": {
+          "1": 0.7,
+          "3": 0.7,
+          "5": 0.8
+        },
+        "recall_any": {
+          "1": 0.7,
+          "3": 0.7,
+          "5": 0.8
+        },
+        "mrr": 0.7446078431372549
+      },
+      "unanswerable": {
+        "count": 0,
+        "recall_all": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "recall_any": {
+          "1": null,
+          "3": null,
+          "5": null
+        },
+        "mrr": null
+      }
+    },
+    "no_evidence": {
+      "eligible": 35,
+      "unanswerable": 5,
+      "answerable": 30,
+      "true_positive": 2,
+      "false_positive": 0,
+      "false_negative": 3,
+      "true_negative": 30,
+      "precision": 1.0,
+      "recall": 0.4,
+      "f1": 0.5714285714285715,
+      "false_empty_rate": 0.0,
+      "unsupported_acceptance_rate": 0.6
+    },
+    "selected_all_gold_recall": 0.6666666666666666,
+    "ordinary_chat_count": 5,
+    "ordinary_chat_empty_rate": 0.2
+  }
+}
