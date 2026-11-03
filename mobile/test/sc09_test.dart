@@ -174,7 +174,7 @@ void main() {
   });
 
   testWidgets(
-    'speech requires disclosure, can cancel, replays cached audio and stops on dispose',
+    'every playback requires disclosure, including cached replay after stop or completion',
     (tester) async {
       final service = Sc09Service();
       final player = Sc09Player();
@@ -194,12 +194,23 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('듣기'));
       await tester.pumpAndSettle();
-      expect(find.text('합성한 목소리예요'), findsNothing);
+      expect(find.text('합성한 목소리예요'), findsOneWidget);
+      expect(service.syntheses, 1);
+      expect(player.plays, 1);
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(player.plays, 1);
+      await acceptSpeech(tester);
+      await tester.pumpAndSettle();
       expect(service.syntheses, 1);
       expect(player.plays, 2);
       player.done.add(null);
       await tester.pumpAndSettle();
       expect(find.text('듣기'), findsOneWidget);
+      await acceptSpeech(tester);
+      await tester.pumpAndSettle();
+      expect(service.syntheses, 1);
+      expect(player.plays, 3);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       expect(player.disposed, true);
@@ -222,6 +233,11 @@ void main() {
       expect(find.textContaining('답변 글은 그대로 볼 수 있어요'), findsOneWidget);
       service.speechFailure = null;
       await tester.tap(find.text('듣기 다시 시도'));
+      await tester.pumpAndSettle();
+      expect(find.text('합성한 목소리예요'), findsOneWidget);
+      expect(service.syntheses, 1);
+      expect(player.plays, 0);
+      await tester.tap(find.widgetWithText(FilledButton, '재생'));
       await tester.pumpAndSettle();
       expect(service.sends, 1);
       expect(service.syntheses, 2);

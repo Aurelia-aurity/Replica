@@ -64,7 +64,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late final StreamSubscription<Object> _audioErrors;
   int? _speechBusy, _playing;
   int _speechGeneration = 0;
-  bool _speechPrompt = false, _voiceAcknowledged = false;
+  bool _speechPrompt = false;
   bool _retryable = true;
   String _failureNotice = '응답을 받지 못했어요.';
 
@@ -264,32 +264,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _speechPrompt = true;
     final generationBeforePrompt = _speechGeneration;
     try {
-      if (!_voiceAcknowledged) {
-        final accepted = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('합성한 목소리예요'),
-            content: const Text('이 답변은 AI가 합성한 음성으로 재생돼요. 실제 인물이 말한 녹음이 아니에요.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('재생'),
-              ),
-            ],
-          ),
-        );
-        if (accepted != true ||
-            !mounted ||
-            generationBeforePrompt != _speechGeneration) {
-          return;
-        }
-        _voiceAcknowledged = true;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('합성한 목소리예요'),
+          content: const Text('이 답변은 AI가 합성한 음성으로 재생돼요. 실제 인물이 말한 녹음이 아니에요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('재생'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true ||
+          !mounted ||
+          generationBeforePrompt != _speechGeneration) {
+        return;
       }
-      if (!mounted) return;
       final generation = ++_speechGeneration;
       setState(() {
         _speechBusy = index;
