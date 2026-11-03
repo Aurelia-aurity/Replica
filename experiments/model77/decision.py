@@ -3,7 +3,6 @@
 import argparse
 from contextlib import contextmanager
 import ctypes
-from hashlib import sha256
 import importlib.metadata
 import json
 import math
@@ -22,6 +21,11 @@ def nearest_rank(values: list[float], quantile: float = 0.95) -> float:
     if not values or not 0 < quantile <= 1:
         raise ValueError("Invalid quantile or empty observations")
     return sorted(values)[math.ceil(len(values) * quantile) - 1]
+
+
+def nvml_uuid(cuda_uuid: str) -> str:
+    """PyTorch 2.7 reports bare UUIDs; nvidia-smi requires the GPU prefix."""
+    return "GPU-" + cuda_uuid.removeprefix("GPU-")
 
 
 def validate_bundle(bundle) -> None:
@@ -260,7 +264,8 @@ def run(args) -> None:
     props = torch.cuda.get_device_properties(0)
     import subprocess
     pci = subprocess.check_output([
-        "nvidia-smi", f"--id={props.uuid}", "--query-gpu=pci.bus_id", "--format=csv,noheader"
+        "nvidia-smi", f"--id={nvml_uuid(str(props.uuid))}",
+        "--query-gpu=pci.bus_id", "--format=csv,noheader"
     ], text=True).strip()
     sampler = DevicePeak(pci)
     phases = {}

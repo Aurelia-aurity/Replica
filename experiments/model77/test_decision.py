@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from decision import authorize, completed, nearest_rank, validate_bundle
+from decision import authorize, completed, nearest_rank, nvml_uuid, validate_bundle
 from prepare import content_hash, digest, save
 
 
@@ -28,6 +28,22 @@ def save_row(path, row):
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_bare_uuid_is_normalized(self):
+        # Given
+        value = "e70efa8a-37ca-255a-6dfd-a21aadbff558"
+        # When
+        result = nvml_uuid(value)
+        # Then
+        self.assertEqual(result, "GPU-" + value)
+
+    def test_prefixed_uuid_is_not_doubled(self):
+        # Given
+        value = "GPU-e70efa8a-37ca-255a-6dfd-a21aadbff558"
+        # When
+        result = nvml_uuid(value)
+        # Then
+        self.assertEqual(result, value)
+
     def test_valid_interleaved_schedule(self):
         # Given
         bundle = fixture()
