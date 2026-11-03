@@ -201,7 +201,7 @@ DB 함수가 돌려주는 JSON dict의 키입니다. 앱에 보내는 필드는 
 | stt_attempt, llm_attempt, tts_attempt | integer | 단계별 시도 번호 |
 | stt_started_at, llm_started_at, tts_started_at | datetime \| null | 단계 시작 시각 |
 | model_name | string \| null | 모델 이름 |
-| llm_request_id | uuid \| null | 가장 최근 LLM 시도의 AI 요청 ID. `start_chat_stage(request_id)`로 AI 호출 전에 기록하고 같은 값으로 마무리함. 다른 턴과 겹칠 수 없고, 새 LLM 시도를 시작하면 비워지며, 답변이 완료되면 바꿀 수 없음. **앱에 보내지 않음** |
+| llm_request_id | uuid \| null | 가장 최근 LLM 시도의 AI 요청 ID. `start_chat_stage(request_id)`로 AI 호출 전에 기록하고 같은 값으로 마무리함. 다른 턴과 겹칠 수 없고, 새 LLM 시도를 시작하면 이전 값이 비워짐. `request_id`를 넘기는 시작은 같은 트랜잭션에서 새 ID를 저장하며, 이미 쓰인 ID이면 시작 전체가 취소됨. 답변이 완료되면 바꿀 수 없음. **앱에 보내지 않음** |
 | finish_reason | string \| null | LLM 성공 때 저장하는 종료 사유 `stop` · `length`(둘 다 성공). 답변이 완료(`done`)된 턴에만 값이 있고, 새 LLM 시도를 시작하면 비워짐. 앱 턴 객체의 `finish_reason`으로 **제공(제안)** |
 | stt_ms, llm_ms, tts_ms, total_ms | integer \| null | 소요 시간(ms). `stt_ms`는 음성 턴에서만 |
 | error_message | string \| null | 실패 코드 |
