@@ -65,6 +65,8 @@ def main() -> None:
     parser.add_argument("--bundles", nargs="+", type=Path, required=True)
     parser.add_argument("--tokenizers", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--normal-only", action="store_true",
+                        help="Audit normal prompts without packing DEV memory probes")
     args = parser.parse_args()
     report = {"ceiling": 4096, "generation_performed": False, "models": {}}
     profiles = json.loads(Path(__file__).with_name("profiles.json").read_text())
@@ -85,7 +87,7 @@ def main() -> None:
                 "max_tokens": max(r["tokens"] for r in rows),
                 "violations": [r for r in rows if r["tokens"] > 4096],
             }
-            if bundle["split"] == "dev":
+            if bundle["split"] == "dev" and not args.normal_only:
                 stress = [pack_stress(tokenizer, row, profile) for row in bundle["stress"]]
                 stress_path = args.output / f"stress-{name}.json"
                 payload = {"dev_bundle_sha256": digest(path), "rows": stress}

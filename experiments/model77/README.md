@@ -132,3 +132,50 @@ The signed file is an execution interlock, not a cryptographic signature.
 records hashes, runtime versions, template and unchanged official `rope_scaling`.
 Kanana-2 uses official YaRN factor 40 even at short context; its warning does not
 change the configuration. Quality impact is unmeasured.
+
+## Opt-in register instruction (ROUND 2)
+
+The default `r1` messages and preparation output remain byte-identical.
+`prepare.py --prompt-version r1-reg` opts in to the register instruction.
+For an already frozen r1 bundle, avoid re-exporting retrieval:
+
+```bash
+python3 experiments/model77/prompt.py --prompt-version r1-reg \
+  --bundle DEV_R1_BUNDLE --output NEW_DEV_VARIANT_BUNDLE
+python3 experiments/model77/audit.py --normal-only \
+  --bundles NEW_DEV_VARIANT_BUNDLE --tokenizers TOKENIZER_DIRECTORY \
+  --output NEW_AUDIT_DIRECTORY
+```
+
+`register-template.json` defines one shared instruction with a rule selected by
+the persona JSON's register. Every model receives the same semantic messages.
+It covers the three DEV registers and the `다정한 반말` alias; unknown registers
+fail rather than silently falling back. Examples are newly written generic
+sentences, not taken from evaluation records. The bundle stores the template
+file SHA-256, version and parent r1 content hash. Only system messages change;
+questions, evidence, schedules, generation settings and model profiles do not.
+
+`decision.py --normal-only` is restricted to DEV. It skips all memory-probe
+loading/execution but retains six warmups and every normal B/C call. Audit
+`--normal-only` skips stress packing and still checks every normal native-template
+prompt for the 4096-token ceiling. The normal default retains stress behavior.
+The `dev-reg` wrapper mode selects `inputs/dev-r1-reg/bundle.json` and
+`inputs/r1-reg/audit-dev.json`. `MODEL77_ROOT` may select a separate remote root
+to preserve round-1 sources; its default remains `/abr/coss40/model-77`.
+
+```bash
+sbatch --export=ALL,MODEL77_ROOT=ROUND2_REMOTE_ROOT \
+  experiments/model77/decision.sbatch dev-reg
+```
+
+`register_check.py` accepts DEV only, excludes warmups/stress, checks exact normal
+row coverage, and emits an ending-based diagnostic plus the full reading sheet.
+Its counts are not the frozen Terra style judge or S1-S6 acceptance results.
+Quotes are excluded from heuristic ending checks; ambiguous endings and nominal
+fragments need human reading. Length and meta-language flags are diagnostics.
+
+Before a separately authorized new heldout run, apply the final variant to the
+**new** r1 bundle and audit it with every tokenizer using the same `prompt.py`
+and `audit.py` commands. The audit supports DEV plus that new bundle together;
+generation authorization remains separate. ROUND 2 DEV work does not open,
+transform or audit round-1 heldout files or round-1 decision outputs.

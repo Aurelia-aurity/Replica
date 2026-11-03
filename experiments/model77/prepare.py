@@ -143,6 +143,9 @@ def prepare(args) -> None:
                 "target_input_tokens": probe["target_input_tokens"],
                 "min_new_tokens": probe["min_new_tokens"],
             })
+    if args.prompt_version != "r1":
+        from prompt import variant_bundle
+        bundle = variant_bundle(bundle, args.prompt_version)
     save(destination / "bundle.json", bundle)
     save(destination / "manifest.json", {
         "corpus_sha256": digest(args.corpus), "protocol_sha256": digest(args.protocol),
@@ -155,6 +158,9 @@ def prepare(args) -> None:
         "artifacts": {p: digest(destination / p) for p in
                       ("evidence.json", "coverage.json", "bundle.json")},
         "generation_performed": False,
+        **({"prompt_version": args.prompt_version,
+            "register_template_sha256": bundle["register_template_sha256"]}
+           if args.prompt_version != "r1" else {}),
     })
     print(json.dumps({"split": split, "bundle_sha256": digest(destination / "bundle.json"),
                       "coverage": json.loads((destination / "coverage.json").read_text())}), flush=True)
@@ -164,6 +170,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ("rag", "corpus", "r1", "protocol", "dev-spec", "output"):
         parser.add_argument("--" + flag, required=True, type=Path)
+    parser.add_argument("--prompt-version", choices=("r1", "r1-reg"), default="r1")
     args = parser.parse_args()
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"

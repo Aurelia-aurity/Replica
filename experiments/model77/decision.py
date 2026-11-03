@@ -163,6 +163,8 @@ def run(args) -> None:
     validate_bundle(bundle)
     validate_bundle(dev)
     authorize(bundle, args.authorize_decision, args.bundle)
+    if args.normal_only and bundle["split"] != "dev":
+        raise ValueError("Normal-only execution is restricted to DEV")
     if dev["split"] != "dev":
         raise ValueError("Warmup/stress bundle must be DEV")
     if bundle["protocol_sha256"] != dev["protocol_sha256"]:
@@ -192,14 +194,18 @@ def run(args) -> None:
     if digest(Path(__file__).with_name("profiles.json")) != bundle["profiles_sha256"]:
         raise ValueError("Profiles changed after preparation")
     stress_path = args.stress
-    if digest(stress_path) != audit["stress_sha256"]:
-        raise ValueError("Stress pack differs from audit")
-    packed = json.loads(stress_path.read_text())
-    if packed["dev_bundle_sha256"] != digest(args.dev_bundle):
-        raise ValueError("Stress pack belongs to a different DEV bundle")
-    stress = packed["rows"]
-    if [r["id"] for r in stress] != [r["id"] for r in dev["stress"]]:
-        raise ValueError("Stress IDs mismatch")
+    stress = []
+    if not args.normal_only:
+        if stress_path is None:
+            raise ValueError("Supply --stress unless --normal-only is selected")
+        if digest(stress_path) != audit["stress_sha256"]:
+            raise ValueError("Stress pack differs from audit")
+        packed = json.loads(stress_path.read_text())
+        if packed["dev_bundle_sha256"] != digest(args.dev_bundle):
+            raise ValueError("Stress pack belongs to a different DEV bundle")
+        stress = packed["rows"]
+        if [r["id"] for r in stress] != [r["id"] for r in dev["stress"]]:
+            raise ValueError("Stress IDs mismatch")
     tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=False)
     if content_hash(tokenizer.chat_template) != audit["template_sha256"]:
         raise ValueError("Native template mismatch")
@@ -211,7 +217,9 @@ def run(args) -> None:
             raise ValueError("Stress packing mismatch")
     frozen = {
         "bundle_sha256": digest(args.bundle), "dev_bundle_sha256": digest(args.dev_bundle),
-        "audit_sha256": digest(args.audit), "stress_sha256": digest(stress_path),
+        "audit_sha256": digest(args.audit),
+        "stress_sha256": digest(stress_path) if not args.normal_only else None,
+        "normal_only": args.normal_only,
         "profile": json.loads(Path(__file__).with_name("profiles.json").read_text())[name],
         "code_sha256": {p: digest(Path(__file__).with_name(p)) for p in
                         ("decision.py", "prepare.py", "audit.py", "smoke.py")},
@@ -374,8 +382,11 @@ def run(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    for flag in ("bundle", "dev-bundle", "audit", "stress", "output"):
+    for flag in ("bundle", "dev-bundle", "audit", "output"):
         parser.add_argument("--" + flag, type=Path, required=True)
+    parser.add_argument("--stress", type=Path)
+    parser.add_argument("--normal-only", action="store_true",
+                        help="DEV warmups and normal calls only; no memory probes")
     parser.add_argument("--model", required=True)
     parser.add_argument("--authorize-decision", type=Path)
     args = parser.parse_args()
