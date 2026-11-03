@@ -1,4 +1,4 @@
-"""Loopback-only baseline HTTP API. Service authentication is deferred."""
+"""Loopback-only inference API. Production persona generation remains gated."""
 import json
 import logging
 import math
@@ -9,6 +9,8 @@ import time
 
 import baseline
 from inference import ContextLimitExceeded, Inference, Request
+import persona_contract
+from persona_adapter import PersonaGenerator
 
 RAW_LIMIT = 262144
 ID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -77,7 +79,8 @@ class Job:
 
 class Service:
     """One mutable slot, reserved and released under the same lock."""
-    def __init__(self, engine=None, deadline_seconds: float | None = None, auth=allow_service):
+    def __init__(self, engine=None, deadline_seconds: float | None = None, auth=allow_service,
+                 persona_generator: PersonaGenerator | None = None):
         if deadline_seconds is not None and (
                 not math.isfinite(deadline_seconds) or deadline_seconds <= 0):
             raise ValueError
@@ -90,6 +93,14 @@ class Service:
         self.deadline_seconds = deadline_seconds
         self.auth = auth
         self.loader = None
+        # Q1/Q2/Q13/Q14 pending: CLI never installs a production persona generator.
+        # Explicit injection exercises the route without selecting a model protocol.
+        self.persona_generator = persona_generator
+
+    def engine_for(self, request):
+        if isinstance(request, persona_contract.PersonaRequest):
+            return self.persona_generator
+        return self.engine
 
     def start_loading(self, factory) -> None:
         """Publish readiness only after one successful background load."""
@@ -107,7 +118,7 @@ class Service:
         self.loader = threading.Thread(target=load, daemon=True)
         self.loader.start()
 
-    def accept(self, request: Request, prepared):
+    def accept(self, request: Request | persona_contract.PersonaRequest, prepared):
         with self.lock:
             if self.active_id == request.request_id:
                 return 409, None
@@ -123,20 +134,23 @@ class Service:
                 return 500, None
             return 200, job
 
-    def _generate(self, request: Request, prepared, job: Job) -> None:
+    def _generate(self, request: Request | persona_contract.PersonaRequest, prepared, job: Job) -> None:
         start = time.monotonic()
         output_tokens = 0
         try:
-            result = self.engine.generate(request, prepared)
+            result = self.engine_for(request).generate(request, prepared)
             output_tokens = result.output_tokens
             if not result.message.strip():
                 raise ValueError
             job.status = 200
-            job.body = {
-                "request_id": request.request_id, "message": result.message,
-                "finish_reason": result.finish_reason, "ai_generated": True,
-                "context": {"used_history_turns": prepared.used_history_turns,
-                            "dropped_history_turns": prepared.dropped_history_turns}}
+            if isinstance(request, persona_contract.PersonaRequest):
+                job.body = persona_contract.success_body(request, prepared, result)
+            else:
+                job.body = {
+                    "request_id": request.request_id, "message": result.message,
+                    "finish_reason": result.finish_reason, "ai_generated": True,
+                    "context": {"used_history_turns": prepared.used_history_turns,
+                                "dropped_history_turns": prepared.dropped_history_turns}}
         except Exception:
             # Compute boundary: all failures map to the safe fixed envelope.
             job.status, job.body = 500, error_body(500, request.request_id)
@@ -195,7 +209,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.started = time.monotonic()
-        if self.path != "/v1/baseline/generate":
+        if self.path not in ("/v1/baseline/generate", "/v1/persona/generate"):
             self.send_error(404)
             return
         service = self.server.service
@@ -230,7 +244,11 @@ class Handler(BaseHTTPRequestHandler):
                 request_id = data["request_id"]
             if self.headers.get_content_type() != "application/json":
                 raise ValueError
-            request = parse_request(data)
+            request = (persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
+                       else parse_request(data))
+        except persona_contract.PayloadTooLarge:
+            self.respond(413, error_body(413, request_id))
+            return
         except (ValueError, UnicodeError, RecursionError):
             self.respond(400, error_body(400, request_id))
             return
@@ -238,11 +256,12 @@ class Handler(BaseHTTPRequestHandler):
                 or any(len(text) > 16000 for pair in request.history for text in pair)):
             self.respond(413, error_body(413, request_id))
             return
-        if not service.ready.is_set():
+        engine = service.engine_for(request)
+        if not service.ready.is_set() or engine is None:
             self.respond(503, error_body(503, request_id))
             return
         try:
-            prepared = service.engine.prepare(request)
+            prepared = engine.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
