@@ -1,0 +1,63 @@
+{
+  "request_id": "00000071-0000-4000-8000-000000000071",
+  "persona_id": "00000002-0002-4002-8002-000000000002",
+  "source_snapshot_id": "00000064-0000-4000-8000-000000000064",
+  "node_id": "00000067-0000-4000-8000-000000000067",
+  "source_revision": 3,
+  "inputs": [
+    {
+      "node_id": "00000065-0000-4000-8000-000000000065",
+      "profile_content": {
+        "schema_version": 1,
+        "speech_style": {
+          "tone": [
+            "다정한 어조"
+          ],
+          "address_terms": [
+            "너"
+          ],
+          "sentence_endings": [
+            "~니?",
+            "~지."
+          ],
+          "frequent_expressions": [
+            "밥은 챙겨 먹었니?"
+          ]
+        },
+        "conversation_habits": [
+          "안부를 물으며 대화를 시작함"
+        ],
+        "limitations": [
+          "소량의 자료를 분석한 결과임"
+        ]
+      }
+    },
+    {
+      "node_id": "00000066-0000-4000-8000-000000000066",
+      "profile_content": {
+        "schema_version": 1,
+        "speech_style": {
+          "tone": [
+            "다정한 어조"
+          ],
+          "address_terms": [
+            "너"
+          ],
+          "sentence_endings": [
+            "~니?",
+            "~지."
+          ],
+          "frequent_expressions": [
+            "너무 무리하지 마."
+          ]
+        },
+        "conversation_habits": [
+          "안부를 물으며 대화를 시작함"
+        ],
+        "limitations": [
+          "소량의 자료를 분석한 결과임"
+        ]
+      }
+    }
+  ]
+}

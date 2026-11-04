@@ -1,0 +1,23 @@
+{
+  "synthetic_only": true,
+  "expectation_policy": "Additive explicit outcomes frozen before informational-request matcher implementation, after user source clarification. Original cases.json remains unchanged. No new generation or judge evaluation.",
+  "identities": {
+    "grandfather": {"relationship_aliases": ["할아버지", "할아버님"], "name_aliases": ["온유"], "register": "하게체"},
+    "mother": {"relationship_aliases": ["엄마", "어머니"], "name_aliases": ["다온"], "register": "다정한 반말"},
+    "senior": {"relationship_aliases": ["선배", "선배님"], "name_aliases": ["여울"], "register": "해요체"}
+  },
+  "cases": [
+    {"id":"r01","identity":"grandfather","mode":"unknown","input":"모임에서 바꿔 온 수집품은 어디에 뒀어?","output":"할아버지께서는 모임에서 바꿔 오신 수집품을 어디에 넣으셨는지에 대해 말씀해 주시면 좋겠습니다. 제가 직접 확인할 수 있는 정보는 없으니, 할아버지께서 기억하시면 알려 주시면 감사하겠습니다.","expected":"replace"},
+    {"id":"r02","identity":"grandfather","mode":"deceased","input":"어디에 뒀어?","output":"할아버지께서 기억하시면 알려 주시면 감사하겠습니다.","expected":"replace"},
+    {"id":"r03","identity":"grandfather","mode":"living","input":"어디에 뒀어?","output":"온유님은 어디에 뒀는지 알려 주세요.","expected":"replace"},
+    {"id":"r04","identity":"mother","mode":"living","input":"어디에 뒀어?","output":"엄마는 어디에 뒀는지 말해 줘.","expected":"replace"},
+    {"id":"r05","identity":"senior","mode":"deceased","input":"어디에 뒀어요?","output":"선배님께서 알려 주시겠어요?","expected":"replace"},
+    {"id":"r06","identity":"grandfather","mode":"living","input":"엄마에게 물을까?","output":"엄마께서는 어디에 뒀는지 알려 주세요.","expected":"pass"},
+    {"id":"r07","identity":"grandfather","mode":"deceased","input":"그때 뭐라고 했어?","output":"할아버지께서는 어디에 넣었는지 말씀해 주셨네.","expected":"pass"},
+    {"id":"r08","identity":"grandfather","mode":"deceased","input":"그때 뭐랬어?","output":"“할아버지께서 알려 주세요.”라고 부탁했지.","expected":"pass"},
+    {"id":"r09","identity":"grandfather","mode":"living","input":"다른 온유는?","output":"소설 속 온유님은 어디에 뒀는지 알려 주세요.","expected":"pass"},
+    {"id":"r10","identity":"grandfather","mode":"deceased","input":"누가 알려 줘?","output":"할아버지께서는 엄마가 알려 주시면 좋겠어요.","expected":"pass"},
+    {"id":"r11","identity":"grandfather","mode":"deceased","input":"부탁할까?","output":"할아버지께서 알려 주지 마세요.","expected":"pass"},
+    {"id":"r12","identity":"grandfather","mode":"living","input":"그 사람은?","output":"내 할아버지께서는 어디에 뒀는지 알려 주세요.","expected":"pass"}
+  ]
+}

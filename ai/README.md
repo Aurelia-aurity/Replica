@@ -7,6 +7,10 @@
 - `configs/`: 공유 가능한 모델·추론·개인화 설정
 - `.env.example`: 비밀 값이 없는 설정 예시
 
+### 페르소나 가드 (`ai/src/persona_guard.py`)
+
+`PersonaIdentity`, `check_reply`, `GuardResult`를 제공하는 표준 라이브러리 기반 모듈과 추가형 프롬프트 규칙 템플릿 `PERSONA_RULES`입니다. 기본 프롬프트나 서비스 런타임/API 계약에는 적용되지 않았고 모델 품질 영향도 검증하지 않았습니다. 자세한 동작, 검증 결과와 한계는 [`experiments/persona_guard/README.md`](../experiments/persona_guard/README.md)를 참고하세요.
+
 ## 오프라인 baseline (#13)
 
 `src/baseline.py`는 학교 Slurm GPU 작업 셸에서 로컬 Qwen2.5-7B-Instruct를 BF16으로 실행하는 CLI입니다. API 서버와 개인화는 후속 과제입니다. 모델 가중치, 체크포인트, 개인 기록, 로컬 검색 색인은 커밋하지 않습니다. 비교·평가는 `experiments/`, 호출 계약은 `contracts/`에서 관리합니다.

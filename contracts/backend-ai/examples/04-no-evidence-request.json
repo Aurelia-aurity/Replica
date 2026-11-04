@@ -1,0 +1,40 @@
+{
+  "request_id": "00000013-0013-4013-8013-000000000013",
+  "persona_id": "00000002-0002-4002-8002-000000000002",
+  "source_revision": 3,
+  "message": "내가 어릴 때 가장 좋아했던 장난감이 뭐였지?",
+  "history": [],
+  "max_new_tokens": 160,
+  "style_profile": {
+    "id": "00000005-0005-4005-8005-000000000005",
+    "version": 2,
+    "source_revision": 3,
+    "content": {
+      "schema_version": 1,
+      "speech_style": {
+        "tone": [
+          "다정한 어조"
+        ],
+        "address_terms": [
+          "너"
+        ],
+        "sentence_endings": [
+          "~니?",
+          "~지."
+        ],
+        "frequent_expressions": [
+          "밥은 챙겨 먹었니?",
+          "너무 무리하지 마."
+        ]
+      },
+      "conversation_habits": [
+        "안부를 물으며 대화를 시작함"
+      ],
+      "limitations": [
+        "소량의 합성 자료를 단계별로 통합한 예시임"
+      ]
+    },
+    "source_snapshot_id": "00000064-0000-4000-8000-000000000064"
+  },
+  "evidence": []
+}

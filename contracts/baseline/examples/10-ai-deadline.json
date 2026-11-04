@@ -1,0 +1,22 @@
+{
+  "description": "10-ai-deadline",
+  "request": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "message": "오늘 공부를 어떻게 시작할까?",
+    "history": [],
+    "max_new_tokens": 160
+  },
+  "request_valid": true,
+  "conditions": {
+    "deadline_exceeded": true
+  },
+  "http_status": 504,
+  "response": {
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "error": {
+      "code": "INFERENCE_DEADLINE_EXCEEDED",
+      "message": "추론 마감 시간을 초과했습니다."
+    }
+  },
+  "transport_outcome": "received"
+}

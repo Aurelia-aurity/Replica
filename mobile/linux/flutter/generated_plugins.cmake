@@ -5,10 +5,13 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links_linux
   file_selector_linux
+  audioplayers_linux
+  record_linux
   url_launcher_linux
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  jni
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

@@ -1,0 +1,35 @@
+name: GitHub → Discord run alerts
+
+on:
+  workflow_run:
+    workflows: ["GitHub → Notion", "Notion ordinary request", "CI", "Backend tests"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    if: github.repository == 'Aurelia-aurity/Replica'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Send run outcome notification
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DISCORD_USER_MAP: ${{ vars.DISCORD_USER_MAP }}
+          DISCORD_EVENTS_MODE: ${{ vars.DISCORD_EVENTS_MODE }}
+          DISCORD_CI_WORKFLOWS: ${{ vars.DISCORD_CI_WORKFLOWS }}
+          PM_GITHUB_LOGIN: ${{ vars.PM_GITHUB_LOGIN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_PM_WEBHOOK_URL: ${{ secrets.DISCORD_PM_WEBHOOK_URL }}
+          DISCORD_SHADOW_WEBHOOK_URL: ${{ secrets.DISCORD_SHADOW_WEBHOOK_URL }}
+        run: python3 -B scripts/run_alerts.py

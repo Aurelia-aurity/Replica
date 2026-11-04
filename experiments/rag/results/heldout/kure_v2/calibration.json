@@ -1,0 +1,21 @@
+{
+  "threshold": 0.5458711981773378,
+  "policy": "max DEV unanswerable F1; tie: min false-empty; then min threshold",
+  "comparator": "no evidence iff top1 score < threshold",
+  "split": "dev",
+  "candidates": 36,
+  "detection": {
+    "eligible": 35,
+    "unanswerable": 5,
+    "answerable": 30,
+    "true_positive": 4,
+    "false_positive": 0,
+    "false_negative": 1,
+    "true_negative": 30,
+    "precision": 1.0,
+    "recall": 0.8,
+    "f1": 0.888888888888889,
+    "false_empty_rate": 0.0,
+    "unsupported_acceptance_rate": 0.2
+  }
+}
