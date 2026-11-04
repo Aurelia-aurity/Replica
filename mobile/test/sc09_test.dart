@@ -245,6 +245,64 @@ void main() {
     },
   );
 
+  testWidgets('reopened reply with stored speech is not requested again', (
+    tester,
+  ) async {
+    final service = Sc09Service();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(
+          service: service,
+          audioPlayer: Sc09Player(),
+          initialMessages: const [
+            (text: '지난 질문', isUser: true),
+            (text: '저장된 답변', isUser: false),
+          ],
+          initialReplies: const {
+            1: ChatReply(
+              text: '저장된 답변',
+              turnId: 'turn-stored',
+              ttsStatus: 'ready',
+            ),
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('듣기 불가'), findsOneWidget);
+    expect(find.text('듣기'), findsNothing);
+    expect(find.text('듣기 다시 시도'), findsNothing);
+    expect(find.textContaining('다시 받을 수 없어요'), findsOneWidget);
+    final button = tester.widget<OutlinedButton>(
+      find.ancestor(
+        of: find.text('듣기 불가'),
+        matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+    expect(service.syntheses, 0);
+  });
+
+  testWidgets('409 from TTS locks the button instead of offering a retry', (
+    tester,
+  ) async {
+    final service = Sc09Service()
+      ..speechFailure = BackendFailure.fromResponse(
+        statusCode: 409,
+        body: {
+          'error': {'code': 'CONFLICT', 'retryable': false},
+        },
+      );
+    await openAndSend(tester, service, player: Sc09Player());
+    await acceptSpeech(tester);
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 1);
+    expect(find.text('듣기 불가'), findsOneWidget);
+    expect(find.text('듣기 다시 시도'), findsNothing);
+    expect(find.textContaining('음성을 재생하지 못했어요'), findsNothing);
+    expect(find.text('합성 답변'), findsOneWidget);
+  });
+
   testWidgets(
     'late TTS completion after leaving screen never starts playback',
     (tester) async {
