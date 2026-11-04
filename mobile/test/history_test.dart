@@ -507,6 +507,81 @@ void main() {
     expect(service.sends.single.session, 'same-session');
   });
 
+  test(
+    '409 for a turn still in progress is retryable with the same turn ID',
+    () async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      final turnIds = <Object?>[];
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        turnIds.add(body['turn_id']);
+        if (turnIds.length == 1) {
+          return jsonResponse({
+            'error': {'code': 'CONFLICT', 'retryable': false},
+          }, status: 409);
+        }
+        return jsonResponse({
+          'turn_id': body['turn_id'],
+          'answer': '저장된 합성 답변',
+          'is_ai_generated': true,
+        });
+      });
+      addTearDown(client.close);
+      final chat = ConversationChatService(
+        HttpConversationService(
+          backend: BackendService(auth),
+          baseUrl: Uri.parse('http://localhost:8000'),
+          client: client,
+        ),
+        'same-session',
+      );
+      BackendFailure? failure;
+      try {
+        await chat.reply('질문');
+      } on BackendFailure catch (error) {
+        failure = error;
+      }
+      expect(failure?.code, turnInProgressCode);
+      expect(failure?.canRetry, isTrue);
+      expect(failure?.userMessage, contains('아직 답변을 만들고 있어요'));
+      expect(await chat.reply('질문'), '저장된 합성 답변');
+      expect(turnIds[0], turnIds[1]);
+    },
+  );
+
+  test('409 on non-send requests keeps the CONFLICT code', () async {
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn(
+      PreviewAuthService.emails.first,
+      PreviewAuthService.password,
+    );
+    final client = MockClient(
+      (_) async => jsonResponse({
+        'error': {'code': 'CONFLICT', 'retryable': false},
+      }, status: 409),
+    );
+    addTearDown(client.close);
+    final service = HttpConversationService(
+      backend: BackendService(auth),
+      baseUrl: Uri.parse('http://localhost:8000'),
+      client: client,
+    );
+    await expectLater(
+      service.delete('session-1'),
+      throwsA(
+        isA<BackendFailure>()
+            .having((error) => error.code, 'code', 'CONFLICT')
+            .having((error) => error.canRetry, 'canRetry', isFalse),
+      ),
+    );
+  });
+
   for (final detailed in [false, true]) {
     test(
       'late text success preserves retry UUID (detailed: $detailed)',
