@@ -40,33 +40,49 @@ class _ConversationRoute extends StatefulWidget {
 
 class _ConversationRouteState extends State<_ConversationRoute> {
   late final ConversationChatService _chat;
-  late DateTime _checkedAt;
-  Timer? _unlockTimer;
+  late Conversation _conversation;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    final conversation = widget.conversation;
-    _chat = ConversationChatService(widget.service, conversation.id);
-    _checkedAt = DateTime.now();
-    final unlockAt = conversation.pendingUntil(_checkedAt);
-    if (unlockAt != null) {
-      _unlockTimer = Timer(unlockAt.difference(_checkedAt), () {
-        setState(() => _checkedAt = unlockAt);
-      });
+    _conversation = widget.conversation;
+    _chat = ConversationChatService(widget.service, _conversation.id);
+    _scheduleRefresh();
+  }
+
+  void _scheduleRefresh() {
+    if (_conversation.pending) {
+      _refreshTimer = Timer(pendingTurnRefreshInterval, _refreshPendingTurns);
+    }
+  }
+
+  Future<void> _refreshPendingTurns() async {
+    try {
+      final latest = await widget.service.get(_conversation.id);
+      if (!mounted || latest.id != _conversation.id) return;
+      if (!latest.pending) {
+        setState(() => _conversation = latest);
+      }
+    } catch (_) {
+      // Keep the last confirmed status if history could not be refreshed.
+    } finally {
+      if (mounted) _scheduleRefresh();
     }
   }
 
   @override
   void dispose() {
-    _unlockTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final conversation = widget.conversation;
+    final conversation = _conversation;
     return ChatScreen(
+      // When the pending request finishes, display the newly fetched turns.
+      key: ObjectKey(conversation),
       service: _chat,
       conversationName:
           conversation.personaName ?? (widget.service.isDemo ? '엄마' : '대화 상대'),
@@ -74,11 +90,11 @@ class _ConversationRouteState extends State<_ConversationRoute> {
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
       initialReplies: conversation.replyMetadata,
-      historyNotice: conversation.hasFailedTurnsAt(_checkedAt)
+      historyNotice: conversation.hasFailedTurns
           ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
           : null,
-      blockedReason: conversation.hasActivePendingTurns(_checkedAt)
-          ? '아직 처리 중인 메시지가 있어요. 잠시 기다리거나 이력에서 새로고침해 주세요.'
+      blockedReason: conversation.pending
+          ? '아직 처리 중인 메시지가 있어요. 상태를 다시 확인할 때까지 기다리거나 이력에서 새로고침해 주세요.'
           : null,
     );
   }

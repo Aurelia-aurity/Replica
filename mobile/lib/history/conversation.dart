@@ -104,21 +104,10 @@ class ConversationTurn {
   }
 
   bool get pending => questionStatus == 'pending' || answerStatus == 'pending';
-
-  /// Whether the server may still be working on this turn. The API gives no
-  /// lease or expiry time, so a turn that has stayed `pending` longer than
-  /// [pendingTurnTimeout] (for example after the app was killed mid-request)
-  /// is treated as abandoned instead of blocking the conversation forever.
-  bool isActivelyPending(DateTime now) =>
-      pending && now.difference(createdAt) < pendingTurnTimeout;
-
-  bool isAbandoned(DateTime now) => pending && !isActivelyPending(now);
 }
 
-/// How long a `pending` turn blocks new messages. Six times the app's 30s
-/// request timeout; the API does not publish a server-side processing limit, so
-/// align this with the backend's stage expiry (`expire_chat_stages`) once known.
-const pendingTurnTimeout = Duration(minutes: 3);
+/// How often an open conversation rechecks pending turns with the server.
+const pendingTurnRefreshInterval = Duration(minutes: 3);
 
 class Conversation {
   Conversation({
@@ -177,38 +166,12 @@ class Conversation {
         (turn.answer?.isNotEmpty == true ? 1 : 0),
   );
 
-  /// True only while a turn is plausibly still being processed; this is what
-  /// blocks sending. Stale `pending` turns no longer lock the conversation.
-  bool hasActivePendingTurns([DateTime? now]) {
-    final at = now ?? DateTime.now();
-    return pendingUntil(at) != null;
-  }
-
-  /// New sends stay blocked until the last active turn reaches its deadline.
-  DateTime? pendingUntil(DateTime now) {
-    DateTime? latest;
-    for (final turn in turns) {
-      if (!turn.isActivelyPending(now)) continue;
-      final deadline = turn.createdAt.add(pendingTurnTimeout);
-      if (latest == null || deadline.isAfter(latest)) latest = deadline;
-    }
-    return latest;
-  }
-
-  /// Failed turns plus pending turns that were abandoned (see
-  /// [ConversationTurn.isAbandoned]); the user can keep chatting past both.
-  bool hasFailedTurnsAt([DateTime? now]) {
-    final at = now ?? DateTime.now();
-    return turns.any(
-      (turn) =>
-          turn.questionStatus == 'failed' ||
-          turn.answerStatus == 'failed' ||
-          turn.isAbandoned(at),
-    );
-  }
-
-  bool get pending => hasActivePendingTurns();
-  bool get hasFailedTurns => hasFailedTurnsAt();
+  // A retry can start long after createdAt. Only the API knows whether the
+  // current attempt is pending or has failed.
+  bool get pending => turns.any((turn) => turn.pending);
+  bool get hasFailedTurns => turns.any(
+    (turn) => turn.questionStatus == 'failed' || turn.answerStatus == 'failed',
+  );
 
   List<({String text, bool isUser})> get messages => [
     for (final turn in turns) ...[
