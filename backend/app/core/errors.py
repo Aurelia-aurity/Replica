@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 INTERNAL_MESSAGE = "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요."
 CONFLICT_MESSAGE = "이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요."
 INVALID_INPUT_MESSAGE = "입력한 내용을 확인해 주세요."
+MESSAGE_TOO_LONG_MESSAGE = "질문이 너무 길어요. 더 짧게 입력해 주세요."
 
 
 class AppError(Exception):
@@ -89,8 +90,7 @@ def _request_validation_error(exc: RequestValidationError) -> AppError:
     kind = first.get("type", "")
     if field == "message":
         if kind == "string_too_long":
-            return AppError(422, "MESSAGE_TOO_LONG", "질문이 너무 길어요. 더 짧게 입력해 주세요.",
-                            retryable=False, field="message")
+            return AppError(422, "MESSAGE_TOO_LONG", MESSAGE_TOO_LONG_MESSAGE, retryable=False, field="message")
         if kind in ("string_too_short", "missing", "value_error"):
             return AppError(422, "MESSAGE_EMPTY", "메시지를 입력해 주세요.", retryable=False, field="message")
     return AppError(422, "INVALID_INPUT", INVALID_INPUT_MESSAGE, retryable=False, field=field)

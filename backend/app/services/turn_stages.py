@@ -1,12 +1,13 @@
 """대화 턴의 단계(STT·LLM·TTS) 처리: 텍스트 대화와 음성 대화가 함께 쓴다.
 
 규칙의 원본은 backend-db 명세 '호출 규칙', backend-ai 명세 '타임아웃과 수동 재시도'다.
-- `start_chat_stage`로 실행권을 얻은 요청만 외부(STT·AI·TTS)를 한 번 부른다. 자동 재시도는 없다.
+- `start_chat_stage`로 실행권을 얻은 요청만 외부(STT·AI·TTS)를 부른다. 자동 재시도는 TTS에만 있다(첫 시도 + 재시도 2번, 앱 대기 3분 안).
 - AI 요청 ID는 호출 전에 만들어 DB(`start_chat_stage`)에 먼저 기록하고, 같은 ID로 AI를 부르고, 결과를 저장할 때 확인한다.
 - 외부 호출이 실패하면 그 시도 번호로 실패를 기록한다. 질문·답변·예외 원문은 기록하지 않는다.
 - 실행 중(pending)인 단계는 제한 시간을 넘긴 것만 실패로 닫고, 아니면 409로 거절한다.
 """
 
+import asyncio
 import base64
 import logging
 import time
@@ -16,11 +17,11 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from app import db
-from app.clients.llm import MAX_HISTORY_PAIRS, LLMClient
+from app.clients.llm import MAX_HISTORY_PAIRS, MAX_TEXT_CHARS, LLMClient
 from app.clients.stt import STTClient
 from app.clients.tts import TTSClient
 from app.core.config import get_settings
-from app.core.errors import CONFLICT_MESSAGE, AppError, from_database_error
+from app.core.errors import CONFLICT_MESSAGE, MESSAGE_TOO_LONG_MESSAGE, AppError, from_database_error
 from app.db import UserDatabase
 from app.schemas.chat import ChatTurn
 
@@ -29,9 +30,14 @@ logger = logging.getLogger(__name__)
 # 시간 제한 수치는 아직 합의 전이다. LLM_TIMEOUT_SECONDS가 없을 때(mock 모드)만 쓰는 임시 값.
 FALLBACK_STALE_SECONDS = 30.0
 
+# TTS 자동 재시도: 팀 회의 결정(앱은 응답을 최대 3분 기다리고, 그 안에 첫 시도 + 재시도 2번). 여유 시간은 임시 값이다.
+APP_WAIT_SECONDS = 180.0
+RESPONSE_MARGIN_SECONDS = 10.0
+TTS_MAX_RETRIES = 2
+
 STT_FAILED_MESSAGE = "음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요."
 EMPTY_TRANSCRIPT_MESSAGE = "음성을 인식하지 못했어요. 다시 말씀해 주세요."
-TTS_FAILED_MESSAGE = "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요."
+TTS_FAILED_MESSAGE = "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요."
 
 
 def elapsed_ms(start: float) -> int:
@@ -136,13 +142,21 @@ class LlmStageResult:
 async def run_llm_stage(
     user_db: UserDatabase, llm: LLMClient, turn: dict, question: str, *, with_audio: bool = False
 ) -> LlmStageResult:
-    """AI를 한 번 호출해 답변을 저장한다. 이력은 이 대화방의 최근 완결 20쌍이다."""
+    """AI를 한 번 호출해 답변을 저장한다. 이력은 이 대화방의 최근 완결 20쌍이다.
+
+    실행권을 잡기 전에 끝낼 수 있는 일(질문 길이 검사, 이력 조회)은 모두 먼저 한다. 여기서 실패하면 잡아 둔
+    실행권이 없어, 앱이 같은 turn_id로 바로 다시 보낼 수 있고 AI는 한 번도 불리지 않는다.
+    """
+    if len(question) > MAX_TEXT_CHARS:
+        # 음성 전사문처럼 앱이 길이를 막지 못한 질문. 자르지 않고 거절한다. 같은 음성으로는 다시 보내도 같은 결과다.
+        raise AppError(422, "MESSAGE_TOO_LONG", MESSAGE_TOO_LONG_MESSAGE, retryable=False, stage="llm")
+    history = await recent_history(user_db, turn["session_id"], current_turn_id=turn["id"])
+
     request_id = uuid4()  # 이 시도의 AI 요청 ID. DB에 먼저 기록하고 같은 값으로 AI를 부른다.
     claimed = await user_db.start_chat_stage(
         turn["id"], "llm", model_name=llm.name, with_audio=with_audio, request_id=request_id
     )
     attempt = claimed["llm_attempt"]
-    history = await recent_history(user_db, claimed["session_id"], current_turn_id=claimed["id"])
 
     started = time.perf_counter()
     try:
@@ -189,21 +203,38 @@ class TtsStageResult:
     attempt: int = 0  # DB 시도 번호. DB를 거치지 않은 재합성이면 0
 
 
-async def synthesize(tts: TTSClient, text: str) -> TtsStageResult:
-    """TTS를 호출해 base64 음성으로 바꾼다. 실패하면 ok=False로 돌려준다. DB 상태는 건드리지 않는다."""
+async def synthesize(tts: TTSClient, text: str, *, request_started: float | None = None) -> TtsStageResult:
+    """TTS를 호출해 base64 음성으로 바꾼다. 실패하면 ok=False로 돌려준다. DB 상태는 건드리지 않는다.
+
+    실패하면 최대 TTS_MAX_RETRIES번 다시 부른다. 앱이 기다리는 시간(요청 시작 기준 APP_WAIT_SECONDS) 안에서만 시도하고,
+    남은 시간이 직전 시도에 걸린 시간보다 짧으면 다시 부르지 않는다. 각 시도도 남은 시간을 넘기지 않는다.
+    """
     started = time.perf_counter()
-    try:
-        audio, fmt = await tts.synthesize(text)
-    except Exception:
-        return TtsStageResult(False, None, None, elapsed_ms(started))
-    return TtsStageResult(True, base64.b64encode(audio).decode("ascii"), fmt, elapsed_ms(started))
+    deadline = (started if request_started is None else request_started) + APP_WAIT_SECONDS - RESPONSE_MARGIN_SECONDS
+    last_took = 0.0
+    for retry in range(TTS_MAX_RETRIES + 1):
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0 or (retry and remaining < last_took):
+            break
+        tried = time.perf_counter()
+        try:
+            async with asyncio.timeout(remaining):
+                audio, fmt = await tts.synthesize(text)
+        except Exception:  # 시간 초과 포함. 예외 원문은 남기지 않는다.
+            last_took = time.perf_counter() - tried
+            logger.warning("TTS 시도 실패 retry=%d", retry)
+            continue
+        return TtsStageResult(True, base64.b64encode(audio).decode("ascii"), fmt, elapsed_ms(started))
+    return TtsStageResult(False, None, None, elapsed_ms(started))
 
 
-async def run_tts_stage(user_db: UserDatabase, tts: TTSClient, turn_id: UUID | str, text: str) -> TtsStageResult:
-    """실행권을 얻은 뒤 TTS를 한 번 호출한다. 실패해도 예외 대신 ok=False로 돌려준다(답변 텍스트는 그대로 남는다)."""
+async def run_tts_stage(
+    user_db: UserDatabase, tts: TTSClient, turn_id: UUID | str, text: str, *, request_started: float | None = None
+) -> TtsStageResult:
+    """실행권을 얻은 뒤 TTS를 부른다(실패 시 시간 안에서 자동 재시도). 실패해도 예외 대신 ok=False로 돌려준다(답변 텍스트는 그대로 남는다)."""
     claimed = await user_db.start_chat_stage(turn_id, "tts")
     attempt = claimed["tts_attempt"]
-    result = await synthesize(tts, text)
+    result = await synthesize(tts, text, request_started=request_started)
     if not result.ok:
         await record_failure(user_db, turn_id, "tts", attempt, "tts_failed", result.tts_ms)
     else:
