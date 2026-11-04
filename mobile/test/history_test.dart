@@ -917,6 +917,37 @@ void main() {
     expect(service.sends.single.turn, isNot('turn-1'));
   });
 
+  test(
+    'turn list tts_status marks stored speech, even over a cached reply',
+    () {
+      final json = {...turnJson(1), 'tts_status': 'ready'};
+      final fresh = ConversationTurn.fromJson(json);
+      expect(fresh.replyDetails!.ttsStatus, 'ready');
+      expect(fresh.replyDetails!.speechAlreadySynthesized, isTrue);
+      // A reply kept from /chat/text has no tts_status; the turn list wins.
+      final cached = ConversationTurn.fromJson(
+        json,
+        replyDetails: const ChatReply(text: '답변 1', turnId: 'turn-1'),
+      );
+      expect(cached.replyDetails!.speechAlreadySynthesized, isTrue);
+      // No tts_status (never requested) or a failed one can still be requested.
+      for (final status in [null, 'failed']) {
+        final turn = ConversationTurn.fromJson({
+          ...turnJson(1),
+          'tts_status': status,
+        });
+        expect(turn.replyDetails!.speechAlreadySynthesized, isFalse);
+      }
+      final voice = ChatReply.fromJson({
+        'turn_id': 't',
+        'answer': '답변',
+        'is_ai_generated': true,
+        'tts_status': 'ready',
+      }, expectedTurnId: 't');
+      expect(voice.speechAlreadySynthesized, isTrue);
+    },
+  );
+
   test('pending turn blocks only until the pending timeout', () {
     final created = DateTime(2026, 11, 4, 12);
     final item = Conversation(

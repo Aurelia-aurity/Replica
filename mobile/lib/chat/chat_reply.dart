@@ -78,15 +78,25 @@ class ChatReply {
     this.turnId,
     this.modelName,
     this.finishReason,
+    this.ttsStatus,
     this.timings = const {},
     this.evidence = EvidenceState.unknown,
     this.sources = const [],
   });
   final String text;
   final String? turnId, modelName, finishReason;
+
+  /// Backend `tts_status` (`pending`, `ready`, `failed`) when the payload
+  /// carried one; null when unknown or not requested yet.
+  final String? ttsStatus;
   final Map<String, int?> timings;
   final EvidenceState evidence;
   final List<EvidenceRecord> sources;
+
+  /// The backend already holds a finished synthesis for this turn. The TTS
+  /// endpoint answers 409 for such turns and the API has no download for the
+  /// stored audio, so only audio this app cached itself can be played again.
+  bool get speechAlreadySynthesized => ttsStatus == 'ready';
 
   factory ChatReply.fromJson(
     Map<String, dynamic> json, {
@@ -116,6 +126,9 @@ class ChatReply {
       turnId: expectedTurnId,
       modelName: json['model_name'] as String?,
       finishReason: json['finish_reason'] as String?,
+      ttsStatus: json['tts_status'] is String
+          ? json['tts_status'] as String
+          : null,
       timings: Map.unmodifiable(timings),
       evidence: evidence.state,
       sources: evidence.sources,
@@ -127,6 +140,20 @@ class ChatReply {
     turnId: id,
     modelName: modelName,
     finishReason: finishReason,
+    ttsStatus: ttsStatus,
+    timings: timings,
+    evidence: evidence,
+    sources: sources,
+  );
+
+  /// Applies a newer server-side TTS state (e.g. from the turn list) to a
+  /// reply the app kept from an earlier request.
+  ChatReply withTtsStatus(String? status) => ChatReply(
+    text: text,
+    turnId: turnId,
+    modelName: modelName,
+    finishReason: finishReason,
+    ttsStatus: status,
     timings: timings,
     evidence: evidence,
     sources: sources,

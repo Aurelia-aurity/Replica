@@ -63,7 +63,12 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       _retryable = false;
   bool _playing = false, _paused = false, _prompt = false, _suspended = false;
   bool _ttsFailed = false;
+  // The backend refused to hand out this turn's synthesis again (409).
+  bool _audioUnavailable = false;
   int _captureGeneration = 0, _playGeneration = 0;
+  bool get _speechLocked =>
+      _audio == null &&
+      (_audioUnavailable || (_reply?.speechAlreadySynthesized ?? false));
   bool get _busy =>
       _starting || _ttsBusy || _phase == VoicePhase.processing || _prompt;
   bool get _recording => _phase == VoicePhase.recording;
@@ -293,6 +298,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _audio = result.audio;
         _phase = VoicePhase.ready;
         _ttsFailed = result.ttsFailed;
+        _audioUnavailable = false;
         _failedStage = result.ttsFailed ? 'tts' : null;
         _pending = null;
         _position = Duration.zero;
@@ -340,6 +346,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
 
   Future<void> _play() async {
     if (_suspended || _busy || _recording || _reply == null) return;
+    if (_speechLocked) return;
     if (_playing) {
       if (_player is InteractiveReplyAudioPlayer) {
         try {
@@ -425,7 +432,16 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
           generation == _playGeneration &&
           failure.kind != BackendFailureKind.unauthenticated &&
           failure.kind != BackendFailureKind.staleSession) {
-        _playbackFailed();
+        if (failure.code == 'CONFLICT') {
+          // Already synthesized or in progress: a retry cannot succeed.
+          setState(() {
+            _audioUnavailable = true;
+            _ttsFailed = false;
+            if (_failedStage == 'tts') _failedStage = null;
+          });
+        } else {
+          _playbackFailed();
+        }
       }
     } catch (_) {
       if (mounted && generation == _playGeneration) _playbackFailed();
@@ -668,7 +684,11 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                             children: [
                               IconButton(
                                 tooltip: _playing ? '음성 일시정지' : '답변 음성 재생',
-                                onPressed: _reply == null || _busy || _recording
+                                onPressed:
+                                    _reply == null ||
+                                        _busy ||
+                                        _recording ||
+                                        _speechLocked
                                     ? null
                                     : _play,
                                 icon: Icon(
@@ -684,6 +704,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                                       ? '합성 음성 재생 중'
                                       : _paused
                                       ? '일시정지'
+                                      : _speechLocked
+                                      ? '음성을 다시 받을 수 없어요'
                                       : '합성 음성 듣기',
                                   style: const TextStyle(color: _muted),
                                 ),
@@ -779,7 +801,15 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                                 ],
                               ),
                             ),
-                          if (_ttsFailed)
+                          if (_speechLocked)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 12),
+                              child: Text(
+                                '이 답변의 음성은 다시 받을 수 없어요. 답변 글은 그대로 볼 수 있어요.',
+                                style: TextStyle(color: _muted, height: 1.5),
+                              ),
+                            )
+                          else if (_ttsFailed)
                             Padding(
                               padding: const EdgeInsets.only(top: 12),
                               child: Column(

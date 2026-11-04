@@ -82,7 +82,7 @@ class Sc10Recorder implements VoiceRecorder {
 
 class Sc10Service implements VoiceChatService {
   VoiceReply result = sampleReply();
-  Object? failure;
+  Object? failure, speechFailure;
   Completer<VoiceReply>? pending;
   int syntheses = 0;
   final recordings = <VoiceRecording>[];
@@ -96,6 +96,7 @@ class Sc10Service implements VoiceChatService {
   @override
   Future<SpeechAudio> synthesize(ChatReply reply) async {
     syntheses++;
+    if (speechFailure != null) throw speechFailure!;
     return SpeechAudio(sampleRecording().bytes, 'audio/wav');
   }
 
@@ -715,6 +716,87 @@ void main() {
       expect(find.text('인식된 합성 질문'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'reopened voice reply with stored speech is not requested again',
+    (tester) async {
+      final service = Sc10Service();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VoiceScreen(
+            conversationName: '합성 상대',
+            service: service,
+            recorder: Sc10Recorder(),
+            audioPlayer: Sc10Player(),
+            lastQuestion: '지난 질문',
+            lastReply: '저장된 답변',
+            lastReplyDetails: const ChatReply(
+              text: '저장된 답변',
+              turnId: 'voice-stored',
+              ttsStatus: 'ready',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('음성을 다시 받을 수 없어요'), findsOneWidget);
+      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+      expect(find.text('음성 다시 시도'), findsNothing);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.play_arrow),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(service.syntheses, 0);
+    },
+  );
+
+  testWidgets('unusable audio from a finished synthesis offers no retry', (
+    tester,
+  ) async {
+    final service = Sc10Service()
+      ..result = const VoiceReply(
+        transcript: '인식된 합성 질문',
+        reply: ChatReply(
+          text: '음성 대화 합성 답변',
+          turnId: 'voice-turn',
+          ttsStatus: 'ready',
+        ),
+        ttsFailed: true,
+      );
+    await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
+    await startRecording(tester);
+    await finishRecording(tester);
+    expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+    expect(find.text('음성 다시 시도'), findsNothing);
+    expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+    expect(service.syntheses, 0);
+  });
+
+  testWidgets('409 from TTS replaces the retry with an unavailable notice', (
+    tester,
+  ) async {
+    final service = Sc10Service()
+      ..result = sampleReply(ttsFailed: true)
+      ..speechFailure = BackendFailure.fromResponse(
+        statusCode: 409,
+        body: {
+          'error': {'code': 'CONFLICT', 'retryable': false},
+        },
+      );
+    await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
+    await startRecording(tester);
+    await finishRecording(tester);
+    expect(find.text('음성 다시 시도'), findsOneWidget);
+    await acceptPlay(tester);
+    expect(service.syntheses, 1);
+    expect(find.text('음성 다시 시도'), findsNothing);
+    expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+    expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+  });
 
   testWidgets(
     'TTS partial failure keeps text and only retries speech, with disclosure',

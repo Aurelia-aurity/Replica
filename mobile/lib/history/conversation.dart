@@ -65,6 +65,9 @@ class ConversationTurn {
       throw const FormatException('Missing AI disclosure');
     }
     final evidence = ReplyEvidence.fromJson(json);
+    final ttsStatus = json['tts_status'] is String
+        ? json['tts_status'] as String
+        : null;
     return ConversationTurn(
       id: json['turn_id'] as String,
       number: json['turn_no'] as int,
@@ -74,13 +77,16 @@ class ConversationTurn {
       voice: json['input_mode'] == 'voice',
       questionStatus: json['question_status'] as String,
       answerStatus: json['answer_status'] as String?,
+      // The turn list is the authority on TTS state, even for a reply the app
+      // kept from an earlier request in this login.
       replyDetails:
-          replyDetails ??
+          replyDetails?.withTtsStatus(ttsStatus ?? replyDetails.ttsStatus) ??
           (json['answer'] is String
               ? ChatReply(
                   text: json['answer'] as String,
                   turnId: json['turn_id'] as String,
                   modelName: json['model_name'] as String?,
+                  ttsStatus: ttsStatus,
                   timings: {
                     for (final key in [
                       'stt_ms',
