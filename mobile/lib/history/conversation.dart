@@ -109,9 +109,10 @@ class ConversationTurn {
   bool isAbandoned(DateTime now) => pending && !isActivelyPending(now);
 }
 
-/// How long a `pending` turn blocks new messages. Twice the app's 30s request
-/// timeout; the API does not publish a server-side processing limit.
-const pendingTurnTimeout = Duration(minutes: 1);
+/// How long a `pending` turn blocks new messages. Six times the app's 30s
+/// request timeout; the API does not publish a server-side processing limit, so
+/// align this with the backend's stage expiry (`expire_chat_stages`) once known.
+const pendingTurnTimeout = Duration(minutes: 3);
 
 class Conversation {
   Conversation({
