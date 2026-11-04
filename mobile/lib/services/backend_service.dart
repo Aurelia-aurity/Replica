@@ -28,6 +28,7 @@ class BackendFailure implements Exception {
       (code == null ? kind != BackendFailureKind.forbidden : retryable);
 
   String get userMessage => switch (code) {
+    'INVALID_AUDIO_DURATION' => '음성 질문은 1분 이내로 다시 녹음해 주세요.',
     'UNSUPPORTED_AUDIO_FORMAT' => '지원하지 않는 음성 형식이에요. 다른 형식으로 다시 녹음해 주세요.',
     'FILE_TOO_LARGE' => '녹음 파일이 너무 커요. 25MB 이내로 다시 녹음해 주세요.',
     'EMPTY_FILE' => '녹음된 내용이 없어요. 다시 녹음해 주세요.',

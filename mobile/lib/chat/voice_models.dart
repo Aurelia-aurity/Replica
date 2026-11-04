@@ -5,6 +5,7 @@ import '../services/backend_service.dart';
 import 'chat_reply.dart';
 
 const maxVoiceBytes = 25 * 1024 * 1024;
+const maxVoiceDuration = Duration(minutes: 1);
 
 class VoiceRecording {
   const VoiceRecording({
@@ -30,6 +31,50 @@ class VoiceRecording {
         code: 'FILE_TOO_LARGE',
         stage: 'stt',
       );
+    }
+    if (!fileName.toLowerCase().endsWith('.wav') || mimeType != 'audio/wav') {
+      throw const BackendFailure(
+        BackendFailureKind.generic,
+        code: 'UNSUPPORTED_AUDIO_FORMAT',
+        stage: 'stt',
+      );
+    }
+    if (duration < const Duration(milliseconds: 300) ||
+        duration > maxVoiceDuration) {
+      throw const BackendFailure(
+        BackendFailureKind.generic,
+        code: 'INVALID_AUDIO_DURATION',
+        stage: 'stt',
+      );
+    }
+    // Our capture/upload contract is canonical PCM16 WAV, not an arbitrary
+    // file renamed to .wav. Validate before allocating the multipart request.
+    if (bytes.length <= 44 ||
+        ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != 'RIFF' ||
+        ascii.decode(bytes.sublist(8, 12), allowInvalid: true) != 'WAVE' ||
+        ascii.decode(bytes.sublist(12, 16), allowInvalid: true) != 'fmt ' ||
+        ascii.decode(bytes.sublist(36, 40), allowInvalid: true) != 'data') {
+      throw const FormatException('Invalid WAV recording');
+    }
+    final header = ByteData.sublistView(bytes);
+    final channels = header.getUint16(22, Endian.little);
+    final rate = header.getUint32(24, Endian.little);
+    final dataSize = bytes.length - 44;
+    if (header.getUint32(4, Endian.little) != bytes.length - 8 ||
+        header.getUint32(16, Endian.little) != 16 ||
+        header.getUint16(20, Endian.little) != 1 ||
+        channels < 1 ||
+        channels > 2 ||
+        rate < 8000 ||
+        rate > 192000 ||
+        header.getUint16(34, Endian.little) != 16 ||
+        header.getUint16(32, Endian.little) != channels * 2 ||
+        header.getUint32(28, Endian.little) != rate * channels * 2 ||
+        header.getUint32(40, Endian.little) != dataSize ||
+        dataSize % (channels * 2) != 0 ||
+        dataSize * 10 < rate * channels * 2 * 3 ||
+        dataSize > rate * channels * 2 * 60) {
+      throw const FormatException('Invalid PCM recording');
     }
   }
 }

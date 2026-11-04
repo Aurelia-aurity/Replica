@@ -7,7 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'voice_models.dart';
 
-enum CaptureFailure { permission, empty, tooLarge, unavailable }
+enum CaptureFailure { permission, empty, tooLarge, interrupted, unavailable }
 
 abstract class VoiceRecorder {
   Stream<double> get levels;
@@ -24,6 +24,8 @@ class DeviceVoiceRecorder implements VoiceRecorder {
   final _levels = StreamController<double>.broadcast();
   final _errors = StreamController<Object>.broadcast();
   StreamSubscription<Uint8List>? _subscription;
+  StreamSubscription<RecordState>? _states;
+  bool _capturing = false;
   final _clock = Stopwatch();
   BytesBuilder _pcm = BytesBuilder(copy: false);
   Completer<void>? _done;
@@ -40,6 +42,12 @@ class DeviceVoiceRecorder implements VoiceRecorder {
   Future<void> start() async {
     if (_disposed) throw CaptureFailure.unavailable;
     final recorder = _recorder ??= AudioRecorder();
+    _states ??= recorder.onStateChanged().listen((state) {
+      if (_capturing && state == RecordState.pause && !_disposed) {
+        _error = CaptureFailure.interrupted;
+        _errors.add(_error!);
+      }
+    });
     if (!await recorder.hasPermission()) throw CaptureFailure.permission;
     if (_disposed) return;
     _pcm = BytesBuilder(copy: false);
@@ -56,6 +64,7 @@ class DeviceVoiceRecorder implements VoiceRecorder {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        audioInterruption: AudioInterruptionMode.pause,
       ),
     );
     if (_disposed) {
@@ -63,18 +72,25 @@ class DeviceVoiceRecorder implements VoiceRecorder {
       return;
     }
     final done = _done = Completer<void>();
+    _capturing = true;
     _clock
       ..reset()
       ..start();
     _subscription = stream.listen(
       (chunk) {
         if (_disposed || _error != null) return;
+        // Bound memory and actual encoded duration even if UI timers stall.
+        final durationCap = _sampleRate * _channels * 2 * 60;
+        if (_pcm.length >= durationCap) return;
         if (_pcm.length + chunk.length > maxVoiceBytes - 44) {
           _error = CaptureFailure.tooLarge;
           _errors.add(_error!);
           return;
         }
-        _pcm.add(chunk);
+        final remaining = durationCap - _pcm.length;
+        _pcm.add(
+          chunk.length > remaining ? chunk.sublist(0, remaining) : chunk,
+        );
         final samples = ByteData.sublistView(chunk);
         var peak = 0;
         for (var i = 0; i + 1 < chunk.length; i += 2) {
@@ -96,6 +112,7 @@ class DeviceVoiceRecorder implements VoiceRecorder {
 
   @override
   Future<VoiceRecording> stop() async {
+    _capturing = false;
     await _recorder?.stop();
     _clock.stop();
     if (_done != null) {
@@ -110,12 +127,15 @@ class DeviceVoiceRecorder implements VoiceRecorder {
     }
     return VoiceRecording(
       bytes: pcmToWave(pcm, sampleRate: _sampleRate, channels: _channels),
-      duration: _clock.elapsed,
+      duration: Duration(
+        microseconds: pcm.length * 1000000 ~/ (_sampleRate * _channels * 2),
+      ),
     );
   }
 
   @override
   Future<void> cancel() async {
+    _capturing = false;
     _clock.stop();
     await _recorder?.cancel();
     await _subscription?.cancel();
@@ -142,6 +162,7 @@ class DeviceVoiceRecorder implements VoiceRecorder {
       await cancel();
     } finally {
       await _recorder?.dispose();
+      await _states?.cancel();
       await _levels.close();
       await _errors.close();
     }
