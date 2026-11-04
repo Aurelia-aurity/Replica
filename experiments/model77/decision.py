@@ -13,6 +13,7 @@ import threading
 import time
 
 from audit import serialize, token_ids
+from arms import arm_context
 from prepare import content_hash, digest, save
 from smoke import MODEL_ROOT, load_profile, termination, think_markers
 
@@ -75,6 +76,8 @@ def completed(path: Path, expected, identity: str):
             raise ValueError("Duplicate or foreign completed row")
         if row["run_identity"] != identity or row["messages_sha256"] != expected[key]["messages_sha256"]:
             raise ValueError("Resume identity mismatch")
+        if any(row.get(field) != expected[key].get(field) for field in ("arm", "run_id")):
+            raise ValueError("Resume arm envelope mismatch")
         if row["status"] != "success":
             raise RuntimeError("Recorded failed call invalidates run; never regenerate it")
         result[key] = row
@@ -162,7 +165,12 @@ def run(args) -> None:
     dev = json.loads(args.dev_bundle.read_text())
     validate_bundle(bundle)
     validate_bundle(dev)
-    authorize(bundle, args.authorize_decision, args.bundle)
+    context = arm_context(args, bundle)
+    if not context:
+        authorize(bundle, args.authorize_decision, args.bundle)
+    if context and (dev.get("prompt_version") != context["prompt_version"]
+                    or dev.get("register_template_sha256") != context["register_template_sha256"]):
+        raise ValueError("Arm DEV/heldout prompt mismatch")
     if args.normal_only and bundle["split"] != "dev":
         raise ValueError("Normal-only execution is restricted to DEV")
     if dev["split"] != "dev":
@@ -216,13 +224,14 @@ def run(args) -> None:
         if row in stress and (len(ids) != 4096 or content_hash(ids) != row["input_ids_sha256"]):
             raise ValueError("Stress packing mismatch")
     frozen = {
+        **context,
         "bundle_sha256": digest(args.bundle), "dev_bundle_sha256": digest(args.dev_bundle),
         "audit_sha256": digest(args.audit),
         "stress_sha256": digest(stress_path) if not args.normal_only else None,
         "normal_only": args.normal_only,
         "profile": json.loads(Path(__file__).with_name("profiles.json").read_text())[name],
         "code_sha256": {p: digest(Path(__file__).with_name(p)) for p in
-                        ("decision.py", "prepare.py", "audit.py", "smoke.py")},
+                        ("decision.py", "prepare.py", "audit.py", "smoke.py", "arms.py")},
         "tokenizer_files": audit["tokenizer_files"], "rope_scaling": model_config.get("rope_scaling"),
         "template_sha256": audit["template_sha256"],
         "packages": {p: importlib.metadata.version(p) for p in ("torch", "transformers")},
@@ -261,6 +270,7 @@ def run(args) -> None:
         pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else eos_ids[0],
         max_time=30.0)
     effective = {
+        **context,
         "run_identity": identity, "load_s": load_s, "generation_config": generation.to_dict(),
         "model_generation_config": model.generation_config.to_dict(),
         "eos_ids": eos_ids, "bos_id": tokenizer.bos_token_id,
@@ -321,6 +331,7 @@ def run(args) -> None:
                     elif phase != "stress" and think_markers(raw):
                         error = "Visible reasoning markers"
                     result = {
+                        **context,
                         "id": row["id"], "question_id": row.get("question_id"),
                         "condition": row["condition"], "phase": phase,
                         "model": name, "run_identity": identity,
@@ -388,6 +399,8 @@ def main() -> None:
     parser.add_argument("--normal-only", action="store_true",
                         help="DEV warmups and normal calls only; no memory probes")
     parser.add_argument("--model", required=True)
+    parser.add_argument("--arm", choices=("BASE", "CAND", "DIAG"))
+    parser.add_argument("--run-id", choices=("decision-v3",))
     parser.add_argument("--authorize-decision", type=Path)
     args = parser.parse_args()
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", TOKENIZERS_PARALLELISM="false")

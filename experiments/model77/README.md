@@ -200,3 +200,27 @@ contexts are controlled evidence, not a new retrieval benchmark. They and the
 original DEV set are reported separately; repeated registers and paired B/C
 calls are not independent questions. DEV heuristics and blind reading do not
 establish held-out acceptance or select a service model.
+
+## ROUND 3 arm envelope
+
+`build_arm.py` derives one arm from the sealed r1 export without retrieval or
+generation. Supply `--arm`, `--template-sha256`, `--bundle`, `--dev-bundle`,
+`--tokenizers` and a fresh `--output`. It audits both Qwen3 tokenizers, records
+every native rendering hash, and packs six 4096-token DEV probes for each.
+The supplied template digest must match the source before creating artifacts.
+
+`decision.py --run-id decision-v3 --arm BASE|CAND|DIAG` requires full heldout
+execution. BASE is Qwen3-8B/r1-reg, CAND is Qwen3-14B/r1-reg-14b, and DIAG is
+Qwen3-8B/r1-reg-14b. Actual `model` identifiers are preserved. Rows, manifests
+and summaries carry the arm, run ID and prompt identity; run hashes bind the
+authorization, so BASE and DIAG cannot share resume state. Output paths must end
+in `decision-v3/<arm>`. Separate processes reload the 8B weights for DIAG;
+warmups, peak resets, latency scope and decoding are unchanged.
+
+The ROUND 3 authorization binds each arm's bundle, DEV bundle, audit, stress
+pack, template and common schedule hashes, plus the code commit and executable
+module hashes. It also verifies the criteria, freeze receipt, content/execution
+seals and frozen retrieval files under the authorization directory's
+`provenance/`. `CODE_COMMIT.txt` supplies the commit identity. Normal legacy/DEV
+execution remains available without the new flags. This is generation plumbing,
+not a replacement for the separate arm-keyed v3 judge/operations envelope.
