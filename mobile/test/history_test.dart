@@ -891,6 +891,54 @@ void main() {
     );
   });
 
+  for (final voice in [false, true]) {
+    testWidgets(
+      'open conversation unlocks after pending timeout (voice: $voice)',
+      (tester) async {
+        final service = TestHistory()
+          ..items = [conversation(pending: true, voice: voice)];
+        await tester.pumpWidget(
+          MaterialApp(home: HistoryScreen(service: service)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('합성 첫 질문 session-1'));
+        await tester.pumpAndSettle();
+
+        final notice = find.textContaining('아직 처리 중인 메시지');
+        void expectBlocked(bool blocked) {
+          if (voice) {
+            final button = tester.widget<IconButton>(
+              find.byWidgetPredicate(
+                (widget) => widget is IconButton && widget.tooltip == '눌러서 말하기',
+              ),
+            );
+            expect(button.onPressed, blocked ? isNull : isNotNull);
+          } else {
+            expect(notice, blocked ? findsOneWidget : findsNothing);
+            expect(
+              tester.widget<TextField>(find.byType(TextField)).readOnly,
+              blocked,
+            );
+          }
+        }
+
+        expectBlocked(true);
+        await tester.pump(const Duration(minutes: 1));
+        expectBlocked(true);
+        await tester.pump(pendingTurnTimeout);
+        expectBlocked(false);
+        if (!voice) {
+          expect(find.textContaining('이전에 처리하지 못한 메시지'), findsOneWidget);
+          await tester.enterText(find.byType(TextField), '잠금 해제 후 질문');
+          await tester.pump();
+          await tester.tap(find.byTooltip('메시지 전송'));
+          await tester.pumpAndSettle();
+          expect(service.sends.single.session, 'session-1');
+        }
+      },
+    );
+  }
+
   testWidgets('abandoned pending turn no longer blocks the conversation', (
     tester,
   ) async {

@@ -181,7 +181,18 @@ class Conversation {
   /// blocks sending. Stale `pending` turns no longer lock the conversation.
   bool hasActivePendingTurns([DateTime? now]) {
     final at = now ?? DateTime.now();
-    return turns.any((turn) => turn.isActivelyPending(at));
+    return pendingUntil(at) != null;
+  }
+
+  /// New sends stay blocked until the last active turn reaches its deadline.
+  DateTime? pendingUntil(DateTime now) {
+    DateTime? latest;
+    for (final turn in turns) {
+      if (!turn.isActivelyPending(now)) continue;
+      final deadline = turn.createdAt.add(pendingTurnTimeout);
+      if (latest == null || deadline.isAfter(latest)) latest = deadline;
+    }
+    return latest;
   }
 
   /// Failed turns plus pending turns that were abandoned (see
