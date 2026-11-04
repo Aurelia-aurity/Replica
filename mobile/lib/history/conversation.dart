@@ -98,7 +98,20 @@ class ConversationTurn {
   }
 
   bool get pending => questionStatus == 'pending' || answerStatus == 'pending';
+
+  /// Whether the server may still be working on this turn. The API gives no
+  /// lease or expiry time, so a turn that has stayed `pending` longer than
+  /// [pendingTurnTimeout] (for example after the app was killed mid-request)
+  /// is treated as abandoned instead of blocking the conversation forever.
+  bool isActivelyPending(DateTime now) =>
+      pending && now.difference(createdAt) < pendingTurnTimeout;
+
+  bool isAbandoned(DateTime now) => pending && !isActivelyPending(now);
 }
+
+/// How long a `pending` turn blocks new messages. Twice the app's 30s request
+/// timeout; the API does not publish a server-side processing limit.
+const pendingTurnTimeout = Duration(minutes: 1);
 
 class Conversation {
   Conversation({
@@ -156,10 +169,28 @@ class Conversation {
         (turn.question?.isNotEmpty == true ? 1 : 0) +
         (turn.answer?.isNotEmpty == true ? 1 : 0),
   );
-  bool get pending => turns.any((turn) => turn.pending);
-  bool get hasFailedTurns => turns.any(
-    (turn) => turn.questionStatus == 'failed' || turn.answerStatus == 'failed',
-  );
+
+  /// True only while a turn is plausibly still being processed; this is what
+  /// blocks sending. Stale `pending` turns no longer lock the conversation.
+  bool hasActivePendingTurns([DateTime? now]) {
+    final at = now ?? DateTime.now();
+    return turns.any((turn) => turn.isActivelyPending(at));
+  }
+
+  /// Failed turns plus pending turns that were abandoned (see
+  /// [ConversationTurn.isAbandoned]); the user can keep chatting past both.
+  bool hasFailedTurnsAt([DateTime? now]) {
+    final at = now ?? DateTime.now();
+    return turns.any(
+      (turn) =>
+          turn.questionStatus == 'failed' ||
+          turn.answerStatus == 'failed' ||
+          turn.isAbandoned(at),
+    );
+  }
+
+  bool get pending => hasActivePendingTurns();
+  bool get hasFailedTurns => hasFailedTurnsAt();
 
   List<({String text, bool isUser})> get messages => [
     for (final turn in turns) ...[

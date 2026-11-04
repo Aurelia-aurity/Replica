@@ -816,6 +816,60 @@ void main() {
     );
   });
 
+  testWidgets('abandoned pending turn no longer blocks the conversation', (
+    tester,
+  ) async {
+    final service = TestHistory()
+      ..items = [
+        conversation(
+          pending: true,
+          date: DateTime.now().subtract(pendingTurnTimeout * 2),
+        ),
+      ];
+    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('합성 첫 질문 session-1'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아직 처리 중인 메시지'), findsNothing);
+    expect(find.textContaining('이전에 처리하지 못한 메시지'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, false);
+    await tester.enterText(find.byType(TextField), '멈춘 턴 이후의 질문');
+    await tester.pump();
+    await tester.tap(find.byTooltip('메시지 전송'));
+    await tester.pumpAndSettle();
+    expect(service.sends.single.session, 'session-1');
+    expect(service.sends.single.message, '멈춘 턴 이후의 질문');
+    expect(service.sends.single.turn, isNot('turn-1'));
+  });
+
+  test('pending turn blocks only until the pending timeout', () {
+    final created = DateTime(2026, 11, 4, 12);
+    final item = Conversation(
+      id: 's',
+      personaId: 'p',
+      createdAt: created,
+      updatedAt: created,
+      acknowledgedAt: created,
+      turns: [
+        ConversationTurn(
+          id: 't',
+          number: 1,
+          createdAt: created,
+          question: '질문',
+          answerStatus: 'pending',
+        ),
+      ],
+    );
+    final justBefore = created.add(
+      pendingTurnTimeout - const Duration(seconds: 1),
+    );
+    final atTimeout = created.add(pendingTurnTimeout);
+    expect(item.hasActivePendingTurns(justBefore), isTrue);
+    expect(item.hasFailedTurnsAt(justBefore), isFalse);
+    expect(item.hasActivePendingTurns(atTimeout), isFalse);
+    expect(item.hasFailedTurnsAt(atTimeout), isTrue);
+  });
+
   testWidgets(
     'home stores and reopens history; account switch clears previous history',
     (tester) async {
