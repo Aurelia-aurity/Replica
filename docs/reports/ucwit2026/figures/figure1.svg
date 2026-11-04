@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190mm" height="108mm" viewBox="0 0 1200 682" role="img" aria-labelledby="title desc">
+  <title id="title">Replica 전체 시스템 구조와 구현·연동 상태</title>
+  <desc id="desc">Flutter 앱은 데모, FastAPI 백엔드는 대역 시험으로 처리 코드를 검증했다. DB·GPU 추론 API·ElevenLabs는 연동 진행 중이다. 오프라인 검색 v2와 평가는 서비스 경로에서 분리되어 있다.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M1 1L8 5L1 9" fill="none" stroke="#111" stroke-width="1.6"/>
+    </marker>
+    <style>
+      text{font-family:"Apple SD Gothic Neo","Noto Sans CJK KR",sans-serif;fill:#111;font-size:21px}
+      .title{font-size:25px;font-weight:700}
+      .bold{font-weight:600}
+      .small{font-size:20px}
+      .solid{fill:#fff;stroke:#111;stroke-width:2}
+      .pending{fill:#fff;stroke:#111;stroke-width:2;stroke-dasharray:8 5}
+      .link{fill:none;stroke:#111;stroke-width:2;marker-end:url(#arrow)}
+      .planned{stroke-dasharray:8 5}
+    </style>
+  </defs>
+  <rect width="1200" height="682" fill="white"/>
+  <!-- Line pattern and explicit text both encode status; no color dependence. -->
+  <line x1="20" y1="23" x2="70" y2="23" stroke="#111" stroke-width="2"/>
+  <text x="82" y="30">구현·검증</text>
+  <path d="M285 19H335M285 27H335" stroke="#111" stroke-width="1.6"/>
+  <text x="347" y="30">Mock·데모</text>
+  <line x1="565" y1="23" x2="615" y2="23" stroke="#111" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="627" y="30">연동 진행 중</text>
+  <text x="20" y="77" class="bold">서비스 구성 (구성요소별 상태)</text>
+
+  <rect x="20" y="106" width="240" height="160" rx="4" class="solid"/>
+  <rect x="26" y="112" width="228" height="148" rx="2" class="solid"/>
+  <text x="140" y="145" text-anchor="middle" class="title">Flutter 앱</text>
+  <text x="140" y="182" text-anchor="middle">메모리 기반 데모</text>
+  <text x="140" y="215" text-anchor="middle">텍스트·음성 화면 틀</text>
+  <text x="140" y="247" text-anchor="middle" class="small">서버 통신 전</text>
+
+  <rect x="460" y="106" width="280" height="160" rx="4" class="solid"/>
+  <text x="600" y="145" text-anchor="middle" class="title">FastAPI 백엔드</text>
+  <text x="600" y="182" text-anchor="middle">대화 턴 처리·저장 코드</text>
+  <text x="600" y="215" text-anchor="middle">가짜 DB·AI로 검증</text>
+  <text x="600" y="247" text-anchor="middle" class="small">STT·TTS 클라이언트: Mock</text>
+
+  <rect x="920" y="106" width="260" height="160" rx="4" class="pending"/>
+  <text x="1050" y="145" text-anchor="middle" class="title">Supabase (DB)</text>
+  <text x="1050" y="182" text-anchor="middle">사용자·기록·대화</text>
+  <text x="1050" y="215" text-anchor="middle">연동 진행 중</text>
+  <text x="1050" y="247" text-anchor="middle" class="small">실제 연결 미검증</text>
+
+  <path d="M260 186H460" class="link planned"/>
+  <text x="360" y="169" text-anchor="middle" class="small">앱 API</text>
+  <path d="M740 186H920" class="link planned"/>
+  <text x="830" y="169" text-anchor="middle" class="small">저장·조회</text>
+
+  <rect x="460" y="357" width="280" height="140" rx="4" class="pending"/>
+  <text x="600" y="392" text-anchor="middle" class="title">GPU 추론 서버</text>
+  <text x="600" y="426" text-anchor="middle">API 연동 진행 중</text>
+  <rect x="472" y="441" width="256" height="43" class="solid"/>
+  <text x="600" y="469" text-anchor="middle" class="small">오프라인 CLI 구현·검증</text>
+  <path d="M600 266V357" class="link planned"/>
+  <text x="617" y="319" class="small">추론 API</text>
+
+  <rect x="920" y="357" width="260" height="140" rx="4" class="pending"/>
+  <text x="1050" y="395" text-anchor="middle" class="title">ElevenLabs</text>
+  <text x="1050" y="431" text-anchor="middle">STT·TTS</text>
+  <text x="1050" y="468" text-anchor="middle">연동 전</text>
+  <path d="M740 238H830V427H920" class="link planned"/>
+  <rect x="781" y="307" width="98" height="33" fill="white"/>
+  <text x="830" y="331" text-anchor="middle" class="small">음성 API</text>
+  <text x="20" y="362" class="small">실선은 구성요소 내부의</text>
+  <text x="20" y="392" class="small">검증 범위만 나타냄</text>
+  <text x="20" y="422" class="small">종단 간 연결은 진행 중</text>
+  <text x="20" y="475" class="small">서비스 모델 미정</text>
+
+  <line x1="20" y1="526" x2="1180" y2="526" stroke="#111" stroke-width="1"/>
+  <text x="20" y="560" class="bold">오프라인 실험 (서비스 경로와 분리)</text>
+  <rect x="20" y="580" width="300" height="79" rx="4" class="solid"/>
+  <text x="170" y="613" text-anchor="middle" class="bold">합성 기록·질문</text>
+  <text x="170" y="642" text-anchor="middle" class="small">보정 / held-out 분리</text>
+  <rect x="460" y="580" width="280" height="79" rx="4" class="solid"/>
+  <text x="600" y="613" text-anchor="middle" class="bold">검색 v2</text>
+  <text x="600" y="642" text-anchor="middle" class="small">문맥 복원·슬롯 평가</text>
+  <rect x="920" y="580" width="260" height="79" rx="4" class="solid"/>
+  <text x="1050" y="613" text-anchor="middle" class="bold">생성·평가</text>
+  <text x="1050" y="642" text-anchor="middle" class="small">자동 판정·작성자 표본</text>
+  <path d="M320 620H460" class="link"/>
+  <path d="M740 620H920" class="link"/>
+</svg>
