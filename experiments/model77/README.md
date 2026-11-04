@@ -179,3 +179,24 @@ Before a separately authorized new heldout run, apply the final variant to the
 and `audit.py` commands. The audit supports DEV plus that new bundle together;
 generation authorization remains separate. ROUND 2 DEV work does not open,
 transform or audit round-1 heldout files or round-1 decision outputs.
+
+## Qwen3-14B DEV instruction (ROUND 3)
+
+`r1-reg-14b` is a separate opt-in template in `register-14b-template.json`.
+Select it through either `prompt.py --prompt-version r1-reg-14b` or the same
+`prepare.py` option. Existing `r1` and `r1-reg` artifacts, defaults and rendered
+messages are preserved. The variant strengthens sentence-wide hageche endings,
+distinguishes missing detail from evidence-supported event denial, and prohibits
+unsupported additions. Template examples are generic, newly written sentences.
+
+The variant is intended for Qwen3-14B. Selecting it does not inspect the model
+name or alter decoding; the same messages can therefore be tested on Qwen3-8B
+as a control. Greedy generation, native EOS and the 160-token maximum remain
+unchanged. Bundle metadata binds the independent template SHA-256.
+
+ROUND 3 validation is DEV only: six excluded warmups plus normal B/C calls,
+with `--normal-only` and a fresh token audit below 4096. Synthetic extension
+contexts are controlled evidence, not a new retrieval benchmark. They and the
+original DEV set are reported separately; repeated registers and paired B/C
+calls are not independent questions. DEV heuristics and blind reading do not
+establish held-out acceptance or select a service model.

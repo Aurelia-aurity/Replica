@@ -170,7 +170,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ("rag", "corpus", "r1", "protocol", "dev-spec", "output"):
         parser.add_argument("--" + flag, required=True, type=Path)
-    parser.add_argument("--prompt-version", choices=("r1", "r1-reg"), default="r1")
+    parser.add_argument("--prompt-version", choices=("r1", "r1-reg", "r1-reg-14b"), default="r1")
     args = parser.parse_args()
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"

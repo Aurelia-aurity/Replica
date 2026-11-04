@@ -5,7 +5,8 @@ import json
 import unittest
 
 from prepare import content_hash
-from prompt import render_messages, variant_bundle
+from prompt import TEMPLATE_14B_PATH, TEMPLATE_PATH, render_messages, variant_bundle
+from prepare import digest
 from register_check import register_match
 
 
@@ -22,6 +23,45 @@ def fixture(register="하게체"):
 
 
 class PromptTests(unittest.TestCase):
+    def test_frozen_r1_reg_template_keeps_shipped_bytes(self):
+        # Given: the exact ROUND 2 artifact, which this task must preserve.
+        frozen_sha256 = "f11ba3f04b4b8f07ed942a2714dc5421e66b1f9575adceb54f152a777afdedaf"
+        # When
+        actual = digest(TEMPLATE_PATH)
+        # Then
+        self.assertEqual(actual, frozen_sha256)
+
+    def test_14b_variant_is_deterministic_and_preserves_source(self):
+        # Given
+        bundle = fixture()
+        before = deepcopy(bundle)
+        # When
+        first = variant_bundle(bundle, "r1-reg-14b")
+        second = variant_bundle(bundle, "r1-reg-14b")
+        # Then
+        self.assertEqual(first, second)
+        self.assertEqual(bundle, before)
+        self.assertEqual(first["register_template_sha256"], digest(TEMPLATE_14B_PATH))
+        self.assertNotEqual(first["register_template_sha256"], digest(TEMPLATE_PATH))
+        for phase in ("rows", "warmups", "stress"):
+            self.assertEqual(first[phase][0]["messages"][1], bundle[phase][0]["messages"][1])
+            self.assertEqual(first[phase][0]["evidence_sha256"], bundle[phase][0]["evidence_sha256"])
+            self.assertEqual(first[phase][0]["messages_sha256"],
+                             content_hash(first[phase][0]["messages"]))
+
+    def test_14b_all_registers_and_alias_render_without_changing_defaults(self):
+        # Given
+        bundles = [fixture(r) for r in ("반말", "해요체", "하게체", "다정한 반말")]
+        originals = [variant_bundle(b, "r1-reg") for b in bundles]
+        # When
+        variants = [variant_bundle(b, "r1-reg-14b") for b in bundles]
+        # Then
+        self.assertEqual(len({b["rows"][0]["messages_sha256"] for b in variants}), 4)
+        self.assertEqual(originals, [variant_bundle(b, "r1-reg") for b in bundles])
+        self.assertEqual(bundles, [variant_bundle(b) for b in bundles])
+        with self.assertRaises(ValueError):
+            variant_bundle(variants[0], "r1-reg-14b")
+
     def test_default_r1_preserves_message_bytes(self):
         # Given
         messages = fixture()["rows"][0]["messages"]

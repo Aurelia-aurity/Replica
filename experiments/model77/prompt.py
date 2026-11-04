@@ -8,8 +8,20 @@ from typing import Literal, TypedDict
 
 from prepare import content_hash, digest, save
 
-PromptVersion = Literal["r1", "r1-reg"]
+PromptVersion = Literal["r1", "r1-reg", "r1-reg-14b"]
 TEMPLATE_PATH = Path(__file__).with_name("register-template.json")
+TEMPLATE_14B_PATH = Path(__file__).with_name("register-14b-template.json")
+
+
+def template_path(prompt_version: PromptVersion) -> Path:
+    """Select the independent instruction artifact, never the decoding profile."""
+    match prompt_version:
+        case "r1-reg":
+            return TEMPLATE_PATH
+        case "r1-reg-14b":
+            return TEMPLATE_14B_PATH
+        case _:
+            raise ValueError(f"No instruction template for: {prompt_version}")
 
 
 class Message(TypedDict):
@@ -22,8 +34,8 @@ def render_messages(messages: list[Message], prompt_version: PromptVersion = "r1
     match prompt_version:
         case "r1":
             return deepcopy(messages)
-        case "r1-reg":
-            template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+        case "r1-reg" | "r1-reg-14b":
+            template = json.loads(template_path(prompt_version).read_text(encoding="utf-8"))
             result = deepcopy(messages)
             system = result[0]["content"]
             persona = json.loads(system.split("<persona>\n", 1)[1].split("\n</persona>", 1)[0])
@@ -49,7 +61,7 @@ def variant_bundle(bundle, prompt_version: PromptVersion = "r1"):
             row["messages"] = render_messages(row["messages"], prompt_version)
             row["messages_sha256"] = content_hash(row["messages"])
     result["prompt_version"] = prompt_version
-    result["register_template_sha256"] = digest(TEMPLATE_PATH)
+    result["register_template_sha256"] = digest(template_path(prompt_version))
     result["r1_bundle_content_sha256"] = content_hash(bundle)
     return result
 
@@ -58,7 +70,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--prompt-version", choices=("r1", "r1-reg"), default="r1")
+    parser.add_argument("--prompt-version", choices=("r1", "r1-reg", "r1-reg-14b"), default="r1")
     args = parser.parse_args()
     bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
     save(args.output, variant_bundle(bundle, args.prompt_version))
