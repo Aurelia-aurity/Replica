@@ -63,12 +63,9 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       _retryable = false;
   bool _playing = false, _paused = false, _prompt = false, _suspended = false;
   bool _ttsFailed = false;
-  // The backend refused to hand out this turn's synthesis again (409).
-  bool _audioUnavailable = false;
   int _captureGeneration = 0, _playGeneration = 0;
   bool get _speechLocked =>
-      _audio == null &&
-      (_audioUnavailable || (_reply?.speechAlreadySynthesized ?? false));
+      _audio == null && (_reply?.speechAlreadySynthesized ?? false);
   bool get _busy =>
       _starting || _ttsBusy || _phase == VoicePhase.processing || _prompt;
   bool get _recording => _phase == VoicePhase.recording;
@@ -298,7 +295,6 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _audio = result.audio;
         _phase = VoicePhase.ready;
         _ttsFailed = result.ttsFailed;
-        _audioUnavailable = false;
         _failedStage = result.ttsFailed ? 'tts' : null;
         _pending = null;
         _position = Duration.zero;
@@ -432,16 +428,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
           generation == _playGeneration &&
           failure.kind != BackendFailureKind.unauthenticated &&
           failure.kind != BackendFailureKind.staleSession) {
-        if (failure.code == 'CONFLICT') {
-          // Already synthesized or in progress: a retry cannot succeed.
-          setState(() {
-            _audioUnavailable = true;
-            _ttsFailed = false;
-            if (_failedStage == 'tts') _failedStage = null;
-          });
-        } else {
-          _playbackFailed();
-        }
+        // A 409 can also mean synthesis is still in progress. Keep manual retry.
+        _playbackFailed();
       }
     } catch (_) {
       if (mounted && generation == _playGeneration) _playbackFailed();

@@ -283,7 +283,7 @@ void main() {
     expect(service.syntheses, 0);
   });
 
-  testWidgets('409 from TTS locks the button instead of offering a retry', (
+  testWidgets('TTS can recover after a 409 without reopening the text screen', (
     tester,
   ) async {
     final service = Sc09Service()
@@ -293,14 +293,24 @@ void main() {
           'error': {'code': 'CONFLICT', 'retryable': false},
         },
       );
-    await openAndSend(tester, service, player: Sc09Player());
+    final player = Sc09Player();
+    await openAndSend(tester, service, player: player);
     await acceptSpeech(tester);
     await tester.pumpAndSettle();
     expect(service.syntheses, 1);
-    expect(find.text('듣기 불가'), findsOneWidget);
-    expect(find.text('듣기 다시 시도'), findsNothing);
-    expect(find.textContaining('음성을 재생하지 못했어요'), findsNothing);
+    expect(find.text('듣기 불가'), findsNothing);
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(player.plays, 0);
     expect(find.text('합성 답변'), findsOneWidget);
+    service.speechFailure = null;
+    await tester.tap(find.text('듣기 다시 시도'));
+    await tester.pumpAndSettle();
+    expect(find.text('합성한 목소리예요'), findsOneWidget);
+    expect(service.syntheses, 1);
+    await tester.tap(find.widgetWithText(FilledButton, '재생'));
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 2);
+    expect(player.plays, 1);
   });
 
   testWidgets(

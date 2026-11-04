@@ -59,8 +59,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _replyDetails = <int, ChatReply>{};
   final _speechCache = <int, SpeechAudio>{};
   final _speechFailed = <int>{};
-  // Replies whose stored synthesis the backend will not hand out again (409).
-  final _speechUnavailable = <int>{};
   late final ReplyAudioPlayer _audio;
   late final StreamSubscription<void> _audioComplete;
   late final StreamSubscription<Object> _audioErrors;
@@ -98,12 +96,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return null;
   }
 
-  /// No cached audio, and the backend already finished (or is finishing) a
-  /// synthesis it cannot return a second time. Calling it would only get a 409.
+  /// The server has confirmed synthesis completed and there is no local audio.
   bool _speechLocked(int index) =>
       _speechCache[index] == null &&
-      (_replyDetails[index]?.speechAlreadySynthesized == true ||
-          _speechUnavailable.contains(index));
+      _replyDetails[index]?.speechAlreadySynthesized == true;
 
   SpeechAudio? _lastReplyAudio() {
     for (var index = _messages.length - 1; index >= 0; index--) {
@@ -310,12 +306,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             failure.kind == BackendFailureKind.staleSession) {
           return;
         }
-        if (failure.code == 'CONFLICT') {
-          // Already synthesized or in progress: retrying cannot succeed.
-          setState(() => _speechUnavailable.add(index));
-          unawaited(_stopAudio());
-          return;
-        }
+        // A 409 can also mean synthesis is still in progress. Keep manual retry.
         _audioFailed();
       } catch (_) {
         if (mounted && generation == _speechGeneration) _audioFailed();
