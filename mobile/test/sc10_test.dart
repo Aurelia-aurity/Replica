@@ -776,27 +776,35 @@ void main() {
     expect(service.syntheses, 0);
   });
 
-  testWidgets('409 from TTS replaces the retry with an unavailable notice', (
-    tester,
-  ) async {
-    final service = Sc10Service()
-      ..result = sampleReply(ttsFailed: true)
-      ..speechFailure = BackendFailure.fromResponse(
-        statusCode: 409,
-        body: {
-          'error': {'code': 'CONFLICT', 'retryable': false},
-        },
-      );
-    await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
-    await startRecording(tester);
-    await finishRecording(tester);
-    expect(find.text('음성 다시 시도'), findsOneWidget);
-    await acceptPlay(tester);
-    expect(service.syntheses, 1);
-    expect(find.text('음성 다시 시도'), findsNothing);
-    expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
-    expect(find.text('음성 대화 합성 답변'), findsOneWidget);
-  });
+  testWidgets(
+    'TTS can recover after a 409 without reopening the voice screen',
+    (tester) async {
+      final service = Sc10Service()
+        ..result = sampleReply(ttsFailed: true)
+        ..speechFailure = BackendFailure.fromResponse(
+          statusCode: 409,
+          body: {
+            'error': {'code': 'CONFLICT', 'retryable': false},
+          },
+        );
+      final player = Sc10Player();
+      await mountVoice(tester, service, Sc10Recorder(), player);
+      await startRecording(tester);
+      await finishRecording(tester);
+      expect(find.text('음성 다시 시도'), findsOneWidget);
+      await acceptPlay(tester);
+      expect(service.syntheses, 1);
+      expect(find.text('음성 다시 시도'), findsOneWidget);
+      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsNothing);
+      expect(player.plays, 0);
+      expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+      service.speechFailure = null;
+      await acceptPlay(tester);
+      expect(service.syntheses, 2);
+      expect(service.recordings, hasLength(1));
+      expect(player.plays, 1);
+    },
+  );
 
   testWidgets(
     'TTS partial failure keeps text and only retries speech, with disclosure',
