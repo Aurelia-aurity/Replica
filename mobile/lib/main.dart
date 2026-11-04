@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 
+import 'auth/auth_gate.dart';
+import 'auth/auth_config.dart';
+import 'auth/auth_service.dart';
+import 'auth/preview_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
-import 'home/home_screen.dart';
 import 'shared/conversation_widgets.dart';
 
-void main() {
-  AppConfig.fromEnvironment();
-  runApp(const ReplicaApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final app = AppConfig.fromEnvironment();
+  final auth = AuthConfig.fromEnvironment(app.environment);
+  runApp(ReplicaApp(authService: selectAuthService(app, auth)));
 }
 
+/// No real authentication client is activated until integration is agreed.
+AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
+    app.environment == 'dev' && auth.mode == 'preview'
+    ? PreviewAuthService()
+    : UnconfiguredAuthService();
+
 class ReplicaApp extends StatelessWidget {
-  const ReplicaApp({super.key, this.chatService});
+  const ReplicaApp({super.key, required this.authService, this.chatService});
+  final AuthService authService;
   final ChatService? chatService;
 
   @override
@@ -26,17 +38,24 @@ class ReplicaApp extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size(0, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
       ),
-      home: HomeScreen(service: chatService ?? const DemoChatService()),
+      home: AuthGate(
+        auth: authService,
+        chat: chatService ?? const DemoChatService(),
+      ),
     );
   }
 }
