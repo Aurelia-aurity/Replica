@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../chat/ai_disclosure_sheet.dart';
@@ -13,23 +15,74 @@ Future<void> openConversation(
   bool? voice,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
-    builder: (_) => ChatScreen(
-      service: ConversationChatService(service, conversation.id),
-      conversationName:
-          conversation.personaName ?? (service.isDemo ? '엄마' : '대화 상대'),
-      initialVoiceMode: voice ?? conversation.lastVoice,
-      acknowledgedAt: conversation.acknowledgedAt,
-      initialMessages: conversation.messages,
-      initialReplies: conversation.replyMetadata,
-      historyNotice: conversation.hasFailedTurns
-          ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
-          : null,
-      blockedReason: conversation.pending
-          ? '아직 처리 중인 메시지가 있어요. 이력으로 돌아가 새로고침해 주세요.'
-          : null,
+    builder: (_) => _ConversationRoute(
+      service: service,
+      conversation: conversation,
+      voice: voice ?? conversation.lastVoice,
     ),
   ),
 );
+
+class _ConversationRoute extends StatefulWidget {
+  const _ConversationRoute({
+    required this.service,
+    required this.conversation,
+    required this.voice,
+  });
+
+  final ConversationService service;
+  final Conversation conversation;
+  final bool voice;
+
+  @override
+  State<_ConversationRoute> createState() => _ConversationRouteState();
+}
+
+class _ConversationRouteState extends State<_ConversationRoute> {
+  late final ConversationChatService _chat;
+  late DateTime _checkedAt;
+  Timer? _unlockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    final conversation = widget.conversation;
+    _chat = ConversationChatService(widget.service, conversation.id);
+    _checkedAt = DateTime.now();
+    final unlockAt = conversation.pendingUntil(_checkedAt);
+    if (unlockAt != null) {
+      _unlockTimer = Timer(unlockAt.difference(_checkedAt), () {
+        setState(() => _checkedAt = unlockAt);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _unlockTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversation = widget.conversation;
+    return ChatScreen(
+      service: _chat,
+      conversationName:
+          conversation.personaName ?? (widget.service.isDemo ? '엄마' : '대화 상대'),
+      initialVoiceMode: widget.voice,
+      acknowledgedAt: conversation.acknowledgedAt,
+      initialMessages: conversation.messages,
+      initialReplies: conversation.replyMetadata,
+      historyNotice: conversation.hasFailedTurnsAt(_checkedAt)
+          ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
+          : null,
+      blockedReason: conversation.hasActivePendingTurns(_checkedAt)
+          ? '아직 처리 중인 메시지가 있어요. 잠시 기다리거나 이력에서 새로고침해 주세요.'
+          : null,
+    );
+  }
+}
 
 Future<void> startConversation(
   BuildContext context,
