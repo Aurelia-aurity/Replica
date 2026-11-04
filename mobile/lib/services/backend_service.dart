@@ -1,10 +1,5 @@
 import '../auth/auth_service.dart';
 
-/// App-local code (not part of the backend contract): the server answered a
-/// resend of the same `turn_id` with 409 because the original request is still
-/// being processed. Retrying the same turn later is the documented recovery.
-const turnInProgressCode = 'TURN_IN_PROGRESS';
-
 enum BackendFailureKind {
   unauthenticated,
   network,
@@ -48,7 +43,6 @@ class BackendFailure implements Exception {
     'AI_TIMEOUT' => '답변을 만드는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
     'AI_UNAVAILABLE' => 'AI 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
     'AI_FAILED' => '답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
-    turnInProgressCode => '아직 답변을 만들고 있어요. 잠시 후 다시 시도해 주세요.',
     'CONFLICT' || 'TURN_ID_CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력을 새로고침해 주세요.',
     'NOT_FOUND' => '대화나 대화 상대를 찾을 수 없어요.',
     'NO_PERSONA' => '대화할 상대가 없어요.',
