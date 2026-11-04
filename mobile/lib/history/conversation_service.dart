@@ -269,25 +269,6 @@ class HttpConversationService
     });
   });
 
-  /// Sends of an existing `turn_id` (text or voice). The backend answers a
-  /// resend with 409 `CONFLICT` while that turn is still being processed, e.g.
-  /// after the app's own 30s timeout fired first. Resending the same turn once
-  /// it finishes returns the stored result, so this is retryable with the same
-  /// `turn_id` rather than a dead end.
-  Future<Object?> _resendable(Future<Object?> Function() send) async {
-    try {
-      return await send();
-    } on BackendFailure catch (failure) {
-      if (failure.code != 'CONFLICT') rethrow;
-      throw BackendFailure(
-        BackendFailureKind.generic,
-        code: turnInProgressCode,
-        retryable: true,
-        stage: failure.stage,
-      );
-    }
-  }
-
   Future<List<ConversationTurn>> _turns(String id) async {
     final turns = <ConversationTurn>[];
     var after = 0;
@@ -470,12 +451,10 @@ class HttpConversationService
     String turnId,
     String message,
   ) async {
-    final json = await _resendable(
-      () => _request(
-        'POST',
-        '/chat/text',
-        body: {'session_id': id, 'turn_id': turnId, 'message': message},
-      ),
+    final json = await _request(
+      'POST',
+      '/chat/text',
+      body: {'session_id': id, 'turn_id': turnId, 'message': message},
     ) as Map<String, dynamic>;
     final reply = ChatReply.fromJson(json, expectedTurnId: turnId);
     (_replyDetails[id] ??= {})[turnId] = reply;
@@ -509,8 +488,7 @@ class HttpConversationService
           contentType: MediaType.parse(recording.mimeType),
         ),
       );
-    final json =
-        await _resendable(() => _perform(request)) as Map<String, dynamic>;
+    final json = await _perform(request) as Map<String, dynamic>;
     final result = VoiceReply.fromJson(json, turnId);
     (_replyDetails[id] ??= {})[turnId] = result.reply;
     return result;

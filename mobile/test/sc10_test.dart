@@ -536,56 +536,44 @@ void main() {
     expect(ids[2], isNot(ids[1]));
   });
 
-  test('HTTP voice 409 while the turn is in progress is retryable', () async {
-    final auth = fixtures.TestAuth();
-    addTearDown(auth.dispose);
-    await auth.signIn(
-      PreviewAuthService.emails.first,
-      PreviewAuthService.password,
-    );
-    final ids = <String>[];
-    final client = MockClient((request) async {
-      final body = latin1.decode(request.bodyBytes);
-      final id = RegExp('name="turn_id"\r\n\r\n([^\r]+)')
-          .firstMatch(body)!
-          .group(1)!;
-      ids.add(id);
-      if (ids.length == 1) {
+  test(
+    'first HTTP voice send preserves a non-retryable conflict and stage',
+    () async {
+      final auth = fixtures.TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
         return fixtures.jsonResponse({
           'error': {'code': 'CONFLICT', 'stage': 'llm', 'retryable': false},
         }, status: 409);
-      }
-      return fixtures.jsonResponse({
-        'turn_id': id,
-        'transcript': '합성 전사문',
-        'answer': '합성 답변',
-        'is_ai_generated': true,
-        'finish_reason': 'stop',
-        'tts_status': 'failed',
       });
-    });
-    addTearDown(client.close);
-    final service = ConversationChatService(
-      HttpConversationService(
-        backend: BackendService(auth),
-        baseUrl: Uri.parse('http://localhost:8000'),
-        client: client,
-      ),
-      'session-one',
-    );
-    final recording = sampleRecording();
-    await expectLater(
-      service.replyVoice(recording),
-      throwsA(
-        isA<BackendFailure>()
-            .having((error) => error.code, 'code', turnInProgressCode)
-            .having((error) => error.canRetry, 'canRetry', isTrue)
-            .having((error) => error.stage, 'stage', 'llm'),
-      ),
-    );
-    expect((await service.replyVoice(recording)).transcript, '합성 전사문');
-    expect(ids[0], ids[1]);
-  });
+      addTearDown(client.close);
+      final service = ConversationChatService(
+        HttpConversationService(
+          backend: BackendService(auth),
+          baseUrl: Uri.parse('http://localhost:8000'),
+          client: client,
+        ),
+        'session-one',
+      );
+      final recording = sampleRecording();
+      await expectLater(
+        service.replyVoice(recording),
+        throwsA(
+          isA<BackendFailure>()
+              .having((error) => error.code, 'code', 'CONFLICT')
+              .having((error) => error.canRetry, 'canRetry', isFalse)
+              .having((error) => error.stage, 'stage', 'llm'),
+        ),
+      );
+      expect(requests, 1);
+    },
+  );
 
   test(
     'voice upload rejects empty and oversized bytes before dispatch',
