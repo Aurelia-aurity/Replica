@@ -1,5 +1,6 @@
 """Local, non-thinking greedy inference; no HTTP or request scheduling."""
 from dataclasses import dataclass
+from typing import Literal
 
 import baseline
 
@@ -26,7 +27,7 @@ class Prepared:
 @dataclass(frozen=True)
 class Generated:
     message: str
-    finish_reason: str
+    finish_reason: Literal["stop", "length"]
     output_tokens: int
 
 

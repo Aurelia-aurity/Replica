@@ -1,4 +1,4 @@
-"""Loopback-only inference API. Production persona generation remains gated."""
+"""Loopback-only inference API with explicitly enabled personalization."""
 import json
 import logging
 import math
@@ -10,7 +10,7 @@ import time
 import baseline
 from inference import ContextLimitExceeded, Inference, Request
 import persona_contract
-from persona_adapter import PersonaGenerator
+from persona_adapter import PersonaGenerator, PersonaInference
 
 RAW_LIMIT = 262144
 ID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -93,8 +93,6 @@ class Service:
         self.deadline_seconds = deadline_seconds
         self.auth = auth
         self.loader = None
-        # Q1/Q2/Q13/Q14 pending: CLI never installs a production persona generator.
-        # Explicit injection exercises the route without selecting a model protocol.
         self.persona_generator = persona_generator
 
     def engine_for(self, request):
@@ -102,7 +100,7 @@ class Service:
             return self.persona_generator
         return self.engine
 
-    def start_loading(self, factory) -> None:
+    def start_loading(self, factory, *, persona_model_name: str | None = None) -> None:
         """Publish readiness only after one successful background load."""
         if self.loader is not None:
             raise RuntimeError
@@ -110,6 +108,8 @@ class Service:
         def load():
             try:
                 self.engine = factory()
+                if persona_model_name is not None:
+                    self.persona_generator = PersonaInference(self.engine, persona_model_name)
                 self.ready.set()
             except Exception:
                 # Runtime boundary: never expose model paths or raw exceptions.
@@ -285,6 +285,7 @@ def main(argv=None) -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--context-limit", type=int)
     parser.add_argument("--deadline-seconds", type=float)
+    parser.add_argument("--mode", choices=("baseline", "persona"), default="baseline")
     try:
         args = parser.parse_args(argv)
         if not 0 < args.port <= 65535 or (
@@ -300,7 +301,9 @@ def main(argv=None) -> int:
         for handler in logging.getLogger().handlers:
             handler.addFilter(lambda record: record.name == LOGGER.name)
         with Server(args.port, service) as server:
-            service.start_loading(lambda: Inference(settings, args.context_limit))
+            service.start_loading(
+                lambda: Inference(settings, args.context_limit),
+                persona_model_name=settings["model_id"] if args.mode == "persona" else None)
             try:
                 server.serve_forever()
             except KeyboardInterrupt:
