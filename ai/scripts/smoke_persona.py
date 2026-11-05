@@ -1,4 +1,4 @@
-"""Synthetic GPU endpoint smoke; no submission, downloads, retries, or answer logs.
+"""Synthetic GPU smoke; raw output capture is opt-in and smoke-only.
 
 Run INSIDE a separately authorized Slurm allocation. Starts one loopback server
 with one real model. Slot checks gate the first real model forward via a hook;
@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import baseline
 from inference import Inference
 import persona_contract
+from persona_adapter import parse_candidate
 import server
 from smoke_baseline import payload, send
 
@@ -55,6 +56,44 @@ class ObservedService(server.Service):
             self.job = job
             self.accepted.set()
         return status, job
+
+
+class DebugCapture:
+    """Write only the two fixed synthetic cases, never production log payloads."""
+
+    def __init__(self, directory: Path):
+        directory.mkdir(parents=True, exist_ok=False)
+        self.directory = directory
+        self.requests = {}
+
+    def select(self, name: str, request: persona_contract.PersonaRequest, data) -> None:
+        if name in ("no-evidence-daily", "history"):
+            self.requests[request.request_id] = (name, request, data)
+
+    def record(self, request, prepared, decoded) -> None:
+        selected = self.requests.get(request.request_id)
+        if selected is None:
+            return
+        name, persona_request, data = selected
+        try:
+            _, ids = parse_candidate(decoded.message, persona_request)
+            citations = {
+                "status": "valid",
+                "numbers": json.loads(decoded.message)["evidence_used"],
+                "mapped_chunk_ids": list(ids),
+            }
+        except ValueError as error:
+            citations = {"status": "invalid", "exception_type": type(error).__name__}
+        capture = {
+            "case": name, "synthetic_only": True,
+            "request_id": request.request_id, "request": data,
+            "raw_output": decoded.message, "finish_reason": decoded.finish_reason,
+            "input_tokens": len(prepared.token_ids),
+            "output_tokens": decoded.output_tokens, "max_new_tokens": request.max_new_tokens,
+            "parsed_citation_result": citations,
+        }
+        with (self.directory / f"{name}.json").open("x", encoding="utf-8") as output:
+            output.write(json.dumps(capture, ensure_ascii=False, indent=2) + "\n")
 
 
 def slot_check(httpd: server.Server, service: ObservedService, timeout: float,
@@ -110,7 +149,8 @@ def slot_check(httpd: server.Server, service: ObservedService, timeout: float,
     return passed and completed and hook_ok == [True] and service.job.status == 200
 
 
-def run(httpd: server.Server, service: ObservedService, timeout: float) -> int:
+def run(httpd: server.Server, service: ObservedService, timeout: float,
+        debug: DebugCapture | None = None) -> int:
     failures = 0
 
     def report(name, passed, status=None):
@@ -121,6 +161,8 @@ def run(httpd: server.Server, service: ObservedService, timeout: float) -> int:
 
     def check(name, data, expected=200, *, citations_required=False):
         parsed = persona_contract.parse_request(data)
+        if debug is not None:
+            debug.select(name, parsed, data)
         status, body = send(httpd.server_port, timeout, data, path="/v1/persona/generate")
         valid = status == expected and body is not None
         if valid and status == 200:
@@ -177,12 +219,15 @@ def main(argv=None) -> int:
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--config", type=Path, default=baseline.DEFAULT_CONFIG)
     parser.add_argument("--timeout", type=float, default=300)
+    parser.add_argument("--debug-output-dir", type=Path,
+                        help="Opt-in raw captures of the two fixed synthetic cases; default off")
     args = parser.parse_args(argv)
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         raise ValueError
     settings = baseline.read_settings(args.config, "smoke", args.model_path)
     if settings["model_id"] != "Qwen/Qwen3-8B":
         raise ValueError  # This prepared smoke is specifically the Qwen3-8B baseline.
+    debug = None if args.debug_output_dir is None else DebugCapture(args.debug_output_dir)
     service = ObservedService()
     with server.Server(0, service) as httpd:
         service.start_loading(lambda: Inference(settings), persona_model_name=settings["model_id"])
@@ -190,11 +235,19 @@ def main(argv=None) -> int:
         if service.loader.is_alive() or not service.ready.is_set():
             print('{"case":"model-load","result":"FAIL"}')
             return 1
+        original_generate = service.engine.generate
+        if debug is not None:
+            def capture_generate(request, prepared):
+                decoded = original_generate(request, prepared)
+                debug.record(request, prepared, decoded)
+                return decoded
+            service.engine.generate = capture_generate
         thread = threading.Thread(target=httpd.serve_forever)
         thread.start()
         try:
-            return run(httpd, service, args.timeout)
+            return run(httpd, service, args.timeout, debug)
         finally:
+            service.engine.generate = original_generate
             httpd.shutdown()
             thread.join(args.timeout)
             if thread.is_alive():
