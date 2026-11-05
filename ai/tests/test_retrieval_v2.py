@@ -132,11 +132,13 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual([h.score for h in result.top5], [float(np.float32(0.8))] * 2)
         self.assertEqual(exact_search(query, vectors, chunks, "missing").top5, ())
 
-    def test_reproduction_config_pins_retrieval_not_service_model(self):
-        data = json.loads((Path(__file__).parents[1] / "configs/persona.json").read_text())
-        self.assertEqual(data["retrieval"], {"threshold": THRESHOLD, "k": 3,
-                                             "window": 3, "budget": 2000})
-        self.assertEqual(data["embedding"]["revision"],
-                         "8b418a58414668e75532ed045c22d9ca018ae2b2")
-        self.assertEqual(data["budget_tokenizer"]["revision"],
-                         "b968826d9c46dd6066d109eabc6255188de91218")
+    def test_default_budget_prunes_the_lower_scoring_record_as_a_whole(self):
+        # Given: each record fits alone, but their combined restored context does not.
+        trace = Retrieval("p1", (Hit(self.chunks[0].chunk_id, 0.9),
+                                 Hit(self.chunks[4].chunk_id, 0.8)))
+        counter = lambda text: 300 * len(json.loads(text))
+        # When: use the service defaults rather than a copied configuration file.
+        result = restore_context(trace, self.chunks, self.records, counter)
+        # Then: retain the higher-scoring diary's complete chunks and original IDs.
+        self.assertEqual(result.evidence,
+                         tuple(contextual_evidence(c) for c in self.chunks[:2]))

@@ -15,12 +15,13 @@ from test_persona import PATH
 from test_server import Engine, call, serving
 
 FIXTURES = Path(__file__).parent / "fixtures/smoke35891"
-PREFIX = '{"message":'
 
 
-class ReplayEngine(Engine):
+class FramingEngine(Engine):
     def generate(self, req, prepared):
-        self.request = req
+        self.answer = (
+            "".join(chr(token) for token in req.output_prefix_ids)
+            + json.dumps("synthetic framed answer") + ',"evidence_used":[]}')
         return super().generate(req, prepared)
 
 
@@ -29,7 +30,7 @@ class JsonPrefixTests(unittest.TestCase):
         for file in sorted(FIXTURES.glob("*.json")):
             # Given: verbatim real GPU output, not a fabricated repaired envelope.
             capture = json.loads(file.read_text())
-            engine = ReplayEngine()
+            engine = Engine()
             engine.answer = capture["raw_output"]
             engine.reason = capture["finish_reason"]
             adapter = PersonaInference(engine, "Qwen/Qwen3-8B")
@@ -42,10 +43,20 @@ class JsonPrefixTests(unittest.TestCase):
                 self.assertEqual((status, body), (
                     500, server.error_body(500, capture["request_id"])))
                 self.assertEqual(engine.calls, 1)
-                self.assertEqual(
-                    getattr(engine.request, "output_prefix_ids", ()),
-                    tuple(ord(c) for c in PREFIX),
-                    "Persona decoding must force its JSON framing before sampling.")
+
+    def test_forwarded_prefix_can_be_completed_in_one_valid_persona_decode(self):
+        # Given: a decoder that completes the adapter's prefix without repairing it.
+        capture = json.loads((FIXTURES / "no-evidence-daily.json").read_text())
+        engine = FramingEngine()
+        adapter = PersonaInference(engine, "synthetic-model")
+        with serving(server.Service(engine, persona_generator=adapter)) as port:
+            # When: the actual adapter forwards its prefix through the HTTP route.
+            status, body = call(port, capture["request"], path=PATH)
+        # Then: strict parsing succeeds with one decode and the expected data.
+        self.assertEqual(status, 200)
+        self.assertEqual(body["message"], "synthetic framed answer")
+        self.assertEqual(body["evidence_used"], [])
+        self.assertEqual(engine.calls, 1)
 
     def test_real_decoder_forces_only_prefix_inside_unchanged_budget(self):
         # Given: the real decoder with fake tensor/model boundaries.

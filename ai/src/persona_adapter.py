@@ -7,7 +7,7 @@ from typing import Protocol
 
 from inference import ContextLimitExceeded, Generated, Prepared, Request
 from persona_contract import JSON, PersonaGenerated, PersonaRequest
-from persona_guard import GuardResult, PERSONA_RULES, PersonaIdentity, Register, check_reply
+from persona_guard import PERSONA_RULES, PersonaIdentity, Register, check_reply
 from rag.retrieval_v2 import evidence_json
 
 
@@ -29,21 +29,6 @@ class PersonaGenerator(Protocol):
     def prepare(self, request: PersonaRequest) -> Prepared: ...
 
     def generate(self, request: PersonaRequest, prepared: Prepared) -> PersonaGenerated: ...
-
-
-class GuardIdentityPending(RuntimeError):
-    """Q1: the wire contract does not yet supply an agreed guard identity."""
-
-
-def check_candidate(message: str, identity: PersonaIdentity | None = None) -> GuardResult:
-    """Never infer aliases/register from free-text tone, names, or history.
-
-    None is an explicit pending placeholder, not a disabled/pass-through guard.
-    PersonaInference supplies only the documented reduced-mode proposal identity.
-    """
-    if identity is None:
-        raise GuardIdentityPending
-    return check_reply(message, identity)
 
 
 def reduced_identity(request: PersonaRequest) -> PersonaIdentity:
@@ -158,7 +143,7 @@ class PersonaInference:
                     tuple(self.engine.tokenizer.encode('{"message":', add_special_tokens=False))),
             prepared)
         message, used = parse_candidate(decoded.message, request)
-        checked = check_candidate(message, reduced_identity(request))
+        checked = check_reply(message, reduced_identity(request))
         return PersonaGenerated(
             checked.text, decoded.finish_reason, decoded.output_tokens,
             () if checked.matched is not None else used, self.model_name)

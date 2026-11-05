@@ -7,9 +7,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-import persona_adapter
 import persona_contract as contract
-from persona_guard import PersonaIdentity, check_reply
 import server
 from test_server import Engine, OTHER_ID, call, request as baseline_request, serving
 
@@ -231,15 +229,3 @@ class PersonaTests(unittest.TestCase):
                     thread.join(5)
                 self.assertFalse(thread.is_alive())
                 self.assertEqual(responses[0][0], 200)
-
-    def test_guard_adapter_requires_explicit_identity(self):
-        with self.assertRaises(persona_adapter.GuardIdentityPending):
-            persona_adapter.check_candidate("candidate")
-        for register in ("반말", "다정한 반말", "해요체", "하게체"):
-            identity = PersonaIdentity(("할아버지",), ("온유",), register)
-            candidate = "할아버지께 물어보세요."
-            result = persona_adapter.check_candidate(candidate, identity)
-            self.assertIsNotNone(result.matched)
-            self.assertEqual(result, check_reply(candidate, identity))
-        identity = PersonaIdentity(("할아버지",), ("온유",), "하게체")
-        self.assertIsNone(persona_adapter.check_candidate("누나에게 물어보세요.", identity).matched)
