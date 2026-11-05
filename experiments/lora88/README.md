@@ -83,3 +83,29 @@ natural-corpus or broad-domain generalization. The register ending heuristic
 is only a diagnostic; official judgments use the separately frozen automatic
 hybrid pipeline. The old #77 arm registry is not reused as a LoRA runner.
 There is no decision-set builder, service integration or training resume.
+
+## Measured DEV pilot result (job 35899)
+
+- **Status:** `DEV_ONLY`, comparison `VALID`, overall pilot `pass=false`,
+  `operations_pass=true`.
+- **Arm summaries:**
+  - **BASE B:** register 138/180, self-honorific 0, over-refusal 0, core 151,
+    fabricated 4, safe 17.
+  - **LORA B:** register 155/180, self-honorific 0, over-refusal 0, core 149,
+    fabricated 4, safe 24.
+  - **BASE C:** register 140/180, self-honorific 0, over-refusal 0, core 170,
+    fabricated 1, safe 34.
+  - **LORA C:** register 174/180, self-honorific 0, over-refusal 0, core 124,
+    fabricated 15, safe 20.
+- **Primary and gates:** B register primary passed (delta +0.094444, two-sided
+  95% CI [0.038889, 0.150000], wins 24, losses 7). Required gates failed:
+  B G2 factual core 107 < 115, B S3 persona p0-1 28 < 29; C G1 124 < 167,
+  G2 91 < 115, G3 15 > 2, G7 20 < 34, G8 13 < 18, S2 banmal 57 < 59,
+  S3 persona p0-0 28 < 29.
+- **Audit and labels:** Audit 6/115 = 5.217391%, triggering full-Terra
+  fallback; all 720 grounding and style labels completed.
+- **Runtime and training:** Training 200.215s, peak 35.497 GiB, 23 updates,
+  max 2582 training tokens; job total 00:20:31.
+- **Scope boundary:** This result is narrow synthetic DEV only, not service
+  approval. No decision held-out set was built or read, and no second run is
+  authorized.
