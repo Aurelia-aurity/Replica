@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from arms import ARMS, PROVENANCE, arm_context, schedule_hash
 from decision import completed
@@ -148,6 +149,14 @@ class ArmTests(unittest.TestCase):
         result = arm_context(args, {})
         # Then
         self.assertEqual(result, {})
+
+    def test_decision_v3_environment_rejects_missing_arm_arguments(self) -> None:
+        # Given: the legacy wrapper supplies only the run ID environment variable.
+        args = SimpleNamespace(arm=None, run_id=None)
+        with patch.dict("os.environ", MODEL77_RUN_ID="decision-v3"):
+            # When / Then
+            with self.assertRaises(PermissionError):
+                arm_context(args, {})
 
     def test_resume_rejects_missing_arm_even_with_matching_identity(self):
         # Given
