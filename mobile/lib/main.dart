@@ -6,6 +6,7 @@ import 'auth/auth_service.dart';
 import 'auth/preview_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
+import 'profile/persona_service.dart';
 import 'shared/conversation_widgets.dart';
 
 Future<void> main() async {
@@ -22,9 +23,17 @@ AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
     : UnconfiguredAuthService();
 
 class ReplicaApp extends StatelessWidget {
-  const ReplicaApp({super.key, required this.authService, this.chatService});
+  const ReplicaApp({
+    super.key,
+    required this.authService,
+    this.chatService,
+    this.personaServiceFactory,
+  });
   final AuthService authService;
   final ChatService? chatService;
+
+  /// Replaces the default partner service. For tests and previews.
+  final PersonaService Function()? personaServiceFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +64,7 @@ class ReplicaApp extends StatelessWidget {
       home: AuthGate(
         auth: authService,
         chat: chatService ?? const DemoChatService(),
+        personaServiceFactory: personaServiceFactory,
       ),
     );
   }

@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../chat/chat_service.dart';
+import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import 'conversation.dart';
 
@@ -166,61 +166,33 @@ class HttpConversationService implements VoiceConversationService {
     required this.backend,
     required this.baseUrl,
     required this.client,
-  });
+    this.selectedPersonaId,
+  }) : _api = ApiClient(backend: backend, baseUrl: baseUrl, client: client);
   final BackendService backend;
   final Uri baseUrl;
   final http.Client client;
+  final ApiClient _api;
+
+  /// Id of the conversation partner shown on the home card. When it returns a
+  /// value, new conversations use it so the displayed name and the chat target
+  /// cannot diverge. Without it the first active partner is used.
+  final String? Function()? selectedPersonaId;
   // The draft session API has no initial input mode field. Keep it for this login.
   final _initialVoiceModes = <String, bool>{};
   final _replyDetails = <String, Map<String, ChatReply>>{};
   @override
   bool get isDemo => false;
 
-  Uri _uri(String path, [Map<String, String>? query]) => baseUrl.replace(
-    path: '${baseUrl.path.replaceFirst(RegExp(r'/$'), '')}$path',
-    queryParameters: query,
-  );
+  Uri _uri(String path, [Map<String, String>? query]) => _api.uri(path, query);
 
   Future<Object?> _request(
     String method,
     String path, {
     Map<String, String>? query,
     Map<String, Object?>? body,
-  }) {
-    final request = http.Request(method, _uri(path, query))
-      ..headers['Content-Type'] = 'application/json';
-    if (body != null) request.body = jsonEncode(body);
-    return _perform(request);
-  }
+  }) => _api.request(method, path, query: query, body: body);
 
-  Future<Object?> _perform(http.BaseRequest request) => backend.run(() async {
-    final headers = await backend.auth.authorizationHeaders();
-    // Check generation again after asynchronous token acquisition.
-    return backend.run(() async {
-      request.headers.addAll(headers);
-      final response = await (() async => http.Response.fromStream(
-        await client.send(request),
-      ))().timeout(const Duration(seconds: 30));
-      Object? json;
-      if (response.bodyBytes.isNotEmpty) {
-        try {
-          json = jsonDecode(utf8.decode(response.bodyBytes));
-        } catch (_) {
-          if (response.statusCode >= 200 && response.statusCode < 300) rethrow;
-        }
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw BackendFailure.fromResponse(
-          statusCode: response.statusCode,
-          body: json,
-        );
-      }
-      if (request.method == 'DELETE' && response.statusCode != 204) {
-        throw const FormatException('Deletion not confirmed');
-      }
-      return json;
-    });
-  });
+  Future<Object?> _perform(http.BaseRequest request) => _api.perform(request);
 
   Future<List<ConversationTurn>> _turns(String id) async {
     final turns = <ConversationTurn>[];
@@ -308,25 +280,29 @@ class HttpConversationService implements VoiceConversationService {
     DateTime acknowledgedAt, {
     bool voice = false,
   }) async {
-    final personas = await _request(
-      'GET',
-      '/personas',
-      query: {'limit': '100', 'offset': '0'},
-    ) as Map<String, dynamic>;
-    final active = (personas['items'] as List)
-        .cast<Map<String, dynamic>>()
-        .where((p) => p['status'] == 'active');
-    if (active.isEmpty) {
-      throw const BackendFailure(
-        BackendFailureKind.generic,
-        code: 'NO_PERSONA',
-      );
+    var personaId = selectedPersonaId?.call();
+    if (personaId == null) {
+      final personas = await _request(
+        'GET',
+        '/personas',
+        query: {'limit': '100', 'offset': '0'},
+      ) as Map<String, dynamic>;
+      final active = (personas['items'] as List)
+          .cast<Map<String, dynamic>>()
+          .where((p) => p['status'] == 'active');
+      if (active.isEmpty) {
+        throw const BackendFailure(
+          BackendFailureKind.generic,
+          code: 'NO_PERSONA',
+        );
+      }
+      personaId = active.first['id'] as String;
     }
     final json = await _request(
       'POST',
       '/sessions',
       body: {
-        'persona_id': active.first['id'],
+        'persona_id': personaId,
         'session_id': newConversationId(),
         'ai_notice_ack_at': acknowledgedAt.toUtc().toIso8601String(),
       },

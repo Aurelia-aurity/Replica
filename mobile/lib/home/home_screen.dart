@@ -3,17 +3,27 @@ import 'package:flutter/material.dart';
 import '../history/conversation.dart';
 import '../history/conversation_service.dart';
 import '../history/history_screen.dart';
+import '../profile/persona_card.dart';
+import '../profile/persona_controller.dart';
+import '../profile/persona_flow.dart';
+import '../profile/speech_profile_screen.dart';
 import '../shared/conversation_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.history,
+    required this.personas,
+    this.onOpenRecordUpload,
     this.accountEmail,
     this.onSignOut,
     this.onExpireSession,
   });
   final ConversationService history;
+  final PersonaController personas;
+
+  /// Opens SC-04 for the partner. Null until the records feature is connected.
+  final RecordUploadLauncher? onOpenRecordUpload;
   final String? accountEmail;
   final VoidCallback? onSignOut;
   final VoidCallback? onExpireSession;
@@ -31,6 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _refreshRecent();
+    // Not synchronously: the listeners below must not rebuild during mount.
+    Future.microtask(widget.personas.load);
   }
 
   void _refreshRecent() {
@@ -80,7 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_starting) return;
     setState(() => _starting = true);
     try {
-      await startConversation(context, widget.history, voice: voice);
+      await startConversation(
+        context,
+        widget.history,
+        voice: voice,
+        conversationName: widget.personas.current?.name,
+      );
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
     } finally {
@@ -98,7 +115,14 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _starting = true);
     try {
       final latest = await widget.history.get(item.id);
-      if (mounted) await openConversation(context, widget.history, latest);
+      if (mounted) {
+        await openConversation(
+          context,
+          widget.history,
+          latest,
+          conversationName: widget.personas.current?.name,
+        );
+      }
     } catch (_) {
       if (mounted) _notice('대화를 불러오지 못했어요. 다시 시도해 주세요.');
     } finally {
@@ -142,10 +166,16 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.personas,
+    builder: (context, _) => _buildBody(context),
+  );
+
+  Widget _buildBody(BuildContext context) {
     if (_tab == 2) {
       return HistoryScreen(
         service: widget.history,
+        conversationName: widget.personas.current?.name,
         bottomNavigationBar: _navigation(),
       );
     }
@@ -172,90 +202,16 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: replicaGreen,
-                  borderRadius: BorderRadius.circular(22),
+              PersonaCard(
+                controller: widget.personas,
+                busy: _starting,
+                onOpenProfile: () => openPersonaEntry(
+                  context,
+                  widget.personas,
+                  onOpenRecordUpload: widget.onOpenRecordUpload,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '대화 상대',
-                      style: TextStyle(color: Color(0xFFCAE0D6), fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '엄마',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.history.isDemo
-                          ? '데모 대화 · 말투 프로필과 기록은 아직 연결되지 않았어요'
-                          : '대화를 시작해 보세요',
-                      style: const TextStyle(
-                        color: Color(0xFFDAEAE2),
-                        height: 1.5,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final buttons = [
-                          FilledButton.icon(
-                            onPressed: _starting
-                                ? null
-                                : () => _start(voice: false),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: replicaGreen,
-                            ),
-                            icon: const Icon(
-                              Icons.chat_bubble_outline,
-                              size: 18,
-                            ),
-                            label: const Text('텍스트로 대화'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _starting
-                                ? null
-                                : () => _start(voice: true),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Color(0xFF77A493)),
-                            ),
-                            icon: const Icon(Icons.mic_none, size: 18),
-                            label: const Text('음성으로 대화'),
-                          ),
-                        ];
-                        if (constraints.maxWidth < 340) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              buttons[0],
-                              const SizedBox(height: 8),
-                              buttons[1],
-                            ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(child: buttons[0]),
-                            const SizedBox(width: 10),
-                            Expanded(child: buttons[1]),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                onStartText: () => _start(voice: false),
+                onStartVoice: () => _start(voice: true),
               ),
               const SizedBox(height: 28),
               Row(

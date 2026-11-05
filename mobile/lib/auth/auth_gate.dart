@@ -7,6 +7,9 @@ import '../chat/chat_service.dart';
 import '../config/app_config.dart';
 import '../history/conversation_service.dart';
 import '../home/home_screen.dart';
+import '../profile/persona_controller.dart';
+import '../profile/persona_service.dart';
+import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
@@ -14,9 +17,17 @@ import 'preview_auth_service.dart';
 
 /// Each account owns a separate navigation tree, including dialogs and drafts.
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.auth, required this.chat});
+  const AuthGate({
+    super.key,
+    required this.auth,
+    required this.chat,
+    this.personaServiceFactory,
+  });
   final AuthService auth;
   final ChatService chat;
+
+  /// Replaces the default partner service (preview data or HTTP). For tests.
+  final PersonaService Function()? personaServiceFactory;
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
@@ -25,12 +36,36 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   var _navigator = GlobalKey<NavigatorState>();
   late int _generation;
   ConversationService? _history;
+  PersonaController? _personas;
   http.Client? _historyClient;
 
   void _resetHistory() {
     _historyClient?.close();
     _historyClient = null;
     _history = null;
+    _personas?.dispose();
+    _personas = null;
+  }
+
+  /// One client for every HTTP adapter of this login.
+  http.Client get _client => _historyClient ??= http.Client();
+
+  PersonaController _personaController() {
+    if (_personas != null) return _personas!;
+    final factory = widget.personaServiceFactory;
+    final backend = BackendService(widget.auth);
+    final PersonaService service = factory != null
+        ? factory()
+        : widget.auth.isPreview
+        ? MemoryPersonaService.preview(backend: backend)
+        : HttpPersonaService(
+            ApiClient(
+              backend: backend,
+              baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
+              client: _client,
+            ),
+          );
+    return _personas = PersonaController(service);
   }
 
   ConversationService _conversationService() {
@@ -42,11 +77,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         chat: widget.chat,
       );
     }
-    final client = _historyClient = http.Client();
+    final personas = _personaController();
     return _history = HttpConversationService(
       backend: backend,
       baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
-      client: client,
+      client: _client,
+      selectedPersonaId: () => personas.current?.id,
     );
   }
 
@@ -105,6 +141,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) => HomeScreen(
               history: _conversationService(),
+              personas: _personaController(),
               accountEmail: widget.auth.identity!.email,
               onSignOut: () =>
                   unawaited(widget.auth.signOut().catchError((Object _) {})),

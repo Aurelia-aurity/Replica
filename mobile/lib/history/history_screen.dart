@@ -6,16 +6,19 @@ import '../shared/conversation_widgets.dart';
 import 'conversation.dart';
 import 'conversation_service.dart';
 
+/// [conversationName] is the partner name set in SC-13; without one the
+/// previous fallback is kept.
 Future<void> openConversation(
   BuildContext context,
   ConversationService service,
   Conversation conversation, {
   bool? voice,
+  String? conversationName,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
     builder: (_) => ChatScreen(
       service: ConversationChatService(service, conversation.id),
-      conversationName: service.isDemo ? '엄마' : '대화',
+      conversationName: conversationName ?? (service.isDemo ? '엄마' : '대화'),
       initialVoiceMode: voice ?? conversation.lastVoice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
@@ -34,6 +37,7 @@ Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
+  String? conversationName,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
@@ -42,7 +46,13 @@ Future<void> startConversation(
   if (acknowledgedAt == null || !context.mounted) return;
   final conversation = await service.create(acknowledgedAt, voice: voice);
   if (!context.mounted) return;
-  await openConversation(context, service, conversation, voice: voice);
+  await openConversation(
+    context,
+    service,
+    conversation,
+    voice: voice,
+    conversationName: conversationName,
+  );
 }
 
 class HistoryScreen extends StatefulWidget {
@@ -50,9 +60,13 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     required this.service,
     this.bottomNavigationBar,
+    this.conversationName,
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
+
+  /// Partner name shown at the top of the conversations opened from here.
+  final String? conversationName;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -148,7 +162,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       );
       if (voice == null || !mounted) return;
-      await startConversation(context, widget.service, voice: voice);
+      await startConversation(
+        context,
+        widget.service,
+        voice: voice,
+        conversationName: widget.conversationName,
+      );
       if (mounted) await _load();
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
@@ -163,7 +182,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final latest = await widget.service.get(item.id);
       if (!mounted) return;
-      await openConversation(context, widget.service, latest);
+      await openConversation(
+        context,
+        widget.service,
+        latest,
+        conversationName: widget.conversationName,
+      );
       if (mounted) await _load();
     } catch (_) {
       if (mounted) _notice('대화를 불러오지 못했어요.', retry: () => _open(item));
