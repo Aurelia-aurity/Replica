@@ -1,6 +1,8 @@
 """POST /chat/voice, POST /chat/turns/{id}/tts: 음성 → STT → LLM → TTS 흐름. 가짜 DB·STT·AI·TTS로 시험한다."""
 
+import asyncio
 import base64
+import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -12,6 +14,7 @@ from app.clients.tts import get_tts_client
 from app.core.auth import get_user_db
 from app.core.config import get_settings
 from app.main import app
+from app.services import turn_stages as stages
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS, FakeUserDB, busy_error, new_id
 
 AUDIO = b"fake-audio-bytes"
@@ -98,7 +101,7 @@ def test_length_finish_reason_is_passed_through(client, fake_db):
 
 
 def test_tts_failure_keeps_text_and_returns_200_then_dedicated_retry_works(client, fake_db):
-    use(tts=FakeTTS(RuntimeError("provider 비밀 내용"), (b"RIFFok", "wav")))
+    use(tts=FakeTTS(*[RuntimeError("provider 비밀 내용")] * 3, (b"RIFFok", "wav")))  # 한 요청 안의 3번 시도가 모두 실패
     session_id, turn_id = fake_db.add_session(), new_id()
 
     res = send_voice(client, session_id, turn_id)
@@ -106,7 +109,7 @@ def test_tts_failure_keeps_text_and_returns_200_then_dedicated_retry_works(clien
     assert res.status_code == 200
     body = res.json()
     assert body["tts_status"] == "failed" and body["audio_base64"] is None and body["audio_format"] is None
-    assert body["tts_error"] == {"code": "TTS_FAILED", "message": "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요."}
+    assert body["tts_error"] == {"code": "TTS_FAILED", "message": "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요."}
     assert body["answer"] and body["transcript"]
     assert "비밀" not in res.text
     stored = fake_db.turns[turn_id]
@@ -320,7 +323,7 @@ def _finished_text_turn(client, fake_db) -> str:
     return turn_id
 
 
-def test_turn_tts_synthesizes_a_finished_text_turn_once(client, fake_db):
+def test_turn_tts_synthesizes_a_finished_text_turn(client, fake_db):
     turn_id = _finished_text_turn(client, fake_db)
 
     res = client.post(f"/chat/turns/{turn_id}/tts")
@@ -332,19 +335,44 @@ def test_turn_tts_synthesizes_a_finished_text_turn_once(client, fake_db):
     assert set(body["timings"]) == {"tts_ms", "total_ms"}
     assert fake_db.turns[turn_id]["tts_status"] == "ready"
 
+
+def test_turn_tts_on_a_ready_turn_resynthesizes_without_touching_the_db(client, fake_db):
+    turn_id = _finished_text_turn(client, fake_db)
+    assert client.post(f"/chat/turns/{turn_id}/tts").status_code == 200
+    stored = dict(fake_db.turns[turn_id])
+
     again = client.post(f"/chat/turns/{turn_id}/tts")
-    assert again.status_code == 409 and again.json()["error"]["code"] == "CONFLICT"
+
+    assert again.status_code == 200
+    assert (again.json()["tts_status"], base64.b64decode(again.json()["audio_base64"])) == ("ready", b"RIFFfake")
+    assert fake_db.turns[turn_id] == stored  # 시도 번호·시간·상태 모두 그대로
+
+
+def test_turn_tts_failure_on_a_ready_turn_keeps_it_ready_and_the_next_try_works(client, fake_db):
+    turn_id = _finished_text_turn(client, fake_db)
+    assert client.post(f"/chat/turns/{turn_id}/tts").status_code == 200
+    stored = dict(fake_db.turns[turn_id])
+    use(tts=FakeTTS(*[RuntimeError("down")] * 3, (b"RIFFok", "wav")))
+
+    failed = client.post(f"/chat/turns/{turn_id}/tts")
+
+    assert failed.status_code == 502
+    assert failed.json()["error"]["code"] == "TTS_FAILED" and failed.json()["error"]["retryable"] is True
+    assert fake_db.turns[turn_id] == stored  # ready와 답변이 보존된다
+
+    retry = client.post(f"/chat/turns/{turn_id}/tts")
+    assert retry.status_code == 200 and fake_db.turns[turn_id] == stored
 
 
 def test_turn_tts_failure_is_502_then_retry_succeeds(client, fake_db):
     turn_id = _finished_text_turn(client, fake_db)
-    use(tts=FakeTTS(RuntimeError("x"), (b"RIFFok", "wav")))
+    use(tts=FakeTTS(*[RuntimeError("x")] * 3, (b"RIFFok", "wav")))
 
     first = client.post(f"/chat/turns/{turn_id}/tts")
 
     assert first.status_code == 502
     assert first.json()["error"] == {
-        "code": "TTS_FAILED", "message": "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요.",
+        "code": "TTS_FAILED", "message": "음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.",
         "stage": "tts", "turn_id": turn_id, "retryable": True, "field": None,
     }
     assert fake_db.turns[turn_id]["tts_status"] == "failed"
@@ -407,3 +435,108 @@ def test_dedicated_tts_endpoint_records_total_ms(client, fake_db):
     turn_id = _finished_text_turn(client, fake_db)
     body = client.post(f"/chat/turns/{turn_id}/tts").json()
     assert fake_db.turns[turn_id]["total_ms"] == body["timings"]["total_ms"]
+
+
+# --- TTS 자동 재시도: 첫 시도 + 재시도 2번, 앱 대기 시간 안에서만 (#64 F5, 팀 회의 결정) ---
+
+
+def test_tts_retries_inside_one_request_and_succeeds_on_the_second_try(client, fake_db):
+    _, _, tts = use(tts=FakeTTS(RuntimeError("down"), (b"RIFFok", "wav")))
+    session_id, turn_id = fake_db.add_session(), new_id()
+
+    body = send_voice(client, session_id, turn_id).json()
+
+    assert body["tts_status"] == "ready" and base64.b64decode(body["audio_base64"]) == b"RIFFok"
+    assert len(tts.calls) == 2
+    assert fake_db.turns[turn_id]["tts_attempt"] == 1  # 자동 재시도는 DB 시도 번호를 늘리지 않는다
+
+
+def test_tts_gives_up_after_three_tries_in_one_request(client, fake_db):
+    _, _, tts = use(tts=FakeTTS(RuntimeError("down")))
+    session_id, turn_id = fake_db.add_session(), new_id()
+
+    body = send_voice(client, session_id, turn_id).json()
+
+    assert body["tts_status"] == "failed" and len(tts.calls) == 3
+    assert fake_db.turns[turn_id]["tts_attempt"] == 1 and fake_db.turns[turn_id]["tts_status"] == "failed"
+
+
+def test_tts_retry_is_skipped_when_the_remaining_time_is_shorter_than_the_last_try(monkeypatch):
+    class SlowFailingTTS:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def synthesize(self, text):
+            self.calls += 1
+            await asyncio.sleep(0.05)
+            raise RuntimeError("down")
+
+    monkeypatch.setattr(stages, "APP_WAIT_SECONDS", stages.RESPONSE_MARGIN_SECONDS + 0.08)
+    tts = SlowFailingTTS()
+
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=time.perf_counter()))
+
+    assert not result.ok and tts.calls == 1  # 남은 약 0.03초가 직전 시도(0.05초)보다 짧아 건너뛴다
+
+
+def test_first_tts_try_is_made_even_when_no_time_is_left():
+    tts = FakeTTS((b"RIFFok", "wav"))
+    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5  # 앞 단계가 앱 대기 시간을 이미 다 썼다
+
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
+
+    assert result.ok and len(tts.calls) == 1
+
+
+def test_no_retry_when_no_time_is_left_after_the_first_try():
+    tts = FakeTTS(RuntimeError("down"))
+    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5
+
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
+
+    assert not result.ok and len(tts.calls) == 1  # 첫 시도만 하고 재시도는 건너뛴다
+
+
+def test_tts_try_is_cut_off_at_the_remaining_time(monkeypatch):
+    class HangingTTS:
+        async def synthesize(self, text):
+            await asyncio.sleep(5)
+
+    monkeypatch.setattr(stages, "APP_WAIT_SECONDS", stages.RESPONSE_MARGIN_SECONDS + 0.05)
+    monkeypatch.setattr(stages, "FIRST_TRY_MIN_SECONDS", 0.05)
+    started = time.perf_counter()
+
+    result = asyncio.run(stages.synthesize(HangingTTS(), "답변", request_started=started))
+
+    assert not result.ok and time.perf_counter() - started < 1
+
+
+# --- 질문 길이: 16000자 상한은 실행권을 잡기 전에 막는다 (#64 F4) ---
+
+
+def test_transcript_over_16000_chars_is_rejected_before_the_llm_stage_is_claimed(client, fake_db):
+    stt, llm, tts = use(FakeSTT("가" * 16001))
+    session_id, turn_id = fake_db.add_session(), new_id()
+
+    res = send_voice(client, session_id, turn_id)
+
+    assert res.status_code == 422
+    error = res.json()["error"]
+    assert (error["code"], error["retryable"], error["stage"], error["turn_id"]) == (
+        "MESSAGE_TOO_LONG", False, "llm", turn_id
+    )
+    assert error["message"] == "질문이 너무 길어요. 더 짧게 입력해 주세요."
+    assert llm.calls == [] and tts.calls == []
+    assert ("start", "llm") not in fake_db.calls
+    stored = fake_db.turns[turn_id]
+    assert (stored["question_status"], stored["answer_status"], stored["llm_attempt"]) == ("done", None, 0)
+    assert len(stored["question"]) == 16001  # 자르지 않고 보관한다
+
+
+def test_transcript_of_exactly_16000_chars_is_accepted(client, fake_db):
+    stt, llm, tts = use(FakeSTT("가" * 16000))
+
+    res = send_voice(client, fake_db.add_session())
+
+    assert res.status_code == 200
+    assert len(llm.calls) == 1 and len(llm.calls[0]["message"]) == 16000

@@ -16,7 +16,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, ValidationError
 
 from app.core.config import get_settings
-from app.core.errors import AppError
+from app.core.errors import MESSAGE_TOO_LONG_MESSAGE, AppError
 from app.schemas.chat import ChatTurn
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ _AI_ERRORS = {
     "SERVICE_FORBIDDEN": (403, 503, "AI_UNAVAILABLE", _UNAVAILABLE, False, "llm_service_auth"),
     "PAYLOAD_TOO_LARGE": (413, 502, "AI_FAILED", _RETRY_LATER, False, "llm_payload_too_large"),
     "CONTEXT_LIMIT_EXCEEDED": (
-        422, 422, "MESSAGE_TOO_LONG", "질문이 너무 길어요. 더 짧게 입력해 주세요.", False, "llm_context_limit",
+        422, 422, "MESSAGE_TOO_LONG", MESSAGE_TOO_LONG_MESSAGE, False, "llm_context_limit",
     ),
     "MODEL_NOT_READY": (
         503, 503, "AI_NOT_READY", "AI를 준비하고 있어요. 잠시 후 다시 시도해 주세요.", True, "llm_not_ready",
