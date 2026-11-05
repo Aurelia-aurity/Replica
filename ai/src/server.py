@@ -38,6 +38,10 @@ def valid_id(value) -> bool:
     return isinstance(value, str) and ID_PATTERN.fullmatch(value) is not None
 
 
+def reject_json_constant(_value: str) -> None:
+    raise ValueError
+
+
 def parse_request(data) -> Request:
     """Check all structural rules before checking any parsed length limit."""
     if not isinstance(data, dict) or set(data) != {
@@ -241,7 +245,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         request_id = None
         try:
-            data = json.loads(raw.decode("utf-8"), parse_constant=lambda value: None)
+            data = json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant)
             if isinstance(data, dict) and valid_id(data.get("request_id")):
                 request_id = data["request_id"]
             if self.headers.get_content_type() != "application/json":
