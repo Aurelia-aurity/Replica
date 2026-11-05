@@ -10,6 +10,7 @@ import 'reply_evidence.dart';
 import 'voice_recorder.dart';
 import '../shared/conversation_widgets.dart';
 import '../services/backend_service.dart';
+import '../services/request_timeouts.dart';
 
 const _green = replicaGreen;
 const _background = replicaBackground;
@@ -59,6 +60,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _replyDetails = <int, ChatReply>{};
   final _speechCache = <int, SpeechAudio>{};
   final _speechFailed = <int>{};
+
+  /// Failed because the server may still be synthesizing this turn (409).
+  final _speechConflict = <int>{};
   late final ReplyAudioPlayer _audio;
   late final StreamSubscription<void> _audioComplete;
   late final StreamSubscription<Object> _audioErrors;
@@ -138,10 +142,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  void _audioFailed() {
+  void _audioFailed({bool conflict = false}) {
     if (!mounted) return;
     final index = _speechBusy ?? _playing;
-    if (index != null) setState(() => _speechFailed.add(index));
+    if (index != null) {
+      setState(() {
+        _speechFailed.add(index);
+        if (conflict) {
+          _speechConflict.add(index);
+        } else {
+          _speechConflict.remove(index);
+        }
+      });
+    }
     unawaited(_stopAudio());
   }
 
@@ -182,7 +195,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       text,
                     )
                   : ChatReply(text: await widget.service.reply(text)))()
-              .timeout(const Duration(seconds: 30));
+              .timeout(textRequestTimeout);
       if (!mounted) return;
       if (response.text.trim().isEmpty) throw StateError('Empty response');
       setState(() {
@@ -284,6 +297,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _speechBusy = index;
         _playing = null;
         _speechFailed.remove(index);
+        _speechConflict.remove(index);
       });
       try {
         await _audio.stop();
@@ -291,7 +305,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _speechCache[index] ??
             await (widget.service as DetailedChatService)
                 .synthesize(reply!)
-                .timeout(const Duration(seconds: 30));
+                .timeout(speechRequestTimeout);
         if (!mounted || generation != _speechGeneration) return;
         _speechCache[index] = audio;
         await _audio.play(audio);
@@ -307,7 +321,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           return;
         }
         // A 409 can also mean synthesis is still in progress. Keep manual retry.
-        _audioFailed();
+        _audioFailed(
+          conflict:
+              failure.code == 'CONFLICT' ||
+              failure.code == speechInProgressCode,
+        );
       } catch (_) {
         if (mounted && generation == _speechGeneration) _audioFailed();
       } finally {
@@ -456,11 +474,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
           ),
         if (_speechFailed.contains(index))
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
             child: Text(
-              '음성을 재생하지 못했어요. 답변 글은 그대로 볼 수 있어요.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF9C5818)),
+              _speechConflict.contains(index)
+                  ? '아직 음성을 만드는 중일 수 있어요. 잠시 후 다시 시도해 주세요. 답변 글은 그대로 볼 수 있어요.'
+                  : '음성을 재생하지 못했어요. 답변 글은 그대로 볼 수 있어요.',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF9C5818)),
             ),
           ),
         if (_playing == index)

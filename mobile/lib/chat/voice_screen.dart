@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../services/backend_service.dart';
+import '../services/request_timeouts.dart';
 import '../shared/conversation_widgets.dart';
 import 'chat_service.dart';
 import 'reply_audio_player.dart';
@@ -63,6 +64,9 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       _retryable = false;
   bool _playing = false, _paused = false, _prompt = false, _suspended = false;
   bool _ttsFailed = false;
+
+  /// The last speech request got a 409: the server may still be synthesizing.
+  bool _ttsConflict = false;
   int _captureGeneration = 0, _playGeneration = 0;
   bool get _speechLocked =>
       _audio == null && (_reply?.speechAlreadySynthesized ?? false);
@@ -282,11 +286,12 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       _error = null;
       _failedStage = null;
       _ttsFailed = false;
+      _ttsConflict = false;
     });
     try {
       final result = await (widget.service as VoiceChatService)
           .replyVoice(recording)
-          .timeout(const Duration(seconds: 30));
+          .timeout(voiceRequestTimeout);
       if (!mounted) return;
       widget.onReply?.call(result);
       setState(() {
@@ -312,6 +317,18 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _retryable = failure.canRetry;
         _error = failure.userMessage;
       });
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _phase = VoicePhase.failed;
+          _retryable = true;
+          _error = const BackendFailure(
+            BackendFailureKind.network,
+            code: speechTimeoutCode,
+            retryable: true,
+          ).userMessage;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -323,10 +340,11 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _playbackFailed() {
+  void _playbackFailed({bool conflict = false}) {
     if (!mounted) return;
     setState(() {
       _ttsFailed = true;
+      _ttsConflict = conflict;
       _failedStage = 'tts';
       _ttsBusy = false;
     });
@@ -403,7 +421,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         }
         final audio = await (widget.service as DetailedChatService)
             .synthesize(_reply!)
-            .timeout(const Duration(seconds: 30));
+            .timeout(speechRequestTimeout);
         if (!mounted || generation != _playGeneration || _suspended) return;
         _audio = audio;
         widget.onAudio?.call(_reply!, audio);
@@ -429,7 +447,11 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
           failure.kind != BackendFailureKind.unauthenticated &&
           failure.kind != BackendFailureKind.staleSession) {
         // A 409 can also mean synthesis is still in progress. Keep manual retry.
-        _playbackFailed();
+        _playbackFailed(
+          conflict:
+              failure.code == 'CONFLICT' ||
+              failure.code == speechInProgressCode,
+        );
       }
     } catch (_) {
       if (mounted && generation == _playGeneration) _playbackFailed();
@@ -803,9 +825,11 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    '음성 합성·재생에 실패했어요. 답변 글은 그대로 볼 수 있어요.',
-                                    style: TextStyle(
+                                  Text(
+                                    _ttsConflict
+                                        ? '아직 음성을 만드는 중일 수 있어요. 잠시 후 다시 시도해 주세요. 답변 글은 그대로 볼 수 있어요.'
+                                        : '음성 합성·재생에 실패했어요. 답변 글은 그대로 볼 수 있어요.',
+                                    style: const TextStyle(
                                       color: Color(0xFFFFDAD6),
                                       height: 1.5,
                                     ),

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +16,7 @@ import 'package:mobile/history/history_screen.dart';
 import 'package:mobile/home/home_screen.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 class TestAuth extends PreviewAuthService {
   @override
@@ -584,6 +587,175 @@ void main() {
             .having((error) => error.code, 'code', 'CONFLICT')
             .having((error) => error.canRetry, 'canRetry', isFalse),
       ),
+    );
+  });
+
+  test('HTTP adapter waits 180s for text and TTS and 200s for voice', () async {
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn(
+      PreviewAuthService.emails.first,
+      PreviewAuthService.password,
+    );
+    final client = MockClient((_) => Completer<http.Response>().future);
+    addTearDown(client.close);
+    final service = HttpConversationService(
+      backend: BackendService(auth),
+      baseUrl: Uri.parse('http://localhost:8000'),
+      client: client,
+    );
+    // Returns the whole seconds elapsed when the call fails with [code].
+    int? timedOutAt(Future<Object?> Function() call, String code) {
+      int? at;
+      fakeAsync((time) {
+        var failed = false;
+        call().then(
+          (_) {},
+          onError: (Object error) {
+            if (error is BackendFailure && error.code == code) failed = true;
+          },
+        );
+        for (var seconds = 1; seconds <= 260 && !failed; seconds++) {
+          time.elapse(const Duration(seconds: 1));
+          if (failed) at = seconds;
+        }
+      });
+      return at;
+    }
+
+    expect(
+      timedOutAt(() => service.sendDetailed('s', 't', '질문'), 'AI_TIMEOUT'),
+      180,
+    );
+    expect(
+      timedOutAt(
+        () => service.synthesize(const ChatReply(text: '답변', turnId: 't')),
+        'SPEECH_TIMEOUT',
+      ),
+      180,
+    );
+    final recording = VoiceRecording(
+      bytes: pcmToWave(
+        Uint8List.fromList(List.generate(32000, (i) => i.isEven ? 0 : 64)),
+      ),
+      duration: const Duration(seconds: 1),
+    );
+    expect(
+      timedOutAt(
+        () => service.sendVoice('s', 'v', recording),
+        'SPEECH_TIMEOUT',
+      ),
+      200,
+    );
+    expect(
+      const BackendFailure(
+        BackendFailureKind.network,
+        code: 'SPEECH_TIMEOUT',
+        retryable: true,
+      ).userMessage,
+      '음성 처리가 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
+    );
+  });
+
+  group('speech requests while the backend may still be working', () {
+    http.Response speechOk(String turnId) => jsonResponse({
+      'turn_id': turnId,
+      'tts_status': 'ready',
+      'audio_base64': base64Encode([1, 2, 3]),
+      'audio_format': 'wav',
+    });
+    const reply = ChatReply(text: '답변', turnId: 'turn-a');
+    Matcher failsWith(String code) =>
+        throwsA(isA<BackendFailure>().having((e) => e.code, 'code', code));
+
+    Future<HttpConversationService> signedIn(
+      MockClient client,
+      DateTime Function() now,
+    ) async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      addTearDown(client.close);
+      return HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+        now: now,
+      );
+    }
+
+    test('a lost connection holds the next request until the wait is over', () async {
+      var now = DateTime(2026, 11, 5, 12);
+      var calls = 0;
+      var mode = 'drop';
+      final client = MockClient((request) async {
+        calls++;
+        if (mode == 'drop') throw http.ClientException('connection lost');
+        if (mode == 'fail') {
+          return jsonResponse({
+            'error': {'code': 'TTS_FAILED', 'retryable': true, 'stage': 'tts'},
+          }, status: 502);
+        }
+        return speechOk(request.url.pathSegments[2]);
+      });
+      final service = await signedIn(client, () => now);
+
+      await expectLater(service.synthesize(reply), failsWith('AI_UNAVAILABLE'));
+      expect(calls, 1);
+      // The backend may still be retrying, so a second request is not sent.
+      await expectLater(
+        service.synthesize(reply),
+        failsWith(speechInProgressCode),
+      );
+      now = now.add(const Duration(seconds: 179));
+      await expectLater(
+        service.synthesize(reply),
+        failsWith(speechInProgressCode),
+      );
+      expect(calls, 1);
+      // Another turn is not affected.
+      mode = 'ok';
+      await service.synthesize(const ChatReply(text: '다른', turnId: 'turn-b'));
+      expect(calls, 2);
+
+      now = now.add(const Duration(seconds: 2));
+      mode = 'fail';
+      await expectLater(service.synthesize(reply), failsWith('TTS_FAILED'));
+      expect(calls, 3);
+      // The backend answered, so it is done and the next request goes out now.
+      mode = 'ok';
+      final audio = await service.synthesize(reply);
+      expect(audio.bytes, [1, 2, 3]);
+      expect(calls, 4);
+    });
+
+    test(
+      'a request still in flight blocks a second one for the same turn',
+      () async {
+        var calls = 0;
+        final held = Completer<http.Response>();
+        final client = MockClient((request) {
+          calls++;
+          return calls == 1 ? held.future : Future.value(speechOk('turn-a'));
+        });
+        final service = await signedIn(client, DateTime.now);
+
+        final first = service.synthesize(reply);
+        await Future<void>.delayed(Duration.zero);
+        await expectLater(
+          service.synthesize(reply),
+          failsWith(speechInProgressCode),
+        );
+        expect(calls, 1);
+
+        held.complete(speechOk('turn-a'));
+        expect((await first).bytes, [1, 2, 3]);
+        expect((await service.synthesize(reply)).bytes, [1, 2, 3]);
+        expect(calls, 2);
+      },
     );
   });
 

@@ -12,6 +12,7 @@ import 'package:mobile/chat/reply_audio_player.dart';
 import 'package:mobile/chat/reply_evidence.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 import 'history_test.dart' as fixtures;
 
@@ -300,6 +301,7 @@ void main() {
     expect(service.syntheses, 1);
     expect(find.text('듣기 불가'), findsNothing);
     expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(find.textContaining('아직 음성을 만드는 중일 수 있어요'), findsOneWidget);
     expect(player.plays, 0);
     expect(find.text('합성 답변'), findsOneWidget);
     service.speechFailure = null;
@@ -374,11 +376,15 @@ void main() {
   );
 
   testWidgets(
-    '30-second timeout enables manual retry and ignores a late answer',
+    '180-second timeout enables manual retry and ignores a late answer',
     (tester) async {
       final service = Sc09Service()..replyPending = Completer<ChatReply>();
       await openAndSend(tester, service);
       await tester.pump(const Duration(seconds: 31));
+      expect(find.text('응답을 받지 못했어요.'), findsNothing);
+      await tester.pump(const Duration(seconds: 148));
+      expect(find.text('응답을 받지 못했어요.'), findsNothing);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
       expect(find.text('응답을 받지 못했어요.'), findsOneWidget);
       expect(service.sends, 1);
@@ -392,6 +398,39 @@ void main() {
       expect(find.text('합성 질문'), findsOneWidget);
     },
   );
+
+  testWidgets('TTS held back while the backend may still be working says so', (
+    tester,
+  ) async {
+    final service = Sc09Service()
+      ..speechFailure = const BackendFailure(
+        BackendFailureKind.generic,
+        code: speechInProgressCode,
+        retryable: true,
+      );
+    await openAndSend(tester, service, player: Sc09Player());
+    await acceptSpeech(tester);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아직 음성을 만드는 중일 수 있어요'), findsOneWidget);
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+  });
+
+  testWidgets('TTS waits past 30 seconds and gives up at 180 seconds', (
+    tester,
+  ) async {
+    final service = Sc09Service()..speechPending = Completer<SpeechAudio>();
+    await openAndSend(tester, service, player: Sc09Player());
+    await acceptSpeech(tester);
+    await tester.pump(const Duration(seconds: 31));
+    expect(find.text('음성 준비 중'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 148));
+    expect(find.text('음성 준비 중'), findsOneWidget);
+    expect(find.textContaining('재생하지 못했어요'), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(find.textContaining('재생하지 못했어요'), findsOneWidget);
+  });
 
   test('HTTP detailed reply preserves timing and finish reason and uses authenticated turn TTS', () async {
     final auth = fixtures.TestAuth();

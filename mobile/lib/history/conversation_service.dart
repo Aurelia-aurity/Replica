@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../chat/chat_service.dart';
 import '../services/backend_service.dart';
+import '../services/request_timeouts.dart';
 import 'conversation.dart';
 
 abstract class ConversationService {
@@ -197,10 +198,16 @@ class HttpConversationService
     required this.backend,
     required this.baseUrl,
     required this.client,
-  });
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
   final BackendService backend;
   final Uri baseUrl;
   final http.Client client;
+  final DateTime Function() _now;
+
+  /// Until when the backend may still be working on a turn's speech request.
+  /// Kept per login, so it survives leaving the screen or backgrounding the app.
+  final _speechBusyUntil = <String, DateTime>{};
   // The draft session API has no initial input mode field. Keep it for this login.
   final _initialVoiceModes = <String, bool>{};
   final _replyDetails = <String, Map<String, ChatReply>>{};
@@ -218,14 +225,20 @@ class HttpConversationService
     String path, {
     Map<String, String>? query,
     Map<String, Object?>? body,
+    Duration timeout = textRequestTimeout,
+    String timeoutCode = 'AI_TIMEOUT',
   }) {
     final request = http.Request(method, _uri(path, query))
       ..headers['Content-Type'] = 'application/json';
     if (body != null) request.body = jsonEncode(body);
-    return _perform(request);
+    return _perform(request, timeout: timeout, timeoutCode: timeoutCode);
   }
 
-  Future<Object?> _perform(http.BaseRequest request) => backend.run(() async {
+  Future<Object?> _perform(
+    http.BaseRequest request, {
+    Duration timeout = textRequestTimeout,
+    String timeoutCode = 'AI_TIMEOUT',
+  }) => backend.run(() async {
     final headers = await backend.auth.authorizationHeaders();
     // Check generation again after asynchronous token acquisition.
     return backend.run(() async {
@@ -234,11 +247,11 @@ class HttpConversationService
       try {
         response = await (() async => http.Response.fromStream(
           await client.send(request),
-        ))().timeout(const Duration(seconds: 30));
+        ))().timeout(timeout);
       } on TimeoutException {
-        throw const BackendFailure(
+        throw BackendFailure(
           BackendFailureKind.network,
-          code: 'AI_TIMEOUT',
+          code: timeoutCode,
           retryable: true,
         );
       } on http.ClientException {
@@ -461,14 +474,52 @@ class HttpConversationService
     return reply;
   }
 
+  /// Runs a speech or voice request for [turnId] unless an earlier one may still
+  /// be running on the backend. The backend closes a stage that stays pending
+  /// past its limit when another request arrives for the same turn, so a second
+  /// request must wait until the first has answered or its wait ([wait]) is over.
+  /// Any HTTP answer ends the wait; a timeout or lost connection keeps it,
+  /// because the backend may still be retrying speech for up to ~170 seconds.
+  Future<T> _guardSpeech<T>(
+    String turnId,
+    Duration wait,
+    Future<T> Function() call,
+  ) async {
+    final busyUntil = _speechBusyUntil[turnId];
+    if (busyUntil != null && _now().isBefore(busyUntil)) {
+      throw const BackendFailure(
+        BackendFailureKind.generic,
+        code: speechInProgressCode,
+        retryable: true,
+      );
+    }
+    _speechBusyUntil[turnId] = _now().add(wait);
+    var answered = true;
+    try {
+      return await call();
+    } on BackendFailure catch (failure) {
+      if (failure.kind == BackendFailureKind.network) answered = false;
+      rethrow;
+    } finally {
+      if (answered) _speechBusyUntil.remove(turnId);
+    }
+  }
+
   @override
   Future<SpeechAudio> synthesize(ChatReply reply) async {
     if (reply.turnId == null) throw const FormatException('Missing turn id');
-    final json = await _request(
-      'POST',
-      '/chat/turns/${Uri.encodeComponent(reply.turnId!)}/tts',
+    final turnId = reply.turnId!;
+    final json = await _guardSpeech(
+      turnId,
+      speechRequestTimeout,
+      () => _request(
+        'POST',
+        '/chat/turns/${Uri.encodeComponent(turnId)}/tts',
+        timeout: speechRequestTimeout,
+        timeoutCode: speechTimeoutCode,
+      ),
     ) as Map<String, dynamic>;
-    return SpeechAudio.fromJson(json, reply.turnId!);
+    return SpeechAudio.fromJson(json, turnId);
   }
 
   @override
@@ -488,7 +539,15 @@ class HttpConversationService
           contentType: MediaType.parse(recording.mimeType),
         ),
       );
-    final json = await _perform(request) as Map<String, dynamic>;
+    final json = await _guardSpeech(
+      turnId,
+      voiceRequestTimeout,
+      () => _perform(
+        request,
+        timeout: voiceRequestTimeout,
+        timeoutCode: speechTimeoutCode,
+      ),
+    ) as Map<String, dynamic>;
     final result = VoiceReply.fromJson(json, turnId);
     (_replyDetails[id] ??= {})[turnId] = result.reply;
     return result;
