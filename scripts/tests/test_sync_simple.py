@@ -11,20 +11,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
-import notion_api as na
 import sync_simple as ss
-import sync_simple_state as state
-from sync_simple_fakes import CONFIG, FIELD, NOW, OPTIONS, PAGE, REPO, SOURCE
-from sync_simple_fakes import GitHub, Notion, Project, REST, conn, page
-
-
-def checkpoint(github, last="백로그"):
-    snapshot = {"repository_node_id": REPO, "pulls": {}}
-    _, fingerprint, ready_hash = state.issue_facts(github.issues[0], snapshot)
-    return json.dumps({"v": 2, "repository_id": gp.REPOSITORY_ID, "issue_id": 800,
-                       "project_id": CONFIG["project_id"], "review_pr_hash": ready_hash,
-                       "baseline": {"notion_status": last, "facts_fingerprint": fingerprint},
-                       "hold": {"code": "STATUS_CONFLICT", "message": "not for artifact"}})
+from sync_simple_fakes import CONFIG, FIELD, NOW, OPTIONS, SOURCE
+from sync_simple_fakes import GitHub, Notion, Project, REST, checkpoint, item, page
 
 
 class EngineTests(unittest.TestCase):
@@ -37,109 +26,59 @@ class EngineTests(unittest.TestCase):
     def run_sync(self, **kwargs):
         return ss.sync(self.github, self.rest, self.project, self.notion, CONFIG, **kwargs)
 
-    def test_default_and_explicit_dry_run_have_no_writes(self):
-        # Given: changes on both sides and an ambient apply authorization.
+    def test_changed_notion_is_planned_without_mutation(self):
+        # Given:
+        before_project = copy.deepcopy(self.project.items)
         self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "진행 중"}}
+        before_notion = copy.deepcopy(self.notion.pages)
         # When:
-        report = self.run_sync(env={"SYNC_SIMPLE_APPLY": "true"})
+        report = self.run_sync()
         # Then:
         self.assertEqual(report["items"][0]["target"], "진행 중")
         self.assertTrue(report["items"][0]["write_project"])
         self.assertEqual(report["run"]["mode"], "dry-run")
-        self.assertEqual(self.project.mutations + self.notion.writes, [])
+        self.assertEqual(self.project.items, before_project)
+        self.assertEqual(self.notion.pages, before_notion)
         self.assertEqual(report["items"][0]["old_hold"], {"code": "STATUS_CONFLICT"})
 
-    def test_apply_is_rejected_before_any_reads_without_exact_gate(self):
+    def test_initial_alignment_remains_only_a_proposal(self):
         # Given:
-        for value in (None, "TRUE", "false"):
-            with self.subTest(value=value):
-                # When / Then:
-                with self.assertRaises(gp.SyncError):
-                    self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": value})
-        self.assertEqual(self.github.calls + self.project.calls + self.notion.calls, [])
-
-    def test_project_write_and_rerun_are_idempotent(self):
-        # Given: one-sided Notion change.
-        self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "진행 중"}}
-        # When: apply followed by the same full scan.
-        self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        report = self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        # Then:
-        self.assertEqual(self.project.mutations, [gp.SET_STATUS_MUTATION])
-        self.assertEqual(sum(query == gp.PROJECT_ITEM_QUERY for query, _, _ in self.project.calls), 1)
-        self.assertFalse(report["items"][0]["write_project"])
-        self.assertEqual(self.notion.writes, [])
-
-    def test_notion_write_preserves_internal_state_and_rerun_is_idempotent(self):
-        # Given: one-sided Project change, with a legacy hold.
-        self.project = Project("진행 중")
-        internal = na.read_text(self.notion.pages[0], "동기화 내부 상태")
+        self.notion = Notion("준비 중")
+        before = copy.deepcopy(self.project.items)
         # When:
-        self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        report = self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
+        report = self.run_sync()
         # Then:
-        self.assertEqual(len(self.notion.writes), 1)
-        self.assertEqual(set(self.notion.writes[0]), {"작업 상태", "확인 필요"})
-        self.assertEqual(na.read_text(self.notion.pages[0], "동기화 내부 상태"), internal)
-        self.assertEqual(sum(method == "GET" and path.startswith("/pages/")
-                             for method, path, _ in self.notion.calls), 1)
+        self.assertEqual(report["items"][0]["note"], "초기 정렬")
+        self.assertTrue(report["items"][0]["write_project"])
+        self.assertEqual(self.project.items, before)
+
+    def test_note_only_proposal_is_separate_from_status_write(self):
+        # Given: unknown closure must leave both statuses alone.
+        self.github.issues[0].update(state="CLOSED", stateReason="UNKNOWN", closedAt=NOW)
+        # When:
+        report = self.run_sync()
+        # Then:
         self.assertFalse(report["items"][0]["write_notion"])
+        self.assertTrue(report["items"][0]["write_note"])
+        self.assertEqual(report["counts"]["write_notion"], 0)
+        self.assertEqual(report["counts"]["write_note"], 1)
 
-    def test_missing_project_is_added_and_each_mutation_read_back_once(self):
-        # Given:
-        self.project.items = []
-        # When:
-        self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        # Then:
-        self.assertEqual(self.project.mutations, [gp.ADD_ISSUE_MUTATION, gp.SET_STATUS_MUTATION])
-        self.assertEqual(sum(query == gp.PROJECT_ITEM_QUERY for query, _, _ in self.project.calls), 2)
-
-    def test_initial_alignment_and_invalid_reversion_do_not_write_on_rerun(self):
-        # Given: diagnostics have no separate durable state property in this PR.
-        for status, internal in (("준비 중", ""), ("unexpected", checkpoint(self.github))):
-            with self.subTest(status=status):
-                self.project, self.notion = Project(), Notion(status, internal)
-                # When:
-                self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-                first_counts = (len(self.project.mutations), len(self.notion.writes))
-                report = self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-                # Then:
-                self.assertEqual((len(self.project.mutations), len(self.notion.writes)), first_counts)
-                self.assertFalse(report["items"][0]["write_project"])
-                self.assertFalse(report["items"][0]["write_notion"])
-
-    def test_readback_mismatch_stops_before_next_write(self):
-        # Given: closure would change both systems, Project readback is wrong.
-        self.github.issues[0].update(state="CLOSED", stateReason="COMPLETED", closedAt=NOW)
-        self.project.corrupt_readback = True
-        # When / Then:
-        with self.assertRaises(gp.SyncError):
-            self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        self.assertEqual(self.notion.writes, [])
-
-    def test_notion_readback_mismatch_fails(self):
-        # Given:
-        self.project = Project("진행 중")
-        self.notion.corrupt_readback = True
-        # When / Then:
-        with self.assertRaises(gp.SyncError):
-            self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-
-    def test_corrupt_or_missing_baseline_initializes_without_state_writes(self):
+    def test_corrupt_or_missing_baseline_initializes_without_mutation(self):
         # Given:
         for raw in ("", "{broken", "[]", '{"baseline": {}}'):
             with self.subTest(raw=raw):
                 self.notion = Notion("준비 중", raw)
+                before = copy.deepcopy(self.notion.pages)
                 # When:
                 report = self.run_sync()
                 # Then:
                 self.assertIsNone(report["items"][0]["last_synced"])
                 self.assertEqual(report["items"][0]["note"], "초기 정렬")
-                self.assertEqual(self.notion.writes, [])
+                self.assertEqual(self.notion.pages, before)
 
-    def test_full_preflight_rejects_duplicate_wrong_number_and_archived_rows(self):
+    def test_full_scan_rejects_duplicate_wrong_number_and_archived_rows(self):
         # Given:
-        for kind in ("duplicate", "number", "archived"):
+        for kind in ("duplicate", "number", "archived", "is_archived"):
             with self.subTest(kind=kind):
                 self.notion = Notion("진행 중", checkpoint(self.github))
                 if kind == "duplicate":
@@ -147,50 +86,88 @@ class EngineTests(unittest.TestCase):
                 elif kind == "number":
                     self.notion.pages[0]["properties"]["번호"]["number"] = 81
                 else:
-                    self.notion.pages[0]["archived"] = True
+                    self.notion.pages[0][kind] = True
                 # When / Then:
                 with self.assertRaises(gp.SyncError):
-                    self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-                self.assertEqual(self.project.mutations + self.notion.writes, [])
+                    self.run_sync()
 
-    def test_missing_notion_is_reported_and_apply_refused(self):
+    def test_missing_notion_and_project_are_reported(self):
         # Given:
         self.notion.pages = []
+        self.project.items = []
         # When:
         report = self.run_sync()
         # Then:
         self.assertTrue(report["items"][0]["missing_notion"])
-        with self.assertRaises(gp.SyncError):
-            self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        self.assertEqual(self.project.mutations + self.notion.writes, [])
+        self.assertTrue(report["items"][0]["missing_project"])
+        self.assertFalse(report["items"][0]["write_notion"])
+        self.assertEqual(self.project.items, [])
+        self.assertEqual(self.notion.pages, [])
 
-    def test_incomplete_query_fails_before_mutation(self):
+    def test_incomplete_query_fails(self):
         # Given:
         self.notion.query_transform = lambda result: {**result, "request_status": {"type": "incomplete"}}
         # When / Then:
         with self.assertRaises(gp.SyncError):
-            self.run_sync(apply=True, env={"SYNC_SIMPLE_APPLY": "true"})
-        self.assertEqual(self.project.mutations + self.notion.writes, [])
+            self.run_sync()
 
-    def test_cli_defaults_to_read_only_even_with_apply_environment(self):
+    def test_two_issue_rows_keep_their_own_status_proposals(self):
+        # Given:
+        second = copy.deepcopy(self.github.issues[0])
+        second.update(id="I_82", databaseId=802, number=82)
+        self.github.issues.append(second)
+        second_page = page("완료")
+        second_page["id"] = "00000000-0000-4000-8000-000000000082"
+        second_page["properties"].update({"동기화 키": {"rich_text": [{"plain_text":
+            f"gh:{gp.REPOSITORY_ID}:issue:802"}]}, "번호": {"number": 82}})
+        second_item = item("진행 중")
+        second_item.update(id="PVTI_82")
+        second_item["content"].update(id="I_82", databaseId=802, number=82)
+        self.project.items.append(second_item)
+        self.notion.pages.insert(0, second_page)
+        # When:
+        report = self.run_sync()
+        # Then:
+        self.assertEqual([(row["issue"], row["target"]) for row in report["items"]],
+                         [(80, "백로그"), (82, "완료")])
+
+    def test_every_public_status_field_is_bounded_in_serialized_json(self):
+        # Given:
+        fields = ("notion", "project", "last_synced", "target")
+        for value in (*OPTIONS, None, "PRIVATE_SYNTHETIC_STATUS"):
+            # When:
+            serialized = json.dumps(ss.status_fields(dict.fromkeys(fields, value)), ensure_ascii=False)
+            decoded = json.loads(serialized)
+            # Then:
+            self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", serialized)
+            for field in fields:
+                self.assertEqual(decoded[field], "invalid" if value == "PRIVATE_SYNTHETIC_STATUS" else value)
+                self.assertEqual(decoded[field + "_invalid"], value == "PRIVATE_SYNTHETIC_STATUS")
+
+    def test_cli_serialized_report_redacts_invalid_notion_for_both_modes(self):
         # Given: real CLI entrypoint with only transport constructors replaced.
         env = {"GITHUB_TOKEN": "fixture", "PROJECT_TOKEN": "fixture", "NOTION_TOKEN": "fixture",
                "PROJECT_ID": CONFIG["project_id"], "PROJECT_OWNER_ID": CONFIG["owner_id"],
                "PROJECT_STATUS_FIELD_ID": FIELD, "PROJECT_STATUS_OPTIONS": json.dumps(OPTIONS),
-               "NOTION_DATA_SOURCE_ID": SOURCE, "SYNC_SIMPLE_APPLY": "true"}
-        with tempfile.TemporaryDirectory() as directory:
-            path = str(Path(directory) / "plan.json")
-            summary_path = str(Path(directory) / "summary.md")
-            with patch.dict(os.environ, {**env, "GITHUB_STEP_SUMMARY": summary_path}, clear=True), \
-                 patch.object(gp, "GraphQLClient", return_value=self.github), \
-                 patch.object(gp, "RESTClient", return_value=self.rest), \
-                 patch.object(ss, "ProjectClient", return_value=self.project), \
-                 patch.object(na, "NotionClient", return_value=self.notion), \
-                 contextlib.redirect_stdout(io.StringIO()):
-                # When:
-                result = ss.main(["--report", path])
-            # Then:
-            self.assertEqual(result, 0)
-            self.assertEqual(json.loads(Path(path).read_text())["schema"], "replica-sync-simple-plan-v1")
-            self.assertTrue(Path(summary_path).read_text().startswith("## "))
-        self.assertEqual(self.project.mutations + self.notion.writes, [])
+               "NOTION_DATA_SOURCE_ID": SOURCE}
+        self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "PRIVATE_SYNTHETIC_STATUS"}}
+        for mode in ([], ["--dry-run"]):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                path = str(Path(directory) / "plan.json")
+                summary_path = str(Path(directory) / "summary.md")
+                with patch.dict(os.environ, {**env, "GITHUB_STEP_SUMMARY": summary_path}, clear=True), \
+                     patch.object(gp, "GraphQLClient", return_value=self.github), \
+                     patch.object(gp, "RESTClient", return_value=self.rest), \
+                     patch.object(ss, "ProjectClient", return_value=self.project), \
+                     patch.object(ss.na, "NotionClient", return_value=self.notion), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    # When:
+                    result = ss.main([*mode, "--report", path])
+                # Then:
+                self.assertEqual(result, 0)
+                serialized = Path(path).read_text(encoding="utf-8")
+                self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", serialized)
+                row = json.loads(serialized)["items"][0]
+                self.assertEqual(row["notion"], "invalid")
+                self.assertTrue(row["notion_invalid"])
+                self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", Path(summary_path).read_text(encoding="utf-8"))

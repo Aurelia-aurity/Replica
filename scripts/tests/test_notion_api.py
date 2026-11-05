@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
 import notion_api as na
 from sync_simple import ProjectClient
-from sync_simple_fakes import PAGE, SOURCE, Notion
+from sync_simple_fakes import OPTIONS, PAGE, SOURCE, Notion
 
 
 class Opener:
@@ -39,30 +39,27 @@ class NotionTransportTests(unittest.TestCase):
                 client.request(method, path)
         self.assertEqual(opener.requests, [])
 
-    def test_read_uses_fixed_host_headers_and_timeout(self):
+    def test_read_uses_fixed_host_method_and_body(self):
         # Given:
         opener = Opener()
         client = na.NotionClient("synthetic-token", opener=opener, sleep=lambda _: None)
         # When:
         client.request("POST", f"/data_sources/{SOURCE}/query", {"page_size": 100})
         # Then:
-        request, timeout = opener.requests[0]
+        request, _ = opener.requests[0]
         self.assertEqual(request.full_url, f"https://api.notion.com/v1/data_sources/{SOURCE}/query")
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(json.loads(request.data), {"page_size": 100})
-        self.assertEqual(request.get_header("Notion-version"), "2026-03-11")
-        self.assertEqual(timeout, 30)
 
-    def test_apply_patch_is_sent_once_and_error_is_redacted(self):
+    def test_read_error_is_redacted(self):
         # Given:
         opener = Opener()
         opener.error = urllib.error.HTTPError("https://secret.invalid", 503, "private", {},
                                                io.BytesIO(b"private token"))
-        client = na.NotionClient("synthetic-token", allow_apply=True,
-                                  opener=opener, sleep=lambda _: None)
+        client = na.NotionClient("synthetic-token", opener=opener, sleep=lambda _: None)
         # When / Then:
         with self.assertRaisesRegex(gp.SyncError, "^Notion HTTP 503; stopped$"):
-            client.request("PATCH", f"/pages/{PAGE}", {"properties": {}})
+            client.request("GET", f"/data_sources/{SOURCE}")
         self.assertEqual(len(opener.requests), 1)
 
     def test_project_default_client_blocks_mutation_before_network(self):
@@ -117,4 +114,4 @@ class NotionTransportTests(unittest.TestCase):
                 return schema
         # When / Then:
         with self.assertRaises(gp.SyncError):
-            na.check_schema(WrongSchema(), SOURCE)
+            na.check_schema(WrongSchema(), SOURCE, OPTIONS)

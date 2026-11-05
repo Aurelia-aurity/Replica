@@ -1,4 +1,3 @@
-import copy
 import json
 import sys
 import unittest
@@ -9,8 +8,8 @@ import github_project as gp
 import notion_api as na
 import sync_simple as ss
 import sync_simple_state as state
-from sync_simple_fakes import CONFIG, NOW, REPO, SOURCE, GitHub, Notion, Project, REST, conn, page
-from test_sync_simple import checkpoint
+import sync_engine as legacy
+from sync_simple_fakes import CONFIG, NOW, REPO, GitHub, Notion, Project, REST, checkpoint, conn, page, text
 
 
 def pull():
@@ -57,27 +56,45 @@ class StateTests(unittest.TestCase):
         github.pulls = [pull()]
         pr_page = page()
         pr_page["id"] = "00000000-0000-4000-8000-000000000003"
-        pr_page["properties"].update({"동기화 키": na.text(state.key_for(901)),
+        pr_page["properties"].update({"동기화 키": text(state.key_for(901)),
                                      "번호": {"number": 81}, "종류": {"select": {"name": "PR"}}})
         notion.pages.append(pr_page)
         # When:
         report = ss.sync(github, REST(github), Project(), notion, CONFIG)
         # Then:
         self.assertEqual([item["issue"] for item in report["items"]], [80])
-        self.assertEqual(notion.writes, [])
+        self.assertTrue(all(method in {"GET", "POST"} for method, _, _ in notion.calls))
 
-    def test_legacy_fingerprint_is_exact_and_cosmetic_edits_do_not_change_it(self):
-        # Given:
+    def test_legacy_fingerprint_matches_independent_producer_with_reordered_events(self):
+        # Given: nontrivial history and links, hashed by the old engine before any new producer runs.
         github = GitHub()
+        ready = pull()
+        draft = {**pull(), "id": "PR_82", "number": 82, "databaseId": 902,
+                 "legacy_issue_id": 903, "isDraft": True}
+        github.pulls = [draft, ready]
+        github.issues[0]["linked_prs"] = [draft, ready]
+        github.issues[0]["reopens"] = [
+            {"id": "RE_new", "createdAt": "2026-11-04T00:00:00Z"},
+            {"id": "RE_old", "createdAt": "2026-11-03T00:00:00Z"}]
         row = page(internal=checkpoint(github))
-        snapshot = {"repository_node_id": REPO, "pulls": {}}
+        saved = json.loads(na.read_text(row, "동기화 내부 상태"))
+        snapshot = {"repository_node_id": REPO, "pulls": {901: ready, 903: draft}}
+        refs, eligible = legacy._linked_pr_facts(github.issues[0], snapshot)
+        expected_fingerprint = legacy._status_facts_fingerprint(github.issues[0], refs)
+        expected_ready_hash = legacy._digest([pr["id"] for pr in eligible])
         github.issues[0]["title"] = "Changed cosmetic title"
+        github.issues[0]["updatedAt"] = "2026-11-05T01:00:00Z"
+        github.issues[0]["linked_prs"].reverse()
+        github.issues[0]["reopens"].reverse()
         # When:
         observed = state.issue_facts(github.issues[0], snapshot)
         last, previous, _, history = state.legacy_checkpoint(row, github.issues[0], CONFIG, observed)
         # Then:
+        self.assertEqual(observed[1], expected_fingerprint)
+        self.assertEqual(observed[2], expected_ready_hash)
+        self.assertEqual(saved["baseline"]["facts_fingerprint"], expected_fingerprint)
         self.assertEqual(last, "백로그")
-        self.assertEqual(previous, {"state": "OPEN", "reason": None, "ready": False})
+        self.assertEqual(previous, {"state": "OPEN", "reason": None, "ready": True})
         self.assertEqual(history, "matching_fingerprint")
 
     def test_reopen_and_ready_transition_reconstruction_table(self):

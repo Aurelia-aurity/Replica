@@ -4,12 +4,20 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from typing import NamedTuple
 
 import github_project as gp
 from notion_api import bound_page, query_all, read_select, read_text
 from sync_rules import STATUSES
 
 KEY_RE = re.compile(r"gh:([1-9][0-9]*):issue:([1-9][0-9]*)\Z")
+
+
+class LegacyCheckpoint(NamedTuple):
+    last_synced: str | None
+    last_facts: dict | None
+    old_hold: dict | None
+    history: str
 
 
 def digest(value):
@@ -39,7 +47,7 @@ def index_rows(notion, source_id, snapshot):
             gp.require(key == "replica-sync-control" or
                        bool(match and int(match[1]) == gp.REPOSITORY_ID),
                        "Notion canonical key invalid")
-            if archived or page.get("archived") or page.get("in_trash"):
+            if archived or page.get("archived") or page.get("in_trash") or page.get("is_archived"):
                 archived_keys.add(key)
                 continue
             gp.require(key not in index, "Duplicate Notion canonical key")
@@ -107,12 +115,12 @@ def legacy_checkpoint(page, issue, config, observed):
     except (ValueError, TypeError):
         state = None
     if not isinstance(state, dict):
-        return None, None, None, "initialization"
+        return LegacyCheckpoint(None, None, None, "initialization")
     binding = (state.get("repository_id") == gp.REPOSITORY_ID and
                state.get("issue_id") == issue["databaseId"] and
                state.get("project_id") == config["project_id"] and state.get("v") in (1, 2))
     if not binding:
-        return None, None, None, "initialization"
+        return LegacyCheckpoint(None, None, None, "initialization")
     hold = state.get("hold")
     # Never copy untrusted free text into the public artifact or summary.
     old_hold = ({"code": hold["code"]} if isinstance(hold, dict)
@@ -122,17 +130,17 @@ def legacy_checkpoint(page, issue, config, observed):
     if (not isinstance(baseline, dict) or baseline.get("notion_status") not in STATUSES
             or not isinstance(baseline.get("facts_fingerprint"), str)
             or not re.fullmatch(r"[0-9a-f]{64}", baseline["facts_fingerprint"])):
-        return None, None, old_hold, "initialization"
+        return LegacyCheckpoint(None, None, old_hold, "initialization")
     last = baseline["notion_status"]
     if baseline.get("facts_fingerprint") == fingerprint:
-        return last, current, old_hold, "matching_fingerprint"
+        return LegacyCheckpoint(last, current, old_hold, "matching_fingerprint")
     previous_hash = state.get("review_pr_hash")
     if previous_hash == digest([]):
         ready = False
     elif isinstance(previous_hash, str) and re.fullmatch(r"[0-9a-f]{64}", previous_hash):
         ready = True
     else:
-        return last, None, old_hold, "unknown_facts"
+        return LegacyCheckpoint(last, None, old_hold, "unknown_facts")
     previous = {"state": "CLOSED" if last in {"완료", "취소"} else "OPEN",
                 "reason": None, "ready": ready}
-    return last, previous, old_hold, "reconstructed"
+    return LegacyCheckpoint(last, previous, old_hold, "reconstructed")

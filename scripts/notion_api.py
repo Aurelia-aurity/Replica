@@ -1,4 +1,4 @@
-"""Minimal fixed-host Notion transport; reads are the default capability."""
+"""Minimal fixed-host Notion transport with read-only operations."""
 from __future__ import annotations
 
 import json
@@ -16,12 +16,6 @@ def identifier(value):
         return str(UUID(value))
     except (ValueError, TypeError, AttributeError):
         raise SyncError("Notion ID format invalid") from None
-
-
-def text(value):
-    require(isinstance(value, str) and len(value) <= 20000, "Notion text invalid")
-    return {"rich_text": [{"type": "text", "text": {"content": value[i:i + 2000]}}
-                          for i in range(0, len(value), 2000)]}
 
 
 def read_text(page, name):
@@ -45,9 +39,8 @@ def bound_page(page, source_id):
 
 
 class NotionClient:
-    def __init__(self, token, *, allow_apply=False, opener=None, sleep=time.sleep):
+    def __init__(self, token, *, opener=None, sleep=time.sleep):
         require(isinstance(token, str) and token, "NOTION_TOKEN missing")
-        self.allow_apply = allow_apply
         self.opener = opener or urllib.request.build_opener(NoRedirect())
         self.sleep = sleep
         self.headers = {"Authorization": f"Bearer {token}",
@@ -56,9 +49,7 @@ class NotionClient:
     def request(self, method, path, payload=None):
         query = method == "POST" and re.fullmatch(r"/data_sources/[0-9a-f-]+/query", path)
         read = method == "GET" and re.fullmatch(r"/(?:pages|data_sources)/[0-9a-f-]+", path)
-        write = method == "PATCH" and re.fullmatch(r"/pages/[0-9a-f-]+", path)
-        require(bool(query or read or (write and self.allow_apply)),
-                "Notion operation not allowed")
+        require(bool(query or read), "Notion operation not allowed")
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
         self.sleep(0.4)
         request = urllib.request.Request("https://api.notion.com/v1" + path,
@@ -90,9 +81,7 @@ def query_all(notion, source_id, archived):
         require(isinstance(batch, list) and type(response.get("has_more")) is bool
                 and "next_cursor" in response, "Notion query page invalid")
         status = response.get("request_status", {"type": "complete"})
-        require(isinstance(status, dict) and status.get("type") == "complete"
-                and ("incomplete_reason" not in status or
-                     status["incomplete_reason"] == "query_result_limit_reached"),
+        require(isinstance(status, dict) and status.get("type") == "complete",
                 "Notion query incomplete")
         rows.extend(batch)
         require(len(rows) < 10000, "Notion query limit reached")
@@ -105,7 +94,7 @@ def query_all(notion, source_id, archived):
         seen.add(cursor)
 
 
-def check_schema(notion, source_id):
+def check_schema(notion, source_id, statuses):
     source = notion.request("GET", f"/data_sources/{source_id}")
     require(identifier(source.get("id")) == source_id, "Notion schema ID mismatch")
     props = source.get("properties", {})
@@ -114,6 +103,5 @@ def check_schema(notion, source_id):
                        ("동기화 내부 상태", "rich_text")):
         require(props.get(name, {}).get("type") == kind, "Notion schema property mismatch")
     options = props["작업 상태"]["select"]["options"]
-    from sync_rules import STATUSES
-    require({option["name"] for option in options} == set(STATUSES),
+    require({option["name"] for option in options} == set(statuses),
             "Notion task status options mismatch")

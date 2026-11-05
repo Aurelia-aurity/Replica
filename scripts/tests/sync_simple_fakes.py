@@ -1,9 +1,10 @@
 """In-memory wire-shaped APIs; production GitHub parsers remain in the path."""
 import copy
+import json
 from datetime import datetime, timezone
 
 import github_project as gp
-import notion_api as na
+import sync_engine as legacy
 
 SOURCE = "00000000-0000-4000-8000-000000000001"
 PAGE = "00000000-0000-4000-8000-000000000002"
@@ -32,13 +33,34 @@ def issue():
             "closedByPullRequestsReferences": conn([]), "linked_prs": [], "reopens": []}
 
 
+def text(value):
+    return {"rich_text": [{"type": "text", "text": {"content": value}}]}
+
+
+def checkpoint(github, last="백로그"):
+    """Build a synthetic checkpoint with the existing engine's own hash producer."""
+    row = github.issues[0]
+    snapshot = {"repository_node_id": REPO,
+                "pulls": {pr["legacy_issue_id"]: pr for pr in github.pulls}}
+    refs, eligible = legacy._linked_pr_facts(row, snapshot)
+    saved = legacy.new_issue_state(row["databaseId"], CONFIG["project_id"])
+    saved["project_item_id"] = "PVTI_80"
+    saved["review_pr_hash"] = legacy._digest([pr["id"] for pr in eligible])
+    saved["baseline"] = legacy.status_sync.make_baseline(
+        last, {"field_id": FIELD, "option_id": OPTIONS[last],
+               "value_id": "PVTSV_fixture", "updated_at": NOW},
+        "PVTI_80", legacy._status_facts_fingerprint(row, refs), NOW)
+    saved["hold"] = {"code": "STATUS_CONFLICT", "message": "not for artifact"}
+    return json.dumps(saved)
+
+
 def page(status="백로그", internal=""):
     return {"object": "page", "id": PAGE, "archived": False, "in_trash": False,
             "parent": {"type": "data_source_id", "data_source_id": SOURCE},
-            "properties": {"동기화 키": na.text(f"gh:{gp.REPOSITORY_ID}:issue:800"),
+            "properties": {"동기화 키": text(f"gh:{gp.REPOSITORY_ID}:issue:800"),
                            "종류": {"select": {"name": "Issue"}}, "번호": {"number": 80},
                            "작업 상태": {"select": {"name": status} if status else None},
-                           "동기화 내부 상태": na.text(internal), "확인 필요": na.text("")}}
+                           "동기화 내부 상태": text(internal), "확인 필요": text("")}}
 
 
 def item(status="백로그"):
@@ -106,35 +128,19 @@ class Project:
     def __init__(self, status="백로그"):
         self.items = [item(status)]
         self.calls = []
-        self.mutations = []
-        self.corrupt_readback = False
 
     def request(self, query, variables=None, *, mutation=False):
         self.calls.append((query, copy.deepcopy(variables), mutation))
+        if mutation:
+            raise AssertionError("Project mutation forbidden")
         node = {"id": gp.EXPECTED_PROJECT_ID, "number": 4,
                 "owner": {"id": gp.EXPECTED_PROJECT_OWNER_ID, "login": gp.PROJECT_OWNER_LOGIN}}
-        if mutation:
-            self.mutations.append(query)
-            if query == gp.ADD_ISSUE_MUTATION:
-                self.items.append(item(None))
-                return {"addProjectV2ItemById": {"item": {"id": "PVTI_80"}}}, None
-            if query == gp.SET_STATUS_MUTATION:
-                name = next(name for name, option in OPTIONS.items() if option == variables["option"])
-                self.items[0]["fieldValues"] = conn([status_value(name)])
-                return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "PVTI_80"}}}, None
-            raise AssertionError("Unexpected mutation")
         if query == gp.PROJECT_FIELDS_QUERY:
             node["fields"] = conn([{"__typename": "ProjectV2SingleSelectField", "id": FIELD,
                                     "name": "Status", "options": [
                                         {"name": name, "id": option} for name, option in OPTIONS.items()]}])
         elif query == gp.PROJECT_ITEMS_QUERY:
             node["items"] = conn(self.items, total=True)
-        elif query == gp.PROJECT_ITEM_QUERY:
-            result = copy.deepcopy(self.items[0])
-            result["project"] = node
-            if self.corrupt_readback:
-                result["content"]["id"] = "I_wrong"
-            return {"node": result}, None
         else:
             raise AssertionError("Unexpected Project query")
         return {"node": node}, None
@@ -144,8 +150,6 @@ class Notion:
     def __init__(self, status="백로그", internal=""):
         self.pages = [page(status, internal)]
         self.calls = []
-        self.writes = []
-        self.corrupt_readback = False
         self.query_transform = lambda response: response
 
     def request(self, method, path, payload=None):
@@ -162,13 +166,4 @@ class Notion:
             return self.query_transform({"object": "list", "type": "page_or_data_source",
                                         "page_or_data_source": {}, "results": copy.deepcopy(rows),
                                         "has_more": False, "next_cursor": None})
-        if method == "PATCH":
-            self.writes.append(copy.deepcopy(payload["properties"]))
-            self.pages[0]["properties"].update(copy.deepcopy(payload["properties"]))
-            return copy.deepcopy(self.pages[0])
-        if method == "GET" and path == f"/pages/{PAGE}":
-            result = copy.deepcopy(self.pages[0])
-            if self.corrupt_readback:
-                result["properties"]["작업 상태"] = {"select": {"name": "완료"}}
-            return result
         raise AssertionError("Unexpected Notion request")
