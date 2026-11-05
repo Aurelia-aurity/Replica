@@ -36,6 +36,8 @@ class FakeEngine implements RecordPlaybackEngine {
   final seeks = <Duration>[];
   int plays = 0, pauses = 0;
   bool opened = false, disposed = false, failOpen = false;
+  Completer<void>? pendingOpen, pendingPlay, pendingSeek, pendingDispose;
+  int disposals = 0;
   @override
   Stream<Duration> get position => positions.stream;
   @override
@@ -46,19 +48,32 @@ class FakeEngine implements RecordPlaybackEngine {
   Stream<Object> get errors => failures.stream;
   @override
   Future<void> open(RecordAudioSource source) async {
+    await pendingOpen?.future;
     if (failOpen) throw StateError('cannot open');
     opened = true;
     durations.add(const Duration(seconds: 192));
   }
 
   @override
-  Future<void> play() async => plays++;
+  Future<void> play() async {
+    plays++;
+    await pendingPlay?.future;
+  }
+
   @override
   Future<void> pause() async => pauses++;
   @override
-  Future<void> seek(Duration value) async => seeks.add(value);
+  Future<void> seek(Duration value) async {
+    seeks.add(value);
+    await pendingSeek?.future;
+  }
+
   @override
-  Future<void> dispose() async => disposed = true;
+  Future<void> dispose() async {
+    disposals++;
+    await pendingDispose?.future;
+    disposed = true;
+  }
 }
 
 class Fixture extends PreviewRecordService {
@@ -250,7 +265,7 @@ void main() {
 
     test('segment edits fold line breaks and are kept as drafts', () async {
       final service = Fixture();
-      final drafts = <String, String>{};
+      final drafts = <String, RecordReviewDraft>{};
       final c = RecordReviewController(
         service: service,
         recordId: 'record',
@@ -262,7 +277,7 @@ void main() {
       expect(c.content.split('\n').length, 4);
       expect(c.document.segments[1].text, '김치 두 통 싸 줄게.');
       expect(c.document.segments[1].startMs, 11000);
-      expect(drafts['record'], c.content);
+      expect(drafts['record']!.content, c.content);
       c.editSegment(9, '범위 밖');
       expect(c.content.split('\n').length, 4);
     });
@@ -305,6 +320,162 @@ void main() {
       await pumpEventQueue();
       expect(player.playing, isFalse);
     });
+
+    test('every failed engine is released and detached before retry', () async {
+      final engines = <FakeEngine>[];
+      final player = RecordPlayerController(
+        resolve: () async =>
+            RecordAudioSource(url: Uri.parse('https://audio.invalid/a')),
+        engineFactory: (_) {
+          final engine = FakeEngine()..failOpen = engines.length < 3;
+          engines.add(engine);
+          return engine;
+        },
+      );
+      for (var i = 0; i < 3; i++) {
+        await player.toggle();
+        await pumpEventQueue();
+        final failed = engines.last;
+        expect(failed.disposed, isTrue);
+        expect(failed.disposals, 1);
+        expect(failed.positions.hasListener, isFalse);
+        expect(failed.durations.hasListener, isFalse);
+        expect(failed.done.hasListener, isFalse);
+        expect(failed.failures.hasListener, isFalse);
+      }
+      await player.toggle();
+      expect(player.playing, isTrue);
+      for (final old in engines.take(3)) {
+        old.positions.add(const Duration(seconds: 80));
+        old.durations.add(const Duration(seconds: 999));
+        old.done.add(null);
+        old.failures.add(StateError('late event'));
+      }
+      await pumpEventQueue();
+      expect(player.phase, PlayerPhase.ready);
+      expect(player.playing, isTrue);
+      expect(player.position, Duration.zero);
+      expect(player.duration, const Duration(seconds: 192));
+      player.dispose();
+      await pumpEventQueue();
+      expect(engines.every((e) => e.disposed && e.disposals == 1), isTrue);
+    });
+
+    for (final leaveDuringCleanup in [false, true]) {
+      test('retry waits for cleanup (leave: $leaveDuringCleanup)', () async {
+        final cleanup = Completer<void>();
+        final engines = <FakeEngine>[];
+        final player = RecordPlayerController(
+          resolve: () async =>
+              RecordAudioSource(url: Uri.parse('https://audio.invalid/a')),
+          engineFactory: (_) {
+            final engine = FakeEngine();
+            if (engines.isEmpty) {
+              engine.failOpen = true;
+              engine.pendingDispose = cleanup;
+            }
+            engines.add(engine);
+            return engine;
+          },
+        );
+        await player.toggle();
+        final retry = player.toggle();
+        await pumpEventQueue();
+        expect(engines.length, 1);
+        expect(engines.first.disposals, 1);
+        if (leaveDuringCleanup) player.dispose();
+        cleanup.complete();
+        await retry;
+        expect(engines.first.disposed, isTrue);
+        expect(engines.length, leaveDuringCleanup ? 1 : 2);
+        if (!leaveDuringCleanup) {
+          expect(player.playing, isTrue);
+          player.dispose();
+        }
+        await pumpEventQueue();
+        expect(engines.every((e) => e.disposals == 1), isTrue);
+      });
+    }
+
+    for (final lateOpenFails in [false, true]) {
+      test(
+        'late open cannot affect the replacement (failure: $lateOpenFails)',
+        () async {
+          final opening = Completer<void>();
+          final engines = <FakeEngine>[];
+          final player = RecordPlayerController(
+            resolve: () async =>
+                RecordAudioSource(url: Uri.parse('https://audio.invalid/a')),
+            engineFactory: (_) {
+              final engine = FakeEngine();
+              if (engines.isEmpty) engine.pendingOpen = opening;
+              engines.add(engine);
+              return engine;
+            },
+          );
+          addTearDown(player.dispose);
+          final first = player.toggle();
+          await pumpEventQueue();
+          engines.first.failures.add(StateError('opening failed'));
+          await pumpEventQueue();
+          await player.toggle();
+          expect(engines.first.disposed, isTrue);
+          expect(player.playing, isTrue);
+          if (lateOpenFails) {
+            opening.completeError(StateError('late open failure'));
+          } else {
+            opening.complete();
+          }
+          await first;
+          await pumpEventQueue();
+          expect(player.phase, PlayerPhase.ready);
+          expect(player.playing, isTrue);
+          expect(engines.last.plays, 1);
+        },
+      );
+    }
+
+    for (final command in ['play', 'seek']) {
+      test('late $command cannot change a replacement engine', () async {
+        final pending = Completer<void>();
+        final engines = <FakeEngine>[];
+        final player = RecordPlayerController(
+          resolve: () async =>
+              RecordAudioSource(url: Uri.parse('https://audio.invalid/a')),
+          engineFactory: (_) {
+            final engine = FakeEngine();
+            if (engines.isEmpty && command == 'play') {
+              engine.pendingPlay = pending;
+            }
+            engines.add(engine);
+            return engine;
+          },
+        );
+        addTearDown(player.dispose);
+        Future<void> first;
+        if (command == 'play') {
+          first = player.toggle();
+        } else {
+          await player.toggle();
+          engines.first.pendingSeek = pending;
+          first = player.seekTo(const Duration(seconds: 30), play: true);
+        }
+        await pumpEventQueue();
+        engines.first.failures.add(StateError('engine failed'));
+        await pumpEventQueue();
+        await player.toggle();
+        if (command == 'seek') {
+          pending.completeError(StateError('late seek failure'));
+        } else {
+          pending.complete();
+        }
+        await first;
+        expect(player.phase, PlayerPhase.ready);
+        expect(player.playing, isTrue);
+        expect(player.position, Duration.zero);
+        expect(engines.last.plays, 1);
+      });
+    }
 
     test('a source that cannot be opened fails and can be retried', () async {
       final engines = <FakeEngine>[];
@@ -426,7 +597,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('segment-done-1')));
       await tester.pumpAndSettle();
       expect(find.text('김치 두 통 싸 줄게.'), findsOneWidget);
-      expect(records.reviewDrafts['record'], contains('김치 두 통'));
+      expect(records.reviewDrafts['record']!.content, contains('김치 두 통'));
       await tester.tap(find.byKey(const ValueKey('transcript-confirm')));
       await tester.pumpAndSettle();
       expect(
@@ -506,7 +677,7 @@ void main() {
   group('edit conflicts', () {
     test('a changed server text must be chosen explicitly', () async {
       final service = Fixture(audio: false)..conflictOnSave = true;
-      final drafts = <String, String>{};
+      final drafts = <String, RecordReviewDraft>{};
       final c = RecordReviewController(
         service: service,
         recordId: 'record',

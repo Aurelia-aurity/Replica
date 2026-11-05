@@ -43,9 +43,10 @@ abstract class RecordService
   // UploadCancelled once upload.cancelToken is cancelled.
   Future<void> upload(RecordUpload upload, void Function() onStageChanged);
 
-  /// Removes what a cancelled upload left behind (a reservation without a
-  /// file). Never touches a record whose upload already completed.
-  Future<void> discardUpload(RecordUpload upload) async {}
+  /// Requests cleanup of an unfinished upload and returns its deletion job.
+  /// Null means no deletion job was requested, not proof of completed cleanup.
+  /// Never touches a record whose upload already completed.
+  Future<DeletionJob?> discardUpload(RecordUpload upload) async => null;
   bool get canRetryProcessing => false;
   Future<void> retryProcessing(String id) =>
       throw UnsupportedError('Retry API not agreed');
@@ -382,7 +383,7 @@ class SessionRecordService extends RecordService {
   Future<void> upload(RecordUpload upload, void Function() onStageChanged) =>
       backend.run(() => delegate.upload(upload, onStageChanged));
   @override
-  Future<void> discardUpload(RecordUpload upload) =>
+  Future<DeletionJob?> discardUpload(RecordUpload upload) =>
       backend.run(() => delegate.discardUpload(upload));
   @override
   Future<void> retryProcessing(String id) =>

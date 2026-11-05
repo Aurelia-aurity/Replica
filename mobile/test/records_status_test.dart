@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
@@ -12,6 +13,7 @@ import 'package:mobile/records/personalization.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_deletion.dart';
 import 'package:mobile/records/record_models.dart';
+import 'package:mobile/records/record_review.dart';
 import 'package:mobile/records/record_playback.dart';
 import 'package:mobile/records/record_service.dart';
 import 'package:mobile/records/records_panel.dart';
@@ -94,62 +96,20 @@ RecordEntry _ready(
 
 void main() {
   group('personalization state', () {
-    final confirmed = DateTime.utc(2026, 11, 1, 12);
-    ReviewProfileState derive(ProfileEvidence profile, Duration after) =>
-        derivePersonalization(
-          confirmedAt: confirmed,
-          profile: profile,
-          now: confirmed.add(after),
-        );
-
-    test('a profile published after confirming counts as reflected', () {
-      expect(
-        derive(
-          ProfileEvidence.ready(confirmed.add(const Duration(seconds: 30))),
-          const Duration(minutes: 1),
-        ),
-        ReviewProfileState.reflected,
-      );
-      expect(
-        derive(ProfileEvidence.ready(confirmed), Duration.zero),
-        ReviewProfileState.reflected,
-      );
-    });
-
-    test(
-      'no newer profile means reflecting, then delayed — never reflected',
-      () {
+    for (final evidence in ProfileEvidence.values) {
+      test('profile $evidence establishes availability only', () {
+        final state = derivePersonalization(evidence);
         expect(
-          derive(const ProfileEvidence.none(), const Duration(minutes: 2)),
-          ReviewProfileState.processing,
+          state,
+          evidence == ProfileEvidence.ready
+              ? ReviewProfileState.available
+              : ReviewProfileState.unknown,
         );
-        expect(
-          derive(
-            ProfileEvidence.ready(confirmed.subtract(const Duration(days: 2))),
-            const Duration(minutes: 2),
-          ),
-          ReviewProfileState.processing,
-        );
-        expect(
-          derive(const ProfileEvidence.none(), personalizationWindow),
-          ReviewProfileState.processing,
-        );
-        expect(
-          derive(
-            const ProfileEvidence.none(),
-            personalizationWindow + const Duration(seconds: 1),
-          ),
-          ReviewProfileState.delayed,
-        );
-      },
-    );
-
-    test('an unchecked profile proves nothing', () {
-      expect(
-        derive(const ProfileEvidence.unavailable(), const Duration(hours: 5)),
-        ReviewProfileState.unknown,
-      );
-    });
+        expect(state, isNot(ReviewProfileState.reflected));
+        expect(state, isNot(ReviewProfileState.processing));
+        expect(state, isNot(ReviewProfileState.delayed));
+      });
+    }
 
     test('labels cover every state', () {
       final labels = {
@@ -181,14 +141,326 @@ void main() {
   });
 
   group('ApiRecordService list', () {
+    testWidgets(
+      'refresh follows new drafts, confirmations and failed version lookups',
+      (tester) async {
+        final auth = ApiTestAuth();
+        addTearDown(auth.dispose);
+        await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+        final t1 = DateTime.utc(2026, 11, 1);
+        final t2 = DateTime.utc(2026, 11, 2);
+        Map<String, Object?> version(
+          String recordId,
+          int revision,
+          String status,
+          DateTime at,
+        ) => {
+          'id': '$recordId-$revision',
+          'record_id': recordId,
+          'revision': revision,
+          'content': 'text-$revision',
+          'status': status,
+          'updated_at': at.toIso8601String(),
+          'confirmed_at': status == 'confirmed' ? at.toIso8601String() : null,
+        };
+        var versions = [version('A', 1, 'confirmed', t1)];
+        var failLookup = false;
+        final client = MockClient((request) async {
+          final path = request.url.path;
+          if (path.endsWith('style-profile')) {
+            return http.Response('null', 200);
+          }
+          if (path == '/records/A/text-versions') {
+            return http.Response(
+              failLookup ? '{}' : jsonEncode({'items': versions}),
+              failLookup ? 503 : 200,
+            );
+          }
+          if (path == '/records/B/text-versions') {
+            return http.Response(
+              jsonEncode({
+                'items': [version('B', 1, 'confirmed', t1)],
+              }),
+              200,
+            );
+          }
+          final records = [
+            for (final id in ['A', 'B'])
+              recordJson(id, status: 'ready')..['original_name'] = '$id.txt',
+          ];
+          if (path == '/records/A') {
+            return http.Response(jsonEncode(records.first), 200);
+          }
+          return http.Response(
+            jsonEncode({'items': path == '/records' ? records : []}),
+            200,
+          );
+        });
+        addTearDown(client.close);
+        final service = ApiRecordService(
+          client: client,
+          baseUrl: Uri.parse('https://example.invalid'),
+          auth: auth,
+          personaId: 'persona',
+          fileTransport: Transfer(),
+          policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
+        );
+        final controller = RecordController(service);
+        addTearDown(controller.dispose);
+        RecordEntry a() => controller.entries.firstWhere((e) => e.id == 'A');
+        await controller.refresh();
+        expect(a().textConfirmed, isTrue);
+        expect(a().confirmedAt, t1);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: RecordsPanel(controller: controller)),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // A newer draft can coexist with the previous confirmed version.
+        versions = [
+          version('A', 1, 'confirmed', t1),
+          version('A', 2, 'draft', t2),
+        ];
+        await controller.refresh();
+        await tester.pumpAndSettle();
+        expect(a().statusLabel, '확인 필요');
+        expect(a().confirmedAt, isNull);
+        await tester.tap(find.text('A.txt'));
+        await tester.pumpAndSettle();
+        expect(find.text('전사 확인'), findsOneWidget);
+        expect(find.text('text-2'), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        // Confirming revision 2 supersedes revision 1 and updates the date.
+        versions = [
+          version('A', 1, 'superseded', t1),
+          version('A', 2, 'confirmed', t2),
+        ];
+        await controller.refresh();
+        await tester.pumpAndSettle();
+        expect(a().textConfirmed, isTrue);
+        expect(a().confirmedAt, t2);
+        await tester.tap(find.text('A.txt'));
+        await tester.pumpAndSettle();
+        expect(find.text('기록 상세'), findsOneWidget);
+        expect(find.text('text-2'), findsOneWidget);
+        expect(find.text('확정일    2026.11.02'), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        failLookup = true;
+        await controller.refresh();
+        expect(a().textConfirmed, isFalse);
+        expect(a().confirmedAt, isNull);
+        expect(a().personalization, ReviewProfileState.unknown);
+        expect(
+          controller.entries.firstWhere((e) => e.id == 'B').textConfirmed,
+          isTrue,
+        );
+        expect(controller.listError, isNull);
+        failLookup = false;
+        versions = [];
+        await controller.refresh();
+        expect(a().textConfirmed, isFalse);
+        expect(a().confirmedAt, isNull);
+      },
+    );
+
     test(
-      'marks confirmed records and derives reflection, caching lookups',
+      'overlapping lists keep version evidence local to each response',
+      () async {
+        final auth = ApiTestAuth();
+        addTearDown(auth.dispose);
+        await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+        final started = Completer<void>();
+        final pending = Completer<http.Response>();
+        var lookups = 0;
+        Map<String, Object?> version(int revision, String status) => {
+          'id': 'v$revision',
+          'record_id': 'A',
+          'revision': revision,
+          'content': 'text',
+          'status': status,
+          'updated_at': '2026-11-01T00:00:00Z',
+          'confirmed_at': status == 'confirmed' ? '2026-11-01T00:00:00Z' : null,
+        };
+        final client = MockClient((request) async {
+          if (request.url.path.endsWith('text-versions')) {
+            lookups++;
+            if (lookups == 1) {
+              started.complete();
+              return pending.future;
+            }
+            return http.Response(
+              jsonEncode({
+                'items': [version(2, 'draft')],
+              }),
+              200,
+            );
+          }
+          if (request.url.path.endsWith('style-profile')) {
+            return http.Response('null', 200);
+          }
+          return http.Response(
+            jsonEncode({
+              'items': [recordJson('A', status: 'ready')],
+            }),
+            200,
+          );
+        });
+        addTearDown(client.close);
+        final service = ApiRecordService(
+          client: client,
+          baseUrl: Uri.parse('https://example.invalid'),
+          auth: auth,
+          personaId: 'persona',
+          fileTransport: Transfer(),
+          policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
+        );
+        final older = service.list();
+        await started.future;
+        expect((await service.list()).single.textConfirmed, isFalse);
+        pending.complete(
+          http.Response(
+            jsonEncode({
+              'items': [version(1, 'confirmed')],
+            }),
+            200,
+          ),
+        );
+        expect((await older).single.textConfirmed, isTrue);
+        expect((await service.list()).single.textConfirmed, isFalse);
+        expect(lookups, 3);
+      },
+    );
+
+    for (final response in ['ready', 'null', 'error']) {
+      testWidgets(
+        'confirmed record stays unproven with profile $response and does not poll',
+        (tester) async {
+          final auth = ApiTestAuth();
+          addTearDown(auth.dispose);
+          await auth.signIn(
+            'preview.a@example.com',
+            PreviewAuthService.password,
+          );
+          final t = DateTime.utc(2026, 11, 1);
+          var requests = 0;
+          final client = MockClient((request) async {
+            requests++;
+            final path = request.url.path;
+            if (path.endsWith('style-profile')) {
+              return response == 'error'
+                  ? http.Response('{}', 503)
+                  : http.Response(
+                      response == 'null'
+                          ? 'null'
+                          : jsonEncode({
+                              'status': 'ready',
+                              'persona_id': 'persona',
+                              'updated_at': t
+                                  .add(const Duration(days: 100))
+                                  .toIso8601String(),
+                            }),
+                      200,
+                    );
+            }
+            if (path.endsWith('text-versions')) {
+              return http.Response(
+                jsonEncode({
+                  'items': [
+                    {
+                      'id': 'vA',
+                      'record_id': 'A',
+                      'revision': 1,
+                      'content': '확정한 합성 전사문',
+                      'status': 'confirmed',
+                      'updated_at': t.toIso8601String(),
+                      'confirmed_at': t.toIso8601String(),
+                    },
+                  ],
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            final record = recordJson('A', status: 'ready');
+            if (path == '/records/A') {
+              return http.Response(jsonEncode(record), 200);
+            }
+            return http.Response(
+              jsonEncode({
+                'items': path == '/records' ? [record] : [],
+              }),
+              200,
+            );
+          });
+          addTearDown(client.close);
+          final service = ApiRecordService(
+            client: client,
+            baseUrl: Uri.parse('https://example.invalid'),
+            auth: auth,
+            personaId: 'persona',
+            fileTransport: Transfer(),
+            policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
+          );
+          expect(await service.list(), hasLength(1));
+          final controller = RecordController(service);
+          addTearDown(controller.dispose);
+          await controller.refresh();
+          expect(controller.entries.single.statusLabel, '확정됨');
+          expect(controller.hasPending, isFalse);
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(body: RecordsPanel(controller: controller)),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('synthetic.txt'));
+          await tester.pumpAndSettle();
+          expect(find.text('기록 상세'), findsOneWidget);
+          expect(find.text('확정한 합성 전사문'), findsOneWidget);
+          expect(
+            find.textContaining('프로필·검색 색인 반영 상태는 확인이 필요해요.'),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('personalization-reflected')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('personalization-processing')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('personalization-delayed')),
+            findsNothing,
+          );
+          final before = requests;
+          await tester.pump(const Duration(minutes: 20));
+          expect(
+            requests,
+            before,
+            reason: 'availability does not imply processing',
+          );
+          expect(
+            find.textContaining('프로필·검색 색인 반영 상태는 확인이 필요해요.'),
+            findsOneWidget,
+          );
+        },
+      );
+    }
+
+    test(
+      'marks confirmed records without inferring reflection from timestamps',
       () async {
         final auth = ApiTestAuth();
         addTearDown(auth.dispose);
         await auth.signIn('preview.a@example.com', PreviewAuthService.password);
         final t = DateTime.utc(2026, 11, 1, 12);
-        var now = t.add(const Duration(minutes: 2));
         Object? profile; // null body, or a profile map
         final hits = <String, int>{};
         final client = MockClient((request) async {
@@ -254,14 +526,13 @@ void main() {
           personaId: 'persona',
           policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
           fileTransport: Transfer(),
-          clock: () => now,
         );
         Map<String, String> labels(List<RecordEntry> list) => {
           for (final e in list) e.id: e.statusLabel,
         };
 
         expect(labels(await service.list()), {
-          'A': '반영 중',
+          'A': '확정됨',
           'B': '확인 필요',
           'C': '처리 중',
         });
@@ -274,20 +545,35 @@ void main() {
           'status': 'ready',
           'updated_at': t.add(const Duration(minutes: 1)).toIso8601String(),
         };
-        now = t.add(const Duration(minutes: 2, seconds: 10));
-        expect(labels(await service.list())['A'], '반영됨');
-        // Confirmed records and a recently seen draft are not looked up again.
-        expect(hits['/records/A/text-versions'], 1);
-        expect(hits['/records/B/text-versions'], 1);
-
-        now = t.add(const Duration(minutes: 3));
+        for (final profileAt in [
+          t.subtract(const Duration(days: 1)),
+          t,
+          t.add(const Duration(minutes: 1)),
+          t.add(const Duration(days: 100)),
+        ]) {
+          (profile as Map<String, Object?>)['updated_at'] = profileAt
+              .toIso8601String();
+          final list = await service.list();
+          expect(labels(list)['A'], '확정됨');
+          final confirmed = list.firstWhere((e) => e.id == 'A');
+          expect(confirmed.textConfirmed, isTrue);
+          expect(confirmed.confirmedAt, t);
+          expect(confirmed.personalization, ReviewProfileState.available);
+          expect(confirmed.inProgress, isFalse);
+        }
+        // Even consecutive list requests recheck confirmed and draft versions.
+        expect(hits['/records/A/text-versions'], 5);
+        expect(hits['/records/B/text-versions'], 5);
+        expect(hits['/records/C/text-versions'], isNull);
         await service.list();
-        expect(hits['/records/B/text-versions'], 2);
-        expect(hits['/records/A/text-versions'], 1);
+        expect(hits['/records/B/text-versions'], 6);
+        expect(hits['/records/A/text-versions'], 6);
 
         profile = null;
-        now = t.add(const Duration(hours: 1));
-        expect(labels(await service.list())['A'], '반영 지연');
+        final later = (await service.list()).firstWhere((e) => e.id == 'A');
+        expect(later.statusLabel, '확정됨');
+        expect(later.personalization, ReviewProfileState.unknown);
+        expect(later.inProgress, isFalse);
       },
     );
 
@@ -781,7 +1067,7 @@ void main() {
       controller.setConsent(true);
       await controller.send();
       expect(controller.entries, isNotEmpty);
-      controller.reviewDrafts['x'] = '임시 수정';
+      controller.reviewDrafts['x'] = const RecordReviewDraft(content: '임시 수정');
       controller.select(file('next.m4a'));
       final deletion = controller.deletionFor('#account', account: true);
       await deletion.execute();

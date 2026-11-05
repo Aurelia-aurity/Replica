@@ -981,7 +981,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
         replicaGreen,
         widget.records.service.isPreview
             ? '반영됨 · 미리보기 합성 결과'
-            : '반영됨 · 확정한 전사문이 말투 프로필에 반영된 것으로 확인했어요.',
+            : '반영됨 · 확정한 전사문의 말투 프로필과 검색 색인 반영을 확인했어요.',
       ),
       ReviewProfileState.processing => (
         Icons.autorenew,
@@ -1001,12 +1001,12 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
       ReviewProfileState.available => (
         Icons.info_outline,
         const Color(0xFF56645D),
-        '사용 가능한 말투 프로필이 있어요. 이 기록의 반영 여부는 확인이 필요해요.',
+        '사용 가능한 말투 프로필이 있어요. 이 기록의 프로필·검색 색인 반영 상태는 확인이 필요해요.',
       ),
       ReviewProfileState.unknown => (
         Icons.help_outline,
         const Color(0xFF56645D),
-        '개인화 반영 상태를 아직 확인할 수 없어요.',
+        '전사문은 확정됐어요. 이 기록의 프로필·검색 색인 반영 상태는 확인이 필요해요.',
       ),
     };
     return Column(

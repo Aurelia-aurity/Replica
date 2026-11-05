@@ -68,11 +68,173 @@ class ReviewFixture extends PreviewRecordService {
 }
 
 void main() {
+  for (final reloadBeforeClosing in [false, true]) {
+    test('reopening preserves unresolved edits (reload: $reloadBeforeClosing)', () async {
+      final service = ReviewFixture()..failSave = true;
+      final drafts = <String, RecordReviewDraft>{};
+      final first = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      await first.load();
+      first.edit('내 수정');
+      expect(await first.save(confirm: true), isFalse);
+      service.body = '다른 기기에서 저장한 내용';
+      service.updated = service.updated.add(const Duration(minutes: 1));
+      service.failSave = false;
+      if (reloadBeforeClosing) {
+        await first.load();
+        expect(first.needsResolution, isTrue);
+        // Refreshing again must not implicitly accept the changed server text.
+        await first.load();
+        expect(first.needsResolution, isTrue);
+      }
+      first.dispose();
+
+      final reopened = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      addTearDown(reopened.dispose);
+      await reopened.load();
+      expect(reopened.content, '내 수정');
+      expect(reopened.needsResolution, isTrue);
+      expect(reopened.canConfirm, isFalse);
+      expect(await reopened.save(), isFalse);
+      expect(await reopened.save(confirm: true), isFalse);
+      expect(service.saved, isFalse);
+      reopened.useServer();
+      expect(reopened.content, service.body);
+      expect(drafts, isEmpty);
+      expect(reopened.canConfirm, isTrue);
+    });
+  }
+
+  test(
+    'accepted server base survives reopening and detects further changes',
+    () async {
+      final service = ReviewFixture();
+      final drafts = <String, RecordReviewDraft>{};
+      final first = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      await first.load();
+      first.edit('내 수정');
+      service.body = '외부 수정';
+      service.updated = service.updated.add(const Duration(minutes: 1));
+      await first.load();
+      expect(first.needsResolution, isTrue);
+      first.keepMine();
+      first.dispose();
+
+      final reopened = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      addTearDown(reopened.dispose);
+      await reopened.load();
+      expect(reopened.content, '내 수정');
+      expect(reopened.canConfirm, isTrue);
+      service.body = '또 다른 외부 수정';
+      service.updated = service.updated.add(const Duration(minutes: 1));
+      await reopened.load();
+      expect(reopened.needsResolution, isTrue);
+      reopened.keepMine();
+      expect(await reopened.save(confirm: true), isTrue);
+      expect(service.body, '내 수정');
+      expect(drafts, isEmpty);
+    },
+  );
+
+  test(
+    'reopening after a saved edit and failed confirmation needs no resolution',
+    () async {
+      final service = ReviewFixture()..failConfirm = true;
+      final drafts = <String, RecordReviewDraft>{};
+      final first = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      await first.load();
+      first.edit('이미 저장된 내 수정');
+      expect(await first.save(confirm: true), isFalse);
+      first.dispose();
+      final reopened = RecordReviewController(
+        service: service,
+        recordId: 'record',
+        drafts: drafts,
+      );
+      addTearDown(reopened.dispose);
+      await reopened.load();
+      expect(reopened.needsResolution, isFalse);
+      expect(reopened.canConfirm, isTrue);
+      service.failConfirm = false;
+      expect(await reopened.save(confirm: true), isTrue);
+    },
+  );
+
+  testWidgets('leaving a conflict and reopening still requires a choice', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final service = ReviewFixture()..failSave = true;
+    final records = RecordController(service);
+    addTearDown(records.dispose);
+    await records.refresh();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RecordsPanel(controller: records)),
+      ),
+    );
+    await tester.tap(find.text(service.entry.name));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('segment-text-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('segment-editor-0')),
+      '내 수정',
+    );
+    await tester.tap(find.text('확정하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+    service.body = '외부 수정';
+    service.updated = service.updated.add(const Duration(minutes: 1));
+    service.failSave = false;
+    await tester.tap(find.text(service.entry.name));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('conflict-resolution')), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('transcript-confirm')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(service.saved, isFalse);
+    await tester.tap(find.byKey(const ValueKey('resolve-mine')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('확정하기'));
+    await tester.pumpAndSettle();
+    expect(service.body, '내 수정');
+    expect(service.confirmed, isTrue);
+  });
+
   test(
     'edited text retained across conflict and reload, no automatic overwrite',
     () async {
       final service = ReviewFixture()..failSave = true;
-      final drafts = <String, String>{};
+      final drafts = <String, RecordReviewDraft>{};
       final c = RecordReviewController(
         service: service,
         recordId: 'record',
@@ -92,6 +254,7 @@ void main() {
       expect(await c.save(confirm: true), isTrue);
       expect(drafts, isEmpty);
       expect(c.confirmed, isTrue);
+      expect(c.value!.profile, ReviewProfileState.unknown);
     },
   );
   test(
@@ -186,7 +349,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('기록 상세'), findsOneWidget);
       expect(find.byType(TextField), findsNothing);
-      expect(find.text('개인화 반영 상태를 아직 확인할 수 없어요.'), findsOneWidget);
+      expect(
+        find.text('전사문은 확정됐어요. 이 기록의 프로필·검색 색인 반영 상태는 확인이 필요해요.'),
+        findsOneWidget,
+      );
     },
   );
   testWidgets(
@@ -284,7 +450,6 @@ void main() {
         );
       });
       addTearDown(client.close);
-      var now = updated.add(const Duration(minutes: 5));
       final api = ApiRecordService(
         client: client,
         baseUrl: Uri.parse('https://example.invalid'),
@@ -292,7 +457,6 @@ void main() {
         personaId: 'persona',
         policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
         fileTransport: Transfer(),
-        clock: () => now,
       );
       var v = (await api.review('record')).version!;
       v = await api.saveText(v, '수정');
@@ -301,14 +465,8 @@ void main() {
       expect(v.status, 'confirmed');
       expect(confirms, 1);
       expect(patches, 1);
-      // Confirmed minutes ago and no newer profile yet: still being reflected.
-      expect(
-        (await api.review('record')).profile,
-        ReviewProfileState.processing,
-      );
-      // Much later with still no profile: delayed, not "reflected".
-      now = updated.add(const Duration(hours: 1));
-      expect((await api.review('record')).profile, ReviewProfileState.delayed);
+      // A confirmed transcript does not establish profile/index completion.
+      expect((await api.review('record')).profile, ReviewProfileState.unknown);
     },
   );
 }

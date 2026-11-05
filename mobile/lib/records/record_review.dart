@@ -39,8 +39,7 @@ class TextVersion {
           : DateTime.parse(json['confirmed_at'] as String),
       segments: raw is List
           ? TranscriptDocument.validated([
-              for (final item in raw)
-                ?TranscriptSegment.tryParse(item),
+              for (final item in raw) ?TranscriptSegment.tryParse(item),
             ], content)
           : null,
     );
@@ -64,6 +63,14 @@ abstract class RecordReviewService {
   Future<TextVersion> confirmText(TextVersion version);
 }
 
+/// Session-owned edits and the server version the user edited or accepted.
+class RecordReviewDraft {
+  const RecordReviewDraft({required this.content, this.baseVersion});
+
+  final String content;
+  final TextVersion? baseVersion;
+}
+
 /// One screen owns requests; the session-owned map preserves unsent edits.
 class RecordReviewController extends ChangeNotifier {
   RecordReviewController({
@@ -73,7 +80,7 @@ class RecordReviewController extends ChangeNotifier {
   });
   final RecordReviewService service;
   final String recordId;
-  final Map<String, String> drafts;
+  final Map<String, RecordReviewDraft> drafts;
   RecordReview? value;
   String content = '';
   bool loading = false, busy = false, disposed = false, conflict = false;
@@ -110,7 +117,10 @@ class RecordReviewController extends ChangeNotifier {
   void edit(String text) {
     if (busy || confirmed || needsResolution) return;
     content = text;
-    drafts[recordId] = text;
+    drafts[recordId] = RecordReviewDraft(
+      content: text,
+      baseVersion: drafts[recordId]?.baseVersion ?? value?.version,
+    );
     changed();
   }
 
@@ -135,28 +145,37 @@ class RecordReviewController extends ChangeNotifier {
       error = null;
       changed();
     }
-    final before = value?.version;
-    final hadConflict = conflict;
     try {
       final result = await service.review(recordId);
       if (disposed) return;
       final latest = result.version;
       final edited = drafts[recordId];
+      final base = edited?.baseVersion;
       value = result;
       content = latest?.status == 'confirmed'
           ? latest!.content
-          : edited ?? latest?.content ?? '';
-      // After a conflict, an edit over a different server text is never saved
-      // implicitly: the user decides explicitly.
+          : edited?.content ?? latest?.content ?? '';
+      // Compare with the session-owned base on every load, including a newly
+      // opened screen. Keep the old base until the user resolves the conflict.
       needsResolution =
-          hadConflict &&
           latest != null &&
           latest.status == 'draft' &&
           edited != null &&
-          edited != latest.content &&
-          (before == null ||
-              before.updatedAt != latest.updatedAt ||
-              before.content != latest.content);
+          edited.content != latest.content &&
+          (base == null ||
+              base.id != latest.id ||
+              base.revision != latest.revision ||
+              base.updatedAt != latest.updatedAt ||
+              base.content != latest.content);
+      if (edited != null &&
+          latest != null &&
+          !needsResolution &&
+          latest.status == 'draft') {
+        drafts[recordId] = RecordReviewDraft(
+          content: content,
+          baseVersion: latest,
+        );
+      }
       conflict = false;
       if (!quiet) error = null;
     } catch (_) {
@@ -170,6 +189,10 @@ class RecordReviewController extends ChangeNotifier {
   /// Keeps the user's edit and saves it over the newer server text.
   void keepMine() {
     if (!needsResolution) return;
+    drafts[recordId] = RecordReviewDraft(
+      content: content,
+      baseVersion: value!.version!,
+    );
     needsResolution = false;
     changed();
   }
@@ -204,6 +227,12 @@ class RecordReviewController extends ChangeNotifier {
         version = await service.saveText(version, content);
       }
       if (disposed) return false;
+      // A later confirmation can fail independently of this successful save.
+      // Reopening must compare against the version we just saved.
+      drafts[recordId] = RecordReviewDraft(
+        content: content,
+        baseVersion: version,
+      );
       value = RecordReview(
         record: value!.record,
         version: version,
@@ -218,7 +247,8 @@ class RecordReviewController extends ChangeNotifier {
         value = RecordReview(
           record: value!.record,
           version: version,
-          profile: ReviewProfileState.processing,
+          // Confirmation proves the text is saved, not profile/index readiness.
+          profile: ReviewProfileState.unknown,
         );
       }
       drafts.remove(recordId);

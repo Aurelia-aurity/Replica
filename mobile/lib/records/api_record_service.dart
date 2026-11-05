@@ -72,9 +72,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     required this.policy,
     required this.fileTransport,
     this.extensions = const RecordApiExtensions(),
-    DateTime Function()? clock,
-  }) : _backend = BackendService(auth),
-       _clock = clock ?? DateTime.now;
+  }) : _backend = BackendService(auth);
   final http.Client client;
   final Uri baseUrl;
   final AuthService auth;
@@ -84,15 +82,6 @@ class ApiRecordService extends RecordService implements RecordApiClient {
   final RecordPolicy policy;
   final RecordFileTransport fileTransport;
   final BackendService _backend;
-  final DateTime Function() _clock;
-
-  /// Records whose confirmed transcript has been seen, with the confirmation
-  /// time. The record object itself carries no confirmation evidence.
-  final _confirmedAt = <String, DateTime>{};
-
-  /// When a record was last seen with an unconfirmed draft (rechecked lazily).
-  final _seenUnconfirmed = <String, DateTime>{};
-  static const _recheck = Duration(seconds: 30);
   @override
   bool get isPreview => false;
   @override
@@ -188,8 +177,8 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       ..sort((a, b) => b.revision.compareTo(a.revision));
   }
 
-  /// A ready persona profile does not prove this record was indexed, so the
-  /// reflection state is derived from when the profile was last updated.
+  /// Checks only persona-level availability. Timestamps cannot establish
+  /// whether the confirmed record's profile and search index are both ready.
   Future<ProfileEvidence> _profileEvidence() async {
     try {
       final result = await _request(
@@ -198,19 +187,15 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       );
       final body = jsonDecode(result.body);
       if (body is Map && body['status'] == 'ready') {
-        final stamp = body['updated_at'] ?? body['created_at'];
-        final at = stamp is String ? DateTime.tryParse(stamp) : null;
-        return at == null
-            ? const ProfileEvidence.unavailable()
-            : ProfileEvidence.ready(at);
+        return ProfileEvidence.ready;
       }
-      return const ProfileEvidence.none();
+      return ProfileEvidence.none;
     } on BackendFailure catch (failure) {
       if (_fatal(failure)) rethrow;
-      return const ProfileEvidence.unavailable();
+      return ProfileEvidence.unavailable;
     } on FormatException {
       /* Keep the confirmed text available if the profile reply is malformed. */
-      return const ProfileEvidence.unavailable();
+      return ProfileEvidence.unavailable;
     }
   }
 
@@ -221,11 +206,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
   ) => record.copyWith(
     textConfirmed: true,
     confirmedAt: confirmedAt,
-    personalization: derivePersonalization(
-      confirmedAt: confirmedAt,
-      profile: profile,
-      now: _clock().toUtc(),
-    ),
+    personalization: derivePersonalization(profile),
   );
 
   @override
@@ -240,12 +221,9 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     final versions = await _versions(recordId);
     final latest = versions.isEmpty ? null : versions.first;
     if (latest == null || latest.status != 'confirmed') {
-      _confirmedAt.remove(recordId);
-      _seenUnconfirmed[recordId] = _clock();
       return RecordReview(record: record, version: latest);
     }
     final at = latest.confirmedAt ?? latest.updatedAt;
-    _confirmedAt[recordId] = at;
     final profile = await _profileEvidence();
     final enriched = _confirmed(record, at, profile);
     return RecordReview(
@@ -303,8 +281,6 @@ class ApiRecordService extends RecordService implements RecordApiClient {
         confirmed.confirmedAt == null) {
       throw StateError('Invalid confirmation');
     }
-    _confirmedAt[version.recordId] = confirmed.confirmedAt!;
-    _seenUnconfirmed.remove(version.recordId);
     return confirmed;
   }
 
@@ -370,19 +346,17 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     return _withConfirmation(records.values.toList());
   }
 
-  /// Marks which ready records have a confirmed transcript and how far each
-  /// one has reached personalization. Looks at most a few records up at once;
+  /// Rechecks each ready record's latest transcript and profile availability.
+  /// Confirmation evidence belongs only to this list request, since another
+  /// device can create or confirm a new revision between requests.
+  /// Looks at most a few records up at once;
   /// a lookup that fails leaves that record as "확인 필요" instead of failing
   /// the whole list.
   Future<List<RecordEntry>> _withConfirmation(List<RecordEntry> records) async {
-    final now = _clock();
-    final lookups = records.where((r) {
-      if (r.status != RecordStatus.ready || _confirmedAt.containsKey(r.id)) {
-        return false;
-      }
-      final seen = _seenUnconfirmed[r.id];
-      return seen == null || now.difference(seen) > _recheck;
-    }).toList();
+    final confirmedAt = <String, DateTime>{};
+    final lookups = records
+        .where((r) => r.status == RecordStatus.ready)
+        .toList();
     for (var i = 0; i < lookups.length; i += 4) {
       await Future.wait([
         for (final record in lookups.skip(i).take(4))
@@ -391,11 +365,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
               final versions = await _versions(record.id);
               final latest = versions.isEmpty ? null : versions.first;
               if (latest != null && latest.status == 'confirmed') {
-                _confirmedAt[record.id] =
-                    latest.confirmedAt ?? latest.updatedAt;
-                _seenUnconfirmed.remove(record.id);
-              } else {
-                _seenUnconfirmed[record.id] = now;
+                confirmedAt[record.id] = latest.confirmedAt ?? latest.updatedAt;
               }
             } on BackendFailure catch (failure) {
               if (_fatal(failure)) rethrow;
@@ -405,19 +375,13 @@ class ApiRecordService extends RecordService implements RecordApiClient {
           }(),
       ]);
     }
-    final confirmed = records
-        .where(
-          (r) =>
-              r.status == RecordStatus.ready && _confirmedAt.containsKey(r.id),
-        )
-        .toList();
-    if (confirmed.isEmpty) return records;
+    if (confirmedAt.isEmpty) return records;
     final profile = await _profileEvidence();
     return [
       for (final record in records)
         if (record.status == RecordStatus.ready &&
-            _confirmedAt.containsKey(record.id))
-          _confirmed(record, _confirmedAt[record.id]!, profile)
+            confirmedAt.containsKey(record.id))
+          _confirmed(record, confirmedAt[record.id]!, profile)
         else
           record,
     ];
@@ -433,15 +397,19 @@ class ApiRecordService extends RecordService implements RecordApiClient {
   }
 
   @override
-  Future<void> discardUpload(RecordUpload upload) async {
+  Future<DeletionJob?> discardUpload(RecordUpload upload) async {
     if (!upload.reservationRequested || upload.stage == UploadStage.done) {
-      return;
+      return null;
     }
     final existing = await _find(upload.id);
-    if (existing == null || existing.status == RecordStatus.deleting) return;
+    if (existing == null) return null;
     // An upload that already completed is a finished record: keep it.
-    if (existing.status != RecordStatus.uploading) return;
-    await _request('DELETE', '/records/${upload.id}');
+    if (existing.status != RecordStatus.uploading &&
+        existing.status != RecordStatus.deleting) {
+      return null;
+    }
+    // Deleting the same record again returns the existing job by contract.
+    return deleteRecord(upload.id);
   }
 
   @override
@@ -458,6 +426,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     if (upload.stage == UploadStage.reserve) {
       RecordEntry? existing;
       if (upload.reservationRequested) existing = await _find(upload.id);
+      upload.cancelToken.throwIfCancelled();
       if (existing == null) {
         upload.reservationRequested = true;
         final response = await _request(
@@ -472,6 +441,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
           jsonDecode(response.body) as Map<String, dynamic>,
         );
       }
+      upload.cancelToken.throwIfCancelled();
       if (existing.id != upload.id) throw StateError('Record ID mismatch');
       if (existing.status == RecordStatus.deleting) {
         throw StateError('Record deleted');
@@ -491,8 +461,10 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       onStageChanged();
     }
     if (upload.stage == UploadStage.complete) {
+      upload.cancelToken.throwIfCancelled();
       // A previous completion may have succeeded even if its response was lost.
       final existing = await _find(upload.id);
+      upload.cancelToken.throwIfCancelled();
       if (existing == null) throw StateError('Record no longer exists');
       if (existing.status == RecordStatus.deleting) {
         throw StateError('Record deleted');
@@ -500,6 +472,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       if (existing.status == RecordStatus.uploading) {
         await _request('POST', '/records/${upload.id}/uploaded');
       }
+      upload.cancelToken.throwIfCancelled();
       upload.stage = UploadStage.done;
       onStageChanged();
     }

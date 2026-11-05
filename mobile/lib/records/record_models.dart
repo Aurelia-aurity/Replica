@@ -7,10 +7,9 @@ enum RecordStatus { uploading, uploaded, processing, ready, failed, deleting }
 
 /// How far a confirmed transcript has reached the personalization pipeline.
 ///
-/// The draft API has no per-record reflection evidence. `reflected`,
-/// `processing` and `delayed` are derived from the confirmation time and the
-/// persona's current style profile (see `personalization.dart`); `failed` is
-/// reserved for an explicit server signal and for synthetic previews.
+/// The draft API has no per-record reflection evidence. It can establish only
+/// persona profile availability. Processing, reflection, delay and failure
+/// require explicit record-level evidence or synthetic preview data.
 enum ReviewProfileState {
   unknown,
   available,

@@ -6,21 +6,51 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
+import 'package:mobile/main.dart';
 import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/http_record_transport.dart';
 import 'package:mobile/records/record_controller.dart';
+import 'package:mobile/records/record_deletion.dart';
 import 'package:mobile/records/record_models.dart';
 import 'package:mobile/records/record_service.dart';
 import 'package:mobile/records/record_upload_screen.dart';
+import 'package:mobile/records/records_panel.dart';
 import 'package:mobile/services/backend_service.dart';
 
 import 'records_test.dart' show ApiTestAuth, file, recordJson;
 
 class _Discarding extends PreviewRecordService {
   final discarded = <RecordUpload>[];
+  Completer<void>? pendingDiscard;
+  DeletionJob? discardedJob;
+  DeletionJob? checkedJob;
+  bool failDiscard = false;
   @override
-  Future<void> discardUpload(RecordUpload upload) async =>
-      discarded.add(upload);
+  Future<DeletionJob?> discardUpload(RecordUpload upload) async {
+    discarded.add(upload);
+    await pendingDiscard?.future;
+    if (failDiscard) throw StateError('cleanup unavailable');
+    return discardedJob;
+  }
+
+  @override
+  Future<DeletionJob> deletionJob(String jobId) async =>
+      checkedJob?.id == jobId ? checkedJob! : await super.deletionJob(jobId);
+}
+
+class _TransferringRecords extends _Discarding {
+  _TransferringRecords(this.transport);
+  final RecordFileTransport transport;
+
+  @override
+  Future<void> upload(RecordUpload upload, void Function() changed) async {
+    upload.reservationRequested = true;
+    upload.stage = UploadStage.transfer;
+    changed();
+    await transport.ensureUploaded(upload);
+    upload.stage = UploadStage.done;
+    changed();
+  }
 }
 
 RecordUpload _upload(RecordFile f) => RecordUpload(
@@ -50,6 +80,279 @@ Future<ApiTestAuth> _auth() async {
 }
 
 void main() {
+  group('cancelled upload cleanup', () {
+    test('no returned job makes no claim about server deletion', () async {
+      final service = _TransferringRecords(_CancelOnTransfer());
+      final controller = RecordController(service);
+      addTearDown(controller.dispose);
+      controller.select(file('voice.m4a'));
+      controller.setConsent(true);
+      await controller.send();
+      expect(controller.uploadNotice, '업로드를 취소했어요.');
+      expect(controller.deletions, isEmpty);
+    });
+
+    test('abandoning a failed upload also tracks its cleanup job', () async {
+      final service = _Discarding();
+      final controller = RecordController(service);
+      addTearDown(controller.dispose);
+      final upload = _upload(file('voice.m4a'))..reservationRequested = true;
+      controller.attempt = upload;
+      service.discardedJob = DeletionJob(
+        id: 'job',
+        targetId: upload.id,
+        targetType: 'record',
+        status: 'pending',
+        remaining: ['storage'],
+      );
+      controller.beginSelection();
+      await pumpEventQueue();
+      expect(controller.deletions[upload.id]!.job, same(service.discardedJob));
+    });
+
+    for (final state in ['pending', 'failed', 'partial', 'completed']) {
+      test(
+        'cancellation tracks $state without assuming deletion completed',
+        () async {
+          final pending = Completer<void>();
+          final service = _TransferringRecords(_CancelOnTransfer())
+            ..pendingDiscard = pending;
+          final controller = RecordController(service);
+          addTearDown(controller.dispose);
+          controller.select(file('voice.m4a'));
+          controller.setConsent(true);
+          final sending = controller.send();
+          await pumpEventQueue();
+          expect(controller.uploadNotice, contains('정리하고 있어요'));
+          final upload = service.discarded.single;
+          service.discardedJob = DeletionJob(
+            id: 'cleanup-job',
+            targetId: upload.id,
+            targetType: 'record',
+            status: state == 'partial' ? 'completed' : state,
+            remaining: state == 'completed' ? [] : ['storage'],
+          );
+          pending.complete();
+          await sending;
+          final deletion = controller.deletions[upload.id]!;
+          expect(deletion.job, same(service.discardedJob));
+          expect(deletion.label, 'voice.m4a');
+          expect(deletion.complete, state == 'completed');
+          expect(
+            controller.uploadNotice!.contains('임시 기록을 삭제했어요'),
+            state == 'completed',
+          );
+          expect(controller.uploadNotice, isNot(contains('남기지 않았어요')));
+          expect(controller.selected, same(upload.file));
+          expect(controller.consent, isFalse);
+          expect(controller.attempt, isNull);
+          if (state == 'pending') {
+            expect(controller.uploadNotice, contains('진행 중'));
+          } else if (state != 'completed') {
+            expect(controller.uploadNotice, contains('삭제하지 못했어요'));
+          }
+        },
+      );
+    }
+
+    test('cleanup failures remain accessible from the record list', () async {
+      final service = _TransferringRecords(_CancelOnTransfer())
+        ..failDiscard = true;
+      final controller = RecordController(service);
+      addTearDown(controller.dispose);
+      controller.select(file('voice.m4a'));
+      controller.setConsent(true);
+      await controller.send();
+      final deletion = controller.deletions.values.single;
+      expect(deletion.job, isNull);
+      expect(deletion.error, contains('삭제 상태를 확인하지 못했어요'));
+      expect(controller.uploadNotice, contains('기록 목록에서 확인'));
+      expect(controller.uploadNotice, isNot(contains('삭제했어요')));
+    });
+
+    testWidgets(
+      'cancelled uploads expose their job for checking failure and completion',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(800, 1600);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final pending = Completer<void>();
+        final service = _TransferringRecords(_CancelOnTransfer())
+          ..pendingDiscard = pending;
+        final controller = RecordController(service);
+        addTearDown(controller.dispose);
+        controller.select(file('voice.m4a'));
+        controller.setConsent(true);
+        final sending = controller.send();
+        await tester.pump();
+        final upload = service.discarded.single;
+        DeletionJob job(String status, List<String> remaining) => DeletionJob(
+          id: 'cleanup-job',
+          targetId: upload.id,
+          targetType: 'record',
+          status: status,
+          remaining: remaining,
+        );
+        service.discardedJob = job('pending', ['storage']);
+        pending.complete();
+        await tester.pump();
+        await sending;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: RecordsPanel(controller: controller)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('voice.m4a 삭제 요청'), findsOneWidget);
+        expect(find.textContaining('삭제 진행 중'), findsOneWidget);
+        service.checkedJob = job('failed', ['storage']);
+        await tester.tap(find.text('voice.m4a 삭제 요청'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+        await tester.pumpAndSettle();
+        expect(find.text('일부 자료를 삭제하지 못했어요.'), findsOneWidget);
+        service.checkedJob = job('completed', []);
+        await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+        await tester.pumpAndSettle();
+        expect(find.text('미리보기 자료 삭제를 완료했어요.'), findsOneWidget);
+        expect(controller.deletions[upload.id]!.complete, isTrue);
+        expect(service.discarded, hasLength(1));
+      },
+    );
+  });
+
+  group('session-owned uploads', () {
+    test(
+      'disposing the controller aborts HTTP and releases the file',
+      () async {
+        final reading = Completer<void>();
+        var fileCancelled = false;
+        var requestAborted = false;
+        final source = StreamController<List<int>>(
+          onListen: reading.complete,
+          onCancel: () {
+            fileCancelled = true;
+          },
+        );
+        final client = MockClient.streaming((request, stream) async {
+          final subscription = stream.listen((_) {});
+          await (request as http.Abortable).abortTrigger;
+          requestAborted = true;
+          await subscription.cancel();
+          throw http.RequestAbortedException(request.url);
+        });
+        addTearDown(client.close);
+        final service = _TransferringRecords(
+          HttpRecordFileTransport(
+            client: client,
+            resolveTarget: (_) async => RecordUploadTarget(
+              url: Uri.parse('https://storage.invalid/original'),
+            ),
+          ),
+        );
+        final controller = RecordController(service);
+        controller.select(
+          RecordFile(
+            name: 'voice.m4a',
+            sizeBytes: 2,
+            openRead: () => source.stream,
+          ),
+        );
+        controller.setConsent(true);
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+        final sending = controller.send();
+        await reading.future;
+        final upload = controller.attempt!;
+        controller.dispose();
+        final previousNotifications = notifications;
+        expect(upload.cancelToken.isCancelled, isTrue);
+        expect(upload.onProgress, isNull);
+        await sending;
+        expect(requestAborted, isTrue);
+        expect(fileCancelled, isTrue);
+        expect(controller.attempt, isNull);
+        expect(controller.selected, isNull);
+        expect(controller.deletions, isEmpty);
+        expect(service.discarded, isEmpty);
+        source.add([1, 2]);
+        upload.reportProgress(2);
+        await pumpEventQueue();
+        expect(notifications, previousNotifications);
+        await source.close();
+      },
+    );
+
+    testWidgets(
+      'logout stops the old upload and a new account stays signed in',
+      (tester) async {
+        final transfer = _WaitingTransfer();
+        final service = _TransferringRecords(transfer);
+        final auth = PreviewAuthService();
+        addTearDown(auth.dispose);
+        await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+        var services = 0;
+        await tester.pumpWidget(
+          ReplicaApp(
+            authService: auth,
+            recordServiceFactory: () =>
+                services++ == 0 ? service : PreviewRecordService(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('기록'));
+        await tester.pumpAndSettle();
+        final controller = tester
+            .widget<RecordsPanel>(find.byType(RecordsPanel))
+            .controller;
+        controller.select(file('voice.m4a'));
+        controller.setConsent(true);
+        final sending = controller.send();
+        await tester.pump();
+        final upload = controller.attempt!;
+        await auth.signOut();
+        await tester.pumpAndSettle();
+        expect(upload.cancelToken.isCancelled, isTrue);
+        expect(upload.onProgress, isNull);
+        await auth.signIn('preview.b@example.com', PreviewAuthService.password);
+        await tester.pumpAndSettle();
+        // The old transport finishes after the new account is already signed in.
+        transfer.finish.complete();
+        await tester.pump();
+        await sending;
+        expect(transfer.cancelled, isTrue);
+        expect(service.discarded, isEmpty);
+        expect(controller.deletions, isEmpty);
+        expect(controller.attempt, isNull);
+        expect(auth.identity!.email, 'preview.b@example.com');
+        await tester.tap(find.text('기록'));
+        await tester.pumpAndSettle();
+        expect(find.text('아직 올린 기록이 없어요.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    test(
+      'a pending cancellation cannot recreate deletion state after disposal',
+      () async {
+        final service = _TransferringRecords(_CancelOnTransfer())
+          ..pendingDiscard = Completer<void>();
+        final controller = RecordController(service);
+        controller.select(file('voice.m4a'));
+        controller.setConsent(true);
+        final sending = controller.send();
+        await pumpEventQueue();
+        expect(service.discarded, hasLength(1));
+        controller.dispose();
+        service.pendingDiscard!.complete();
+        await sending;
+        expect(controller.deletions, isEmpty);
+        expect(controller.attempt, isNull);
+      },
+    );
+  });
+
   group('preview upload progress and cancel', () {
     test('progress rises monotonically to the file size', () async {
       final service = PreviewRecordService();
@@ -158,6 +461,218 @@ void main() {
       url: Uri.parse('https://storage.invalid/replica/original'),
       headers: const {'x-agreed': 'yes'},
     );
+
+    test(
+      'timeout aborts a stalled file read before retrying the same upload',
+      () async {
+        var fileCancelled = false;
+        var requests = 0;
+        var activeRequests = 0;
+        var reads = 0;
+        final source = StreamController<List<int>>(
+          onCancel: () {
+            fileCancelled = true;
+          },
+        );
+        final client = MockClient.streaming((request, stream) async {
+          requests++;
+          activeRequests++;
+          if (requests == 1) {
+            final subscription = stream.listen((_) {});
+            await (request as http.Abortable).abortTrigger;
+            await subscription.cancel();
+            activeRequests--;
+            throw http.RequestAbortedException(request.url);
+          }
+          expect(activeRequests, 1);
+          await stream.drain<void>();
+          activeRequests--;
+          return http.StreamedResponse(const Stream.empty(), 200);
+        });
+        addTearDown(client.close);
+        final transport = HttpRecordFileTransport(
+          client: client,
+          resolveTarget: (_) async => target,
+          timeout: const Duration(milliseconds: 50),
+        );
+        final upload = _upload(
+          RecordFile(
+            name: 'voice.m4a',
+            sizeBytes: 2,
+            openRead: () => reads++ == 0 ? source.stream : Stream.value([1, 2]),
+          ),
+        );
+        source.add([1]);
+        await expectLater(
+          transport.ensureUploaded(upload),
+          throwsA(
+            isA<BackendFailure>()
+                .having((e) => e.kind, 'kind', BackendFailureKind.network)
+                .having((e) => e.retryable, 'retryable', isTrue),
+          ),
+        );
+        expect(fileCancelled, isTrue);
+        expect(upload.cancelToken.isCancelled, isFalse);
+        final previousProgress = upload.bytesSent;
+        source.add([2]);
+        await Future<void>.delayed(Duration.zero);
+        expect(upload.bytesSent, previousProgress);
+        expect(activeRequests, 0);
+        await transport.ensureUploaded(upload);
+        expect(requests, 2);
+        expect(upload.progress, 1);
+        await source.close();
+      },
+    );
+
+    for (final fileError in [StateError('file unreadable'), 'grew', 'shrank']) {
+      test(
+        'file error $fileError aborts without waiting for a server response',
+        () async {
+          var aborted = false;
+          final client = MockClient.streaming((request, stream) async {
+            final subscription = stream.listen((_) {});
+            await (request as http.Abortable).abortTrigger;
+            aborted = true;
+            await subscription.cancel();
+            throw http.RequestAbortedException(request.url);
+          });
+          addTearDown(client.close);
+          final transport = HttpRecordFileTransport(
+            client: client,
+            resolveTarget: (_) async => target,
+            timeout: const Duration(minutes: 1),
+          );
+          final upload = _upload(
+            RecordFile(
+              name: 'voice.m4a',
+              sizeBytes: 2,
+              openRead: () => fileError is StateError
+                  ? Stream.error(fileError)
+                  : Stream.value(fileError == 'grew' ? [1, 2, 3] : [1]),
+            ),
+          );
+          await expectLater(
+            transport
+                .ensureUploaded(upload)
+                .timeout(const Duration(seconds: 2)),
+            throwsA(
+              fileError is StateError
+                  ? same(fileError)
+                  : isA<BackendFailure>().having(
+                      (e) => e.code,
+                      'code',
+                      'FILE_CHANGED',
+                    ),
+            ),
+          );
+          expect(aborted, isTrue);
+          expect(upload.cancelToken.isCancelled, isFalse);
+        },
+      );
+    }
+
+    test('timeout aborts a response body that never finishes', () async {
+      var responseCancelled = false;
+      final response = StreamController<List<int>>(
+        onCancel: () {
+          responseCancelled = true;
+        },
+      );
+      final client = MockClient.streaming((request, stream) async {
+        await stream.drain<void>();
+        unawaited(
+          (request as http.Abortable).abortTrigger!.then((_) {
+            response.addError(http.RequestAbortedException(request.url));
+            unawaited(response.close());
+          }),
+        );
+        return http.StreamedResponse(response.stream, 200);
+      });
+      addTearDown(client.close);
+      final transport = HttpRecordFileTransport(
+        client: client,
+        resolveTarget: (_) async => target,
+        timeout: const Duration(milliseconds: 50),
+      );
+      await expectLater(
+        transport.ensureUploaded(
+          _upload(
+            _chunks([
+              [1, 2],
+            ]),
+          ),
+        ),
+        throwsA(
+          isA<BackendFailure>().having(
+            (e) => e.kind,
+            'kind',
+            BackendFailureKind.network,
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(responseCancelled, isTrue);
+    });
+
+    for (final cancelByUser in [true, false]) {
+      test(
+        'stalled file is released on ${cancelByUser ? 'user cancellation' : 'network failure'}',
+        () async {
+          final reading = Completer<void>();
+          var fileCancelled = false;
+          final source = StreamController<List<int>>(
+            onListen: reading.complete,
+            onCancel: () {
+              fileCancelled = true;
+            },
+          );
+          final client = MockClient.streaming((request, stream) async {
+            final subscription = stream.listen((_) {});
+            await reading.future;
+            if (cancelByUser) {
+              await (request as http.Abortable).abortTrigger;
+            }
+            await subscription.cancel();
+            throw cancelByUser
+                ? http.RequestAbortedException(request.url)
+                : http.ClientException('connection lost', request.url);
+          });
+          addTearDown(client.close);
+          final transport = HttpRecordFileTransport(
+            client: client,
+            resolveTarget: (_) async => target,
+            timeout: const Duration(minutes: 1),
+          );
+          final upload = _upload(
+            RecordFile(
+              name: 'voice.m4a',
+              sizeBytes: 2,
+              openRead: () => source.stream,
+            ),
+          );
+          final result = expectLater(
+            transport
+                .ensureUploaded(upload)
+                .timeout(const Duration(seconds: 2)),
+            throwsA(
+              cancelByUser
+                  ? isA<UploadCancelled>()
+                  : isA<BackendFailure>().having(
+                      (e) => e.kind,
+                      'kind',
+                      BackendFailureKind.network,
+                    ),
+            ),
+          );
+          await reading.future;
+          if (cancelByUser) upload.cancelToken.cancel();
+          await result;
+          expect(fileCancelled, isTrue);
+          await source.close();
+        },
+      );
+    }
 
     test('streams every byte with progress and agreed headers', () async {
       late http.BaseRequest seen;
@@ -315,6 +830,46 @@ void main() {
           fileTransport: _CancelOnTransfer(),
         );
 
+    for (final stage in [UploadStage.reserve, UploadStage.complete]) {
+      test(
+        'disposal during $stage lookup sends no follow-up request',
+        () async {
+          final auth = await _auth();
+          addTearDown(auth.dispose);
+          final started = Completer<void>();
+          final pending = Completer<http.Response>();
+          final calls = <String>[];
+          final client = MockClient((request) async {
+            calls.add(request.method);
+            started.complete();
+            return pending.future;
+          });
+          addTearDown(client.close);
+          final controller = RecordController(service(client, auth));
+          controller.select(file('voice.m4a'));
+          controller.setConsent(true);
+          final upload = _upload(controller.selected!)
+            ..stage = stage
+            ..reservationRequested = true;
+          controller.attempt = upload;
+          final sending = controller.send();
+          await started.future;
+          controller.dispose();
+          pending.complete(
+            stage == UploadStage.reserve
+                ? http.Response('{}', 404)
+                : http.Response(jsonEncode(recordJson(upload.id)), 200),
+          );
+          await sending;
+          expect(calls, ['GET']);
+          expect(upload.stage, stage);
+          expect(upload.cancelToken.isCancelled, isTrue);
+          expect(controller.deletions, isEmpty);
+          expect(controller.uploadError, isNull);
+        },
+      );
+    }
+
     test('discard removes a reservation that has no file yet', () async {
       final auth = await _auth();
       addTearDown(auth.dispose);
@@ -340,7 +895,10 @@ void main() {
       final api = service(client, auth);
       final upload = _upload(file('a.txt'))..reservationRequested = true;
       id = upload.id;
-      await api.discardUpload(upload);
+      final job = await api.discardUpload(upload);
+      expect(job!.id, 'job');
+      expect(job.status, 'pending');
+      expect(job.complete, isFalse);
       expect(calls, ['GET /records/$id', 'DELETE /records/$id']);
     });
 
@@ -360,9 +918,9 @@ void main() {
       final api = service(client, auth);
       final upload = _upload(file('a.txt'))..reservationRequested = true;
       id = upload.id;
-      await api.discardUpload(upload);
+      expect(await api.discardUpload(upload), isNull);
       missing = true;
-      await api.discardUpload(upload);
+      expect(await api.discardUpload(upload), isNull);
       expect(calls, ['GET', 'GET']);
       // Never reserved: nothing to look up at all.
       calls.clear();
@@ -446,6 +1004,19 @@ class _CancelOnTransfer extends RecordFileTransport {
   @override
   Future<void> ensureUploaded(RecordUpload upload) async {
     upload.cancelToken.cancel();
+    throw const UploadCancelled();
+  }
+}
+
+class _WaitingTransfer extends RecordFileTransport {
+  final finish = Completer<void>();
+  bool cancelled = false;
+
+  @override
+  Future<void> ensureUploaded(RecordUpload upload) async {
+    await upload.cancelToken.whenCancelled;
+    cancelled = true;
+    await finish.future;
     throw const UploadCancelled();
   }
 }

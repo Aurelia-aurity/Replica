@@ -154,6 +154,7 @@ class RecordPlayerController extends ChangeNotifier {
   RecordPlaybackEngine? _engine;
   final _subscriptions = <StreamSubscription<dynamic>>[];
   Future<void>? _opening;
+  Future<void> _releasing = Future<void>.value();
   bool _disposed = false;
   PlayerPhase phase = PlayerPhase.idle;
   bool playing = false;
@@ -167,41 +168,76 @@ class RecordPlayerController extends ChangeNotifier {
 
   Future<void> _ensureOpen() => _opening ??= _open();
 
+  bool _isCurrent(RecordPlaybackEngine engine) =>
+      !_disposed && identical(_engine, engine);
+
+  Future<void> _releaseEngine() {
+    final engine = _engine;
+    if (engine == null) return _releasing;
+    // Detach immediately so queued events and in-flight commands cannot change
+    // the state of a replacement engine while asynchronous cleanup runs.
+    _engine = null;
+    final subscriptions = List.of(_subscriptions);
+    _subscriptions.clear();
+    return _releasing =
+        (() async {
+          try {
+            await Future.wait(subscriptions.map((s) => s.cancel()));
+          } finally {
+            await engine.dispose();
+          }
+        })().catchError((Object _) {
+          // Cleanup errors must not escape an event callback or widget disposal.
+        });
+  }
+
   Future<void> _open() async {
     phase = PlayerPhase.loading;
     _changed();
+    RecordPlaybackEngine? openingEngine;
     try {
+      await _releasing;
+      if (_disposed) return;
       final source = await resolve();
       if (_disposed) return;
       simulated = source.simulated;
       duration = source.duration;
+      position = Duration.zero;
       final engine = _engine = _engineFactory(source);
+      openingEngine = engine;
       _subscriptions
         ..add(
           engine.position.listen((value) {
+            if (!_isCurrent(engine)) return;
             position = value;
             _changed();
           }),
         )
         ..add(
           engine.duration.listen((value) {
+            if (!_isCurrent(engine)) return;
             duration = value;
             _changed();
           }),
         )
         ..add(
           engine.completed.listen((_) {
+            if (!_isCurrent(engine)) return;
             playing = false;
             position = duration ?? position;
             _changed();
           }),
         )
-        ..add(engine.errors.listen((_) => _fail()));
+        ..add(
+          engine.errors.listen((_) {
+            if (_isCurrent(engine)) _fail();
+          }),
+        );
       await engine.open(source);
-      if (_disposed) return;
+      if (!_isCurrent(engine)) return;
       phase = PlayerPhase.ready;
     } catch (_) {
-      _fail();
+      if (openingEngine == null || _isCurrent(openingEngine)) _fail();
     }
     _changed();
   }
@@ -211,48 +247,58 @@ class RecordPlayerController extends ChangeNotifier {
     phase = PlayerPhase.failed;
     playing = false;
     _opening = null; // a later tap may try again
+    unawaited(_releaseEngine());
     _changed();
   }
 
   Future<void> toggle() async {
     if (phase == PlayerPhase.loading) return;
-    await _ensureOpen();
+    final opening = _ensureOpen();
+    await opening;
+    if (!identical(opening, _opening)) return;
     final engine = _engine;
     if (_disposed || engine == null || phase != PlayerPhase.ready) return;
     try {
       if (playing) {
         await engine.pause();
+        if (!_isCurrent(engine)) return;
         playing = false;
       } else {
         if (duration != null && position >= duration!) {
           await engine.seek(Duration.zero);
+          if (!_isCurrent(engine)) return;
           position = Duration.zero;
         }
         await engine.play();
+        if (!_isCurrent(engine)) return;
         playing = true;
       }
     } catch (_) {
-      _fail();
+      if (_isCurrent(engine)) _fail();
     }
     _changed();
   }
 
   Future<void> seekTo(Duration value, {bool play = false}) async {
     if (phase == PlayerPhase.loading) return;
-    await _ensureOpen();
+    final opening = _ensureOpen();
+    await opening;
+    if (!identical(opening, _opening)) return;
     final engine = _engine;
     if (_disposed || engine == null || phase != PlayerPhase.ready) return;
     try {
       final limit = duration;
       final target = limit != null && value > limit ? limit : value;
       await engine.seek(target);
+      if (!_isCurrent(engine)) return;
       position = target;
       if (play && !playing) {
         await engine.play();
+        if (!_isCurrent(engine)) return;
         playing = true;
       }
     } catch (_) {
-      _fail();
+      if (_isCurrent(engine)) _fail();
     }
     _changed();
   }
@@ -265,6 +311,7 @@ class RecordPlayerController extends ChangeNotifier {
     } catch (_) {
       /* The player is going away or already stopped. */
     }
+    if (!_isCurrent(engine)) return;
     playing = false;
     _changed();
   }
@@ -272,11 +319,7 @@ class RecordPlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    for (final subscription in _subscriptions) {
-      unawaited(subscription.cancel());
-    }
-    final engine = _engine;
-    if (engine != null) unawaited(engine.dispose());
+    unawaited(_releaseEngine());
     super.dispose();
   }
 }

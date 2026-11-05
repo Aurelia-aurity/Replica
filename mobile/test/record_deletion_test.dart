@@ -11,6 +11,7 @@ import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_deletion.dart';
 import 'package:mobile/records/record_models.dart';
+import 'package:mobile/records/record_review.dart';
 import 'package:mobile/records/records_panel.dart';
 import 'package:mobile/records/deletion_sheet.dart';
 
@@ -158,7 +159,9 @@ void main() {
       final service = DeletionFixture();
       final records = RecordController(service);
       addTearDown(records.dispose);
-      records.reviewDrafts['record'] = '합성 초안';
+      records.reviewDrafts['record'] = const RecordReviewDraft(
+        content: '합성 초안',
+      );
       await records.refresh();
       final c = records.deletionFor('record');
       await c.execute();

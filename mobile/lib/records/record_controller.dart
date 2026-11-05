@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../services/backend_service.dart';
 import 'record_deletion.dart';
 import 'record_models.dart';
+import 'record_review.dart';
 import 'record_service.dart';
 import 'text_analysis.dart';
 
@@ -21,7 +22,7 @@ class RecordController extends ChangeNotifier {
   final Duration pollInterval;
   final Future<TextAnalysis> Function(RecordFile file) analyze;
   List<RecordEntry> entries = [];
-  final reviewDrafts = <String, String>{};
+  final reviewDrafts = <String, RecordReviewDraft>{};
   final deletions = <String, RecordDeletionController>{};
   String? deletionLoadError;
   RecordDeletionController deletionFor(
@@ -58,6 +59,9 @@ class RecordController extends ChangeNotifier {
   /// Drops everything this session holds about the user's records: the list,
   /// unsent transcript edits, the picked file and the parsed speaker names.
   void clearLocalData() {
+    // Detach progress callbacks before stopping the session-owned transfer.
+    attempt?.onProgress = null;
+    attempt?.cancelToken.cancel();
     entries.clear();
     reviewDrafts.clear();
     selected = null;
@@ -120,13 +124,13 @@ class RecordController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     stopPolling();
     for (final deletion in deletions.values) {
       deletion.removeListener(_deletionChanged);
       deletion.dispose();
     }
     clearLocalData();
-    _disposed = true;
     super.dispose();
   }
 
@@ -343,8 +347,10 @@ class RecordController extends ChangeNotifier {
       uploadSucceeded = true;
       await refresh();
     } on UploadCancelled {
+      if (_disposed) return;
       await _afterCancel(current);
     } catch (error) {
+      if (_disposed) return;
       if (current.cancelToken.isCancelled) {
         await _afterCancel(current);
       } else {
@@ -378,19 +384,40 @@ class RecordController extends ChangeNotifier {
     return '업로드하지 못했어요. 같은 기록으로 다시 시도할 수 있어요.';
   }
 
-  Future<void> _discardQuietly(RecordUpload old) async {
+  Future<DeletionJob?> _discardUpload(RecordUpload upload) async {
     try {
-      await service.discardUpload(old);
-      if (!_disposed && old.reservationRequested) {
-        deletionFor(old.id).label = old.file.name;
+      final job = await service.discardUpload(upload);
+      if (_disposed || job == null) return null;
+      if (job.targetType != 'record' || job.targetId != upload.id) {
+        throw StateError('Deletion target mismatch');
       }
+      final deletion = deletionFor(upload.id);
+      deletion.label = upload.file.name;
+      deletion.job = job;
+      deletion.error = null;
+      deletion.changed();
+      return job;
     } catch (_) {
-      /* The list shows any leftover reservation. */
+      if (!_disposed) {
+        final deletion = deletionFor(upload.id);
+        deletion.label = upload.file.name;
+        deletion.error = '임시 기록의 삭제 상태를 확인하지 못했어요. 다시 확인해 주세요.';
+        deletion.changed();
+      }
+      rethrow;
     }
   }
 
-  /// Stops the running upload. Whatever it already stored is removed; the
-  /// picked file stays so the user can upload again after confirming consent.
+  Future<void> _discardQuietly(RecordUpload old) async {
+    try {
+      await _discardUpload(old);
+    } catch (_) {
+      /* The deletion card retains the error for the user to check. */
+    }
+  }
+
+  /// Stops the running upload and requests cleanup. The picked file stays so
+  /// the user can upload again after confirming consent.
   void cancelUpload() {
     final current = attempt;
     if (!canCancelUpload || current == null) return;
@@ -400,13 +427,19 @@ class RecordController extends ChangeNotifier {
   }
 
   Future<void> _afterCancel(RecordUpload current) async {
-    uploadNotice = '업로드를 취소했어요. 올리던 내용은 남기지 않았어요.';
+    uploadNotice = '업로드를 취소했어요. 임시 기록을 정리하고 있어요.';
     try {
-      await service.discardUpload(current);
-      if (current.reservationRequested) {
-        deletionFor(current.id).label = current.file.name;
-      }
+      final job = await _discardUpload(current);
+      if (_disposed) return;
+      uploadNotice = job == null
+          ? '업로드를 취소했어요.'
+          : job.complete
+          ? '업로드를 취소하고 임시 기록을 삭제했어요.'
+          : job.failed
+          ? '업로드를 취소했지만 일부 자료를 삭제하지 못했어요. 기록 목록에서 삭제 상태를 확인해 주세요.'
+          : '업로드를 취소했어요. 임시 기록 삭제가 진행 중이에요. 기록 목록에서 상태를 확인할 수 있어요.';
     } catch (_) {
+      if (_disposed) return;
       uploadNotice = '업로드를 취소했어요. 서버에 남은 임시 기록이 있으면 기록 목록에서 확인해 주세요.';
     }
     if (_disposed) return;
