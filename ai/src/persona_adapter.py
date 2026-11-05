@@ -91,6 +91,8 @@ def parse_candidate(raw: str, request: PersonaRequest) -> tuple[str, tuple[str, 
 
 
 class Tokenizer(Protocol):
+    def encode(self, text: str, *, add_special_tokens: bool) -> list[int]: ...
+
     def apply_chat_template(self, messages: list[dict[str, str]], *, tokenize: bool,
                             add_generation_prompt: bool, enable_thinking: bool) -> list[int]: ...
 
@@ -152,7 +154,8 @@ class PersonaInference:
     def generate(self, request: PersonaRequest, prepared: Prepared) -> PersonaGenerated:
         # Same total decoding budget, one call only, including JSON/citation tokens.
         decoded = self.engine.generate(
-            Request(request.request_id, request.message, request.history, request.max_new_tokens),
+            Request(request.request_id, request.message, request.history, request.max_new_tokens,
+                    tuple(self.engine.tokenizer.encode('{"message":', add_special_tokens=False))),
             prepared)
         message, used = parse_candidate(decoded.message, request)
         checked = check_candidate(message, reduced_identity(request))

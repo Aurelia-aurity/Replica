@@ -1,0 +1,59 @@
+{
+  "case": "history",
+  "synthetic_only": true,
+  "request_id": "547ce61a-efb9-4ae3-98d8-f028c310069c",
+  "request": {
+    "request_id": "547ce61a-efb9-4ae3-98d8-f028c310069c",
+    "message": "2024년 여름에 어디에 다녀왔지?",
+    "history": [
+      {
+        "user": "안녕.",
+        "assistant": "안녕하세요."
+      }
+    ],
+    "max_new_tokens": 160,
+    "persona_id": "123e01e5-abfa-4720-811c-d84817aced7c",
+    "persona": {
+      "display_name": "온유",
+      "provider_address": null
+    },
+    "source_revision": 1,
+    "style_profile": {
+      "id": "45d789b5-b2fd-44ef-8922-494cd464d0e8",
+      "version": 1,
+      "source_revision": 1,
+      "source_snapshot_id": "08f50c0a-96ad-40f1-a435-1006aba5c78a",
+      "content": {
+        "schema_version": 1,
+        "speech_style": {
+          "tone": [
+            "해요체"
+          ],
+          "address_terms": [],
+          "sentence_endings": [],
+          "frequent_expressions": []
+        },
+        "conversation_habits": [],
+        "limitations": []
+      }
+    },
+    "evidence": [
+      {
+        "chunk_id": "7d56195d-ba9a-4dad-a660-06fca8b79a34",
+        "record_id": "da1982a7-4a2b-4bb5-a3b2-6fc33b5ef8f2",
+        "text_version_id": "4864a41e-b21a-4cf1-b387-e4a30ab89bf4",
+        "speaker_role": "persona",
+        "content": "2024-07-12 | 온유 (speaker_role=persona) | 여름에 부산에 다녀왔다."
+      }
+    ]
+  },
+  "raw_output": "2024년 여름에 부산에 다녀왔어요.",
+  "finish_reason": "stop",
+  "input_tokens": 856,
+  "output_tokens": 17,
+  "max_new_tokens": 160,
+  "parsed_citation_result": {
+    "status": "invalid",
+    "exception_type": "JSONDecodeError"
+  }
+}

@@ -15,6 +15,7 @@ class Request:
     message: str
     history: tuple[tuple[str, str], ...]
     max_new_tokens: int
+    output_prefix_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,20 @@ class Generated:
     message: str
     finish_reason: Literal["stop", "length"]
     output_tokens: int
+
+
+@dataclass(frozen=True)
+class OutputPrefix:
+    """Force only initial decoder tokens; they consume the normal output budget."""
+    token_ids: tuple[int, ...]
+    input_length: int
+
+    def __call__(self, input_ids, scores):
+        position = input_ids.shape[1] - self.input_length
+        if position < len(self.token_ids):
+            scores.fill_(float("-inf"))
+            scores[:, self.token_ids[position]] = 0
+        return scores
 
 
 class Inference:
@@ -64,10 +79,14 @@ class Inference:
                 max_new_tokens=request.max_new_tokens, do_sample=False,
                 eos_token_id=self.model.generation_config.eos_token_id,
                 pad_token_id=self.tokenizer.eos_token_id)
+            options = {}
+            if request.output_prefix_ids:
+                options["logits_processor"] = [
+                    OutputPrefix(request.output_prefix_ids, len(prepared.token_ids))]
             with torch.inference_mode():
                 outputs = self.model.generate(
                     input_ids=inputs, attention_mask=torch.ones_like(inputs),
-                    generation_config=generation, use_model_defaults=False)
+                    generation_config=generation, use_model_defaults=False, **options)
             tokens = outputs[0, len(prepared.token_ids):].tolist()
             eos = generation.eos_token_id
             eos_ids = eos if isinstance(eos, (list, tuple)) else [eos]
