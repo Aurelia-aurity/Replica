@@ -30,13 +30,13 @@ class TrainingError(ValueError):
 class TrainConfig:
     epochs: int = 2
     accumulation: int = 8
-    max_sequence: int = 1024
+    max_sequence: int = 4096
     learning_rate: float = 1e-4
     seed: int = 88
 
     def __post_init__(self) -> None:
         if (self.epochs not in (1, 2) or self.accumulation < 1
-                or self.max_sequence < 2 or self.max_sequence > 1024
+                or self.max_sequence < 2 or self.max_sequence > 4096
                 or not 0 < self.learning_rate < float("inf")):
             raise TrainingError("Invalid bounded pilot training configuration")
 
@@ -80,6 +80,7 @@ class EpochResult:
 def train_epochs(
     model: nn.Module, batches: tuple[Batch, ...], config: TrainConfig,
     on_epoch: Callable[[EpochResult], None] | None = None,
+    on_step: Callable[[int, int], None] | None = None,
 ) -> tuple[EpochResult, ...]:
     """Train adapters only; token-weight accumulated loss handles short groups."""
     if not batches or not adapters(model):
@@ -127,6 +128,8 @@ def train_epochs(
             torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0, error_if_nonfinite=True)
             optimizer.step()
             steps += 1
+            if on_step is not None:
+                on_step(steps, count)
         results.append(EpochResult(epoch, steps, count, total_loss / count))
         if on_epoch is not None:
             on_epoch(results[-1])

@@ -144,3 +144,19 @@ def test_token_weighted_accumulation_matches_single_group_when_lengths_differ() 
     # Then
     for actual, expected in zip(model.parameters(), reference.parameters(), strict=True):
         torch.testing.assert_close(actual, expected, atol=1e-7, rtol=1e-6)
+
+
+def test_long_4096_batch_and_step_callback_when_within_new_cap() -> None:
+    # Given
+    model, _ = setup()
+    ids = torch.ones(1, 4096, dtype=torch.long)
+    labels = torch.full_like(ids, -100)
+    labels[0, -2:] = 1
+    updates = []
+    # When
+    result = train_epochs(
+        model, (Batch(ids, torch.ones_like(ids), labels),),
+        TrainConfig(epochs=1), on_step=lambda step, tokens: updates.append((step, tokens)))
+    # Then
+    assert result[0].supervised_tokens == 2
+    assert updates == [(1, 2)]
