@@ -25,6 +25,24 @@ class PersonaNameScreen extends StatefulWidget {
 /// Height of the cancel/save row plus its padding and a small gap.
 const _noticeLift = 88.0;
 
+const _fieldLabel = '대화 상대 이름 또는 호칭';
+
+final _cancelStyle = OutlinedButton.styleFrom(
+  minimumSize: const Size.fromHeight(54),
+  foregroundColor: const Color(0xFF17201C),
+  backgroundColor: Colors.white,
+  side: const BorderSide(color: Color(0xFFC9D0CC)),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+);
+
+final _saveStyle = FilledButton.styleFrom(
+  minimumSize: const Size.fromHeight(54),
+  backgroundColor: replicaGreen,
+  disabledBackgroundColor: const Color(0xFFD5DBD8),
+  disabledForegroundColor: const Color(0xFF8A948F),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+);
+
 class _PersonaNameScreenState extends State<PersonaNameScreen> {
   late final _text = TextEditingController(text: widget.editing?.name ?? '');
   bool _saving = false;
@@ -62,6 +80,8 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
   }
 
   Future<void> _save() async {
+    // A notice action can fire after the screen is gone.
+    if (!mounted) return;
     final name = _name;
     if (name == null || !_canSave) return;
     setState(() => _saving = true);
@@ -90,9 +110,15 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         ..showSnackBar(
           SnackBar(
             // Lifted above the button row so the failed name can be fixed and
-            // saved again while the notice is still visible.
+            // saved again while the notice is still visible. The row sits above
+            // the bottom safe area, so the notice has to clear it as well.
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, _noticeLift),
+            margin: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              _noticeLift + MediaQuery.paddingOf(context).bottom,
+            ),
             content: Text(_failureText(error)),
             action: error is PersonaFeatureUnavailable
                 ? null
@@ -125,7 +151,7 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
                       child: Column(
@@ -136,19 +162,20 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
                                 ? '이름이나 호칭을\n바꿔 볼까요?'
                                 : '누구의 말투로\n대화하고 싶으세요?',
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 28,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Text(
                             _isEdit
                                 ? '대화 상대의 이름이나 호칭을 바꿔요. 말투 프로필의 표현·호칭·끝맺음은 그대로 유지돼요.'
                                 : '아직 말투 프로필이 없어요. 학습시킬 대화 상대의 이름이나 호칭을 먼저 정해 주세요.',
                             style: const TextStyle(
-                              color: Color(0xFF68766F),
-                              height: 1.5,
+                              color: Color(0xFF3D4743),
+                              fontSize: 15,
+                              height: 1.6,
                             ),
                           ),
                           if (_isEdit && !_renameSupported) ...[
@@ -157,59 +184,92 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
                               '이름 수정은 서버 연결이 준비되면 사용할 수 있어요. 지금은 저장할 수 없어요.',
                             ),
                           ],
-                          const SizedBox(height: 24),
-                          TextField(
-                            controller: _text,
-                            enabled: !_saving,
-                            autofocus: true,
-                            maxLength: personaNameMaxLength,
-                            maxLengthEnforcement: MaxLengthEnforcement.enforced,
-                            textInputAction: TextInputAction.done,
-                            onChanged: (_) => setState(() {}),
-                            onSubmitted: (_) => _save(),
-                            decoration: InputDecoration(
-                              labelText: '대화 상대 이름 또는 호칭',
-                              hintText: '예: 엄마, 할머니, 민지',
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: replicaBorder,
-                                ),
+                          const SizedBox(height: 32),
+                          // The label sits above the field and the example stays
+                          // visible under it, as in the screen plan.
+                          const ExcludeSemantics(
+                            child: Text(
+                              _fieldLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF3D4743),
                               ),
                             ),
-                            buildCounter:
-                                (
-                                  context, {
-                                  required currentLength,
-                                  required isFocused,
-                                  required maxLength,
-                                }) => Text(
-                                  '$currentLength / $maxLength',
-                                  style: const TextStyle(
-                                    color: Color(0xFF68766F),
-                                    fontSize: 12,
+                          ),
+                          const SizedBox(height: 8),
+                          Semantics(
+                            label: _fieldLabel,
+                            child: TextField(
+                              controller: _text,
+                              enabled: !_saving,
+                              autofocus: true,
+                              maxLength: personaNameMaxLength,
+                              maxLengthEnforcement:
+                                  MaxLengthEnforcement.enforced,
+                              textInputAction: TextInputAction.done,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              onSubmitted: (_) => _save(),
+                              decoration: InputDecoration(
+                                helperText: '예: 엄마, 할머니, 민지',
+                                helperStyle: const TextStyle(
+                                  color: Color(0xFF5A6560),
+                                  fontSize: 12,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 17,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: replicaBorder,
                                   ),
                                 ),
+                              ),
+                              buildCounter:
+                                  (
+                                    context, {
+                                    required currentLength,
+                                    required isFocused,
+                                    required maxLength,
+                                  }) => Text(
+                                    '$currentLength / $maxLength',
+                                    style: const TextStyle(
+                                      color: Color(0xFF5A6560),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                     child: Row(
                       children: [
+                        // 1 : 1.6 as in the screen plan.
                         Expanded(
+                          flex: 10,
                           child: OutlinedButton(
+                            style: _cancelStyle,
                             onPressed: _saving ? null : _cancel,
                             child: const Text('취소'),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
+                          flex: 16,
                           child: FilledButton(
+                            style: _saveStyle,
                             onPressed: _canSave ? _save : null,
                             child: _saving
                                 ? const SizedBox(

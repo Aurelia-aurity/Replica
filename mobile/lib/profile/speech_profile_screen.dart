@@ -19,11 +19,37 @@ String profileDate(DateTime value, DateTime now) {
   return date.year == now.year ? day : '${date.year}년 $day';
 }
 
+// Colors and sizes follow the SC-07 mockup of the screen plan (ver.2).
+const _line = Color(0xFFDDE3E0);
+const _chipFill = Color(0xFFF3F5F4);
+const _buttonLine = Color(0xFFC9D0CC);
+const _ink = Color(0xFF17201C);
+const _subInk = Color(0xFF3D4743);
+const _muted = Color(0xFF5A6560);
+const _disabledInk = Color(0xFF8A948F);
+
+ButtonStyle _footerButton({required Color color, required Color line}) =>
+    OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(54),
+      foregroundColor: color,
+      backgroundColor: Colors.white,
+      disabledForegroundColor: _disabledInk,
+      disabledBackgroundColor: Colors.white,
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    ).copyWith(
+      side: WidgetStateProperty.resolveWith(
+        (states) => BorderSide(
+          color: states.contains(WidgetState.disabled) ? _buttonLine : line,
+        ),
+      ),
+    );
+
 /// SC-07 말투 프로필.
 ///
 /// Shows only what the server answered. A missing profile is one state because
 /// the server does not say whether records are missing, the profile is being
-/// built or it is outdated.
+/// built or it is outdated. The rename and regenerate buttons stay pinned below
+/// the scrolling items, as in the screen plan.
 class SpeechProfileScreen extends StatefulWidget {
   const SpeechProfileScreen({
     super.key,
@@ -100,10 +126,7 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
                       padding: EdgeInsets.all(32),
                       child: Text('대화 상대를 찾을 수 없어요.'),
                     )
-                  : ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: _content(persona),
-                    ),
+                  : _body(persona),
             ),
           ),
         ),
@@ -111,48 +134,62 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
     },
   );
 
-  List<Widget> _content(Persona persona) {
+  Widget _body(Persona persona) {
     final controller = _controller;
     final profile = controller.profile;
-    final isReady =
-        controller.profileStatus == LoadStatus.ready && profile != null;
-    final isMissing =
-        controller.profileStatus == LoadStatus.ready && profile == null;
-    return [
-      Text(
-        '${persona.name}의 말투',
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
-      ),
-      if (isReady) ...[
-        const SizedBox(height: 8),
-        Text(
-          _summary(profile),
-          style: const TextStyle(color: Color(0xFF68766F), height: 1.5),
+    final status = controller.profileStatus;
+    // While a lookup is refreshing, the profile already known stays on screen:
+    // conversations keep using it, also while it is being rebuilt.
+    final shown =
+        profile != null &&
+        (status == LoadStatus.ready || status == LoadStatus.loading);
+    final missing = status == LoadStatus.ready && profile == null;
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+                child: Text(
+                  '${persona.name}의 말투',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              if (shown)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    _summary(profile),
+                    style: const TextStyle(color: _muted, fontSize: 13),
+                  ),
+                ),
+              if (controller.service.isPreview) ...[
+                const SizedBox(height: 12),
+                const _PreviewLabel(),
+              ],
+              const SizedBox(height: 14),
+              if (shown)
+                ..._profileSections(profile)
+              else if (missing)
+                _MissingState(onUpload: () => _uploadRecords(persona))
+              else if (status == LoadStatus.failed)
+                _FailedState(onRetry: controller.loadProfile)
+              else
+                const _LoadingState(),
+            ],
+          ),
         ),
+        _footer(persona, regenerate: shown),
       ],
-      if (controller.service.isPreview) ...[
-        const SizedBox(height: 12),
-        const _PreviewLabel(),
-      ],
-      const SizedBox(height: 20),
-      if (isReady)
-        ..._profileSections(profile)
-      else if (isMissing)
-        _MissingState(onUpload: () => _uploadRecords(persona))
-      else if (controller.profileStatus == LoadStatus.failed)
-        _FailedState(onRetry: controller.loadProfile)
-      else
-        const _LoadingState(),
-      const SizedBox(height: 20),
-      OutlinedButton.icon(
-        onPressed: () => _editName(persona),
-        icon: const Icon(Icons.edit_outlined, size: 18),
-        label: const Text('대화 상대 이름 수정'),
-      ),
-      if (isReady) ...[const SizedBox(height: 12), ..._regeneration()],
-    ];
+    );
   }
 
   String _summary(StyleProfile profile) {
@@ -163,53 +200,82 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
 
   List<Widget> _profileSections(StyleProfile profile) => [
     _SectionCard(title: '자주 쓰는 표현', items: profile.expressions),
-    const SizedBox(height: 12),
+    const SizedBox(height: 14),
     _SectionCard(title: '호칭', items: profile.addressTerms),
-    const SizedBox(height: 12),
+    const SizedBox(height: 14),
     _SectionCard(title: '문장 끝맺음', items: profile.endings),
   ];
 
-  List<Widget> _regeneration() {
-    final status = _controller.regeneration;
-    final running = status == RegenerationStatus.running;
+  Widget _footer(Persona persona, {required bool regenerate}) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (regenerate) ..._regenerationNotice(),
+        OutlinedButton.icon(
+          style: _footerButton(color: _ink, line: _buttonLine),
+          onPressed: () => _editName(persona),
+          icon: const Icon(Icons.edit_outlined, size: 20),
+          label: const Text('대화 상대 이름 수정'),
+        ),
+        if (regenerate) ...[const SizedBox(height: 10), _regenerateButton()],
+      ],
+    ),
+  );
+
+  Widget _regenerateButton() {
+    final running = _controller.regeneration == RegenerationStatus.running;
     final supported = _controller.service.supportedFeatures.contains(
       PersonaFeature.regenerate,
     );
-    return [
-      FilledButton.icon(
-        onPressed: supported && !running ? _controller.regenerate : null,
-        icon: running
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  semanticsLabel: '프로필 다시 만드는 중',
-                ),
-              )
-            : const Icon(Icons.refresh, size: 18),
-        label: Text(running ? '다시 만드는 중…' : '프로필 다시 만들기'),
-      ),
-      const SizedBox(height: 8),
-      if (!supported)
-        const _Caption('서버가 아직 프로필 다시 만들기를 제공하지 않아요. (미연동)')
-      else if (running)
-        const _Caption('대화는 이전 프로필로 계속할 수 있어요.')
-      else if (status == RegenerationStatus.succeeded)
-        const _Banner(
-          icon: Icons.check_circle_outline,
-          text: '새 프로필로 바꿨어요.',
-          color: replicaGreen,
-          background: Color(0xFFE3EFEB),
-        )
-      else if (status == RegenerationStatus.failed)
-        const _Banner(
-          icon: Icons.error_outline,
-          text: '프로필을 다시 만들지 못했어요. 이전 프로필은 그대로 쓰여요. 다시 시도해 주세요.',
-          color: Color(0xFFB42318),
-          background: Color(0xFFFDECEA),
-        ),
-    ];
+    return OutlinedButton.icon(
+      style: _footerButton(color: replicaGreen, line: replicaGreen),
+      onPressed: supported && !running ? _controller.regenerate : null,
+      icon: running
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                semanticsLabel: '프로필 다시 만드는 중',
+              ),
+            )
+          : const Icon(Icons.refresh, size: 20),
+      label: Text(running ? '다시 만드는 중…' : '프로필 다시 만들기'),
+    );
+  }
+
+  /// Progress, result or limitation of the regenerate action, shown directly
+  /// above its button so it is visible wherever the list is scrolled to.
+  List<Widget> _regenerationNotice() {
+    final status = _controller.regeneration;
+    final supported = _controller.service.supportedFeatures.contains(
+      PersonaFeature.regenerate,
+    );
+    final Widget? notice;
+    if (!supported) {
+      notice = const _Caption('서버가 아직 프로필 다시 만들기를 제공하지 않아요. (미연동)');
+    } else if (status == RegenerationStatus.running) {
+      notice = const _Caption('대화는 이전 프로필로 계속할 수 있어요.');
+    } else if (status == RegenerationStatus.succeeded) {
+      notice = const _Banner(
+        icon: Icons.check_circle_outline,
+        text: '새 프로필로 바꿨어요.',
+        color: replicaGreen,
+        background: Color(0xFFE3EFEB),
+      );
+    } else if (status == RegenerationStatus.failed) {
+      notice = const _Banner(
+        icon: Icons.error_outline,
+        text: '프로필을 다시 만들지 못했어요. 이전 프로필은 그대로 쓰여요. 다시 시도해 주세요.',
+        color: Color(0xFFB42318),
+        background: Color(0xFFFDECEA),
+      );
+    } else {
+      notice = null;
+    }
+    return notice == null ? const [] : [notice, const SizedBox(height: 10)];
   }
 }
 
@@ -224,21 +290,25 @@ class _SectionCard extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: replicaBorder),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _subInk,
+          ),
         ),
         const SizedBox(height: 12),
         if (items.isEmpty)
           const Text(
             '추출된 항목이 없어요',
-            style: TextStyle(color: Color(0xFF68766F), fontSize: 13),
+            style: TextStyle(color: _muted, fontSize: 13),
           )
         else
           Wrap(
@@ -256,13 +326,19 @@ class _ItemChip extends StatelessWidget {
   final String text;
 
   @override
+  // No `alignment` here: it would stretch the chip to the full row width.
+  // The text height plus padding and border already gives the 36 high chip.
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: const Color(0xFFE3EFEB),
+      color: _chipFill,
       borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _line),
     ),
-    child: Text(text, style: const TextStyle(fontSize: 14, height: 1.4)),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 14, height: 1.4, color: _ink),
+    ),
   );
 }
 
@@ -296,8 +372,8 @@ class _StateCard extends StatelessWidget {
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: replicaBorder),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
     ),
     child: Column(
       children: [
@@ -313,7 +389,7 @@ class _StateCard extends StatelessWidget {
           Text(
             body!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF68766F), height: 1.5),
+            style: const TextStyle(color: _muted, height: 1.5),
           ),
         ],
         const SizedBox(height: 20),
@@ -381,7 +457,7 @@ class _Caption extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     textAlign: TextAlign.center,
-    style: const TextStyle(fontSize: 12, color: Color(0xFF68766F), height: 1.5),
+    style: const TextStyle(fontSize: 12, color: _muted, height: 1.5),
   );
 }
 

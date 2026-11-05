@@ -128,6 +128,9 @@ class PersonaController extends ChangeNotifier {
       _profile = result;
       _profileStatus = LoadStatus.ready;
       _regeneration = RegenerationStatus.succeeded;
+      // A lookup started before this finished may carry the old profile and
+      // must not replace the new one when it arrives.
+      _profileRequest++;
     } catch (_) {
       if (_disposed) return;
       _regeneration = RegenerationStatus.failed;

@@ -217,6 +217,66 @@ void main() {
     expect(service.created.first.id, isNot(service.created.last.id));
   });
 
+  testWidgets('the example stays visible under the field while typing', (
+    tester,
+  ) async {
+    await openName(tester, newController(FakePersonaService(), tester: tester));
+    await tester.enterText(find.byType(TextField), '엄마');
+    await tester.pump();
+    expect(find.text('예: 엄마, 할머니, 민지'), findsOneWidget);
+    expect(find.text('2 / 20'), findsOneWidget);
+    // The label is its own text above the field, not a floating label.
+    final label = find.text('대화 상대 이름 또는 호칭');
+    expect(label, findsOneWidget);
+    expect(
+      tester.getBottomLeft(label).dy,
+      lessThan(tester.getTopLeft(find.byType(TextField)).dy),
+    );
+  });
+
+  testWidgets('cancel and save keep the 1 : 1.6 layout, 54 high', (
+    tester,
+  ) async {
+    await openName(tester, newController(FakePersonaService(), tester: tester));
+    final cancel = tester.getSize(find.widgetWithText(OutlinedButton, '취소'));
+    final save = tester.getSize(saveButton);
+    expect(cancel.height, 54);
+    expect(save.height, 54);
+    expect(save.width / cancel.width, closeTo(1.6, 0.05));
+  });
+
+  for (final inset in [0.0, 34.0]) {
+    testWidgets('the failure notice clears the buttons (bottom inset $inset)', (
+      tester,
+    ) async {
+      tester.view.viewPadding = FakeViewPadding(bottom: inset);
+      tester.view.padding = FakeViewPadding(bottom: inset);
+      addTearDown(tester.view.resetViewPadding);
+      addTearDown(tester.view.resetPadding);
+      final service = FakePersonaService()..createError = StateError('offline');
+      await openName(tester, newController(service, tester: tester));
+      await tester.enterText(find.byType(TextField), '엄마');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      // The SnackBar widget includes its margin; measure the visible body.
+      final body = tester.getRect(
+        find
+            .descendant(
+              of: find.byType(SnackBar),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(body.height, lessThan(120)); // it really is the notice body
+      expect(
+        body.bottom,
+        lessThanOrEqualTo(tester.getRect(saveButton).top),
+        reason: 'the notice must not cover the save button',
+      );
+    });
+  }
+
   testWidgets('rejected input explains itself without a retry loop', (
     tester,
   ) async {

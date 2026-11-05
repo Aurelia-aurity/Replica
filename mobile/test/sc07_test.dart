@@ -13,6 +13,8 @@ import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/profile/speech_profile_screen.dart';
 
 import 'persona_test_support.dart';
+import 'sc09_test.dart' as sc09;
+import 'sc10_test.dart' as sc10;
 
 const mother = Persona(id: 'p1', name: '엄마');
 
@@ -37,6 +39,14 @@ Future<void> pumpProfile(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+/// The pinned buttons take space; a tall surface keeps every card on screen.
+void tallScreen(WidgetTester tester) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(400, 1000);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
 }
 
 void smallScreen(WidgetTester tester) {
@@ -84,13 +94,18 @@ Future<void> startTextChat(WidgetTester tester) async {
 
 void main() {
   group('SC-07 states', () {
-    testWidgets('shows loading, then the profile', (tester) async {
+    testWidgets('shows loading when nothing is known yet, then the profile', (
+      tester,
+    ) async {
       final service = FakePersonaService(
         personas: const [mother],
         profileValue: sampleProfile(),
-      );
-      final controller = await loaded(service);
-      service.profileGate = Completer<void>();
+      )..profileGate = Completer<void>();
+      final controller = PersonaController(service);
+      addTearDown(controller.dispose);
+      unawaited(
+        controller.load(),
+      ); // the partner list answers, the lookup waits
       await tester.pumpWidget(
         MaterialApp(home: SpeechProfileScreen(controller: controller)),
       );
@@ -104,9 +119,75 @@ void main() {
       expect(find.text('자주 쓰는 표현'), findsOneWidget);
     });
 
+    testWidgets('a refresh keeps the profile already known on screen', (
+      tester,
+    ) async {
+      final service = FakePersonaService(
+        personas: const [mother],
+        profileValue: sampleProfile(expressions: const ['이전 표현']),
+      );
+      final controller = await loaded(service);
+      service.profileGate = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(home: SpeechProfileScreen(controller: controller)),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(controller.profileStatus, LoadStatus.loading);
+      expect(find.text('이전 표현'), findsOneWidget);
+      expect(find.bySemanticsLabel('말투 프로필 불러오는 중'), findsNothing);
+      expect(find.text('프로필 다시 만들기'), findsOneWidget);
+      service.profileGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('이전 표현'), findsOneWidget);
+    });
+
+    testWidgets(
+      'reopening while it is being rebuilt shows the old profile and the progress',
+      (tester) async {
+        final service = FakePersonaService(
+          personas: const [mother],
+          profileValue: sampleProfile(expressions: const ['이전 표현']),
+        );
+        final controller = await loaded(service);
+        service.regenerateGate = Completer<void>();
+        unawaited(controller.regenerate());
+        await tester.pumpWidget(
+          MaterialApp(home: SpeechProfileScreen(controller: controller)),
+        );
+        await tester.pump(); // the spinner never settles, so no pumpAndSettle
+        await tester.pump();
+        expect(find.text('다시 만드는 중…'), findsOneWidget);
+        expect(find.text('이전 표현'), findsOneWidget);
+        service.regenerateGate!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('새 프로필로 바꿨어요.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a lookup that was answered before a rebuild finished cannot undo it',
+      (tester) async {
+        final service = FakePersonaService(
+          personas: const [mother],
+          profileValue: sampleProfile(expressions: const ['이전 표현']),
+        );
+        final controller = await loaded(service);
+        final lookup = service.profileGate = Completer<void>();
+        final slow = controller.loadProfile(); // answered with the old profile
+        service.profileGate = null;
+        await controller.regenerate(); // finishes first
+        expect(controller.profile!.expressions, ['새 표현']);
+        lookup.complete();
+        await slow;
+        expect(controller.profile!.expressions, ['새 표현']);
+      },
+    );
+
     testWidgets('shows the name, summary and the three item groups', (
       tester,
     ) async {
+      tallScreen(tester);
       final now = DateTime.now();
       final service = FakePersonaService(
         personas: const [mother],
@@ -127,6 +208,31 @@ void main() {
       // Item exclusion is only proposed in the screen plan, so no delete UI.
       expect(find.byIcon(Icons.close), findsNothing);
       expect(find.text('미리보기 데이터예요. 서버에서 받은 말투 프로필이 아니에요.'), findsNothing);
+    });
+
+    testWidgets('chips hug their text and flow side by side', (tester) async {
+      tallScreen(tester);
+      final service = FakePersonaService(
+        personas: const [mother],
+        profileValue: sampleProfile(addressTerms: const ['우리 딸', '니']),
+      );
+      await pumpProfile(tester, await loaded(service));
+      final first = find.text('우리 딸');
+      final second = find.text('니');
+      final firstChip = tester.getRect(
+        find.ancestor(of: first, matching: find.byType(Container)).first,
+      );
+      final secondChip = tester.getRect(
+        find.ancestor(of: second, matching: find.byType(Container)).first,
+      );
+      // A chip is as wide as its text plus padding, not as wide as the card.
+      expect(firstChip.width, lessThan(120));
+      expect(secondChip.width, lessThan(60));
+      // Both short chips share one row.
+      expect(secondChip.top, firstChip.top);
+      expect(secondChip.left, greaterThan(firstChip.right));
+      // 36 high as in the mockup.
+      expect(firstChip.height, closeTo(36, 2));
     });
 
     testWidgets('without a record count only the date is shown', (
@@ -228,9 +334,18 @@ void main() {
       );
       await pumpProfile(tester, await loaded(service));
       expect(tester.takeException(), isNull);
-      await tester.scrollUntilVisible(find.text('프로필 다시 만들기'), 400);
-      expect(tester.takeException(), isNull);
+      // The buttons are pinned under the list: reachable without scrolling,
+      // however many items there are.
+      expect(find.text('프로필 다시 만들기'), findsOneWidget);
       expect(find.text('대화 상대 이름 수정'), findsOneWidget);
+      expect(
+        tester.getBottomRight(find.text('프로필 다시 만들기')).dy,
+        lessThanOrEqualTo(568),
+      );
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('프로필 다시 만들기'), findsOneWidget);
     });
 
     testWidgets('the no-profile state fits a small screen', (tester) async {
@@ -287,7 +402,7 @@ void main() {
   });
 
   group('SC-07 regenerate', () {
-    final button = find.widgetWithText(FilledButton, '프로필 다시 만들기');
+    final button = find.widgetWithText(OutlinedButton, '프로필 다시 만들기');
 
     testWidgets('shows progress, keeps the old items, then the result', (
       tester,
@@ -298,13 +413,15 @@ void main() {
       );
       await pumpProfile(tester, await loaded(service));
       service.regenerateGate = Completer<void>();
-      await tester.scrollUntilVisible(button, 200);
       await tester.tap(button);
       await tester.pump();
       expect(find.text('다시 만드는 중…'), findsOneWidget);
       expect(find.text('대화는 이전 프로필로 계속할 수 있어요.'), findsOneWidget);
       expect(find.text('이전 표현'), findsOneWidget);
-      await tester.tap(find.byType(FilledButton), warnIfMissed: false);
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, '다시 만드는 중…'),
+        warnIfMissed: false,
+      );
       await tester.pump();
       expect(service.regenerateCalls, 1);
 
@@ -323,12 +440,11 @@ void main() {
         profileValue: sampleProfile(expressions: const ['이전 표현']),
       )..regenerateError = StateError('model busy');
       await pumpProfile(tester, await loaded(service));
-      await tester.scrollUntilVisible(button, 200);
       await tester.tap(button);
       await tester.pumpAndSettle();
       expect(find.textContaining('프로필을 다시 만들지 못했어요'), findsOneWidget);
       expect(find.text('이전 표현'), findsOneWidget);
-      expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+      expect(tester.widget<OutlinedButton>(button).onPressed, isNotNull);
 
       service.regenerateError = null;
       await tester.tap(button);
@@ -346,10 +462,49 @@ void main() {
         supported: {},
       );
       await pumpProfile(tester, await loaded(service));
-      await tester.scrollUntilVisible(find.textContaining('(미연동)'), 200);
-      expect(tester.widget<FilledButton>(button).onPressed, isNull);
+      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
       expect(find.textContaining('(미연동)'), findsOneWidget);
       expect(service.regenerateCalls, 0);
+    });
+  });
+
+  group('a long partner name in the conversation screens', () {
+    final name = '가' * 20;
+
+    testWidgets('text conversation keeps its title on one line', (
+      tester,
+    ) async {
+      smallScreen(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatScreen(service: QuietChat(), conversationName: name),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text(name), findsOneWidget);
+    });
+
+    testWidgets('voice conversation fits the title next to the AI badge', (
+      tester,
+    ) async {
+      smallScreen(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatScreen(
+            service: QuietChat(),
+            conversationName: name,
+            initialVoiceMode: true,
+            audioPlayer: sc09.Sc09Player(),
+            voiceRecorder: sc10.Sc10Recorder(),
+            voiceAudioPlayer: sc10.Sc10Player(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text(name), findsOneWidget);
+      expect(find.text('AI 생성 대화'), findsOneWidget);
     });
   });
 
