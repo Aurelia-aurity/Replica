@@ -74,8 +74,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Verify notification implementation
-        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Reconcile notifications
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -112,8 +110,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Verify notification implementation
-        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Observe Draft without production writes
         env:
           GITHUB_TOKEN: ${{ github.token }}

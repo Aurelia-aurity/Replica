@@ -4,6 +4,7 @@ import 'chat_service.dart';
 import 'ai_disclosure_sheet.dart';
 import 'voice_screen.dart';
 import '../shared/conversation_widgets.dart';
+import '../services/backend_service.dart';
 
 const _green = replicaGreen;
 const _background = replicaBackground;
@@ -22,6 +23,7 @@ class ChatScreen extends StatefulWidget {
   final ChatService service;
   final String conversationName;
   final bool initialVoiceMode;
+
   /// Session acknowledgement; persisted only when an API contract is added.
   final DateTime? acknowledgedAt;
 
@@ -90,6 +92,13 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       if (response.trim().isEmpty) throw StateError('Empty response');
       setState(() => _messages.add((text: response, isUser: false)));
+    } on BackendFailure catch (failure) {
+      if (!mounted ||
+          failure.kind == BackendFailureKind.unauthenticated ||
+          failure.kind == BackendFailureKind.staleSession) {
+        return;
+      }
+      setState(() => _failedMessage = text);
     } catch (_) {
       if (!mounted) return;
       setState(() => _failedMessage = text);
@@ -240,7 +249,8 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             tooltip: 'AI 생성 안내 다시 보기',
             icon: const Icon(Icons.more_horiz),
-            onPressed: () => showAiDisclosure(context, isDemo: widget.service.isDemo),
+            onPressed: () =>
+                showAiDisclosure(context, isDemo: widget.service.isDemo),
           ),
         ],
       ),
@@ -331,13 +341,18 @@ class _ChatScreenState extends State<ChatScreen> {
                             isUser: _messages[index].isUser,
                             footer: !_messages[index].isUser
                                 ? _aiActions()
-                                : _failedMessage != null && index == _messages.length - 1
-                                    ? IconButton(
-                                        tooltip: '다시 보내기',
-                                        onPressed: () => _send(retry: _failedMessage),
-                                        icon: const Icon(Icons.refresh, color: _green),
-                                      )
-                                    : null,
+                                : _failedMessage != null &&
+                                      index == _messages.length - 1
+                                ? IconButton(
+                                    tooltip: '다시 보내기',
+                                    onPressed: () =>
+                                        _send(retry: _failedMessage),
+                                    icon: const Icon(
+                                      Icons.refresh,
+                                      color: _green,
+                                    ),
+                                  )
+                                : null,
                           ),
                         ),
                       if (_loading)

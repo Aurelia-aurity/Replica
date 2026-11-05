@@ -1,0 +1,481 @@
+{
+  "scope": "Documented acceptance scenarios only; no runtime execution claimed.",
+  "scenarios": [
+    {
+      "id": "analysis-late-A-before-B-publish",
+      "given": {
+        "persona_source_revision": 3,
+        "sources_unchanged": true,
+        "current_analysis_operation": "operation-1",
+        "current_analysis_attempt": 2
+      },
+      "events": [
+        "attempt1 transport timeout",
+        "user manually registers attempt2",
+        "attempt1 result arrives",
+        "attempt2 publication"
+      ],
+      "expected": [
+        "attempt1 publication rejected atomically",
+        "only attempt2 may publish",
+        "no version from attempt1 after supersession"
+      ]
+    },
+    {
+      "id": "analysis-late-A-after-B-publish",
+      "given": {
+        "source_revision": 3,
+        "current_attempt": 2,
+        "attempt2_publication": "committed"
+      },
+      "events": [
+        "attempt1 result arrives"
+      ],
+      "expected": [
+        "attempt1 publication rejected",
+        "attempt2 remains current",
+        "no extra profile version"
+      ]
+    },
+    {
+      "id": "analysis-publish-unknown",
+      "given": {
+        "analysis_http_status": 200,
+        "publication_result": "UNKNOWN"
+      },
+      "events": [
+        "lookup publication by operation/attempt"
+      ],
+      "expected": [
+        "not reflected until committed result verified",
+        "no automatic republish"
+      ]
+    },
+    {
+      "id": "empty-evidence-context-overflow",
+      "given": {
+        "history": [],
+        "evidence": [],
+        "fixed_inputs_plus_output_exceed_context": true
+      },
+      "expected": {
+        "http_status": 422,
+        "extra_calls": 0,
+        "silent_changes_to_question_profile_output": false
+      }
+    },
+    {
+      "id": "reduced-evidence-still-overflow",
+      "given": {
+        "user_manually_retries": true,
+        "new_request_id": true,
+        "reduced_evidence_still_exceeds_context": true
+      },
+      "expected": {
+        "http_status": 422,
+        "automatic_repeats": 0
+      }
+    },
+    {
+      "id": "manual-generation-retry",
+      "given": {
+        "turn_id": "same logical turn",
+        "old_request_id": "00000012-0012-4012-8012-000000000012",
+        "new_request_id": "00000014-0014-4014-8014-000000000014"
+      },
+      "events": [
+        "old request transport timeout: UNKNOWN",
+        "user clicks retry",
+        "backend closes expired old local attempt conditionally",
+        "backend claims new attempt",
+        "old GPU inference still holds slot"
+      ],
+      "expected": [
+        "new AI request called once",
+        "429 AI_BUSY allowed only when configured remaining capacity/token budget is insufficient",
+        "no automatic calls",
+        "old local attempt cannot overwrite new result"
+      ]
+    },
+    {
+      "id": "full-snapshot-two-leaves-one-root",
+      "given": [
+        "same record/version has utterances0,1,2",
+        "leafA covers0,1; leafB covers2",
+        "merge(A,B) yieldsroot"
+      ],
+      "expected": [
+        "exact-cover verified by backend",
+        "only root eligible to publish",
+        "GPU200 alone never implies reflected"
+      ]
+    },
+    {
+      "id": "missing-or-duplicate-segment",
+      "given": [
+        "root omits utterance2 or includes utterance1 twice"
+      ],
+      "expected": [
+        "no publish",
+        "no reflected flag",
+        "backend coverage validation fails"
+      ]
+    },
+    {
+      "id": "record-edit-during-tree",
+      "given": [
+        "fixed snapshot revision3",
+        "record revised or deleted before root publish"
+      ],
+      "expected": [
+        "atomic publication rejected",
+        "no relabel to revision4",
+        "invalid previous profile not served"
+      ]
+    },
+    {
+      "id": "merge-does-not-fit",
+      "given": [
+        "two valid child profiles plus template/output exceed token limit"
+      ],
+      "expected": [
+        "operation fails explicitly",
+        "no silent truncation",
+        "no singleton infinite loop",
+        "no partial profile publication"
+      ]
+    },
+    {
+      "id": "output-cutoff",
+      "given": [
+        "GPU returns incomplete profile or output reaches budget before completion"
+      ],
+      "expected": [
+        "node rejected",
+        "no root publication",
+        "no automatic retry"
+      ]
+    },
+    {
+      "id": "capacity-two-reservation",
+      "given": [
+        "overall capacity2",
+        "analysis-class capacity1",
+        "token/KV reservation feasible",
+        "one analysis running",
+        "chat arrives"
+      ],
+      "expected": [
+        "chat may be admitted concurrently",
+        "second analysis receives429",
+        "no guaranteed latency/no preemption"
+      ]
+    },
+    {
+      "id": "capacity-one",
+      "given": [
+        "configured capacity1",
+        "analysis still running",
+        "chat arrives"
+      ],
+      "expected": [
+        "429 AI_BUSY",
+        "no detached queued chat",
+        "no automatic retry"
+      ]
+    },
+    {
+      "id": "timed-out-analysis-concurrent-retry",
+      "given": [
+        "old attempt GPU calculation remains",
+        "user retries new attempt",
+        "remaining capacity available"
+      ],
+      "expected": [
+        "new attempt may run concurrently",
+        "late old attempt cannot publish",
+        "compute completion controls reservation release"
+      ]
+    },
+    {
+      "id": "bounded-corpus",
+      "given": [
+        "full snapshot exceeds configured corpus/call/deadline allowance"
+      ],
+      "expected": [
+        "explicit operation failure before initial dispatch when preflight detects limit",
+        "no sampling or omission",
+        "no reflected flag"
+      ]
+    },
+    {
+      "id": "empty-corpus",
+      "given": [
+        "no eligible confirmed target utterances"
+      ],
+      "expected": [
+        "no analyze/merge/publish",
+        "no fabricated empty learned persona",
+        "old deleted-source profile not served"
+      ]
+    },
+    {
+      "id": "finite-tree-not-retry",
+      "given": [
+        "original user operation producesN distinct planned leaves and decreasing merge nodes"
+      ],
+      "expected": [
+        "distinct nodes are planned work not retries",
+        "any failed node halts new dispatch",
+        "no automatically repeated failed request"
+      ]
+    },
+    {
+      "id": "baseline-and-enhancement-shared-engine",
+      "given": [
+        "baseline route and enhancement routes use same physical engine"
+      ],
+      "expected": [
+        "same global reservation ledger",
+        "baseline remains unchanged wire and local concurrency1",
+        "no double counting GPU memory across servers"
+      ]
+    },
+    {
+      "id": "retry-after-partial-leaf-success",
+      "given": [
+        "attempt1 leafA success,leafB UNKNOWN",
+        "user retries after unpublished failure confirmed"
+      ],
+      "expected": [
+        "attempt2 regenerates all leaves and merges with fresh node IDs",
+        "no attempt1 node reused or relabeled",
+        "fresh per-attempt call budget/deadline",
+        "late attempt1 result cannot publish before or after attempt2 root"
+      ]
+    },
+    {
+      "id": "retry-after-final-merge-timeout",
+      "given": [
+        "attempt1 all leaves success,root merge UNKNOWN",
+        "user retries after unpublished failure confirmed"
+      ],
+      "expected": [
+        "attempt2 starts all leaves again",
+        "new request_id for every new node",
+        "no automatic timeout retry or replacement node",
+        "all root nodes belong to attempt2"
+      ]
+    },
+    {
+      "id": "publication-unknown-manual-retry",
+      "given": [
+        "root analysis success",
+        "DB publication result unknown",
+        "user clicks retry"
+      ],
+      "expected": [
+        "query old publication first",
+        "if committed return persisted result without inference",
+        "if still unknown register no new attempt",
+        "if failure/unpublished confirmed new whole attempt may start"
+      ]
+    },
+    {
+      "id": "per-attempt-bounds",
+      "given": [
+        "N leaves",
+        "manual retry starts attempt2"
+      ],
+      "expected": [
+        "each attempt max2N-1 planned calls with own deadline",
+        "singleton promotion makes zero extra calls",
+        "multiple explicit user attempts not claimed max2N-1 overall",
+        "no auto-new-attempt on failure"
+      ]
+    },
+    {
+      "id": "baseline-only-mode",
+      "given": [
+        "only baseline route deployed",
+        "instance capacity1",
+        "baseline executing"
+      ],
+      "expected": [
+        "second different baseline request429",
+        "old instance-wide1 semantics retained",
+        "enhancement routes not exposed in this mode"
+      ]
+    },
+    {
+      "id": "cross-route-same-id",
+      "given": [
+        "enhancement shared mode",
+        "any valid active request ID",
+        "same ID arrives at another enabled route",
+        "all input/auth/context checks passed"
+      ],
+      "expected": [
+        "409 before any capacity/count/KV decision"
+      ]
+    },
+    {
+      "id": "token-budget-short-with-free-count",
+      "given": [
+        "count limit has room",
+        "token/KV reservation insufficient"
+      ],
+      "expected": [
+        "429",
+        "no detached accepted work"
+      ]
+    },
+    {
+      "id": "disconnect-keeps-shared-capacity",
+      "given": [
+        "C1 request disconnects while GPU computing",
+        "different request arrives"
+      ],
+      "expected": [
+        "old reservation remains until actual compute ends",
+        "new request429"
+      ]
+    },
+    {
+      "id": "shared-capacity-matrix-baseline-analyze",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "baseline",
+        "incoming": "analyze",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-analyze-baseline",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "analyze",
+        "incoming": "baseline",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-baseline-baseline",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "baseline",
+        "incoming": "baseline",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": 429,
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-persona-analyze",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "persona",
+        "incoming": "analyze",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-analyze-persona",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "analyze",
+        "incoming": "persona",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-analyze-merge",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "analyze",
+        "incoming": "merge",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": 429,
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-persona-baseline",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "persona",
+        "incoming": "baseline",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    },
+    {
+      "id": "shared-capacity-matrix-persona-persona",
+      "given": {
+        "mode": "enhancement-shared",
+        "running": "persona",
+        "incoming": "persona",
+        "different_request_ids": true,
+        "other_requests": 0,
+        "token_KV_feasible": true
+      },
+      "expected": {
+        "C1": 429,
+        "C2": "accept",
+        "analysis_class_cap_at_C2": 1,
+        "baseline_route_cap": 1
+      }
+    }
+  ]
+}

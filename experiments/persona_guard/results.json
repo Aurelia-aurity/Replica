@@ -1,0 +1,549 @@
+{
+  "evaluation_mode": "self_referral_only_both_living_and_deceased",
+  "missing_life_status": "unknown; never inferred from age or relationship",
+  "model_calls": 0,
+  "summary": {
+    "synthetic_rows": 51,
+    "synthetic_expected": {
+      "replace": 24,
+      "pass": 27
+    },
+    "synthetic_expectation_failures": 0,
+    "synthetic_independent_postcheck_violations": 0,
+    "heldout_rows": 144,
+    "heldout_detections": 2,
+    "heldout_unchanged_bytes": 142
+  },
+  "sources": [
+    {
+      "path": "experiments/persona_guard/cases.json",
+      "sha256": "bcd6f419352e258426f9e8ca05fd8b0acb220201f288eff405c4ea42b0cdf041"
+    },
+    {
+      "path": "experiments/persona_guard/request_cases.json",
+      "sha256": "d5de674695ad61cd6dfa4696e99c3fbbe2d50f1f1e1d59afeae9fa12c7059601"
+    },
+    {
+      "path": "experiments/persona_guard/replay.py",
+      "sha256": "8f884682ac6a67e1aa17e7e41628275b41d0f43f3b6e0d0b1855c23f7bb2fbdb"
+    },
+    {
+      "path": "ai/src/persona_guard.py",
+      "sha256": "59cf03fae4d221c3da7d47fe5cf34d693f41cbceffff33eadae096365a631a88"
+    },
+    {
+      "path": "corpus-heldout.json (local synthetic corpus)",
+      "sha256": "ef42397c7845a377d0af6b207627d7bcecf182afcee996e5ad5b158b5567bcd8"
+    },
+    {
+      "path": "experiments/rag/results/heldout/generation/r1/generations.jsonl",
+      "sha256": "5b3fa79dec00d532aeda4dd55d455288c3b875b39e7c23648a64374106881d58"
+    }
+  ],
+  "detections": [
+    {
+      "question_id": "ho-p5-08",
+      "condition": "A",
+      "persona_id": "p5",
+      "persona": {
+        "persona_id": "p5",
+        "name": "온유",
+        "display_name": "할아버지",
+        "provider_address": "우리 손주",
+        "age": 74,
+        "relationship": "할아버지",
+        "register": "하게체"
+      },
+      "input": "모임에서 바꿔 오신 수집품은 어느 앨범의 어디에 넣으셨어요?",
+      "output": "할아버지께서는 모임에서 바꿔 오신 수집품을 어디에 넣으셨는지에 대해 말씀해 주시면 좋겠습니다. 제가 직접 확인할 수 있는 정보는 없으니, 할아버지께서 기억하시면 알려 주시면 감사하겠습니다.",
+      "guarded_output": "그건 잘 기억이 안 나네.",
+      "matched": "할아버지께서는 모임에서 바꿔 오신 수집품을 어디에 넣으셨는지에 대해 말씀해 주시면 좋겠습니다.",
+      "unchanged_bytes": false
+    },
+    {
+      "question_id": "ho-p5-08",
+      "condition": "B",
+      "persona_id": "p5",
+      "persona": {
+        "persona_id": "p5",
+        "name": "온유",
+        "display_name": "할아버지",
+        "provider_address": "우리 손주",
+        "age": 74,
+        "relationship": "할아버지",
+        "register": "하게체"
+      },
+      "input": "모임에서 바꿔 오신 수집품은 어느 앨범의 어디에 넣으셨어요?",
+      "output": "할아버지께서는 모임에서 바꿔 오신 수집품을 어디에 넣으셨는지에 대해 말씀해 주시면 좋겠습니다. 제가 직접 확인할 수 있는 정보는 없으니, 할아버지께서 기억하시면 알려 주시면 감사하겠습니다.",
+      "guarded_output": "그건 잘 기억이 안 나네.",
+      "matched": "할아버지께서는 모임에서 바꿔 오신 수집품을 어디에 넣으셨는지에 대해 말씀해 주시면 좋겠습니다.",
+      "unchanged_bytes": false
+    }
+  ],
+  "synthetic_outcomes": [
+    {
+      "id": "g01",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g02",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g03",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g04",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g05",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g06",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g07",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g08",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g09",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g10",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "g11",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "s01",
+      "mode": "living",
+      "register": "반말",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "s02",
+      "mode": "deceased",
+      "register": "반말",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "m01",
+      "mode": "deceased",
+      "register": "다정한 반말",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "m02",
+      "mode": "living",
+      "register": "다정한 반말",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "h01",
+      "mode": "living",
+      "register": "해요체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "h02",
+      "mode": "deceased",
+      "register": "해요체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n01",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n02",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n03",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n04",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n05",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n06",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n07",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n08",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n09",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n10",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n11",
+      "mode": "living",
+      "register": "다정한 반말",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n12",
+      "mode": "living",
+      "register": "반말",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n13",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n14",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n15",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n16",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n17",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n18",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n19",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "n20",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "mix01",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "mix02",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r01",
+      "mode": "unknown",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r02",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r03",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r04",
+      "mode": "living",
+      "register": "다정한 반말",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r05",
+      "mode": "deceased",
+      "register": "해요체",
+      "expected": "replace",
+      "action": "replace",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r06",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r07",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r08",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r09",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r10",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r11",
+      "mode": "deceased",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    },
+    {
+      "id": "r12",
+      "mode": "living",
+      "register": "하게체",
+      "expected": "pass",
+      "action": "pass",
+      "outcome_ok": true,
+      "postcheck_ok": true
+    }
+  ],
+  "limitations": [
+    "Deterministic regression/replay of existing outputs, not a new generation or judge evaluation.",
+    "Explicit aliases, local clause prefixes and listed endings only; no universal recall or general Korean semantic coverage.",
+    "Unknown life status remains unknown."
+  ]
+}

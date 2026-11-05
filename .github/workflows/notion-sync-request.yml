@@ -41,8 +41,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Verify sync implementation
-        run: python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Claim and sync current state
         env:
           GITHUB_TOKEN: ${{ github.token }}

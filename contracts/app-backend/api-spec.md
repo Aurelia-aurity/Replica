@@ -24,7 +24,7 @@
 | 식별자·시간 | id는 소문자 UUID 문자열. 시간은 ISO 8601 (시간대 포함) |
 | 목록 응답 | `{items, limit, offset}`. `limit` 기본 50 · 최대 100, `offset` 0 이상. (턴 목록은 `after_turn_no` 사용) |
 | AI 표시 | AI 답변이 담긴 응답에는 `is_ai_generated: true`를 항상 포함 (FR-08) |
-| 앱에 보내지 않는 필드 | `user_id`, `request_hash`, `*_attempt`, `*_started_at`, `bucket_id`, `object_path`, `manifest` |
+| 앱에 보내지 않는 필드 | `user_id`, `request_hash`, `llm_request_id`, `*_attempt`, `*_started_at`, `bucket_id`, `object_path`, `manifest` |
 | 오류 응답 | 2장 참고 |
 
 ### API 목록
@@ -97,6 +97,7 @@
 | tts_status | string \| null | `pending` · `ready` · `failed`, 요청 전이면 `null` (TTS 단계) |
 | is_ai_generated | boolean | 백엔드가 추가. 답변이 있으면 항상 `true`. 다시 연 대화에서도 AI 표시 유지 (#12) |
 | model_name | string \| null | 답변을 만든 모델 이름 |
+| finish_reason | string \| null | (제안) 답변 종료 사유. `stop` 또는 `length`(길이 한도로 잘림, 성공). 답변이 완료된 턴에만 있고 그 밖에는 `null`. 컬럼이 생기기 전에 만든 턴도 `null`이며, 이때 앱은 `stop`으로 봄 (`/chat/text` 재전송 응답과 같은 규칙) |
 | stt_ms, llm_ms, tts_ms, total_ms | integer \| null | 단계별·전체 소요 시간(ms) |
 | error_message | string \| null | 실패 시 안전한 오류 코드 (예: `llm_timeout`). 질문·답변·예외 원문은 저장하지 않음 |
 | created_at | datetime | 생성 시각 |

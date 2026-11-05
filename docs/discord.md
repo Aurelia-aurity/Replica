@@ -124,3 +124,65 @@ python3 -B scripts/discord_ledger_diagnose.py --samples 3
 schema=2는 observed_at과 observation_uncertainty_seconds를 함께 제공합니다. 관측 시각은 보고서용 snapshot 확정 시각이며 업로드·소비 시각으로 대체하지 않습니다. 생산자·소비자 각각 snapshot/판정 근처 새 GitHub Date, 요청 왕복 지연, monotonic/UTC, 정밀도·근거 나이·clock 점프를 검증해 전체 오차 상한 60초 이하일 때만 timer에 사용합니다. 불명확하면 두 필드 null로 남기며 유효 보류 관측과 2회 계산은 유지합니다. 소비자 clock을 입증하지 못하면 지연 판정만 중단합니다.
 
 후속 유효 관측이 없는 episode는 검증된 timer_origin_at에서 `now - timer_origin_at - 120초 >= 15분`일 때 다음 알림 실행에서 지연 안내를 만들 수 있습니다. 시각 미확정이어도 후속 유효 snapshot이 있으면 미전송 지연 후보를 취소합니다. 최초 시각이 없는 legacy 기록은 과거 시각을 만들지 않고 다음 검증된 관측에서 별도 timer origin을 시작합니다. schema=1과 기존 outbox/pending/streak/alert/cursor는 보존합니다. 오차와 Actions/Discord 실행 지연이 더해지므로 15분 정시 전달을 보장하지 않습니다. 알림 경로 자체가 멈추면 같은 경로로 정시 안내할 수 없습니다. 불확실한 전송의 수동 확인 규칙은 유지합니다.
+
+## 새 알림 경로(#79, 전환 준비 중)
+
+기존 상태 브랜치(`automation/discord-state`) 기반 ledger 알림 경로는 전환(cutover) 전까지 그대로 유지된다. #79에서는 상태 저장이나 주기적 조회 없이 동작하는 이벤트 기반 워크플로(`GitHub → Discord events`, `GitHub → Discord run alerts`)와 스크립트 단위 테스트 전용 `CI` 워크플로를 추가해 단계적으로 전환한다. 기존 운영 워크플로 3개에서는 단위 테스트 실행 단계만 분리하고, 기존 코드와 설정은 그대로 둔다.
+
+### 동작 모드와 설정
+
+새 알림 워크플로 두 개는 `DISCORD_EVENTS_MODE` 변수로 제어한다. 변수가 설정되지 않았거나 값이 `off`이면 로그만 남기고 종료한다(no-op). 정의되지 않은 모드 값은 실패 처리한다.
+
+| 모드 | 동작 |
+|---|---|
+| `off` | 기본값(미설정 포함). 실행 사유만 로그에 남기고 알림을 보내지 않는다 |
+| `shadow` | 검증용 모드. `DISCORD_SHADOW_WEBHOOK_URL`로만 전송하며, 해당 시크릿이 없으면 메시지 JSON을 Actions step summary에 기록한다. 공개 저장소이므로 summary의 Discord 사용자 ID는 `[Discord user]`로 가린다. 운영 Webhook으로 대체 전송(fallback)하지 않는다 |
+| `live` | 실전송 모드. 사건 종류에 따라 팀 채널과 PM 채널 Webhook으로 전송한다 |
+
+| 저장 위치 | 이름 | 값·역할 |
+|---|---|---|
+| Variable | `DISCORD_EVENTS_MODE` | `off`(기본값, 미설정 포함), `shadow`, `live` 중 하나 |
+| Secret | `DISCORD_PM_WEBHOOK_URL` | PM 채널 Webhook URL. 미설정 시 팀 채널(`DISCORD_WEBHOOK_URL`)로 대체(fallback) |
+| Secret | `DISCORD_SHADOW_WEBHOOK_URL` | `shadow` 모드 전용 Webhook URL. 미설정 시 Actions step summary에 JSON 기록 |
+| Variable | `DISCORD_CI_WORKFLOWS` | 감시할 CI 워크플로 이름의 JSON 배열. 기본값은 `["CI", "Backend tests"]` |
+| Variable | `PM_GITHUB_LOGIN` | PM GitHub login. 기본값은 `Just-Simple0` |
+
+`DISCORD_USER_MAP`의 GitHub login → Discord 숫자 ID 매핑 규칙, 미매핑 시 GitHub login 표시, 팀 리뷰 요청의 팀 이름 표시, `everyone`·`here`·역할 전체 멘션 금지 규칙은 기존과 같다. `DISCORD_CI_WORKFLOWS`에 기본값 외 워크플로를 추가할 때는 `workflow_run` 트리거의 워크플로 목록도 함께 수정해야 한다.
+
+### 채널 라우팅과 멘션
+
+| 사건 | 채널 | 멘션 | 비고 |
+|---|---|---|---|
+| Issue 생성·종료·재오픈 | 팀 채널 | 없음 | payload 기반. 종료 사유(완료·미계획·중복) 구분, 생성 시 정적 Project 링크 표시(현재 구현 기본값) |
+| PR 생성(Draft 포함)·병합·병합 없는 종료·재오픈 | 팀 채널 | 없음 | payload 기반. Draft PR 생명주기 포함 |
+| 리뷰 요청 | 팀 채널 | 대상 리뷰어 | Draft 무음, Ready 전환 시 1회 합산, 비-Draft는 payload 대상, `CHANGES_REQUESTED` 후 첫 push 시 해당 리뷰어 멘션 |
+| PR CI 실패 | 팀 채널 | PR 작성자 | 연속 실패 시작 시 1회만 알림. 복구 알림 없음 |
+| main CI 실패·복구 | 팀 채널 | 실패 시 PM, 복구 시 없음 | 연속 실패 시작 시 1회만 알림, 성공 시(재실행 포함) 복구 알림. 팀 채널 라우팅은 기본 제안이며 팀 합의로 변경 가능 |
+| Notion 동기화·일반 요청 실행 실패·복구 | PM 채널 | 실패 시 PM, 복구 시 없음 | 연속 실패 시작 시 1회만 알림, 성공 시(재실행 포함) 복구 알림 |
+| 동기화 보류 발생·사유 변경·해제 | PM 채널 | 발생·사유 변경 시 PM, 해제 시 없음 | Issue 단위 비교. 사유 변경은 `OLD -> NEW` 표시, 해제는 모든 보류 사유가 사라진 경우에만 알림. 15분 지연 알림 없음 |
+
+Issue 생성 알림에는 Project 토큰 조회나 백로그 상태 확인 없이 정적 Project 링크만 표시하며, 이는 현재 구현 기본값이다.
+
+### 세부 동작 규칙
+
+- **리뷰 요청**: Draft PR 상태에서의 리뷰 요청은 알리지 않는다. Draft에서 Ready로 전환될 때 현재 요청된 개인·팀 리뷰어를 한 메시지로 묶어 한 번 알린다(요청된 리뷰어가 없으면 보내지 않는다). 비-Draft PR의 리뷰 요청은 PR을 재조회하지 않고 이벤트 payload의 요청 대상을 그대로 사용한다.
+  `synchronize`(새 커밋 push) 시에는 전체 리뷰 목록을 조회해 각 리뷰어의 최신 유효 리뷰(`APPROVED`, `CHANGES_REQUESTED`, `DISMISSED`)를 확인한다. 최신 리뷰가 직전 커밋(`payload.before`)에 대한 `CHANGES_REQUESTED`인 리뷰어에게만 재검토 요청 알림을 보낸다. 새로운 `CHANGES_REQUESTED` 없이 이어지는 후속 push는 알리지 않는다.
+- **실패와 복구**: 실행 실패(`failure`, `timed_out`, `startup_failure`) 알림은 연속 실패(streak)가 시작될 때 한 번만 보낸다. 판정할 때는 같은 실행(run)의 이전 attempt를 최신순으로 먼저 확인한다.
+  완료된 유효 attempt가 없을 때만 동일 워크플로·범위의 직전 완료 실행을 확인한다. 이때 `cancelled`·`skipped`는 건너뛴다. 앞선 attempt가 실패한 뒤 같은 실행의 재시도(rerun)가 다시 실패해도 중복 실패 알림은 보내지 않는다. 재시도가 성공하면 복구 알림을 보낸다.
+  복구 알림은 `main` CI와 동기화 워크플로(`GitHub → Notion`, 일반 동기화 요청)에서만 보낸다. PR CI는 복구 알림을 보내지 않는다. PR CI 이력은 같은 head 브랜치의 `pull_request` 이벤트로, `main` CI는 `main` 브랜치 `push` 이벤트로, 동기화 워크플로는 전체 이벤트로 범위를 구분한다. Notion 동기화 run은 `.github/workflows/notion-sync.yml` 또는 `.github/workflows/notion-sync-request.yml` 경로와 허용 이벤트를 확인하고, `repository`와 `head_repository`도 Replica와 일치해야 한다. `notion-sync.yml`은 main의 `schedule`·`issues`, `pull_request_target`, main의 `workflow_dispatch`를 허용하고, `notion-sync-request.yml`은 main의 `workflow_dispatch`만 허용한다. 수동 실행은 `refs/heads/main`에서 실행된 경우만 인정하고, 이름이 `main`인 태그가 있으면 ref가 표시되지 않은 수동 실행은 무시한다. Fork의 `pull_request` run과 같은 표시 이름만 가진 다른 workflow는 무시한다. 같은 검증을 이전 run·attempt와 보류 보고서 이력에도 적용한다.
+- **보류 안내**: 성공한 `GitHub → Notion` 실행의 정확한 run·attempt 보고서만 직전 유효 보고서(최근 20개 적격 실행 이내)와 Issue 단위로 비교한다. dry-run·불완전·누락·만료 보고서는 보류 해제 근거로 쓰지 않는다.
+  새로 보류된 Issue는 `동기화 보류 발생 · #번호 (사유)`로 PM을 멘션해 알린다. 보류가 유지된 채 사유 집합이 바뀐 Issue는 해제로 처리하지 않는다. 대신 `동기화 보류 사유 변경 · #번호 (OLD -> NEW)`로 PM을 멘션해 알린다.
+  해당 Issue의 모든 보류 사유가 사라진 경우에만 멘션 없이 `동기화 보류 해제 · #번호`를 보낸다. 기존 경로의 15분 무후속 지연 보류 알림은 보내지 않는다. 보고서를 비교하는 중 일시적인 GitHub API·다운로드 오류가 발생하면 alert run을 실패 처리해 재실행할 수 있게 한다. 누락·만료·무효·dry-run 보고서는 계속 건너뛴다. 재실행 과정에서 보류 조회가 실패하기 전에 이미 보낸 실패·복구 알림이 반복될 수 있다.
+
+### 한계와 로그 보안
+
+- Discord 전송은 `wait=true`(30초 제한)로 요청하며 HTTP 429·5xx에 한해 최대 3회까지 시도한다. 별도 상태 저장소(ledger)가 없으므로 워크플로 실행이 최종 실패하면 해당 알림은 재실행(rerun) 전까지 유실될 수 있다. 재시도나 동시 실행·재실행 과정에서 드물게 중복 알림이 발생할 수도 있다.
+- 워크플로 실행 로그에는 URL·자격증명·원시 응답 본문을 제외한 안전한 실패 사유(`Error` 메시지)만 출력한다. 예상치 못한 예외는 예외 클래스 이름만 기록하며, 원시 예외 상세나 traceback은 출력하지 않는다.
+- 기본 `GITHUB_TOKEN`으로 발생한 이벤트는 GitHub Actions 정책상 후속 워크플로를 트리거하지 않는다.
+
+### 전환(Cutover) 절차
+
+1. `DISCORD_EVENTS_MODE=shadow` 상태에서 기존 ledger 경로와 새 알림 경로의 결과를 비교해 검증한다.
+2. 검증이 완료되면 `DISCORD_EVENTS_MODE=live`로 전환한다.
+3. 기존 알림 워크플로(`GitHub → Discord`)를 비활성화한다.
+4. 전환(cutover) 후 약 1주일이 지난 뒤 기존 ledger 알림 코드를 삭제한다.

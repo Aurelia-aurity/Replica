@@ -1,0 +1,2316 @@
+{
+  "items": 144,
+  "agent_judged_not_human": true,
+  "by_condition": {
+    "A": {
+      "n": 48,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 1,
+          "rate": 0.020833333333333332
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 2,
+          "rate": 0.041666666666666664
+        },
+        "core_correct": {
+          "count": 10,
+          "rate": 0.20833333333333334
+        },
+        "grounding_1to5_mean": 3.3333333333333335,
+        "refused_with_info": {
+          "count": 0,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 38,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.7916666666666666
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 47,
+          "rate": 0.9791666666666666
+        },
+        "no_stray_habitual": {
+          "count": 48,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 42,
+          "rate": 0.875
+        },
+        "no_meta": {
+          "count": 47,
+          "rate": 0.9791666666666666
+        },
+        "natural_1to5_mean": 4.4375
+      }
+    },
+    "B": {
+      "n": 48,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 1,
+          "rate": 0.020833333333333332
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 2,
+          "rate": 0.041666666666666664
+        },
+        "core_correct": {
+          "count": 32,
+          "rate": 0.6666666666666666
+        },
+        "grounding_1to5_mean": 4.208333333333333,
+        "refused_with_info": {
+          "count": 0,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 9,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.1875
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 42,
+          "rate": 0.875
+        },
+        "no_stray_habitual": {
+          "count": 48,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 45,
+          "rate": 0.9375
+        },
+        "no_meta": {
+          "count": 48,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.166666666666667
+      }
+    },
+    "C": {
+      "n": 48,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 2,
+          "rate": 0.041666666666666664
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 2,
+          "rate": 0.041666666666666664
+        },
+        "core_correct": {
+          "count": 38,
+          "rate": 0.7916666666666666
+        },
+        "grounding_1to5_mean": 4.479166666666667,
+        "refused_with_info": {
+          "count": 0,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 9,
+          "n": 48,
+          "unknown": 0,
+          "rate": 0.1875
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 41,
+          "rate": 0.8541666666666666
+        },
+        "no_stray_habitual": {
+          "count": 48,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 46,
+          "rate": 0.9583333333333334
+        },
+        "no_meta": {
+          "count": 48,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.208333333333333
+      }
+    }
+  },
+  "by_split": {
+    "heldout": {
+      "n": 144,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 4,
+          "rate": 0.027777777777777776
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 6,
+          "rate": 0.041666666666666664
+        },
+        "core_correct": {
+          "count": 80,
+          "rate": 0.5555555555555556
+        },
+        "grounding_1to5_mean": 4.006944444444445,
+        "refused_with_info": {
+          "count": 0,
+          "n": 144,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 56,
+          "n": 144,
+          "unknown": 0,
+          "rate": 0.3888888888888889
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 130,
+          "rate": 0.9027777777777778
+        },
+        "no_stray_habitual": {
+          "count": 144,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 133,
+          "rate": 0.9236111111111112
+        },
+        "no_meta": {
+          "count": 143,
+          "rate": 0.9930555555555556
+        },
+        "natural_1to5_mean": 4.270833333333333
+      }
+    }
+  },
+  "by_type": {
+    "ambiguity": {
+      "n": 15,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 1,
+          "rate": 0.06666666666666667
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 2,
+          "rate": 0.13333333333333333
+        },
+        "grounding_1to5_mean": 3.2,
+        "refused_with_info": {
+          "count": 0,
+          "n": 15,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 5,
+          "n": 15,
+          "unknown": 0,
+          "rate": 0.3333333333333333
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 14,
+          "rate": 0.9333333333333333
+        },
+        "no_stray_habitual": {
+          "count": 15,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 14,
+          "rate": 0.9333333333333333
+        },
+        "no_meta": {
+          "count": 14,
+          "rate": 0.9333333333333333
+        },
+        "natural_1to5_mean": 4.133333333333334
+      }
+    },
+    "false_premise": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 15,
+          "rate": 0.5
+        },
+        "grounding_1to5_mean": 4.0,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 9,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.3
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 25,
+          "rate": 0.8333333333333334
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 29,
+          "rate": 0.9666666666666667
+        },
+        "no_meta": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.4
+      }
+    },
+    "multi": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 18,
+          "rate": 0.6
+        },
+        "grounding_1to5_mean": 4.2,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 8,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.26666666666666666
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 25,
+          "rate": 0.8333333333333334
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 28,
+          "rate": 0.9333333333333333
+        },
+        "no_meta": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.3
+      }
+    },
+    "ordinary_chat": {
+      "n": 15,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 3,
+          "rate": 0.2
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 6,
+          "rate": 0.4
+        },
+        "core_correct": {
+          "count": 4,
+          "rate": 0.26666666666666666
+        },
+        "grounding_1to5_mean": 3.0,
+        "refused_with_info": {
+          "count": 0,
+          "n": 15,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 0,
+          "n": 15,
+          "unknown": 0,
+          "rate": 0.0
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 15,
+          "rate": 1.0
+        },
+        "no_stray_habitual": {
+          "count": 15,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 12,
+          "rate": 0.8
+        },
+        "no_meta": {
+          "count": 15,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 2.8
+      }
+    },
+    "single": {
+      "n": 24,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 15,
+          "rate": 0.625
+        },
+        "grounding_1to5_mean": 4.25,
+        "refused_with_info": {
+          "count": 0,
+          "n": 24,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 8,
+          "n": 24,
+          "unknown": 0,
+          "rate": 0.3333333333333333
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 22,
+          "rate": 0.9166666666666666
+        },
+        "no_stray_habitual": {
+          "count": 24,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 24,
+          "rate": 1.0
+        },
+        "no_meta": {
+          "count": 24,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.666666666666667
+      }
+    },
+    "unanswerable": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 26,
+          "rate": 0.8666666666666667
+        },
+        "grounding_1to5_mean": 4.533333333333333,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 26,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.8666666666666667
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 29,
+          "rate": 0.9666666666666667
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 26,
+          "rate": 0.8666666666666667
+        },
+        "no_meta": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.6
+      }
+    }
+  },
+  "by_persona_id": {
+    "p1": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 3,
+          "rate": 0.1
+        },
+        "core_correct": {
+          "count": 16,
+          "rate": 0.5333333333333333
+        },
+        "grounding_1to5_mean": 4.066666666666666,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 13,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.43333333333333335
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_meta": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.6
+      }
+    },
+    "p2": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 16,
+          "rate": 0.5333333333333333
+        },
+        "grounding_1to5_mean": 4.066666666666666,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 11,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.36666666666666664
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 25,
+          "rate": 0.8333333333333334
+        },
+        "no_meta": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.3
+      }
+    },
+    "p3": {
+      "n": 30,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 19,
+          "rate": 0.6333333333333333
+        },
+        "grounding_1to5_mean": 4.066666666666666,
+        "refused_with_info": {
+          "count": 0,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 12,
+          "n": 30,
+          "unknown": 0,
+          "rate": 0.4
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 29,
+          "rate": 0.9666666666666667
+        },
+        "no_stray_habitual": {
+          "count": 30,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 29,
+          "rate": 0.9666666666666667
+        },
+        "no_meta": {
+          "count": 29,
+          "rate": 0.9666666666666667
+        },
+        "natural_1to5_mean": 4.633333333333334
+      }
+    },
+    "p4": {
+      "n": 27,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 4,
+          "rate": 0.14814814814814814
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "core_correct": {
+          "count": 15,
+          "rate": 0.5555555555555556
+        },
+        "grounding_1to5_mean": 3.7777777777777777,
+        "refused_with_info": {
+          "count": 0,
+          "n": 27,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 9,
+          "n": 27,
+          "unknown": 0,
+          "rate": 0.3333333333333333
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 27,
+          "rate": 1.0
+        },
+        "no_stray_habitual": {
+          "count": 27,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 24,
+          "rate": 0.8888888888888888
+        },
+        "no_meta": {
+          "count": 27,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 4.2592592592592595
+      }
+    },
+    "p5": {
+      "n": 27,
+      "grounding": {
+        "premise_accepted": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fabricated": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "contradiction": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "over_refusal": {
+          "count": 3,
+          "rate": 0.1111111111111111
+        },
+        "core_correct": {
+          "count": 14,
+          "rate": 0.5185185185185185
+        },
+        "grounding_1to5_mean": 4.037037037037037,
+        "refused_with_info": {
+          "count": 0,
+          "n": 27,
+          "unknown": 0,
+          "rate": 0.0
+        },
+        "abstained_without_info": {
+          "count": 11,
+          "n": 27,
+          "unknown": 0,
+          "rate": 0.4074074074074074
+        }
+      },
+      "style": {
+        "register_consistent": {
+          "count": 14,
+          "rate": 0.5185185185185185
+        },
+        "no_stray_habitual": {
+          "count": 27,
+          "rate": 1.0
+        },
+        "no_requestion": {
+          "count": 25,
+          "rate": 0.9259259259259259
+        },
+        "no_meta": {
+          "count": 27,
+          "rate": 1.0
+        },
+        "natural_1to5_mean": 3.4814814814814814
+      }
+    }
+  },
+  "p5": {
+    "items": 27,
+    "agent_judged_not_human": true,
+    "by_condition": {
+      "A": {
+        "n": 9,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.1111111111111111
+          },
+          "core_correct": {
+            "count": 2,
+            "rate": 0.2222222222222222
+          },
+          "grounding_1to5_mean": 3.4444444444444446,
+          "refused_with_info": {
+            "count": 0,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 7,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.7777777777777778
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 8,
+            "rate": 0.8888888888888888
+          },
+          "no_stray_habitual": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 8,
+            "rate": 0.8888888888888888
+          },
+          "no_meta": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.333333333333333
+        }
+      },
+      "B": {
+        "n": 9,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.1111111111111111
+          },
+          "core_correct": {
+            "count": 5,
+            "rate": 0.5555555555555556
+          },
+          "grounding_1to5_mean": 4.111111111111111,
+          "refused_with_info": {
+            "count": 0,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 2,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.2222222222222222
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 3,
+            "rate": 0.3333333333333333
+          },
+          "no_stray_habitual": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 8,
+            "rate": 0.8888888888888888
+          },
+          "no_meta": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 2.888888888888889
+        }
+      },
+      "C": {
+        "n": 9,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.1111111111111111
+          },
+          "core_correct": {
+            "count": 7,
+            "rate": 0.7777777777777778
+          },
+          "grounding_1to5_mean": 4.555555555555555,
+          "refused_with_info": {
+            "count": 0,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 2,
+            "n": 9,
+            "unknown": 0,
+            "rate": 0.2222222222222222
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 3,
+            "rate": 0.3333333333333333
+          },
+          "no_stray_habitual": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 9,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.2222222222222223
+        }
+      }
+    },
+    "by_split": {
+      "heldout": {
+        "n": 27,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 0.1111111111111111
+          },
+          "core_correct": {
+            "count": 14,
+            "rate": 0.5185185185185185
+          },
+          "grounding_1to5_mean": 4.037037037037037,
+          "refused_with_info": {
+            "count": 0,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 11,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.4074074074074074
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 14,
+            "rate": 0.5185185185185185
+          },
+          "no_stray_habitual": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 25,
+            "rate": 0.9259259259259259
+          },
+          "no_meta": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.4814814814814814
+        }
+      }
+    },
+    "by_type": {
+      "ambiguity": {
+        "n": 3,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 1,
+            "rate": 0.3333333333333333
+          },
+          "grounding_1to5_mean": 3.6666666666666665,
+          "refused_with_info": {
+            "count": 0,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 2,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.6666666666666666
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 2,
+            "rate": 0.6666666666666666
+          },
+          "no_stray_habitual": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.333333333333333
+        }
+      },
+      "false_premise": {
+        "n": 6,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 4,
+            "rate": 0.6666666666666666
+          },
+          "grounding_1to5_mean": 4.333333333333333,
+          "refused_with_info": {
+            "count": 0,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 1,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.16666666666666666
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 1,
+            "rate": 0.16666666666666666
+          },
+          "no_stray_habitual": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 5,
+            "rate": 0.8333333333333334
+          },
+          "no_meta": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 2.6666666666666665
+        }
+      },
+      "multi": {
+        "n": 6,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 2,
+            "rate": 0.3333333333333333
+          },
+          "grounding_1to5_mean": 3.6666666666666665,
+          "refused_with_info": {
+            "count": 0,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 2,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.3333333333333333
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 2,
+            "rate": 0.3333333333333333
+          },
+          "no_stray_habitual": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.6666666666666665
+        }
+      },
+      "ordinary_chat": {
+        "n": 3,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "core_correct": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "grounding_1to5_mean": 3.0,
+          "refused_with_info": {
+            "count": 0,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 0,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.0
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 2.0
+        }
+      },
+      "single": {
+        "n": 3,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 2,
+            "rate": 0.6666666666666666
+          },
+          "grounding_1to5_mean": 4.333333333333333,
+          "refused_with_info": {
+            "count": 0,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 1,
+            "n": 3,
+            "unknown": 0,
+            "rate": 0.3333333333333333
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 1,
+            "rate": 0.3333333333333333
+          },
+          "no_stray_habitual": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 3,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.3333333333333335
+        }
+      },
+      "unanswerable": {
+        "n": 6,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 5,
+            "rate": 0.8333333333333334
+          },
+          "grounding_1to5_mean": 4.666666666666667,
+          "refused_with_info": {
+            "count": 0,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 5,
+            "n": 6,
+            "unknown": 0,
+            "rate": 0.8333333333333334
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 5,
+            "rate": 0.8333333333333334
+          },
+          "no_stray_habitual": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 5,
+            "rate": 0.8333333333333334
+          },
+          "no_meta": {
+            "count": 6,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.5
+        }
+      }
+    },
+    "by_persona_id": {
+      "p5": {
+        "n": 27,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 0.1111111111111111
+          },
+          "core_correct": {
+            "count": 14,
+            "rate": 0.5185185185185185
+          },
+          "grounding_1to5_mean": 4.037037037037037,
+          "refused_with_info": {
+            "count": 0,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 11,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.4074074074074074
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 14,
+            "rate": 0.5185185185185185
+          },
+          "no_stray_habitual": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 25,
+            "rate": 0.9259259259259259
+          },
+          "no_meta": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.4814814814814814
+        }
+      }
+    }
+  },
+  "excluding_p5": {
+    "items": 117,
+    "agent_judged_not_human": true,
+    "by_condition": {
+      "A": {
+        "n": 39,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 1,
+            "rate": 0.02564102564102564
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.02564102564102564
+          },
+          "core_correct": {
+            "count": 8,
+            "rate": 0.20512820512820512
+          },
+          "grounding_1to5_mean": 3.3076923076923075,
+          "refused_with_info": {
+            "count": 0,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 31,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.7948717948717948
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 34,
+            "rate": 0.8717948717948718
+          },
+          "no_meta": {
+            "count": 38,
+            "rate": 0.9743589743589743
+          },
+          "natural_1to5_mean": 4.461538461538462
+        }
+      },
+      "B": {
+        "n": 39,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 1,
+            "rate": 0.02564102564102564
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.02564102564102564
+          },
+          "core_correct": {
+            "count": 27,
+            "rate": 0.6923076923076923
+          },
+          "grounding_1to5_mean": 4.230769230769231,
+          "refused_with_info": {
+            "count": 0,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 7,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.1794871794871795
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 37,
+            "rate": 0.9487179487179487
+          },
+          "no_meta": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.461538461538462
+        }
+      },
+      "C": {
+        "n": 39,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 2,
+            "rate": 0.05128205128205128
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 1,
+            "rate": 0.02564102564102564
+          },
+          "core_correct": {
+            "count": 31,
+            "rate": 0.7948717948717948
+          },
+          "grounding_1to5_mean": 4.461538461538462,
+          "refused_with_info": {
+            "count": 0,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 7,
+            "n": 39,
+            "unknown": 0,
+            "rate": 0.1794871794871795
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 38,
+            "rate": 0.9743589743589743
+          },
+          "no_stray_habitual": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 37,
+            "rate": 0.9487179487179487
+          },
+          "no_meta": {
+            "count": 39,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.435897435897436
+        }
+      }
+    },
+    "by_split": {
+      "heldout": {
+        "n": 117,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 4,
+            "rate": 0.03418803418803419
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 0.02564102564102564
+          },
+          "core_correct": {
+            "count": 66,
+            "rate": 0.5641025641025641
+          },
+          "grounding_1to5_mean": 4.0,
+          "refused_with_info": {
+            "count": 0,
+            "n": 117,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 45,
+            "n": 117,
+            "unknown": 0,
+            "rate": 0.38461538461538464
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 116,
+            "rate": 0.9914529914529915
+          },
+          "no_stray_habitual": {
+            "count": 117,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 108,
+            "rate": 0.9230769230769231
+          },
+          "no_meta": {
+            "count": 116,
+            "rate": 0.9914529914529915
+          },
+          "natural_1to5_mean": 4.452991452991453
+        }
+      }
+    },
+    "by_type": {
+      "ambiguity": {
+        "n": 12,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 1,
+            "rate": 0.08333333333333333
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 1,
+            "rate": 0.08333333333333333
+          },
+          "grounding_1to5_mean": 3.0833333333333335,
+          "refused_with_info": {
+            "count": 0,
+            "n": 12,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 3,
+            "n": 12,
+            "unknown": 0,
+            "rate": 0.25
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 12,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 12,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 11,
+            "rate": 0.9166666666666666
+          },
+          "no_meta": {
+            "count": 11,
+            "rate": 0.9166666666666666
+          },
+          "natural_1to5_mean": 4.083333333333333
+        }
+      },
+      "false_premise": {
+        "n": 24,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 11,
+            "rate": 0.4583333333333333
+          },
+          "grounding_1to5_mean": 3.9166666666666665,
+          "refused_with_info": {
+            "count": 0,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 8,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.3333333333333333
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.833333333333333
+        }
+      },
+      "multi": {
+        "n": 24,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 16,
+            "rate": 0.6666666666666666
+          },
+          "grounding_1to5_mean": 4.333333333333333,
+          "refused_with_info": {
+            "count": 0,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 6,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.25
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 23,
+            "rate": 0.9583333333333334
+          },
+          "no_stray_habitual": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 22,
+            "rate": 0.9166666666666666
+          },
+          "no_meta": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.458333333333333
+        }
+      },
+      "ordinary_chat": {
+        "n": 12,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 3,
+            "rate": 0.25
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 0.25
+          },
+          "core_correct": {
+            "count": 4,
+            "rate": 0.3333333333333333
+          },
+          "grounding_1to5_mean": 3.0,
+          "refused_with_info": {
+            "count": 0,
+            "n": 12,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 0,
+            "n": 12,
+            "unknown": 0,
+            "rate": 0.0
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 12,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 12,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 9,
+            "rate": 0.75
+          },
+          "no_meta": {
+            "count": 12,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 3.0
+        }
+      },
+      "single": {
+        "n": 21,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 13,
+            "rate": 0.6190476190476191
+          },
+          "grounding_1to5_mean": 4.238095238095238,
+          "refused_with_info": {
+            "count": 0,
+            "n": 21,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 7,
+            "n": 21,
+            "unknown": 0,
+            "rate": 0.3333333333333333
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 21,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 21,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 21,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 21,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.857142857142857
+        }
+      },
+      "unanswerable": {
+        "n": 24,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 21,
+            "rate": 0.875
+          },
+          "grounding_1to5_mean": 4.5,
+          "refused_with_info": {
+            "count": 0,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 21,
+            "n": 24,
+            "unknown": 0,
+            "rate": 0.875
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 21,
+            "rate": 0.875
+          },
+          "no_meta": {
+            "count": 24,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.625
+        }
+      }
+    },
+    "by_persona_id": {
+      "p1": {
+        "n": 30,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 3,
+            "rate": 0.1
+          },
+          "core_correct": {
+            "count": 16,
+            "rate": 0.5333333333333333
+          },
+          "grounding_1to5_mean": 4.066666666666666,
+          "refused_with_info": {
+            "count": 0,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 13,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.43333333333333335
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_meta": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.6
+        }
+      },
+      "p2": {
+        "n": 30,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 16,
+            "rate": 0.5333333333333333
+          },
+          "grounding_1to5_mean": 4.066666666666666,
+          "refused_with_info": {
+            "count": 0,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 11,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.36666666666666664
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 25,
+            "rate": 0.8333333333333334
+          },
+          "no_meta": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.3
+        }
+      },
+      "p3": {
+        "n": 30,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 19,
+            "rate": 0.6333333333333333
+          },
+          "grounding_1to5_mean": 4.066666666666666,
+          "refused_with_info": {
+            "count": 0,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 12,
+            "n": 30,
+            "unknown": 0,
+            "rate": 0.4
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 29,
+            "rate": 0.9666666666666667
+          },
+          "no_stray_habitual": {
+            "count": 30,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 29,
+            "rate": 0.9666666666666667
+          },
+          "no_meta": {
+            "count": 29,
+            "rate": 0.9666666666666667
+          },
+          "natural_1to5_mean": 4.633333333333334
+        }
+      },
+      "p4": {
+        "n": 27,
+        "grounding": {
+          "premise_accepted": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "fabricated": {
+            "count": 4,
+            "rate": 0.14814814814814814
+          },
+          "contradiction": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "over_refusal": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "core_correct": {
+            "count": 15,
+            "rate": 0.5555555555555556
+          },
+          "grounding_1to5_mean": 3.7777777777777777,
+          "refused_with_info": {
+            "count": 0,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.0
+          },
+          "abstained_without_info": {
+            "count": 9,
+            "n": 27,
+            "unknown": 0,
+            "rate": 0.3333333333333333
+          }
+        },
+        "style": {
+          "register_consistent": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "no_stray_habitual": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "no_requestion": {
+            "count": 24,
+            "rate": 0.8888888888888888
+          },
+          "no_meta": {
+            "count": 27,
+            "rate": 1.0
+          },
+          "natural_1to5_mean": 4.2592592592592595
+        }
+      }
+    }
+  }
+}

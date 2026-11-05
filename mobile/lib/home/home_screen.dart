@@ -6,8 +6,11 @@ import '../chat/chat_service.dart';
 import '../shared/conversation_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.service});
+  const HomeScreen({super.key, required this.service, this.accountEmail, this.onSignOut, this.onExpireSession});
   final ChatService service;
+  final String? accountEmail;
+  final VoidCallback? onSignOut;
+  final VoidCallback? onExpireSession;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,6 +22,26 @@ class _HomeScreenState extends State<HomeScreen> {
   void _notice(String text) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  void _account() {
+    showModalBottomSheet<void>(context: context, builder: (sheetContext) => SafeArea(
+      child: Padding(padding: const EdgeInsets.all(24), child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.accountEmail ?? '계정'),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: () {
+            Navigator.of(sheetContext).pop();
+            widget.onSignOut?.call();
+          }, child: const Text('로그아웃')),
+          if (widget.onExpireSession != null) TextButton(onPressed: () {
+            Navigator.of(sheetContext).pop();
+            widget.onExpireSession!();
+          }, child: const Text('세션 만료 확인 (미리보기)')),
+        ],
+      )),
+    ));
   }
 
   Future<void> _start({required bool voice}) async {
@@ -48,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: const Text('레플리카', style: TextStyle(fontWeight: FontWeight.w700)),
       actions: [IconButton(
         tooltip: '계정', icon: const Icon(Icons.person_outline),
-        onPressed: () => _notice('계정 기능은 고도화 단계에서 제공할 예정입니다.'),
+        onPressed: widget.onSignOut == null ? null : _account,
       )],
     ),
     body: Center(child: ConstrainedBox(

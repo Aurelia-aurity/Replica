@@ -1,0 +1,42 @@
+2026-10-29 / Mac Apple M5 / Python 3.12.15 / v2-natural
+Working directory: experiments/rag
+Selected terminal output. Per-question retrieval failures are in each traces.json;
+they are observed quality failures, not failed integrity checks.
+
+$ .venv/bin/python -m pytest -q test_rag.py
+..................................... [100%]
+warnings summary:
+.venv/lib/python3.12/site-packages/typer/__init__.py:24
+  DeprecationWarning: 'click.utils.get_binary_stream' is deprecated and will be removed in Click 9.0.
+.venv/lib/python3.12/site-packages/typer/__init__.py:25
+  DeprecationWarning: 'click.utils.get_text_stream' is deprecated and will be removed in Click 9.0.
+37 passed, 2 warnings in 0.29s
+
+$ .venv/bin/python corpus.py
+VALID: personas=5 records=100 chunks=400 questions=80
+dev: records=50 chunks=200 questions=40 types={'ambiguity': 5, 'false_premise': 5, 'multi': 10, 'ordinary_chat': 5, 'single': 10, 'unanswerable': 5}
+test: records=50 chunks=200 questions=40 types={'ambiguity': 5, 'false_premise': 5, 'multi': 10, 'ordinary_chat': 5, 'single': 10, 'unanswerable': 5}
+PASS: unique IDs; disjoint families; valid scoped gold; exact support quotes
+PASS: unanswerable/ordinary gold empty; all factual gold persona-spoken
+PASS: per-persona event families; known-name/noun particle checks
+
+$ .venv/bin/python run.py kure --device mps --batch-size 8
+ENCODED kure: (400, 1024), max tokens=94
+FROZEN DEV threshold kure: 0.545871198
+Exit code: 0
+
+$ .venv/bin/python run.py e5 --device mps --batch-size 8
+ENCODED e5: (400, 384), max tokens=96
+FROZEN DEV threshold e5: 0.828751206
+Exit code: 0
+
+$ .venv/bin/python audit_results.py kure
+AUDIT PASS kure: 80 traces; current source hashes; DEV-only threshold; recomputed metrics; zero persona-scope leaks; exact five-field evidence
+
+$ .venv/bin/python audit_results.py e5
+AUDIT PASS e5: 80 traces; current source hashes; DEV-only threshold; recomputed metrics; zero persona-scope leaks; exact five-field evidence
+
+LSP: unavailable (basedpyright-langserver not installed).
+Final source/document whitespace check: PASS (exit 0).
+Git status: all 26 visible new files are under experiments/rag/; no commit.
+Korean README + summary standard language gate: exit 0, change rate 0.1%, golden PASS.

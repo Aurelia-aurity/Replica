@@ -1,4 +1,5 @@
 # Miscellaneous
+config/*.local.json
 *.class
 *.log
 *.pyc
