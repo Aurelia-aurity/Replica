@@ -24,6 +24,20 @@ class RecordsPanel extends StatefulWidget {
 
 class _RecordsPanelState extends State<RecordsPanel> {
   RecordKind? _filter;
+  @override
+  void initState() {
+    super.initState();
+    // Quiet status checks while something is uploading, transcribing or being
+    // reflected; the controller only schedules them when a record needs it.
+    widget.controller.startPolling();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.stopPolling();
+    super.dispose();
+  }
+
   void _upload() {
     widget.controller.beginSelection();
     Navigator.of(context).push(
@@ -132,8 +146,10 @@ class _RecordsPanelState extends State<RecordsPanel> {
                         subtitle: Text(
                           deletion.complete
                               ? '삭제 완료'
-                              : deletion.job?.status == 'failed'
-                              ? '일부 삭제 실패'
+                              : deletion.job?.failed == true
+                              ? '일부 삭제 실패${deletion.job!.remaining.isEmpty ? '' : ' · 남은 항목: ${deletion.job!.remainingLabel}'}'
+                              : deletion.job?.remaining.isNotEmpty == true
+                              ? '삭제 진행 중 · 남은 항목: ${deletion.job!.remainingLabel}'
                               : '삭제 상태 확인 필요',
                         ),
                         trailing: const Icon(Icons.chevron_right),
@@ -288,18 +304,29 @@ class _RecordsPanelState extends State<RecordsPanel> {
         : audio
         ? aiAmberBackground
         : const Color(0xFFE2EEE9);
-    final needsReview = entry.status == RecordStatus.ready && !entry.confirmed;
-    final reflected = entry.status == RecordStatus.ready && entry.confirmed;
-    final badgeColor = failed
+    final ready = entry.status == RecordStatus.ready;
+    final reflected = ready && entry.confirmed;
+    final reflectFailed =
+        ready && entry.personalization == ReviewProfileState.failed;
+    // Amber asks for attention: an unconfirmed transcript, or a stalled
+    // reflection that the user may want to look at again.
+    final needsAttention =
+        ready &&
+        !reflected &&
+        !reflectFailed &&
+        ((!entry.textConfirmed &&
+                entry.personalization == ReviewProfileState.unknown) ||
+            entry.personalization == ReviewProfileState.delayed);
+    final badgeColor = failed || reflectFailed
         ? const Color(0xFFBF3328)
-        : needsReview
+        : needsAttention
         ? aiAmber
         : reflected
         ? replicaGreen
         : const Color(0xFF56645D);
-    final badgeBackground = failed
+    final badgeBackground = failed || reflectFailed
         ? const Color(0xFFFCE5E2)
-        : needsReview
+        : needsAttention
         ? aiAmberBackground
         : reflected
         ? const Color(0xFFDCEEE5)
@@ -388,9 +415,7 @@ class _RecordsPanelState extends State<RecordsPanel> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        failed
-                            ? (audio ? '전사에 실패했어요' : '기록 처리에 실패했어요')
-                            : metadata,
+                        failed ? entry.failureLabel : metadata,
                         style: TextStyle(
                           color: failed ? iconColor : const Color(0xFF75817B),
                           fontSize: 12,

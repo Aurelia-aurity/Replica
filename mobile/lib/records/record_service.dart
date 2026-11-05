@@ -1,7 +1,9 @@
 import '../services/backend_service.dart';
-import 'record_models.dart';
-import 'record_review.dart';
 import 'record_deletion.dart';
+import 'record_models.dart';
+import 'record_playback.dart';
+import 'record_review.dart';
+import 'transcript_segments.dart';
 
 abstract class RecordService
     implements RecordReviewService, RecordDeletionService {
@@ -37,11 +39,50 @@ abstract class RecordService
   Future<List<RecordEntry>> list();
   // Implementations reconcile ambiguous responses using upload.id before retry.
   // A successful step advances the stage; completed steps are never resent.
+  // Report transfer progress with upload.reportProgress and stop with
+  // UploadCancelled once upload.cancelToken is cancelled.
   Future<void> upload(RecordUpload upload, void Function() onStageChanged);
+
+  /// Removes what a cancelled upload left behind (a reservation without a
+  /// file). Never touches a record whose upload already completed.
+  Future<void> discardUpload(RecordUpload upload) async {}
   bool get canRetryProcessing => false;
   Future<void> retryProcessing(String id) =>
       throw UnsupportedError('Retry API not agreed');
+
+  /// Whether the original audio of a record can be played in the app.
+  bool get canPlayOriginal => false;
+  Future<RecordAudioSource> originalAudio(String recordId) =>
+      throw UnsupportedError('Original audio endpoint not agreed');
 }
+
+const _previewSegments = [
+  TranscriptSegment(
+    text: '밥은 먹었나? 요즘 날이 추워서 걱정이다.',
+    startMs: 4000,
+    endMs: 11000,
+    speaker: '엄마',
+  ),
+  TranscriptSegment(
+    text: '주말에 내려오면 김치 좀 싸 줄게.',
+    startMs: 11000,
+    endMs: 18000,
+    speaker: '엄마',
+  ),
+  TranscriptSegment(
+    text: '아빠가 너 보고 싶다 카더라.',
+    startMs: 18000,
+    endMs: 26000,
+    speaker: '엄마',
+  ),
+  TranscriptSegment(
+    text: '감기 조심하고 단디 챙겨 입어라.',
+    startMs: 26000,
+    endMs: 33000,
+    speaker: '엄마',
+    uncertain: ['단디'],
+  ),
+];
 
 /// Session-owned, metadata-only preview. Never sends or retains file contents.
 class PreviewRecordService extends RecordService {
@@ -122,6 +163,21 @@ class PreviewRecordService extends RecordService {
   }
 
   @override
+  bool get canPlayOriginal => true;
+  @override
+  Future<RecordAudioSource> originalAudio(String recordId) async {
+    final entry = _entries[recordId];
+    if (entry == null || entry.kind != RecordKind.audio) {
+      throw StateError('No audio');
+    }
+    // A silent clock; the preview never keeps or plays the picked file.
+    return const RecordAudioSource(
+      simulated: true,
+      duration: Duration(seconds: 192),
+    );
+  }
+
+  @override
   Future<RecordReview> review(String recordId) async {
     if (_deletions.values.any(
       (j) => j.targetType == 'account' || j.targetId == recordId,
@@ -130,17 +186,21 @@ class PreviewRecordService extends RecordService {
     }
     final record = _entries[recordId];
     if (record == null) throw StateError('Record missing');
-    final version = _versions.putIfAbsent(
-      recordId,
-      () => TextVersion(
+    final version = _versions.putIfAbsent(recordId, () {
+      final audio = record.kind == RecordKind.audio;
+      final segments = audio
+          ? _previewSegments
+          : [for (final s in _previewSegments) TranscriptSegment(text: s.text)];
+      return TextVersion(
         id: 'preview-$recordId',
         recordId: recordId,
         revision: 1,
-        content: '[합성 전사문 · 실제 파일 내용이 아닙니다]\n밥은 먹었니? 요즘 날이 추워서 걱정이다.\n주말에 내려오면 김치 좀 싸 줄게.\n감기 조심하고 따뜻하게 챙겨 입어라.',
+        content: segments.map((s) => s.text).join('\n'),
         status: 'draft',
         updatedAt: DateTime.now().toUtc(),
-      ),
-    );
+        segments: audio ? segments : null,
+      );
+    });
     return RecordReview(
       record: record,
       version: version,
@@ -171,6 +231,12 @@ class PreviewRecordService extends RecordService {
       content: content,
       status: 'draft',
       updatedAt: DateTime.now().toUtc(),
+      segments: current.segments == null
+          ? null
+          : TranscriptDocument.fromContent(
+              content,
+              base: current.segments,
+            ).segments,
     );
   }
 
@@ -198,6 +264,7 @@ class PreviewRecordService extends RecordService {
       sizeBytes: entry.sizeBytes,
       confirmed: true,
       textConfirmed: true,
+      confirmedAt: now,
     );
     return _versions[entry.id] = TextVersion(
       id: current.id,
@@ -207,6 +274,7 @@ class PreviewRecordService extends RecordService {
       status: 'confirmed',
       updatedAt: now,
       confirmedAt: now,
+      segments: current.segments,
     );
   }
 
@@ -228,13 +296,27 @@ class PreviewRecordService extends RecordService {
   ) async {
     final validation = policy.validate(upload.file);
     if (validation != null) throw StateError(validation);
+    upload.cancelToken.throwIfCancelled();
     for (final stage in [
       UploadStage.transfer,
       UploadStage.complete,
       UploadStage.done,
     ]) {
       if (upload.stage.index >= stage.index) continue;
+      if (stage == UploadStage.complete) {
+        // Synthetic progress only: no bytes are read or sent in the preview.
+        upload.reportProgress(0);
+        for (var step = 1; step <= 7; step++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          upload.cancelToken.throwIfCancelled();
+          upload.reportProgress(upload.file.sizeBytes * step ~/ 7);
+        }
+        upload.stage = stage;
+        onStageChanged();
+        continue;
+      }
       await Future<void>.delayed(const Duration(milliseconds: 350));
+      upload.cancelToken.throwIfCancelled();
       upload.stage = stage;
       onStageChanged();
     }
@@ -290,10 +372,18 @@ class SessionRecordService extends RecordService {
   @override
   bool get canRetryProcessing => delegate.canRetryProcessing;
   @override
+  bool get canPlayOriginal => delegate.canPlayOriginal;
+  @override
+  Future<RecordAudioSource> originalAudio(String recordId) =>
+      backend.run(() => delegate.originalAudio(recordId));
+  @override
   Future<List<RecordEntry>> list() => backend.run(delegate.list);
   @override
   Future<void> upload(RecordUpload upload, void Function() onStageChanged) =>
       backend.run(() => delegate.upload(upload, onStageChanged));
+  @override
+  Future<void> discardUpload(RecordUpload upload) =>
+      backend.run(() => delegate.discardUpload(upload));
   @override
   Future<void> retryProcessing(String id) =>
       backend.run(() => delegate.retryProcessing(id));

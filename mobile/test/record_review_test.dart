@@ -166,8 +166,10 @@ void main() {
       );
       await tester.tap(find.text(service.entry.name));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('segment-text-0')));
+      await tester.pumpAndSettle();
       await tester.enterText(
-        find.byKey(const ValueKey('transcript-editor')),
+        find.byKey(const ValueKey('segment-editor-0')),
         '검토한 합성 전사문',
       );
       await tester.tap(find.text('나중에'));
@@ -176,10 +178,7 @@ void main() {
       expect(service.confirmed, isFalse);
       await tester.tap(find.text(service.entry.name));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        '검토한 합성 전사문',
-      );
+      expect(find.text('검토한 합성 전사문'), findsOneWidget);
       await tester.tap(find.text('확정하기'));
       await tester.pumpAndSettle();
       expect(service.confirmed, isTrue);
@@ -285,6 +284,7 @@ void main() {
         );
       });
       addTearDown(client.close);
+      var now = updated.add(const Duration(minutes: 5));
       final api = ApiRecordService(
         client: client,
         baseUrl: Uri.parse('https://example.invalid'),
@@ -292,6 +292,7 @@ void main() {
         personaId: 'persona',
         policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
         fileTransport: Transfer(),
+        clock: () => now,
       );
       var v = (await api.review('record')).version!;
       v = await api.saveText(v, '수정');
@@ -300,7 +301,14 @@ void main() {
       expect(v.status, 'confirmed');
       expect(confirms, 1);
       expect(patches, 1);
-      expect((await api.review('record')).profile, ReviewProfileState.unknown);
+      // Confirmed minutes ago and no newer profile yet: still being reflected.
+      expect(
+        (await api.review('record')).profile,
+        ReviewProfileState.processing,
+      );
+      // Much later with still no profile: delayed, not "reflected".
+      now = updated.add(const Duration(hours: 1));
+      expect((await api.review('record')).profile, ReviewProfileState.delayed);
     },
   );
 }

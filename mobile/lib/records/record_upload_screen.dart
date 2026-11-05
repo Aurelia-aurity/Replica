@@ -4,6 +4,7 @@ import '../shared/conversation_widgets.dart';
 import 'record_controller.dart';
 import 'record_models.dart';
 import 'record_picker.dart';
+import 'text_analysis.dart';
 
 class RecordUploadScreen extends StatefulWidget {
   const RecordUploadScreen({
@@ -73,6 +74,7 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
       final busy = c.uploading;
       final locked = c.attempt != null;
       final editable = !busy && !locked && !_picking;
+      final analysis = c.analysis;
       return PopScope(
         canPop: !busy,
         child: Scaffold(
@@ -160,7 +162,7 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                                       ? (_kind == RecordKind.text
                                             ? '.txt'
                                             : '.wav .mp3 .m4a')
-                                      : '${formatBytes(file.sizeBytes)} · ${file.kind == RecordKind.text ? '텍스트 파일' : '음성 파일'}',
+                                      : '${formatBytes(file.sizeBytes)} · ${file.kind == RecordKind.text ? (analysis?.label ?? '텍스트 파일') : '음성 파일'}',
                                   style: _muted,
                                 ),
                               ],
@@ -201,28 +203,28 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                           style: const TextStyle(color: Color(0xFFB3261E)),
                         ),
                       ),
+                    if (c.analyzing)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 14),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 10),
+                            Text('파일을 확인하는 중…', style: _muted),
+                          ],
+                        ),
+                      ),
+                    if (c.analysisError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(c.analysisError!, style: _muted),
+                      ),
                     if (_kind == RecordKind.text) ...[
-                      const SizedBox(height: 24),
-                      const Text(
-                        '누구의 말투를 반영할까요?',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF4C5C54),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: _card(),
-                        child: const Text(
-                          '카카오톡 대화의 화자 선택은 준비 중이에요.\n현재는 텍스트 파일 전체를 등록해요.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.6,
-                            color: Color(0xFF68766F),
-                          ),
-                        ),
-                      ),
+                      if (c.needsSpeakers) ..._speakerSections(c, analysis!),
                       const SizedBox(height: 10),
                       const Text(
                         '공유·처리 권한이 있는 자료만 선택하고, 다른 사람의 개인정보는 올리기 전에 가려 주세요.',
@@ -260,29 +262,31 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                       const Padding(
                         padding: EdgeInsets.only(top: 12),
                         child: Text(
-                          '미리보기 · 파일 내용은 읽거나 전송하지 않으며, 목록은 로그아웃하면 초기화돼요.',
+                          '미리보기 · 파일은 서버로 전송하지 않으며, 진행률은 합성 값이고 목록은 로그아웃하면 초기화돼요.',
                           style: _muted,
                         ),
                       ),
-                    if (busy) ...[
-                      const SizedBox(height: 20),
-                      const LinearProgressIndicator(color: replicaGreen),
-                      const SizedBox(height: 10),
-                      Semantics(
-                        liveRegion: true,
-                        child: Text(switch (c.attempt?.stage) {
-                          UploadStage.reserve => '업로드 준비 중…',
-                          UploadStage.transfer => '파일 업로드 중…',
-                          _ => '업로드 결과 확인 중…',
-                        }),
+                    if (busy) ..._progress(c),
+                    if (c.uploadNotice != null && !busy)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            c.uploadNotice!,
+                            style: const TextStyle(color: Color(0xFF3F5A4E)),
+                          ),
+                        ),
                       ),
-                    ],
                     if (c.uploadError != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          c.uploadError!,
-                          style: const TextStyle(color: Color(0xFFB3261E)),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            c.uploadError!,
+                            style: const TextStyle(color: Color(0xFFB3261E)),
+                          ),
                         ),
                       ),
                     if (c.uploadSucceeded)
@@ -357,6 +361,164 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
         ),
       );
     },
+  );
+
+  List<Widget> _progress(RecordController c) {
+    final upload = c.attempt;
+    final transferring = upload?.stage == UploadStage.transfer;
+    final percent = ((upload?.progress ?? 0) * 100).floor();
+    return [
+      const SizedBox(height: 20),
+      LinearProgressIndicator(
+        key: const ValueKey('record-upload-progress'),
+        color: replicaGreen,
+        value: transferring ? upload?.progress : null,
+      ),
+      const SizedBox(height: 10),
+      Semantics(
+        liveRegion: true,
+        child: Text(
+          c.cancelling
+              ? '업로드를 취소하는 중…'
+              : switch (upload?.stage) {
+                  UploadStage.reserve => '업로드 준비 중…',
+                  UploadStage.transfer =>
+                    '파일 올리는 중 · $percent% (${formatBytes(upload!.bytesSent)} / ${formatBytes(upload.file.sizeBytes)})',
+                  _ => '업로드 결과 확인 중…',
+                },
+        ),
+      ),
+      if (c.canCancelUpload || c.cancelling)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const ValueKey('record-upload-cancel'),
+            onPressed: c.canCancelUpload ? c.cancelUpload : null,
+            child: Text(c.cancelling ? '취소하는 중…' : '업로드 취소'),
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _speakerSections(RecordController c, TextAnalysis analysis) {
+    final locked = c.uploading || c.attempt != null;
+    Widget group({
+      required String title,
+      required String keyPrefix,
+      required String? selected,
+      required String? blocked,
+      required void Function(String) onSelect,
+    }) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4C5C54),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: _card(),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < analysis.speakers.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: replicaBorder),
+                _speakerTile(
+                  key: ValueKey('$keyPrefix-${analysis.speakers[i].name}'),
+                  speaker: analysis.speakers[i],
+                  selected: selected == analysis.speakers[i].name,
+                  enabled: !locked && blocked != analysis.speakers[i].name,
+                  onTap: () => onSelect(analysis.speakers[i].name),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+    return [
+      const SizedBox(height: 24),
+      group(
+        title: '누구의 말투를 반영할까요?',
+        keyPrefix: 'speaker-target',
+        selected: c.targetSpeaker,
+        blocked: c.providerSpeaker,
+        onSelect: c.selectTarget,
+      ),
+      const SizedBox(height: 10),
+      const Text(
+        '고르지 않은 사람의 메시지는 문맥으로만 쓰고, 다른 사람의 개인 정보는 저장 전에 가려요.',
+        style: _muted,
+      ),
+      const SizedBox(height: 24),
+      group(
+        title: '이 기록을 제공한 사람은 누구인가요?',
+        keyPrefix: 'speaker-provider',
+        selected: c.providerSpeaker,
+        blocked: c.targetSpeaker,
+        onSelect: c.selectProvider,
+      ),
+      const SizedBox(height: 10),
+      Text(
+        c.service.policy.sendSpeakerSelection
+            ? '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.'
+            : '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
+        style: _muted,
+      ),
+    ];
+  }
+
+  Widget _speakerTile({
+    required Key key,
+    required ChatSpeaker speaker,
+    required bool selected,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) => Semantics(
+    inMutuallyExclusiveGroup: true,
+    checked: selected,
+    enabled: enabled,
+    child: InkWell(
+      key: key,
+      onTap: enabled ? onTap : null,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: !enabled && !selected
+                    ? const Color(0xFFB9C2BD)
+                    : replicaGreen,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  speaker.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: enabled || selected
+                        ? const Color(0xFF17201C)
+                        : const Color(0xFF9AA5A0),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('메시지 ${formatCount(speaker.messages)}개', style: _muted),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 
   static const _muted = TextStyle(

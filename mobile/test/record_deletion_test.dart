@@ -231,6 +231,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('계정 삭제'));
       await tester.pumpAndSettle();
+      // Deleting needs an explicit acknowledgement first.
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('delete-confirm')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
       await tester.pumpAndSettle();
       expect(auth.identity, isNotNull);
@@ -239,6 +248,7 @@ void main() {
       await tester.tap(find.text('완료'));
       await tester.pumpAndSettle();
       expect(auth.identity, isNull);
+      expect(auth.notice, contains('계정 삭제를 완료했어요'));
       expect(find.text('계정과 모든 자료를 삭제할까요?'), findsNothing);
       expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
     },

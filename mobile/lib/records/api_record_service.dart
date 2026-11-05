@@ -5,20 +5,65 @@ import 'package:http/http.dart' as http;
 
 import '../auth/auth_service.dart';
 import '../services/backend_service.dart';
-import 'record_models.dart';
-import 'record_service.dart';
-import 'record_review.dart';
+import 'personalization.dart';
 import 'record_deletion.dart';
+import 'record_models.dart';
+import 'record_playback.dart';
+import 'record_review.dart';
+import 'record_service.dart';
 
 /// Supply only after agreeing the upload protocol. Must reconcile an ambiguous
-/// previous transfer, preserve record ID and never overwrite an existing original.
+/// previous transfer, preserve record ID and never overwrite an existing
+/// original. Report progress with `upload.reportProgress` and stop with
+/// `UploadCancelled` once `upload.cancelToken` is cancelled.
+/// See `HttpRecordFileTransport` for a streaming implementation.
 abstract class RecordFileTransport {
   Future<void> ensureUploaded(RecordUpload upload);
 }
 
+/// Authenticated access to the backend for the optional hooks below.
+abstract interface class RecordApiClient {
+  Future<http.Response> send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Map<String, Object>? body,
+  });
+}
+
+/// Capabilities the 2026-10-13 draft does not define. Each stays disabled
+/// (and its button hidden or inert) until the app and backend agree on the
+/// request; the agreed request is then plugged in here, not guessed in the app.
+class RecordApiExtensions {
+  const RecordApiExtensions({
+    this.retryProcessing,
+    this.retryDeletion,
+    this.originalAudio,
+    this.deleteAccount,
+  });
+
+  /// Asks the server to run speech recognition again for a failed record.
+  final Future<void> Function(RecordApiClient api, String recordId)?
+  retryProcessing;
+
+  /// Resumes a failed deletion worker for the same job.
+  final Future<DeletionJob> Function(RecordApiClient api, DeletionJob job)?
+  retryDeletion;
+
+  /// Resolves where the original audio of a record can be streamed from.
+  final Future<RecordAudioSource> Function(
+    RecordApiClient api,
+    String recordId,
+  )?
+  originalAudio;
+
+  /// Starts deletion of the whole account and returns its job.
+  final Future<DeletionJob> Function(RecordApiClient api)? deleteAccount;
+}
+
 /// Adapter for the supplied 2026-10-13 *draft*. Not enabled by main.dart.
 /// No invented file endpoint, bucket path, persona ID or server size limit.
-class ApiRecordService extends RecordService {
+class ApiRecordService extends RecordService implements RecordApiClient {
   ApiRecordService({
     required this.client,
     required this.baseUrl,
@@ -26,18 +71,75 @@ class ApiRecordService extends RecordService {
     required this.personaId,
     required this.policy,
     required this.fileTransport,
-  }) : _backend = BackendService(auth);
+    this.extensions = const RecordApiExtensions(),
+    DateTime Function()? clock,
+  }) : _backend = BackendService(auth),
+       _clock = clock ?? DateTime.now;
   final http.Client client;
   final Uri baseUrl;
   final AuthService auth;
   final String personaId;
+  final RecordApiExtensions extensions;
   @override
   final RecordPolicy policy;
   final RecordFileTransport fileTransport;
   final BackendService _backend;
-  final _confirmedIds = <String>{};
+  final DateTime Function() _clock;
+
+  /// Records whose confirmed transcript has been seen, with the confirmation
+  /// time. The record object itself carries no confirmation evidence.
+  final _confirmedAt = <String, DateTime>{};
+
+  /// When a record was last seen with an unconfirmed draft (rechecked lazily).
+  final _seenUnconfirmed = <String, DateTime>{};
+  static const _recheck = Duration(seconds: 30);
   @override
   bool get isPreview => false;
+  @override
+  bool get canRetryProcessing => extensions.retryProcessing != null;
+  @override
+  bool get canRetryDeletion => extensions.retryDeletion != null;
+  @override
+  bool get canDeleteAccount => extensions.deleteAccount != null;
+  @override
+  bool get canPlayOriginal => extensions.originalAudio != null;
+
+  @override
+  Future<http.Response> send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Map<String, Object>? body,
+  }) => _request(method, path, query: query, body: body);
+
+  @override
+  Future<void> retryProcessing(String id) {
+    final hook = extensions.retryProcessing;
+    if (hook == null) throw UnsupportedError('Retry API not agreed');
+    return hook(this, id);
+  }
+
+  @override
+  Future<DeletionJob> retryDeletion(DeletionJob job) {
+    final hook = extensions.retryDeletion;
+    if (hook == null) throw UnsupportedError('Retry contract not agreed');
+    return hook(this, job);
+  }
+
+  @override
+  Future<DeletionJob> deleteAccount() {
+    final hook = extensions.deleteAccount;
+    if (hook == null) throw UnsupportedError('Account deletion not agreed');
+    return hook(this);
+  }
+
+  @override
+  Future<RecordAudioSource> originalAudio(String recordId) {
+    final hook = extensions.originalAudio;
+    if (hook == null) throw UnsupportedError('Original audio not agreed');
+    return hook(this, recordId);
+  }
+
   @override
   Future<DeletionJob> deleteRecord(String recordId) async =>
       DeletionJob.fromJson(
@@ -68,6 +170,64 @@ class ApiRecordService extends RecordService {
     }
   }
 
+  bool _fatal(BackendFailure failure) =>
+      failure.kind == BackendFailureKind.unauthenticated ||
+      failure.kind == BackendFailureKind.staleSession;
+
+  Future<List<TextVersion>> _versions(String recordId) async {
+    final response = await _request('GET', '/records/$recordId/text-versions');
+    return ((jsonDecode(response.body) as Map<String, dynamic>)['items']
+            as List)
+        .map((e) => TextVersion.fromJson(e as Map<String, dynamic>))
+        .where(
+          (e) =>
+              e.recordId == recordId &&
+              (e.status == 'draft' || e.status == 'confirmed'),
+        )
+        .toList()
+      ..sort((a, b) => b.revision.compareTo(a.revision));
+  }
+
+  /// A ready persona profile does not prove this record was indexed, so the
+  /// reflection state is derived from when the profile was last updated.
+  Future<ProfileEvidence> _profileEvidence() async {
+    try {
+      final result = await _request(
+        'GET',
+        '/personas/$personaId/style-profile',
+      );
+      final body = jsonDecode(result.body);
+      if (body is Map && body['status'] == 'ready') {
+        final stamp = body['updated_at'] ?? body['created_at'];
+        final at = stamp is String ? DateTime.tryParse(stamp) : null;
+        return at == null
+            ? const ProfileEvidence.unavailable()
+            : ProfileEvidence.ready(at);
+      }
+      return const ProfileEvidence.none();
+    } on BackendFailure catch (failure) {
+      if (_fatal(failure)) rethrow;
+      return const ProfileEvidence.unavailable();
+    } on FormatException {
+      /* Keep the confirmed text available if the profile reply is malformed. */
+      return const ProfileEvidence.unavailable();
+    }
+  }
+
+  RecordEntry _confirmed(
+    RecordEntry record,
+    DateTime confirmedAt,
+    ProfileEvidence profile,
+  ) => record.copyWith(
+    textConfirmed: true,
+    confirmedAt: confirmedAt,
+    personalization: derivePersonalization(
+      confirmedAt: confirmedAt,
+      profile: profile,
+      now: _clock().toUtc(),
+    ),
+  );
+
   @override
   Future<RecordReview> review(String recordId) async {
     final record = await _find(recordId);
@@ -77,48 +237,21 @@ class ApiRecordService extends RecordService {
     if (record.status != RecordStatus.ready) {
       return RecordReview(record: record);
     }
-    final response = await _request('GET', '/records/$recordId/text-versions');
-    final versions =
-        ((jsonDecode(response.body) as Map<String, dynamic>)['items'] as List)
-            .map((e) => TextVersion.fromJson(e as Map<String, dynamic>))
-            .where(
-              (e) =>
-                  e.recordId == recordId &&
-                  (e.status == 'draft' || e.status == 'confirmed'),
-            )
-            .toList()
-          ..sort((a, b) => b.revision.compareTo(a.revision));
-    var profile = ReviewProfileState.unknown;
-    if (versions.isNotEmpty && versions.first.status == 'draft') {
-      _confirmedIds.remove(recordId);
+    final versions = await _versions(recordId);
+    final latest = versions.isEmpty ? null : versions.first;
+    if (latest == null || latest.status != 'confirmed') {
+      _confirmedAt.remove(recordId);
+      _seenUnconfirmed[recordId] = _clock();
+      return RecordReview(record: record, version: latest);
     }
-    if (versions.isNotEmpty && versions.first.status == 'confirmed') {
-      _confirmedIds.add(recordId);
-      // A ready persona profile does not prove this record has been indexed.
-      try {
-        final result = await _request(
-          'GET',
-          '/personas/$personaId/style-profile',
-        );
-        final body = jsonDecode(result.body);
-        if (body is Map && body['status'] == 'ready') {
-          profile = ReviewProfileState.available;
-        }
-      } on BackendFailure catch (failure) {
-        if (failure.kind == BackendFailureKind.unauthenticated ||
-            failure.kind == BackendFailureKind.staleSession) {
-          rethrow;
-        }
-      } on FormatException {
-        /* Keep confirmed text available if profile response is malformed. */
-      }
-    }
+    final at = latest.confirmedAt ?? latest.updatedAt;
+    _confirmedAt[recordId] = at;
+    final profile = await _profileEvidence();
+    final enriched = _confirmed(record, at, profile);
     return RecordReview(
-      record: versions.isNotEmpty && versions.first.status == 'confirmed'
-          ? record.withTextConfirmed()
-          : record,
-      version: versions.isEmpty ? null : versions.first,
-      profile: profile,
+      record: enriched,
+      version: latest,
+      profile: enriched.personalization,
     );
   }
 
@@ -170,7 +303,8 @@ class ApiRecordService extends RecordService {
         confirmed.confirmedAt == null) {
       throw StateError('Invalid confirmation');
     }
-    _confirmedIds.add(version.recordId);
+    _confirmedAt[version.recordId] = confirmed.confirmedAt!;
+    _seenUnconfirmed.remove(version.recordId);
     return confirmed;
   }
 
@@ -228,14 +362,65 @@ class ApiRecordService extends RecordService {
       final page = jsonDecode(response.body) as Map<String, dynamic>;
       final items = page['items'] as List;
       for (final item in items) {
-        var record = RecordEntry.fromJson(item as Map<String, dynamic>);
-        if (_confirmedIds.contains(record.id)) {
-          record = record.withTextConfirmed();
-        }
+        final record = RecordEntry.fromJson(item as Map<String, dynamic>);
         if (record.status != RecordStatus.deleting) records[record.id] = record;
       }
-      if (items.length < 100) return records.values.toList();
+      if (items.length < 100) break;
     }
+    return _withConfirmation(records.values.toList());
+  }
+
+  /// Marks which ready records have a confirmed transcript and how far each
+  /// one has reached personalization. Looks at most a few records up at once;
+  /// a lookup that fails leaves that record as "확인 필요" instead of failing
+  /// the whole list.
+  Future<List<RecordEntry>> _withConfirmation(List<RecordEntry> records) async {
+    final now = _clock();
+    final lookups = records.where((r) {
+      if (r.status != RecordStatus.ready || _confirmedAt.containsKey(r.id)) {
+        return false;
+      }
+      final seen = _seenUnconfirmed[r.id];
+      return seen == null || now.difference(seen) > _recheck;
+    }).toList();
+    for (var i = 0; i < lookups.length; i += 4) {
+      await Future.wait([
+        for (final record in lookups.skip(i).take(4))
+          () async {
+            try {
+              final versions = await _versions(record.id);
+              final latest = versions.isEmpty ? null : versions.first;
+              if (latest != null && latest.status == 'confirmed') {
+                _confirmedAt[record.id] =
+                    latest.confirmedAt ?? latest.updatedAt;
+                _seenUnconfirmed.remove(record.id);
+              } else {
+                _seenUnconfirmed[record.id] = now;
+              }
+            } on BackendFailure catch (failure) {
+              if (_fatal(failure)) rethrow;
+            } on FormatException {
+              /* Leave this record unchecked. */
+            }
+          }(),
+      ]);
+    }
+    final confirmed = records
+        .where(
+          (r) =>
+              r.status == RecordStatus.ready && _confirmedAt.containsKey(r.id),
+        )
+        .toList();
+    if (confirmed.isEmpty) return records;
+    final profile = await _profileEvidence();
+    return [
+      for (final record in records)
+        if (record.status == RecordStatus.ready &&
+            _confirmedAt.containsKey(record.id))
+          _confirmed(record, _confirmedAt[record.id]!, profile)
+        else
+          record,
+    ];
   }
 
   Future<RecordEntry?> _find(String id) async {
@@ -248,6 +433,18 @@ class ApiRecordService extends RecordService {
   }
 
   @override
+  Future<void> discardUpload(RecordUpload upload) async {
+    if (!upload.reservationRequested || upload.stage == UploadStage.done) {
+      return;
+    }
+    final existing = await _find(upload.id);
+    if (existing == null || existing.status == RecordStatus.deleting) return;
+    // An upload that already completed is a finished record: keep it.
+    if (existing.status != RecordStatus.uploading) return;
+    await _request('DELETE', '/records/${upload.id}');
+  }
+
+  @override
   Future<void> upload(
     RecordUpload upload,
     void Function() onStageChanged,
@@ -257,6 +454,7 @@ class ApiRecordService extends RecordService {
     if (upload.consentVersion != policy.consentVersion) {
       throw StateError('Consent version changed');
     }
+    upload.cancelToken.throwIfCancelled();
     if (upload.stage == UploadStage.reserve) {
       RecordEntry? existing;
       if (upload.reservationRequested) existing = await _find(upload.id);
@@ -265,7 +463,10 @@ class ApiRecordService extends RecordService {
         final response = await _request(
           'POST',
           '/records',
-          body: upload.reservationJson(personaId),
+          body: upload.reservationJson(
+            personaId,
+            includeSpeakers: policy.sendSpeakerSelection,
+          ),
         );
         existing = RecordEntry.fromJson(
           jsonDecode(response.body) as Map<String, dynamic>,
@@ -281,7 +482,11 @@ class ApiRecordService extends RecordService {
       onStageChanged();
     }
     if (upload.stage == UploadStage.transfer) {
+      upload.cancelToken.throwIfCancelled();
+      upload.reportProgress(0);
       await _backend.run(() => fileTransport.ensureUploaded(upload));
+      // The file is stored but the user cancelled meanwhile: discard it.
+      upload.cancelToken.throwIfCancelled();
       upload.stage = UploadStage.complete;
       onStageChanged();
     }

@@ -101,7 +101,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 
   VoidCallback _endDeletedAccountSession(int generation) => () {
-    widget.auth.invalidateSession(requestGeneration: generation);
+    unawaited(
+      widget.auth
+          .completeAccountDeletion(requestGeneration: generation)
+          .catchError((Object _) {}),
+    );
   };
   @override
   Widget build(BuildContext context) {
