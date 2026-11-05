@@ -1,12 +1,26 @@
 """Single-pass r1 service adaptation; policy defaults remain PROPOSAL."""
 from dataclasses import asdict
 import json
+import logging
+import traceback
 from typing import Protocol
 
 from inference import ContextLimitExceeded, Generated, Prepared, Request
 from persona_contract import JSON, PersonaGenerated, PersonaRequest
 from persona_guard import GuardResult, PERSONA_RULES, PersonaIdentity, Register, check_reply
 from rag.retrieval_v2 import evidence_json
+
+
+def log_failure(request_id: str, error: Exception) -> None:
+    """Record persona500 location/type, never exception values or frame locals."""
+    stack = [
+        {"file": frame.f_code.co_filename.rsplit("/", 1)[-1],
+         "function": frame.f_code.co_name, "line": line}
+        for frame, line in traceback.walk_tb(error.__traceback__)
+    ]
+    logging.getLogger("baseline.http").error(
+        "request_id=%s status=500 exception_type=%s stack=%s",
+        request_id, type(error).__name__, json.dumps(stack, ensure_ascii=True))
 
 
 class PersonaGenerator(Protocol):

@@ -10,7 +10,7 @@ import time
 import baseline
 from inference import ContextLimitExceeded, Inference, Request
 import persona_contract
-from persona_adapter import PersonaGenerator, PersonaInference
+from persona_adapter import PersonaGenerator, PersonaInference, log_failure
 
 RAW_LIMIT = 262144
 ID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -151,8 +151,10 @@ class Service:
                     "finish_reason": result.finish_reason, "ai_generated": True,
                     "context": {"used_history_turns": prepared.used_history_turns,
                                 "dropped_history_turns": prepared.dropped_history_turns}}
-        except Exception:
+        except Exception as error:
             # Compute boundary: all failures map to the safe fixed envelope.
+            if isinstance(request, persona_contract.PersonaRequest):
+                log_failure(request.request_id, error)
             job.status, job.body = 500, error_body(500, request.request_id)
         finally:
             with self.lock:
@@ -265,7 +267,9 @@ class Handler(BaseHTTPRequestHandler):
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
-        except Exception:
+        except Exception as error:
+            if isinstance(request, persona_contract.PersonaRequest):
+                log_failure(request.request_id, error)
             self.respond(500, error_body(500, request_id))
             return
         status, job = service.accept(request, prepared)
