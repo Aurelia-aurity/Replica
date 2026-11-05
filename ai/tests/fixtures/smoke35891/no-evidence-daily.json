@@ -1,0 +1,46 @@
+{
+  "case": "no-evidence-daily",
+  "synthetic_only": true,
+  "request_id": "910575b9-525b-44f8-868d-1880cfe11958",
+  "request": {
+    "request_id": "910575b9-525b-44f8-868d-1880cfe11958",
+    "message": "안녕!",
+    "history": [],
+    "max_new_tokens": 160,
+    "persona_id": "11b58bec-762c-4a40-8419-c5c4f80956a8",
+    "persona": {
+      "display_name": "온유",
+      "provider_address": null
+    },
+    "source_revision": 1,
+    "style_profile": {
+      "id": "87efd92e-236b-424c-8001-d4896f1a79f7",
+      "version": 1,
+      "source_revision": 1,
+      "source_snapshot_id": "72b5e969-9fe3-47ec-92d7-ee8cdd4951ee",
+      "content": {
+        "schema_version": 1,
+        "speech_style": {
+          "tone": [
+            "해요체"
+          ],
+          "address_terms": [],
+          "sentence_endings": [],
+          "frequent_expressions": []
+        },
+        "conversation_habits": [],
+        "limitations": []
+      }
+    },
+    "evidence": []
+  },
+  "raw_output": "안녕하세요!",
+  "finish_reason": "stop",
+  "input_tokens": 664,
+  "output_tokens": 5,
+  "max_new_tokens": 160,
+  "parsed_citation_result": {
+    "status": "invalid",
+    "exception_type": "JSONDecodeError"
+  }
+}
