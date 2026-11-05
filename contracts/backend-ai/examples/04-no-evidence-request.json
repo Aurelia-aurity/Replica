@@ -1,6 +1,10 @@
 {
   "request_id": "00000013-0013-4013-8013-000000000013",
   "persona_id": "00000002-0002-4002-8002-000000000002",
+  "persona": {
+    "display_name": "엄마",
+    "provider_address": null
+  },
   "source_revision": 3,
   "message": "내가 어릴 때 가장 좋아했던 장난감이 뭐였지?",
   "history": [],
