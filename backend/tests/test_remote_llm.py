@@ -228,14 +228,49 @@ def test_dropped_connection_is_timeout_unknown_and_not_retried():
     assert len(calls) == 1
 
 
-def test_total_timeout_is_ai_timeout():
-    async def slow(request: httpx.Request) -> httpx.Response:
-        await asyncio.sleep(1)
-        return httpx.Response(200)
+def test_total_timeout_is_ai_timeout(monkeypatch):
+    async def scenario():
+        entered, release, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        native_timeout = asyncio.timeout
+        deadlines, calls = [], []
 
-    client = RemoteLLMClient("http://ai.test", 0.05, transport=httpx.MockTransport(slow))
-    err = raised(client)
-    assert (err.http_status, err.code, err.retryable) == (504, "AI_TIMEOUT", True)
+        def controlled_timeout(delay):
+            # Start expiry only after the transport signals entry, independent of CPU speed.
+            scope = native_timeout(None)
+            deadlines.append((delay, scope))
+            return scope
+
+        monkeypatch.setattr("app.clients.llm.asyncio.timeout", controlled_timeout)
+
+        async def slow(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            entered.set()
+            try:
+                await asyncio.wait_for(release.wait(), timeout=5)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return httpx.Response(200)
+
+        client = RemoteLLMClient("http://ai.test", 0.05, transport=httpx.MockTransport(slow))
+        task = asyncio.create_task(client.generate("synthetic question", [], None))
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=2)
+            assert [delay for delay, _ in deadlines] == [0.05]
+            scope = deadlines[0][1]
+            scope.reschedule(asyncio.get_running_loop().time())
+            with pytest.raises(AppError) as caught:
+                await asyncio.wait_for(task, timeout=2)
+            err = caught.value
+            assert (err.http_status, err.code, err.retryable) == (504, "AI_TIMEOUT", True)
+            assert scope.expired() and cancelled.is_set()
+            assert len(calls) == 1
+        finally:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(scenario())
 
 
 # --- 한도: 본문 256 KiB, 문자열 16000자 ---
