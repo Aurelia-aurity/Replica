@@ -233,14 +233,15 @@
 
 ## 8. 저장소 내 재현 도구 경로 및 재현 범위 제한
 
-저장소에는 프롬프트 구성, 실험군 빌드, 입력 길이 감사와 생성 실행 도구가 포함되어 있다. 자동 채점과 최종 판정 집계 코드는 별도로 보관한다.
+저장소는 3라운드 실행 스크립트를 포함하여 프롬프트 구성, 실험군 빌드, 입력 길이 감사 및 생성 실행 도구를 담고 있다. 자동 채점과 최종 판정 집계 코드는 별도로 보관한다.
 
 - 이슈 77 모델 비교 실행 도구 (`experiments/model77/`):
   - `experiments/model77/README.md`: 실행 절차 및 옵션 안내
   - `experiments/model77/profiles.json`: 1단계 5개 모델의 고정 리비전 및 채팅 템플릿 프로필
   - `experiments/model77/prompt.py`, `experiments/model77/register-template.json`, `experiments/model77/register-14b-template.json`: 라운드별 화법 지시문 및 프롬프트 템플릿 렌더링
   - `experiments/model77/build_arm.py`, `experiments/model77/arms.py`: 실험군 매니페스트 구성 및 조건 분리
-  - `experiments/model77/prepare.py`, `experiments/model77/audit.py`, `experiments/model77/decision.py`, `experiments/model77/decision.sbatch`: 평가 입력 준비, 토크나이저별 입력 길이 감사, 생성 실행 및 Slurm 배치 스크립트
+  - `experiments/model77/prepare.py`, `experiments/model77/audit.py`, `experiments/model77/decision.py`, `experiments/model77/decision.sbatch`는 각각 평가 입력 준비 도구, 토크나이저 입력 길이 감사 도구, 생성 실행기, 1·2라운드 Slurm 래퍼에 해당한다.
+  - `experiments/model77/decision_v3.sbatch`는 작업 `35873`에서 `run.sbatch`로 실행된 3라운드 Slurm 스크립트 원본이며 원격 원본과 바이트 단위로 일치한다. 동결된 실행 목록에 기록된 SHA-256 해시는 `fe7b93f39857b7277be18bdd9c51d1b8830857957e878a0f02612774f92bc79a`이다.
 - RAG 근거 검색 및 생성 공통 모듈 (`experiments/rag/`):
   - `experiments/rag/README.md`
   - `experiments/rag/retrieval_v2.py`

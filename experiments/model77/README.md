@@ -1,16 +1,17 @@
-# Model 77 GPU load and generation smoke
+# Issue 77 model re-comparison tools
 
-Operational smoke only, not a model comparison or quality evaluation.
-No service model is selected by this run.
+Tools for the three-round model comparison, including input preparation,
+tokenizer audits, arm isolation and generation. `smoke.py` is operational smoke
+only, not a quality evaluation. The comparison does not finalize a service model.
 
 ## Local checks
 
 From the repository root, without GPU dependencies:
 
 ```bash
-python3 -m unittest discover -s experiments/model77 -v
-python3 -m py_compile experiments/model77/smoke.py
-bash -n experiments/model77/smoke.sbatch
+python3 -m unittest discover -s experiments/model77 -p 'test_*.py' -v
+python3 -m py_compile experiments/model77/*.py
+for script in experiments/model77/*.sbatch; do bash -n "$script" || exit; done
 ```
 
 ## School execution
@@ -224,3 +225,54 @@ seals and frozen retrieval files under the authorization directory's
 `provenance/`. `CODE_COMMIT.txt` supplies the commit identity. Normal legacy/DEV
 execution remains available without the new flags. This is generation plumbing,
 not a replacement for the separate arm-keyed v3 judge/operations envelope.
+
+### Frozen ROUND 3 launcher
+
+`decision_v3.sbatch` is the exact script submitted as `run.sbatch` for Slurm job
+`35873`, not a new mode of the legacy `decision.sbatch` wrapper. Its SHA-256 is
+`fe7b93f39857b7277be18bdd9c51d1b8830857957e878a0f02612774f92bc79a`,
+verified against the remote `inputs-v3/run.sbatch` and the frozen launch
+`SHA256SUMS`. That inventory's SHA-256 is
+`2e784a819b968fc174e936bf44afcc1aea2281d405913128d7d08add39fe9455`,
+also recorded at submission. The runner was frozen at `8cce17f` (rebased as
+`a50c229`); adding this archival copy does not change the code that produced
+the results. Absolute school paths and the Slurm node allocation are preserved
+byte-for-byte, following the neighbouring committed sbatch files. The script
+contains no connection address, password, token or other credential.
+
+The launch form recorded for the frozen input directory, after separate
+authorization and checksum preflight, is:
+
+```bash
+cd /abr/coss40/model-77/inputs-v3
+sbatch --job-name=model77-decision-v3 --partition=p02 --nodelist=DIS02 \
+  --gres=gpu:1 --time=04:00:00 \
+  --chdir=/abr/coss40/model-77/inputs-v3 \
+  --output=/abr/coss40/model-77/decision-v3-%j.out \
+  --export=ALL,MODEL77_RUN_ID=decision-v3 run.sbatch
+```
+
+The archived repository filename is `experiments/model77/decision_v3.sbatch`;
+the frozen input directory uses `run.sbatch`, which is bound by its inventory.
+The three arms run in BASE, CAND, DIAG order. BASE/CAND failures stop selection
+generation; DIAG failure is retained as informational. The frozen arm inputs,
+authorization, provenance and checksum inventory are kept outside the repo.
+This command documents the completed run, not authorization to submit it again.
+
+## Known follow-ups (frozen run code unchanged)
+
+These review findings are deferred to preserve the provenance of the completed
+rounds; none is repaired in the code that generated the reported results:
+
+- `decision.py:367`: NVML sampler cleanup in `finally` can mask a pending
+  generation exception. A future change should retain the primary failure.
+- `decision.py:73`: a truncated final JSONL line fails closed with a bare
+  `JSONDecodeError`; add output-path and line-number context in a future change.
+- `build_arm.py`: failure during the tokenizer audit can leave partial output.
+  The existing-directory guard blocks reuse; an incomplete directory is not a
+  sealed arm. A future change should publish atomically or document an explicit
+  operator cleanup/rebuild procedure.
+- `smoke.sbatch` and `smoke_followup.sbatch`: `set -uo pipefail` intentionally
+  permits later models after a failure, but the unguarded `cd` can leave the
+  process in the submission directory. Guard `cd` explicitly in a future change
+  without removing the intended per-model continuation.
