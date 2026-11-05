@@ -2,7 +2,9 @@
 
 Replica 서버의 `일반` 채팅·음성 채널을 유지하고 `개발-알림` 채팅 채널과 `회의` 음성 채널을 사용한다. 기존 대화 공간은 그대로 사용한다. 결정·일정·완료 근거는 GitHub 이슈·PR 또는 Notion에 기록한다.
 
-## 알림 규칙
+## 알림 규칙 (비활성화된 이전 경로)
+
+> **이전 경로 안내:** 이 알림 규칙 표와 `## Actions 설정`, `## 최초 활성화와 확인`, `## Draft PR에서 병합 전 검증` 절은 비활성화된 기존 `GitHub → Discord` 워크플로와 `automation/discord-state` ledger 경로를 설명합니다. #79에서 관련 코드를 2026-11-10경 삭제할 예정입니다. 현재 운영 규칙은 문서 끝의 `## 현재 알림 경로(#79)`를 따릅니다.
 
 | 사건 | 구분 | 멘션 |
 |---|---|---|
@@ -34,7 +36,9 @@ CI 복구는 과거 실패 실행의 신원·attempt와 현재 최신 성공의 
 
 백로그 관측을 사용하려면 Actions Variable `PROJECT_STATUS_OPTIONS`에 sync workflow와 같은 6개 상태 이름→실제 옵션 ID JSON을 등록한다. 기존 5개 옵션 ID를 보존하고 `취소` ID는 실제 Project readback으로 검증한 값을 쓴다. 변수가 없거나 Project의 현재 mapping과 맞지 않으면 백로그 주석을 생략하며 다른 알림 흐름은 계속된다. 이 값은 읽기 전용 관측에만 쓰이고, 알림 작업에는 기존 Project read 권한 외 권한을 추가하지 않는다.
 
-## Actions 설정
+## Actions 설정 (이전 경로)
+
+아래 설정 표는 비활성화된 ledger 경로 기준입니다. `DISCORD_WEBHOOK_URL`은 현재 팀 채널 webhook이며 `DISCORD_USER_MAP`도 새 경로에서 공유합니다. 나머지 설정은 이전 경로 전용입니다.
 
 서버 `Replica` → `개발-알림` → 채널 설정 → 연동에서 incoming Webhook을 준비하고 저장소 Actions Secret `DISCORD_WEBHOOK_URL`에 직접 등록한다. Webhook URL을 채팅·문서·코드·로그에 붙이지 않는다. 별도 Discord 봇은 필요 없다.
 
@@ -53,7 +57,9 @@ Project 선택 토큰은 classic scope `read:project`가 확인되고 쓰기 sco
 
 `.github/discord-notifications.json`의 `ci_workflows`는 현재 빈 목록이다. #18에서 CI 자체를 만들지 않는다. CI 추가 후 담당자가 검토한 실제 workflow 숫자 ID와 경로를 `{"id":123,"path":".github/workflows/ci.yml"}` 형식으로 지정한다. 빠른 완료 알림이 필요하면 `discord-notify.yml`의 `workflow_run.workflows`에 그 이름도 추가한다. 정기 조회는 15분 간격으로 누락된 이벤트를 보완한다. 알림 작업과 동기화 작업은 CI 목록에 넣지 않는다.
 
-## 최초 활성화와 확인
+## 최초 활성화와 확인 (이전 경로)
+
+이 절은 비활성화된 ledger 워크플로의 최초 활성화·검증 절차를 설명합니다.
 
 1. 검토된 구현이 main에 반영된 후 Webhook·채널 ID·계정 매핑을 등록하고 `DISCORD_NOTIFICATIONS_ENABLED=true`로 설정한다.
 2. PM `Just-Simple0`가 main에서 `GitHub → Discord`를 수동 실행한다. `approved_sha`에 확인한 main 전체 40자리 SHA를 넣는다. 재실행 대신 새 수동 실행을 사용한다.
@@ -63,7 +69,9 @@ Project 선택 토큰은 classic scope `read:project`가 확인되고 쓰기 sco
 
 알림 상태는 `automation/discord-state` 브랜치의 `discord-state.json`에 저장한다. 초기 브랜치는 데이터 파일 하나만 가진 독립된 root commit으로 생성하며 main을 수정하지 않는다. 단일 Actions concurrency 그룹과 기존 파일 SHA 비교, 저장 후 재조회가 충돌과 중복을 방지한다. 파일이 사라지거나 손상되면 실패 처리하며 정기 작업은 기준선을 다시 만들지 않는다. 상태 파일에는 알림 본문·전송 상태·메시지 ID·관측 키가 저장되며 비밀값은 저장하지 않는다. 상태 크기 제한을 초과하면 실패 처리하므로 장기 운영 시 크기를 점검한다.
 
-## Draft PR에서 병합 전 검증
+## Draft PR에서 병합 전 검증 (이전 경로)
+
+이 절은 비활성화된 ledger 워크플로의 Draft PR 검증 절차를 설명합니다.
 
 기존 workflow가 main에 등록되어 있으므로, 같은 저장소의 검토된 Draft 브랜치 버전을 `--ref`로 수동 실행할 수 있다. PM은 현재 Draft PR HEAD의 전체 SHA를 확인하고 다음과 같이 실행한다.
 
@@ -125,9 +133,9 @@ schema=2는 observed_at과 observation_uncertainty_seconds를 함께 제공합�
 
 후속 유효 관측이 없는 episode는 검증된 timer_origin_at에서 `now - timer_origin_at - 120초 >= 15분`일 때 다음 알림 실행에서 지연 안내를 만들 수 있습니다. 시각 미확정이어도 후속 유효 snapshot이 있으면 미전송 지연 후보를 취소합니다. 최초 시각이 없는 legacy 기록은 과거 시각을 만들지 않고 다음 검증된 관측에서 별도 timer origin을 시작합니다. schema=1과 기존 outbox/pending/streak/alert/cursor는 보존합니다. 오차와 Actions/Discord 실행 지연이 더해지므로 15분 정시 전달을 보장하지 않습니다. 알림 경로 자체가 멈추면 같은 경로로 정시 안내할 수 없습니다. 불확실한 전송의 수동 확인 규칙은 유지합니다.
 
-## 새 알림 경로(#79, 전환 준비 중)
+## 현재 알림 경로(#79)
 
-기존 상태 브랜치(`automation/discord-state`) 기반 ledger 알림 경로는 전환(cutover) 전까지 그대로 유지된다. #79에서는 상태 저장이나 주기적 조회 없이 동작하는 이벤트 기반 워크플로(`GitHub → Discord events`, `GitHub → Discord run alerts`)와 스크립트 단위 테스트 전용 `CI` 워크플로를 추가해 단계적으로 전환한다. 기존 운영 워크플로 3개에서는 단위 테스트 실행 단계만 분리하고, 기존 코드와 설정은 그대로 둔다.
+상태 저장이나 주기적 조회 없이 동작하는 이벤트 기반 워크플로(`GitHub → Discord events`, `GitHub → Discord run alerts`)가 운영 중이며 현재 `DISCORD_EVENTS_MODE=live`다. 실제 채널에서 PR 병합 알림과 동기화 보류 해제 알림을 확인했다. 기존 상태 브랜치(`automation/discord-state`) 기반 ledger 워크플로(`GitHub → Discord`)는 비활성화됐다. 관련 코드는 #79에서 2026-11-10경 삭제할 예정이다.
 
 ### 동작 모드와 설정
 
@@ -137,7 +145,7 @@ schema=2는 observed_at과 observation_uncertainty_seconds를 함께 제공합�
 |---|---|
 | `off` | 기본값(미설정 포함). 실행 사유만 로그에 남기고 알림을 보내지 않는다 |
 | `shadow` | 검증용 모드. `DISCORD_SHADOW_WEBHOOK_URL`로만 전송하며, 해당 시크릿이 없으면 메시지 JSON을 Actions step summary에 기록한다. 공개 저장소이므로 summary의 Discord 사용자 ID는 `[Discord user]`로 가린다. 운영 Webhook으로 대체 전송(fallback)하지 않는다 |
-| `live` | 실전송 모드. 사건 종류에 따라 팀 채널과 PM 채널 Webhook으로 전송한다 |
+| `live` | 현재 운영 모드. 사건 종류에 따라 팀 채널과 PM 채널 Webhook으로 전송한다 |
 
 | 저장 위치 | 이름 | 값·역할 |
 |---|---|---|
@@ -180,9 +188,8 @@ Issue 생성 알림에는 Project 토큰 조회나 백로그 상태 확인 없�
 - 워크플로 실행 로그에는 URL·자격증명·원시 응답 본문을 제외한 안전한 실패 사유(`Error` 메시지)만 출력한다. 예상치 못한 예외는 예외 클래스 이름만 기록하며, 원시 예외 상세나 traceback은 출력하지 않는다.
 - 기본 `GITHUB_TOKEN`으로 발생한 이벤트는 GitHub Actions 정책상 후속 워크플로를 트리거하지 않는다.
 
-### 전환(Cutover) 절차
+### 이전 경로 정리
 
-1. `DISCORD_EVENTS_MODE=shadow` 상태에서 기존 ledger 경로와 새 알림 경로의 결과를 비교해 검증한다.
-2. 검증이 완료되면 `DISCORD_EVENTS_MODE=live`로 전환한다.
-3. 기존 알림 워크플로(`GitHub → Discord`)를 비활성화한다.
-4. 전환(cutover) 후 약 1주일이 지난 뒤 기존 ledger 알림 코드를 삭제한다.
+1. 새 알림 경로(`GitHub → Discord events`, `GitHub → Discord run alerts`)를 `DISCORD_EVENTS_MODE=live`로 운영한다.
+2. 기존 ledger 알림 workflow(`GitHub → Discord`)는 비활성화된 상태다.
+3. #79에서 기존 ledger 알림 코드를 2026-11-10경 삭제할 예정이다.
