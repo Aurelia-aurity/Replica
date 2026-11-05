@@ -12,6 +12,22 @@ REVIEW = {**OPEN, "ready": True}
 
 
 class RuleTests(unittest.TestCase):
+    def test_named_general_change_cases(self):
+        # Given: independently specified one-sided and two-sided examples.
+        cases = [
+            ("only_notion", "준비 중", "백로그", "준비 중", True, False),
+            ("only_project", "백로그", "진행 중", "진행 중", False, True),
+            ("both_different", "준비 중", "진행 중", "준비 중", True, False),
+            ("both_equal", "진행 중", "진행 중", "진행 중", False, False),
+        ]
+        for name, notion, project, target, wp, wn in cases:
+            with self.subTest(name=name):
+                # When:
+                result = decide("백로그", notion, project, OPEN, OPEN)
+                # Then:
+                self.assertEqual(result, {"target": target, "write_project": wp,
+                                          "write_notion": wn, "note": ""})
+
     def test_every_status_triple_when_facts_unchanged(self):
         # Given: every baseline and pair, including the protected cancellation.
         for last, notion, project in itertools.product(STATUSES, repeat=3):
@@ -93,6 +109,8 @@ class RuleTests(unittest.TestCase):
             (None, None, "진행 중", "진행 중", False, True),
             (None, "bad", "준비 중", "준비 중", False, True),
             (None, None, None, None, False, False),
+            (None, "취소", None, None, False, False),
+            (None, "bad", None, None, False, False),
             ("진행 중", "", None, "진행 중", True, True),
         ]
         for last, notion, project, target, wp, wn in cases:

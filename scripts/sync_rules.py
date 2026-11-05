@@ -29,14 +29,10 @@ def decide(last_synced: str | None, notion_status: str | None,
     """
     target = None
     if facts["state"] == "CLOSED":
-        match facts["reason"]:
-            case "COMPLETED":
-                target = "완료"
-            case "NOT_PLANNED" | "DUPLICATE":
-                target = "취소"
-            case _:
-                return {"target": None, "write_project": False,
-                        "write_notion": False, "note": "확인 필요"}
+        target = {"COMPLETED": "완료", "NOT_PLANNED": "취소", "DUPLICATE": "취소"}.get(facts["reason"])
+        if target is None:
+            return {"target": None, "write_project": False,
+                    "write_notion": False, "note": "확인 필요"}
     elif last_facts is not None and facts != last_facts:
         if last_facts["state"] == "CLOSED":
             target = "검토 중" if facts["ready"] else "백로그"
@@ -53,7 +49,7 @@ def decide(last_synced: str | None, notion_status: str | None,
     if invalid_notion:
         target = last_synced if last_synced in STATUSES else project_status
         return {"target": target, "write_project": project_status is None and target is not None,
-                "write_notion": notion_status != target, "note": "확인 필요"}
+                "write_notion": target is not None and notion_status != target, "note": "확인 필요"}
     if last_synced is None:
         target = notion_status
         note = "초기 정렬" if notion_status != project_status else ""
