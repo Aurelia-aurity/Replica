@@ -14,6 +14,7 @@ import 'package:mobile/chat/voice_recorder.dart';
 import 'package:mobile/chat/voice_screen.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 import 'history_test.dart' as fixtures;
 import 'sc09_test.dart' as sc09;
@@ -852,7 +853,7 @@ void main() {
   );
 
   testWidgets(
-    'pending response blocks duplicate capture, times out, ignores late response',
+    'pending response blocks duplicate capture, waits 200 seconds, ignores late response',
     (tester) async {
       final service = Sc10Service()..pending = Completer<VoiceReply>();
       final player = Sc10Player();
@@ -870,13 +871,37 @@ void main() {
             .onPressed,
         isNull,
       );
+      const timeoutText = '음성 처리가 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.';
+      // The backend may retry TTS for ~170 seconds, so 30 seconds is not a failure.
+      // (Voice turns wait 200 seconds: the 180 second wait plus upload time.)
       await tester.pump(const Duration(seconds: 31));
+      expect(find.text(timeoutText), findsNothing);
+      await tester.pump(const Duration(seconds: 168));
+      expect(find.text(timeoutText), findsNothing);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
-      expect(find.text('응답을 받지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.text(timeoutText), findsOneWidget);
       service.pending!.complete(sampleReply());
       await tester.pumpAndSettle();
       expect(find.text('인식된 합성 질문'), findsNothing);
       expect(player.plays, 0);
+    },
+  );
+
+  testWidgets(
+    'resending a voice turn held back by the app shows a wait notice',
+    (tester) async {
+      final service = Sc10Service()
+        ..failure = const BackendFailure(
+          BackendFailureKind.generic,
+          code: speechInProgressCode,
+          retryable: true,
+        );
+      await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
+      await startRecording(tester);
+      await finishRecording(tester);
+      expect(find.text('음성을 준비하는 중이에요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.text('같은 녹음 다시 전송'), findsOneWidget);
     },
   );
 

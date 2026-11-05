@@ -41,6 +41,8 @@ class BackendFailure implements Exception {
     'AI_BUSY' => '지금 다른 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
     'AI_NOT_READY' => 'AI를 준비하고 있어요. 잠시 후 다시 시도해 주세요.',
     'AI_TIMEOUT' => '답변을 만드는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
+    'SPEECH_IN_PROGRESS' => '음성을 준비하는 중이에요. 잠시 후 다시 시도해 주세요.',
+    'SPEECH_TIMEOUT' => '음성 처리가 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
     'AI_UNAVAILABLE' => 'AI 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
     'AI_FAILED' => '답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
     'CONFLICT' || 'TURN_ID_CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력을 새로고침해 주세요.',
