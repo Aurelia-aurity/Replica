@@ -34,6 +34,7 @@ FALLBACK_STALE_SECONDS = 30.0
 APP_WAIT_SECONDS = 180.0
 RESPONSE_MARGIN_SECONDS = 10.0
 TTS_MAX_RETRIES = 2
+FIRST_TRY_MIN_SECONDS = 10.0  # 앞 단계가 오래 걸려 남은 시간이 없어도 첫 시도가 기다리는 최소 시간
 
 STT_FAILED_MESSAGE = "음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요."
 EMPTY_TRANSCRIPT_MESSAGE = "음성을 인식하지 못했어요. 다시 말씀해 주세요."
@@ -206,19 +207,20 @@ class TtsStageResult:
 async def synthesize(tts: TTSClient, text: str, *, request_started: float | None = None) -> TtsStageResult:
     """TTS를 호출해 base64 음성으로 바꾼다. 실패하면 ok=False로 돌려준다. DB 상태는 건드리지 않는다.
 
-    실패하면 최대 TTS_MAX_RETRIES번 다시 부른다. 앱이 기다리는 시간(요청 시작 기준 APP_WAIT_SECONDS) 안에서만 시도하고,
-    남은 시간이 직전 시도에 걸린 시간보다 짧으면 다시 부르지 않는다. 각 시도도 남은 시간을 넘기지 않는다.
+    첫 시도는 항상 한다. 실패하면 최대 TTS_MAX_RETRIES번 다시 부르며, 앱이 기다리는 시간(요청 시작 기준 APP_WAIT_SECONDS)
+    안에서만 다시 시도하고 남은 시간이 직전 시도에 걸린 시간보다 짧으면 다시 부르지 않는다. 재시도는 남은 시간을 넘기지
+    않고, 이미 시간이 지났어도 첫 시도는 FIRST_TRY_MIN_SECONDS까지 기다린다.
     """
     started = time.perf_counter()
     deadline = (started if request_started is None else request_started) + APP_WAIT_SECONDS - RESPONSE_MARGIN_SECONDS
     last_took = 0.0
     for retry in range(TTS_MAX_RETRIES + 1):
         remaining = deadline - time.perf_counter()
-        if remaining <= 0 or (retry and remaining < last_took):
+        if retry and (remaining <= 0 or remaining < last_took):
             break
         tried = time.perf_counter()
         try:
-            async with asyncio.timeout(remaining):
+            async with asyncio.timeout(max(remaining, FIRST_TRY_MIN_SECONDS) if not retry else remaining):
                 audio, fmt = await tts.synthesize(text)
         except Exception:  # 시간 초과 포함. 예외 원문은 남기지 않는다.
             last_took = time.perf_counter() - tried

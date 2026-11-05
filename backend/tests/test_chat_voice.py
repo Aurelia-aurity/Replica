@@ -479,12 +479,31 @@ def test_tts_retry_is_skipped_when_the_remaining_time_is_shorter_than_the_last_t
     assert not result.ok and tts.calls == 1  # 남은 약 0.03초가 직전 시도(0.05초)보다 짧아 건너뛴다
 
 
+def test_first_tts_try_is_made_even_when_no_time_is_left():
+    tts = FakeTTS((b"RIFFok", "wav"))
+    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5  # 앞 단계가 앱 대기 시간을 이미 다 썼다
+
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
+
+    assert result.ok and len(tts.calls) == 1
+
+
+def test_no_retry_when_no_time_is_left_after_the_first_try():
+    tts = FakeTTS(RuntimeError("down"))
+    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5
+
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
+
+    assert not result.ok and len(tts.calls) == 1  # 첫 시도만 하고 재시도는 건너뛴다
+
+
 def test_tts_try_is_cut_off_at_the_remaining_time(monkeypatch):
     class HangingTTS:
         async def synthesize(self, text):
             await asyncio.sleep(5)
 
     monkeypatch.setattr(stages, "APP_WAIT_SECONDS", stages.RESPONSE_MARGIN_SECONDS + 0.05)
+    monkeypatch.setattr(stages, "FIRST_TRY_MIN_SECONDS", 0.05)
     started = time.perf_counter()
 
     result = asyncio.run(stages.synthesize(HangingTTS(), "답변", request_started=started))
