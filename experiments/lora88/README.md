@@ -118,6 +118,12 @@ There is no decision-set builder, service integration or training resume.
   max 2569 tokens; lr 2e-5, rank 8/alpha 16, all 36 q/v layers, one epoch,
   45 updates. Training took 432.379s, validation loss 1.675104->1.074148,
   and peak device memory was 34.272GiB. The complete Slurm job took 00:30:08.
+- **Loss telemetry:** All 45 step losses and gradient norms are finite.
+  Unweighted mean losses for steps 1-15/16-30/31-45 were
+  2.144152/1.930045/1.599542; the supervised-token-weighted overall mean was
+  1.882567. Pre-clipping gradient norms ranged from 1.397675 to 3.649813
+  (`max_norm=1.0`). Validation loss was measured only before and after training,
+  not per step, so these two points cannot identify overfitting onset.
 - **Arm summaries:**
   - **BASE B:** register 138/180, self-honorific 0, over-refusal 0, core 152,
     fabricated 5, safe 15.
