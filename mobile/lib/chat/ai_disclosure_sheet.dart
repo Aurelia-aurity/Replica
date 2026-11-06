@@ -63,8 +63,9 @@ class _AiDisclosureSheetState extends State<_AiDisclosureSheet> {
                 child: Text('현재는 데모예요. 실제 기록 검색·AI 서버 연결·음성 녹음 및 재생은 제공하지 않습니다.',
                   style: TextStyle(color: Color(0xFF68766F), fontSize: 12, height: 1.5)),
               ),
-            DecoratedBox(
-              decoration: BoxDecoration(color: replicaBackground, borderRadius: BorderRadius.circular(12)),
+            Material(
+              color: replicaBackground,
+              borderRadius: BorderRadius.circular(12),
               child: CheckboxListTile(
                 value: _acknowledged,
                 onChanged: (value) => setState(() => _acknowledged = value ?? false),

@@ -1,7 +1,21 @@
+import '../services/backend_service.dart';
+
 /// Replace this implementation when the backend API contract is agreed.
 abstract class ChatService {
   bool get isDemo;
   Future<String> reply(String message);
+}
+
+/// Keeps the existing screen independent of authentication and transport.
+class SessionChatService implements ChatService {
+  SessionChatService({required this.backend, required this.delegate});
+  final BackendService backend;
+  final ChatService delegate;
+  @override
+  bool get isDemo => delegate.isDemo;
+  @override
+  Future<String> reply(String message) =>
+      backend.run(() => delegate.reply(message));
 }
 
 class DemoChatService implements ChatService {

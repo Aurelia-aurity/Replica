@@ -167,10 +167,55 @@ class BaselineTests(unittest.TestCase):
             baseline.read_settings(self.config, "q", str(self.model_path))
 
     def test_missing_model_does_not_fall_back_to_hub_id(self):
-        for path in (None, "Qwen/Qwen2.5-7B-Instruct", str(self.root / "missing")):
+        for path in (None, "example/missing-model", str(self.root / "missing")):
             with self.assertRaises(baseline.BaselineError) as ctx:
                 baseline.read_settings(self.config, "q", path)
             self.assertEqual(ctx.exception.code, "MODEL_PATH")
+
+    def test_optional_thinking_setting_preserves_existing_cli_configuration(self):
+        self.config.write_text(json.dumps({
+            "system_prompt": "system", "max_new_tokens": 160,
+            "model_id": "configurable/model", "enable_thinking": False}))
+        self.settings = baseline.read_settings(self.config, "q", str(self.model_path))
+        runtime = self.fake_runtime()
+        self.run_fake(runtime)
+        self.assertFalse(runtime[2].apply_chat_template.call_args.kwargs["enable_thinking"])
+        self.assertFalse(runtime[3].generate.call_args.kwargs["use_model_defaults"])
+        self.config.write_text(json.dumps({
+            "system_prompt": "system", "max_new_tokens": 160, "enable_thinking": "false"}))
+        with self.assertRaises(baseline.BaselineError) as ctx:
+            baseline.read_settings(self.config, "q", str(self.model_path))
+        self.assertEqual(ctx.exception.code, "CONFIG")
+
+    def test_model_metadata_and_revision_are_configurable(self):
+        self.config.write_text(json.dumps({
+            "system_prompt": "system", "max_new_tokens": 160,
+            "model_id": "example/test-model", "model_revision": "config-revision"}))
+        with patch.dict(baseline.os.environ, {}, clear=True):
+            configured = baseline.read_settings(self.config, "q", str(self.model_path))
+        self.assertEqual(configured["model_id"], "example/test-model")
+        self.assertEqual(configured["model_revision"], "config-revision")
+        with patch.dict(baseline.os.environ, {
+                "REPLICA_MODEL_ID": "example/other-model",
+                "REPLICA_MODEL_REVISION": "env-revision"}, clear=True):
+            self.settings = baseline.read_settings(self.config, "q", str(self.model_path))
+        self.assertEqual(self.settings["model_id"], "example/other-model")
+        runtime = self.fake_runtime()
+        self.run_fake(runtime)
+        for loader in (runtime[1].AutoTokenizer, runtime[1].AutoModelForCausalLM):
+            self.assertEqual(loader.from_pretrained.call_args.kwargs["revision"], "env-revision")
+            self.assertTrue(loader.from_pretrained.call_args.kwargs["local_files_only"])
+            self.assertEqual(loader.from_pretrained.call_args.args[0], str(self.model_path.resolve()))
+
+    def test_invalid_model_metadata_is_configuration_error(self):
+        for field in ("model_id", "model_revision"):
+            for value in ("", " ", 7, False):
+                self.config.write_text(json.dumps({
+                    "system_prompt": "system", "max_new_tokens": 160, field: value}))
+                with self.subTest(field=field, value=value), patch.dict(
+                        baseline.os.environ, {}, clear=True), self.assertRaises(baseline.BaselineError) as ctx:
+                    baseline.read_settings(self.config, "q", str(self.model_path))
+                self.assertEqual(ctx.exception.code, "CONFIG")
 
     def test_sensitive_exceptions_are_not_printed(self):
         for phase in ("load", "template", "generate"):
