@@ -109,3 +109,31 @@ There is no decision-set builder, service integration or training resume.
 - **Scope boundary:** This result is narrow synthetic DEV only, not service
   approval. No decision held-out set was built or read, and no second run is
   authorized.
+
+## Measured DEV2 option-B result (job 39188)
+
+- **Status:** `DEV_ONLY`, comparison `VALID`, overall `pass=false`,
+  `operations_pass=true`.
+- **Data and training:** 60 distinct families/360 rows, 72 long B rows,
+  max 2569 tokens; lr 2e-5, rank 8/alpha 16, all 36 q/v layers, one epoch,
+  45 updates. Training took 432.379s, validation loss 1.675104->1.074148,
+  and peak device memory was 34.272GiB. The complete Slurm job took 00:30:08.
+- **Arm summaries:**
+  - **BASE B:** register 138/180, self-honorific 0, over-refusal 0, core 152,
+    fabricated 5, safe 15.
+  - **LORA B:** register 163/180, self-honorific 0, over-refusal 0, core 133,
+    fabricated 5, safe 11.
+  - **BASE C:** register 140/180, self-honorific 0, over-refusal 0, core 161,
+    fabricated 2, safe 25.
+  - **LORA C:** register 164/180, self-honorific 0, over-refusal 2, core 138,
+    fabricated 17, safe 19.
+- **Primary and gates:** B register primary passed (delta +0.138889,
+  two-sided 95% CI [0.094444,0.188889], wins 25, losses 0), and
+  self-honorific stayed 0. Required gates failed: B G1/G2/G7 and
+  C G1/G2/G3/G5/G6_all/G7/G8. Multi core recovered to 36/36 in both
+  conditions, while ambiguity core was 5/18 and C unanswerable fabrication
+  remained 11/36.
+- **Audit and labels:** Audit 8/114=7.0175% (core 0, fabricated 8) triggered
+  full-Terra fallback; all 720 grounding and style labels completed.
+- **Scope boundary:** This controlled synthetic DEV result does not justify
+  building a decision held-out. No decision set was built or read.
