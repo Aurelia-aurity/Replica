@@ -81,6 +81,7 @@ def train_epochs(
     model: nn.Module, batches: tuple[Batch, ...], config: TrainConfig,
     on_epoch: Callable[[EpochResult], None] | None = None,
     on_step: Callable[[int, int], None] | None = None,
+    on_metrics: Callable[[int, float, float], None] | None = None,
 ) -> tuple[EpochResult, ...]:
     """Train adapters only; token-weight accumulated loss handles short groups."""
     if not batches or not adapters(model):
@@ -111,6 +112,7 @@ def train_epochs(
         while group := tuple(itertools.islice(iterator, config.accumulation)):
             tokens = [int((batches[index].labels[:, 1:] != -100).sum()) for index in group]
             denominator = sum(tokens)
+            group_loss = 0.0
             optimizer.zero_grad(set_to_none=True)
             for index, token_count in zip(group, tokens, strict=True):
                 batch = batches[index]
@@ -124,10 +126,14 @@ def train_epochs(
                     raise TrainingError("Loss must be a finite scalar")
                 (loss * (token_count / denominator)).backward()
                 total_loss += float(loss.detach()) * token_count
+                group_loss += float(loss.detach()) * token_count
                 count += token_count
-            torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0, error_if_nonfinite=True)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                trainable, max_norm=1.0, error_if_nonfinite=True)
             optimizer.step()
             steps += 1
+            if on_metrics is not None:
+                on_metrics(steps, group_loss / denominator, float(grad_norm))
             if on_step is not None:
                 on_step(steps, count)
         results.append(EpochResult(epoch, steps, count, total_loss / count))

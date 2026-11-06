@@ -44,6 +44,7 @@ class GenerationResult(TypedDict):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--dev2", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
     seal = verify_seal(root)
@@ -193,17 +194,61 @@ def main() -> None:
 
     try:
         evaluate_arm("BASE")
+        config = TrainConfig(epochs=1, learning_rate=2e-5 if args.dev2 else 1e-4)
+        torch.manual_seed(config.seed)
         spec = AdapterSpec(BASE_MODEL, REVISION, TARGETS)
         inject(model, spec)
         model.config.use_cache = False
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         payload = torch.load(root / "data/pilot.pt", map_location="cpu", weights_only=True)
-        if payload["split"] != "train" or len(payload["batches"]) != 180:
+        expected_rows = 360 if args.dev2 else 180
+        if payload["split"] != "train" or len(payload["batches"]) != expected_rows:
             raise PilotError("Frozen pilot training count differs")
         batches = tuple(Batch(**row) for row in payload["batches"])
         phase_start()
         start = time.perf_counter()
         steps = []
+        validation_batches = []
+        if args.dev2:
+            for row in rows:
+                prefix_ids = row["input_ids"]
+                prefix = tokenizer.apply_chat_template(
+                    row["messages"], tokenize=False, add_generation_prompt=True,
+                    enable_thinking=False)
+                full = tokenizer.encode(prefix + row["text"] + "<|im_end|>",
+                                        add_special_tokens=False)
+                if full[:len(prefix_ids)] != prefix_ids or full[-1] != 151645:
+                    raise PilotError("Validation supervision token boundary mismatch")
+                validation_batches.append(Batch(
+                    torch.tensor([full]), torch.ones(1, len(full), dtype=torch.long),
+                    torch.tensor([[-100] * len(prefix_ids) + full[len(prefix_ids):]])))
+
+        def validation_loss() -> float:
+            model.eval()
+            total, tokens = 0.0, 0
+            with torch.no_grad():
+                for batch in validation_batches:
+                    n = int((batch.labels[:, 1:] != -100).sum())
+                    loss = model(
+                        input_ids=batch.input_ids.to("cuda"),
+                        attention_mask=batch.attention_mask.to("cuda"),
+                        labels=batch.labels.to("cuda"), use_cache=False).loss
+                    if not torch.isfinite(loss):
+                        raise PilotError("Nonfinite validation loss")
+                    total += float(loss) * n
+                    tokens += n
+            model.train()
+            return total / tokens
+
+        if args.dev2:
+            save(output / "validation-before.json",
+                 {"mean_loss": validation_loss(), "rows": len(validation_batches)})
+            phase_start()
+            start = time.perf_counter()
+
+        def metrics(step: int, loss: float, grad_norm: float) -> None:
+            save(output / f"train-metrics-{step:03d}.json",
+                 {"step": step, "loss": loss, "grad_norm": grad_norm})
 
         def update(step: int, supervised_tokens: int) -> None:
             torch.cuda.synchronize()
@@ -211,7 +256,9 @@ def main() -> None:
                           "wall_seconds": time.perf_counter() - start, **memory()})
             save(output / f"train-step-{step:03d}.json", steps[-1])
 
-        result = train_epochs(model, batches, TrainConfig(epochs=1), on_step=update)[0]
+        result = train_epochs(
+            model, batches, config, on_step=update,
+            on_metrics=metrics if args.dev2 else None)[0]
         torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
         peak = memory()
@@ -226,7 +273,12 @@ def main() -> None:
             "max_sequence": max(b.input_ids.shape[1] for b in batches),
             "trainable_parameters": sum(p.numel() for p in model.parameters() if p.requires_grad),
         }
-        if not frozen or result.optimizer_steps != 23 or train_report["trainable_parameters"] != 3833856:
+        train_report["config"] = asdict(config)
+        train_report["seed_before_adapter_init"] = True
+        if args.dev2:
+            save(output / "validation-after.json",
+                 {"mean_loss": validation_loss(), "rows": len(validation_batches)})
+        if not frozen or result.optimizer_steps != (45 if args.dev2 else 23) or train_report["trainable_parameters"] != 3833856:
             raise PilotError("Frozen base/adapter/update invariant failed")
         save(output / "training.json", train_report)
         operations["TRAIN"] = {
