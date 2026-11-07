@@ -10,12 +10,18 @@ enum BackendFailureKind {
 
 /// Frontend error contract; no HTTP client or server implementation here.
 class BackendFailure implements Exception {
-  const BackendFailure(this.kind, {this.code, this.retryable = false});
+  const BackendFailure(
+    this.kind, {
+    this.code,
+    this.retryable = false,
+    this.stage,
+  });
   const BackendFailure.unauthenticated()
     : this(BackendFailureKind.unauthenticated, code: 'UNAUTHENTICATED');
   final BackendFailureKind kind;
   final String? code;
   final bool retryable;
+  final String? stage;
 
   /// A future transport can translate the draft API envelope at this boundary.
   /// Raw server messages are deliberately not exposed to the UI.
@@ -31,6 +37,9 @@ class BackendFailure implements Exception {
           ? error['code'] as String
           : null,
       retryable: error is Map && error['retryable'] == true,
+      stage: error is Map && ['stt', 'llm', 'tts'].contains(error['stage'])
+          ? error['stage'] as String
+          : null,
     );
   }
 }
