@@ -177,3 +177,44 @@ causal estimate of the data intervention.
   full-Terra fallback; all 720 grounding and style labels completed.
 - **Scope boundary:** This controlled synthetic DEV result does not justify
   building a decision held-out. No decision set was built or read.
+
+## Measured DEV3 new-environment result (job 44051)
+
+- **Status:** `DEV_ONLY`, comparison `VALID`, overall `pass=false`,
+  `operations_pass=true`. The conditional Qwen3-8B baseline is not a final
+  service-model decision.
+- **Data and backend:** The sealed DEV2 60-family/360-row set is retained.
+  All 108 unanswerable targets add explicit no-guess abstention (54 empty and
+  54 incomplete nonempty evidence); the other 252 tensors, all multi/two-event
+  rows, 72 long B rows and frozen validation are unchanged. PEFT preserves the
+  original q/v rank8/alpha16 initialization and pretokenized loss masks; TRL
+  collation/packing is not used.
+- **Execution:** The only GPU job completed `0:0` in `00:33:46` on DIS02.
+  Training took 717.931s for 45 updates, peaked at 34.19GiB device high-water,
+  and reduced full validation loss `1.671718 -> 1.112888`. BASE/LORA each
+  produced 360 normal replies, six warmups and six real 4096/160 stress calls.
+  No OOM, offload or allocation failure occurred.
+- **Loss telemetry:** All 45 step losses and pre-clip gradient norms are finite.
+  Loss means for steps 1-15/16-30/31-45 were
+  `2.300184 / 2.105997 / 1.840242`; gradient norms ranged
+  `1.182096..3.298281`. The fixed 12-row validation trace means were
+  `1.499478 / 1.374480 / 1.170629`; it is diagnostic, not a whole-set
+  overfitting claim.
+- **Primary:** B register improved `137 -> 157 / 180`, delta `+11.1111%p`,
+  two-sided 95% CI `[+6.6667,+16.1111]%p`, wins/losses `20/0`.
+  Self-honorific errors remained zero.
+- **Quality:** B failed G1/G2/G3/G7/G8; C failed
+  G1/G2/G3/G5/G6_all/G7/G8. LORA B was core 142, fabricated 8, safe 13,
+  chat 15, register 157. LORA C was core 155, fabricated 9, over-refusal 1,
+  safe 24, chat 17, register 161.
+- **DEV2 comparison:** LORA C improved core `138 -> 155`, fabrication
+  `17 -> 9` and safe abstention `19 -> 24`; C unanswerable fabrication
+  improved `11 -> 8` and safe/core `19 -> 24 / 36`. The remaining frozen-gate
+  failures still do not justify a decision held-out.
+- **Audit:** `3/117=2.5641%` any-field/fabricated disagreement, core 0.
+  Fabricated disagreement exceeded 2%, so full-Terra fallback completed.
+- **Integrity and boundary:** 143 fetched files and all 34 sealed inputs matched
+  SHA-256; archive SHA is
+  `70a71daf11864a0a5e74d97965cc0ec49bb55e431fada2658be99f33bdd5e848`.
+  No decision held-out was built/read, and no install, old-environment change,
+  push, PR or comment occurred.
