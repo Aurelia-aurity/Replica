@@ -82,14 +82,20 @@ def train_epochs(
     on_epoch: Callable[[EpochResult], None] | None = None,
     on_step: Callable[[int, int], None] | None = None,
     on_metrics: Callable[[int, float, float], None] | None = None,
+    peft_backend: bool = False,
 ) -> tuple[EpochResult, ...]:
     """Train adapters only; token-weight accumulated loss handles short groups."""
-    if not batches or not adapters(model):
+    if peft_backend:
+        from .peft_backend import parameters
+        adapter_parameters = parameters(model)
+    else:
+        adapter_parameters = tuple(p for module in adapters(model)
+                                   for p in (module.lora_A, module.lora_B))
+    if not batches or not adapter_parameters:
         raise TrainingError("Nonempty reviewed batches and injected adapters required")
     for batch in batches:
         batch.validate(config.max_sequence)
-    allowed = {id(p) for module in adapters(model)
-               for p in (module.lora_A, module.lora_B)}
+    allowed = {id(p) for p in adapter_parameters}
     trainable = [p for p in model.parameters() if p.requires_grad]
     if {id(p) for p in trainable} != allowed:
         raise TrainingError("Only all declared LoRA parameters may be trainable")

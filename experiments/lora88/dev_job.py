@@ -1,4 +1,7 @@
-"""Exactly one offline school DEV pilot: BASE, train180 rows, merged LORA."""
+"""Exactly one sealed offline school DEV pilot: BASE, train, merged LORA.
+
+SIZE_OK: the existing single-job state machine retains phase-local telemetry.
+"""
 
 import argparse
 from dataclasses import asdict
@@ -45,15 +48,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--dev2", action="store_true")
+    parser.add_argument("--dev3", action="store_true")
     args = parser.parse_args()
+    if args.dev3:
+        args.dev2 = True
     root = args.root.resolve()
     seal = verify_seal(root)
     if not os.environ.get("SLURM_JOB_ID") or os.environ.get("SLURMD_NODENAME") != "DIS02":
         raise PilotError("Requires the authorized DIS02 Slurm allocation")
     versions = {p: importlib.metadata.version(p) for p in ("torch", "transformers", "accelerate")}
-    if (versions["torch"] != "2.7.1+cu118" or versions["transformers"] != "4.57.1"
+    expected_torch, expected_transformers = (
+        ("2.7.1+cu126", "5.22.2") if args.dev3 else ("2.7.1+cu118", "4.57.1"))
+    if (versions["torch"] != expected_torch or versions["transformers"] != expected_transformers
             or versions["accelerate"] != "1.15.0"):
         raise PilotError(f"Existing package versions differ: {versions}")
+    if args.dev3:
+        versions["peft"] = importlib.metadata.version("peft")
+        if versions["peft"] != "0.21.2":
+            raise PilotError("New environment PEFT pin differs")
     if torch.cuda.device_count() != 1 or not torch.cuda.is_bf16_supported():
         raise PilotError("Requires exactly one bf16 GPU")
     output = root / "results" / os.environ["SLURM_JOB_ID"]
@@ -137,7 +149,8 @@ def main() -> None:
         with torch.inference_mode():
             result = model.generate(
                 input_ids=inputs, attention_mask=torch.ones_like(inputs),
-                generation_config=generation, use_model_defaults=False, use_cache=True,
+                generation_config=generation, use_cache=True,
+                **({} if args.dev3 else {"use_model_defaults": False}),
                 **({"min_new_tokens": 160} if stress else {}))
         torch.cuda.synchronize()
         ids = result[0, len(tokens):].tolist()
@@ -197,7 +210,11 @@ def main() -> None:
         config = TrainConfig(epochs=1, learning_rate=2e-5 if args.dev2 else 1e-4)
         torch.manual_seed(config.seed)
         spec = AdapterSpec(BASE_MODEL, REVISION, TARGETS)
-        inject(model, spec)
+        if args.dev3:
+            from .peft_backend import inject_peft
+            model = inject_peft(model, spec)
+        else:
+            inject(model, spec)
         model.config.use_cache = False
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         payload = torch.load(root / "data/pilot.pt", map_location="cpu", weights_only=True)
@@ -223,11 +240,11 @@ def main() -> None:
                     torch.tensor([full]), torch.ones(1, len(full), dtype=torch.long),
                     torch.tensor([[-100] * len(prefix_ids) + full[len(prefix_ids):]])))
 
-        def validation_loss() -> float:
+        def validation_loss(*, step_subset: bool = False) -> float:
             model.eval()
             total, tokens = 0.0, 0
             with torch.no_grad():
-                for batch in validation_batches:
+                for batch in (validation_batches[:12] if step_subset else validation_batches):
                     n = int((batch.labels[:, 1:] != -100).sum())
                     loss = model(
                         input_ids=batch.input_ids.to("cuda"),
@@ -247,8 +264,11 @@ def main() -> None:
             start = time.perf_counter()
 
         def metrics(step: int, loss: float, grad_norm: float) -> None:
+            extra = ({"validation_loss": validation_loss(step_subset=True),
+                      "validation_rows": 12, "validation_subset": "first-12-frozen-rows"}
+                     if args.dev3 else {})
             save(output / f"train-metrics-{step:03d}.json",
-                 {"step": step, "loss": loss, "grad_norm": grad_norm})
+                 {"step": step, "loss": loss, "grad_norm": grad_norm, **extra})
 
         def update(step: int, supervised_tokens: int) -> None:
             torch.cuda.synchronize()
@@ -258,12 +278,14 @@ def main() -> None:
 
         result = train_epochs(
             model, batches, config, on_step=update,
-            on_metrics=metrics if args.dev2 else None)[0]
+            on_metrics=metrics if args.dev2 else None,
+            peft_backend=args.dev3)[0]
         torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
         peak = memory()
         frozen = all(not p.requires_grad and p.grad is None for name, p in model.named_parameters()
-                     if not name.endswith(("lora_A", "lora_B")))
+                     if not (".lora_A." in name or ".lora_B." in name
+                             or name.endswith(("lora_A", "lora_B"))))
         train_report = {
             **asdict(result), **peak, "wall_seconds": elapsed, "base_frozen": frozen,
             "total_tokens": sum(b.input_ids.numel() for b in batches),
@@ -285,11 +307,18 @@ def main() -> None:
             "finite": True, "base_frozen": frozen,
             "peak_bytes": max(peak["max_memory_reserved_bytes"], peak["device_highwater_bytes"]),
         }
-        save_adapter(model, spec, output / "adapter.pt")
+        if args.dev3:
+            from .peft_backend import save_peft
+            save_peft(model, output / "adapter")
+        else:
+            save_adapter(model, spec, output / "adapter.pt")
         model.gradient_checkpointing_disable()
         model.eval()
-        for module in adapters(model):
-            module.merge()
+        if args.dev3:
+            model = model.merge_and_unload(safe_merge=True)
+        else:
+            for module in adapters(model):
+                module.merge()
         evaluate_arm("LORA")
         save(output / "operations.json", operations)
         save(output / "diagnostics.json", diagnostics)

@@ -1,14 +1,17 @@
 # `experiments/lora88`
 
-Offline pure-PyTorch LoRA adapter and training skeleton. No service integration.
+Offline speech-register LoRA experiments. No service integration.
 
 ## Scope
 
-- Existing school packages only: torch 2.7.1, transformers 4.57.1.
-  No PEFT/TRL/bitsandbytes/datasets, installs or model downloads.
+- Historical DEV/DEV2 use the manual adapter with torch 2.7.1 and
+  transformers 4.57.1. DEV3 uses the separately authorized, already installed
+  training environment: torch 2.7.1+cu126, transformers 5.22.2, PEFT 0.21.2.
+  No experiment installs packages or downloads models.
 - Base weights are frozen; only FP32 `lora_A`/`lora_B` train. Adapter files
   contain tensors and exact declared base/config identity, not full weights.
   The format is project-specific, not PEFT-compatible.
+  DEV3 instead saves standard PEFT adapter-only safetensors.
 - `LoRALinear.merge()` is eval-only. `train()` unmerges automatically.
   Unmerge restores base bytes exactly; bf16 merged inference has rounding error.
 - All actual data, model files, checkpoints and logs belong outside tracked
@@ -83,6 +86,37 @@ natural-corpus or broad-domain generalization. The register ending heuristic
 is only a diagnostic; official judgments use the separately frozen automatic
 hybrid pipeline. The old #77 arm registry is not reused as a LoRA runner.
 There is no decision-set builder, service integration or training resume.
+
+## DEV3 new-environment path
+
+`dev3_data.py` starts from the sealed DEV2 data, preserves all 60 bundles and
+360 rows, including every two-event target, and adds explicit no-guess
+abstention to the 108 unanswerable targets. There are 54 empty and 54
+incomplete nonempty evidence rows; all other 252 training tensors are unchanged.
+There is no rebalance, learning-rate change or capacity change. The added
+supervised abstention tokens are the data intervention; this is not a new
+natural-record dataset. The existing 72 long B rows and frozen validation stay
+unchanged. Exact answer diversity is 114 to 120 (raw counts, not normalized).
+
+`peft_backend.py` uses PEFT with the same explicit q/v targets, rank/alpha,
+FP32 A/B tensors and original seed/draw ordering. It reuses the original
+supervised-token-weighted AdamW loop; TRL collation, packing and retokenization
+are not used. `supervised_batch` preserves the old native nonthinking prefix,
+prompt masks and EOS supervision. `verify_dev3.py` checks every row against
+the serialized tensors and runs real CPU Qwen initialization/training,
+adapter save/reload and merge parity before the sole GPU job.
+CPU float32 parity is not a claim of bitwise bf16 GPU forward equivalence
+between the manual and PEFT implementations.
+
+`dev3.sbatch` requires the new training venv and successful CPU preflight.
+It regenerates BASE, trains one epoch at lr 2e-5, and evaluates merged LoRA
+on all 360 frozen DEV rows. Each optimizer update records loss, preclip
+gradient norm and validation loss on the fixed first 12 validation rows.
+Full 360-row validation loss is measured before and after training. The
+12-row trace does not establish whole-set overfitting onset. BASE/LORA each
+retain six warmups and six 4096/160 stress calls. Changing the environment
+and adapter backend means DEV2 versus DEV3 is descriptive, not an isolated
+causal estimate of the data intervention.
 
 ## Measured DEV pilot result (job 35899)
 
