@@ -65,6 +65,27 @@ Before a parent-authorized follow-up, confirm completed downloads and inspect
 each local config, tokenizer template and generation EOS list, particularly
 Kanana-1.5's Mixtral template. Do not infer support from a prepared profile.
 
+## Additional-architecture DEV compatibility
+
+`decision.py` accepts `--dev-profile PATH` to a profile JSON with `model_id`,
+`revision`, `model_type`, `chat_template_kwargs` and `empty_think_required`.
+Both bundles must be DEV and `--normal-only` must be set; heldout and
+stress-mode overrides are rejected before reading the additional profile.
+
+The original `profiles.json` and frozen message bundle remain unchanged.
+The additional profile hash is logged separately. A `qwen3_5` override uses
+native `Qwen3_5ForConditionalGeneration` with bf16/eager/local-only loading;
+the default path retains `AutoModelForCausalLM`. Supply a matching tokenizer
+audit and an already installed compatible environment.
+The runner passes `use_model_defaults=False` only when the installed
+`generate` signature explicitly supports it; the resolved call options are
+recorded in the summary. This retains the 4.57 override without forwarding
+the removed option as an unused model argument in 5.22.
+
+This DEV check does not authorize a decision run or select a service model.
+New decision criteria, data, freezes and stress validation need separate
+authorization. Passing normal DEV does not establish maximum-context capacity.
+
 ## Fixed #77 generation runner
 
 `prepare.py` reuses #59's unchanged chunker, CPU embedding/search, retrieval-v2
