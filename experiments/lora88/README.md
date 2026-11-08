@@ -16,8 +16,12 @@ Offline speech-register LoRA experiments. No service integration.
   Unmerge restores base bytes exactly; bf16 merged inference has rounding error.
 - All actual data, model files, checkpoints and logs belong outside tracked
   source. GPU execution requires separate user authorization and frozen inputs.
-- The current DEV pilot has locally frozen criteria. It does not authorize a
-  decision held-out run, longer training, environment changes or deployment.
+- The completed DEV1/DEV2/DEV3 experiments used locally frozen criteria.
+  All comparisons were VALID but failed overall. The owner put LoRA on hold
+  on 2026-11-07; register remains prompt-based, and further training or a
+  decision held-out run requires a new owner decision. Qwen3-8B remains a
+  conditional baseline, not the final service model. See the
+  [consolidated results](../results/2026-11-07-issue88-register-lora/README.md).
 
 ## CPU checks
 
@@ -141,8 +145,9 @@ causal estimate of the data intervention.
 - **Runtime and training:** Training 200.215s, peak 35.497 GiB, 23 updates,
   max 2582 training tokens; job total 00:20:31.
 - **Scope boundary:** This result is narrow synthetic DEV only, not service
-  approval. No decision held-out set was built or read, and no second run is
-  authorized.
+  approval. No decision held-out set was built or read. DEV2 and DEV3 were
+  separately authorized later and are recorded below; the 2026-11-07 hold
+  applies to further experiments.
 
 ## Measured DEV2 option-B result (job 39188)
 
