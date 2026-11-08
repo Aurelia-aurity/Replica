@@ -1,7 +1,7 @@
 """Prepare explicit synthetic DEV inputs; never generate model answers."""
 
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -11,7 +11,7 @@ from uuid import UUID
 
 import typer
 
-from corpus import Corpus, Evidence, FrozenModel, chunk_corpus, load_corpus, validate
+from corpus import Corpus, Evidence, FrozenModel, Question, chunk_corpus, load_corpus, validate
 from exemplars import Intent, StyleRequest, UtteranceTag, add_style_reference, select_exemplars
 from generate import Message, render_messages
 from per_item import ItemQuery, RetrievalPolicy, SearchIndex, retrieve_items, split_items
@@ -64,6 +64,17 @@ class Preparation:
     index: SearchIndex
     encode: Callable[[Sequence[str]], Matrix]
     count_tokens: Callable[[str], int]
+    gold_context: Mapping[str, tuple[Evidence, ...]] | None = None
+    style_corpus: Corpus | None = None
+
+
+def case_queries(question: Question, case: CasePlan) -> tuple[str, ...]:
+    """The query planner sees question text and literal spans, never the oracle."""
+    if any(not span.strip() or span not in question.question for span in case.item_spans):
+        raise ValueError("Authored item spans must be literal question substrings")
+    return tuple(
+        f"{question.question}\n검색할 요구 항목: {span}" for span in case.item_spans
+    ) if case.item_spans else split_items(question.question)
 
 
 def build_rows(corpus: Corpus, plan: DevPlan, runtime: Preparation) -> tuple[PreparedRow, ...]:
@@ -88,10 +99,7 @@ def build_rows(corpus: Corpus, plan: DevPlan, runtime: Preparation) -> tuple[Pre
     random.Random(95).shuffle(ordered)
     for case in ordered:
         q = questions[case.question_id]
-        if any(not span.strip() or span not in q.question for span in case.item_spans):
-            raise ValueError("Authored item spans must be literal question substrings")
-        queries = tuple(f"{q.question}\n검색할 요구 항목: {s}" for s in case.item_spans) if (
-            case.item_spans) else split_items(q.question)
+        queries = case_queries(q, case)
         match q.type:
             case "multi" | "ambiguity":
                 if len(set(queries)) < 2:
@@ -105,14 +113,22 @@ def build_rows(corpus: Corpus, plan: DevPlan, runtime: Preparation) -> tuple[Pre
         per_item = retrieve_items(q, tuple(
             ItemQuery(text, vector) for text, vector in zip(queries, vectors[1:], strict=True)
         ), runtime.index, policy=policies)
-        gold = tuple(contextual_evidence(by_chunk[cid]) for cid in q.gold_chunk_ids)
-        if any(by_chunk[cid].persona_id != q.persona_id for cid in q.gold_chunk_ids):
+        gold = (
+            runtime.gold_context[q.question_id] if runtime.gold_context is not None else
+            tuple(contextual_evidence(by_chunk[cid]) for cid in q.gold_chunk_ids)
+        )
+        if any(by_chunk[e.chunk_id].persona_id != q.persona_id for e in gold):
             raise ValueError("Foreign persona in gold evidence")
+        if any(e != contextual_evidence(by_chunk[e.chunk_id]) for e in gold):
+            raise ValueError("C evidence must be exact contextual source chunks")
         persona = personas[q.persona_id]
         request = StyleRequest.model_validate({
             "persona_id": q.persona_id, "register": persona.speech_register, "intent": case.intent,
         })
-        examples = select_exemplars(corpus, request, plan.utterance_tags)
+        examples = select_exemplars(
+            runtime.style_corpus if runtime.style_corpus is not None else corpus,
+            request, plan.utterance_tags,
+        )
         base_messages = render_messages(runtime.system, persona, q.question, base.evidence)
         style_messages = add_style_reference(base_messages, examples, runtime.count_tokens)
         conditions: tuple[tuple[Arm, tuple[Evidence, ...], tuple[Message, Message]], ...] = (

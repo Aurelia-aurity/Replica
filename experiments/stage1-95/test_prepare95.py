@@ -2,6 +2,7 @@
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from prepare95 import (
     CRITERIA_SHA256, CasePlan, DevPlan, Pack, Preparation, build_rows, check_design,
 )
 from run_dev import validate_pack
+from retrieval_v2 import contextual_evidence
 
 
 def preparation(corpus):
@@ -75,6 +77,32 @@ def test_preparation_when_corpus_and_index_differ(synthetic_corpus):
     # When / Then: no stale/foreign index can enter the prompt bundle.
     with pytest.raises(ValueError):
         build_rows(synthetic_corpus, plan_for(synthetic_corpus), wrong)
+
+
+def test_preparation_when_c_gold_is_supplied_separately(synthetic_corpus):
+    # Given: public questions contain no oracle; only the C intervention has gold.
+    runtime = preparation(synthetic_corpus)
+    chunk = chunk_corpus(synthetic_corpus)[0]
+    gold = (contextual_evidence(chunk),)
+    runtime = replace(runtime, gold_context={"q": gold}, style_corpus=synthetic_corpus)
+    # When: use the existing four-arm composition with separated sources.
+    rows = build_rows(synthetic_corpus, plan_for(synthetic_corpus), runtime)
+    # Then: C receives the exact intervention; B/S retain identical factual bytes.
+    arms = {row.arm: row for row in rows}
+    assert arms["C"].evidence_ids == (chunk.chunk_id,)
+    assert factual_payload(arms["C"]) == [e.model_dump(mode="json") for e in gold]
+    assert factual_payload(arms["B"]) == factual_payload(arms["S"])
+
+
+def test_preparation_when_c_content_is_not_from_source(synthetic_corpus):
+    # Given: a valid ID paired with forged content.
+    runtime = preparation(synthetic_corpus)
+    chunk = chunk_corpus(synthetic_corpus)[0]
+    forged = contextual_evidence(chunk).model_copy(update={"content": "forged"})
+    runtime = replace(runtime, gold_context={"q": (forged,)})
+    # When / Then: reject the forged C intervention before model input is returned.
+    with pytest.raises(ValueError):
+        build_rows(synthetic_corpus, plan_for(synthetic_corpus), runtime)
 
 
 def test_design_when_small_fixture_is_not_full_run(synthetic_corpus):
