@@ -1,9 +1,11 @@
 """Offline #77 generation; DEV by default, heldout requires a separate signed file."""
 
 import argparse
+from collections.abc import Mapping
 from contextlib import contextmanager
 import ctypes
 import importlib.metadata
+from inspect import Parameter, signature
 import json
 import math
 import os
@@ -11,11 +13,12 @@ from pathlib import Path
 from statistics import median
 import threading
 import time
+from typing import TypedDict
 
 from audit import serialize, token_ids
 from arms import arm_context
 from prepare import content_hash, digest, save
-from smoke import MODEL_ROOT, load_profile, termination, think_markers
+from smoke import MODEL_ROOT, Profile, load_profile, termination, think_markers
 
 
 def nearest_rank(values: list[float], quantile: float = 0.95) -> float:
@@ -157,6 +160,22 @@ def exclusive_output(output: Path):
         yield
 
 
+def additional_dev_profile(path: Path, normal_only: bool, split: str, dev_split: str) -> Profile:
+    """Keep an additional pinned architecture out of all decision executions."""
+    if not normal_only or split != "dev" or dev_split != "dev":
+        raise ValueError("An additional profile is restricted to normal-only DEV")
+    return Profile(**json.loads(path.read_text()))
+
+
+class ModelDefaultOptions(TypedDict, total=False):
+    use_model_defaults: bool
+
+
+def model_default_options(parameters: Mapping[str, Parameter]) -> ModelDefaultOptions:
+    """Preserve the legacy override only where generate explicitly supports it."""
+    return {"use_model_defaults": False} if "use_model_defaults" in parameters else {}
+
+
 def run(args) -> None:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -182,7 +201,11 @@ def run(args) -> None:
     if torch.cuda.device_count() != 1 or not torch.cuda.is_bf16_supported():
         raise RuntimeError("Requires exactly one visible bf16 CUDA GPU")
     name = args.model
-    profile = load_profile(name)
+    dev_profile = getattr(args, "dev_profile", None)
+    if dev_profile is not None:
+        profile = additional_dev_profile(dev_profile, args.normal_only, bundle["split"], dev["split"])
+    else:
+        profile = load_profile(name)
     path = MODEL_ROOT / name
     audit = json.loads(args.audit.read_text())["models"][name]
     for selected, bundle_path in ((bundle, args.bundle), (dev, args.dev_bundle)):
@@ -229,7 +252,13 @@ def run(args) -> None:
         "audit_sha256": digest(args.audit),
         "stress_sha256": digest(stress_path) if not args.normal_only else None,
         "normal_only": args.normal_only,
-        "profile": json.loads(Path(__file__).with_name("profiles.json").read_text())[name],
+        "profile": {
+            "model_id": profile.model_id, "revision": profile.revision,
+            "model_type": profile.model_type,
+            "chat_template_kwargs": profile.chat_template_kwargs,
+            "empty_think_required": profile.empty_think_required,
+        },
+        "dev_profile_sha256": digest(dev_profile) if dev_profile is not None else None,
         "code_sha256": {p: digest(Path(__file__).with_name(p)) for p in
                         ("decision.py", "prepare.py", "audit.py", "smoke.py", "arms.py")},
         "tokenizer_files": audit["tokenizer_files"], "rope_scaling": model_config.get("rope_scaling"),
@@ -252,7 +281,11 @@ def run(args) -> None:
     torch.cuda.set_device(0)
     torch.cuda.synchronize()
     load_start = time.perf_counter()
-    model = AutoModelForCausalLM.from_pretrained(
+    model_class = AutoModelForCausalLM
+    if dev_profile is not None and profile.model_type == "qwen3_5":
+        from transformers import Qwen3_5ForConditionalGeneration
+        model_class = Qwen3_5ForConditionalGeneration
+    model = model_class.from_pretrained(
         path, local_files_only=True, trust_remote_code=False, use_safetensors=True,
         dtype=torch.bfloat16, device_map={"": 0}, attn_implementation="eager").eval()
     torch.cuda.synchronize()
@@ -269,10 +302,12 @@ def run(args) -> None:
         eos_token_id=eos_ids,
         pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else eos_ids[0],
         max_time=30.0)
+    defaults_options = model_default_options(signature(model.generate).parameters)
     effective = {
         **context,
         "run_identity": identity, "load_s": load_s, "generation_config": generation.to_dict(),
         "model_generation_config": model.generation_config.to_dict(),
+        "generation_api_options": defaults_options,
         "eos_ids": eos_ids, "bos_id": tokenizer.bos_token_id,
         "job_id": os.environ["SLURM_JOB_ID"], "gpu": torch.cuda.get_device_name(0),
         "latency_scope": "generator only; rendering/tokenization/H2D/prefill/decode/sync/reply decode",
@@ -312,7 +347,7 @@ def run(args) -> None:
                     generation_start = time.perf_counter()
                     with torch.inference_mode():
                         outputs = model.generate(
-                            **inputs, generation_config=generation, use_model_defaults=False,
+                            **inputs, generation_config=generation, **defaults_options,
                             **({"min_new_tokens": 160} if phase == "stress" else {}))
                     torch.cuda.synchronize()
                     generation_s = time.perf_counter() - generation_start
@@ -398,6 +433,8 @@ def main() -> None:
     parser.add_argument("--stress", type=Path)
     parser.add_argument("--normal-only", action="store_true",
                         help="DEV warmups and normal calls only; no memory probes")
+    parser.add_argument("--dev-profile", type=Path,
+                        help="Additional pinned profile, normal-only DEV exclusively")
     parser.add_argument("--model", required=True)
     parser.add_argument("--arm", choices=("BASE", "CAND", "DIAG"))
     parser.add_argument("--run-id", choices=("decision-v3",))

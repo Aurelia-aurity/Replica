@@ -2,13 +2,14 @@
 
 from copy import deepcopy
 import json
+from inspect import signature
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
 
 from audit import pack_stress
-from decision import authorize, completed, nearest_rank, nvml_uuid, validate_bundle
+from decision import additional_dev_profile, authorize, completed, model_default_options, nearest_rank, nvml_uuid, validate_bundle
 from prepare import content_hash, digest, save
 
 
@@ -107,6 +108,56 @@ class ScheduleTests(unittest.TestCase):
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_removed_generation_option_is_not_forwarded_to_current_model(self):
+        # Given: the observed 5.22 generate signature has kwargs but no defaults option.
+        def generate(*, generation_config, **model_kwargs):
+            if "use_model_defaults" in model_kwargs:
+                raise ValueError("unused model argument")
+            return generation_config
+
+        # When
+        result = generate(generation_config="synthetic-config",
+                          **model_default_options(signature(generate).parameters))
+        # Then
+        self.assertEqual(result, "synthetic-config")
+
+    def test_supported_generation_option_preserves_legacy_false_override(self):
+        # Given: the 4.57 API explicitly accepts this option, defaulting it to true.
+        def generate(*, generation_config, use_model_defaults=True, **model_kwargs):
+            return generation_config, use_model_defaults
+
+        # When
+        result = generate(generation_config="synthetic-config",
+                          **model_default_options(signature(generate).parameters))
+        # Then
+        self.assertEqual(result, ("synthetic-config", False))
+
+    def test_additional_profile_rejects_decision_and_stress_before_reading(self):
+        # Given: no real corpus or profile is read.
+        path = Path("nonexistent-synthetic-profile.json")
+        for normal_only, split, dev_split in (
+            (True, "heldout", "dev"), (True, "dev", "heldout"), (False, "dev", "dev"),
+        ):
+            with self.subTest(normal_only=normal_only, split=split, dev_split=dev_split):
+                # When / Then
+                with self.assertRaises(ValueError):
+                    additional_dev_profile(path, normal_only, split, dev_split)
+
+    def test_additional_profile_reads_exact_pinned_dev_configuration(self):
+        # Given
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            value = {"model_id": "synthetic/model", "revision": "synthetic-revision",
+                     "model_type": "synthetic", "chat_template_kwargs": {"enable_thinking": False},
+                     "empty_think_required": True}
+            save(path, value)
+            # When
+            result = additional_dev_profile(path, True, "dev", "dev")
+            # Then
+            self.assertEqual(result.model_id, value["model_id"])
+            self.assertEqual(result.revision, value["revision"])
+            self.assertEqual(result.chat_template_kwargs, value["chat_template_kwargs"])
+
     def test_stress_packing_handles_token_count_gaps(self):
         # Given: a tokenizer with two-token character steps except for a tab.
         class GappedTokenizer:
