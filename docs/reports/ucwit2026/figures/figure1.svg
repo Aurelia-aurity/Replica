@@ -57,7 +57,7 @@
   <text x="600" y="392" text-anchor="middle" class="title">GPU 추론 서버</text>
   <text x="600" y="426" text-anchor="middle">API 연동 진행 중</text>
   <rect x="472" y="441" width="256" height="43" class="solid"/>
-  <text x="600" y="469" text-anchor="middle" class="small">오프라인 CLI 구현·검증</text>
+  <text x="600" y="469" text-anchor="middle" class="small">기본 추론 API 구현·GPU 시험</text>
   <path d="M600 266V357" class="link planned"/>
   <text x="617" y="319" class="small">추론 API</text>
 
