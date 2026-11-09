@@ -1,13 +1,17 @@
 """One bounded plan for dry-run reporting and actual reconciliation."""
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Final, NamedTuple
 
 import github_project as gp
 import notion_api as na
-from sync_rules import STATUSES, decide
+from sync_rules import STATUSES, Decision, Facts, decide
 from sync_simple_metadata import closure, differences, metadata
 from sync_simple_state import CHECKPOINT, checkpoint_text, history, issue_facts, key_for
+
+
+INITIAL_DECISION: Final[Decision] = {
+    "target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
 
 
 class Work(NamedTuple):
@@ -35,14 +39,15 @@ def metadata_plan(page, properties, *, enabled=True):
             "metadata_operation": "create" if enabled and page is None else "update" if fields else "none"}
 
 
-def migration_decision(last, notion_status, project_status, facts, *, missing=False):
+def migration_decision(last: str, notion_status: str | None, project_status: str | None,
+                       facts: Facts, *, missing: bool = False) -> Decision:
     """Use exact inputs only; unsafe first-scan choices require PM alignment."""
-    initial = {"target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
+    initial = INITIAL_DECISION.copy()
     exact = decide(last, notion_status, project_status, facts, None)
     if last in {"완료", "취소"} and facts["state"] == "OPEN":
-        return initial
-    if not missing and last is None and (
-            notion_status != project_status or notion_status not in STATUSES):
+        if (notion_status == project_status and notion_status in STATUSES and
+                (notion_status != "검토 중" or facts["ready"])):
+            return decide(notion_status, notion_status, project_status, facts, None)
         return initial
     if facts["state"] == "CLOSED":
         return exact
@@ -79,7 +84,7 @@ def plan_issue(issue, page, item, snapshot, config, *, archived=False):
         last, previous, hold, history_kind = None, None, None, "invalid_checkpoint"
         invalid_checkpoint = True
 
-    initial = {"target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
+    initial = INITIAL_DECISION.copy()
     approximate = history_kind in {"reconstructed", "unknown_facts"}
     if approximate:
         decision = migration_decision(last, notion_status, project_status, observed[0],

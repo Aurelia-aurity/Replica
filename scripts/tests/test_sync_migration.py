@@ -79,7 +79,10 @@ class MigrationScenarioTests(unittest.TestCase):
                 plan = result["items"][0]
                 self.assertEqual(result["counts"]["failed"], 0)
                 self.assertEqual(plan["target"], target)
-                self.assertIn(f"#80 ({plan['history']})", ss.summary(result))
+                expected_history = ("reconstructed" if history == "matching_fingerprint" and
+                                    (draft or reason is not None) else history)
+                self.assertEqual(plan["history"], expected_history)
+                self.assertIn(f"#80 ({expected_history})", ss.summary(result))
                 if target is None:
                     self.assertEqual(plan["note"], "초기 정렬")
                     self.assertFalse(plan["write_notion"] or plan["write_project"] or
@@ -104,7 +107,11 @@ class MigrationScenarioTests(unittest.TestCase):
 
     def test_equal_values_do_not_replay_approximate_ready_transitions(self):
         for baseline, current, ready, reason, target in (
-                ("완료", "진행 중", False, None, None),
+                ("완료", "진행 중", False, None, "진행 중"),
+                ("취소", "준비 중", False, None, "준비 중"),
+                ("완료", "완료", False, None, "완료"),
+                ("취소", "취소", False, None, "취소"),
+                ("완료", "검토 중", True, None, "검토 중"),
                 ("백로그", "준비 중", True, None, "준비 중"),
                 ("검토 중", "준비 중", False, None, "준비 중"),
                 ("완료", "진행 중", False, "COMPLETED", "완료")):
@@ -118,6 +125,56 @@ class MigrationScenarioTests(unittest.TestCase):
                 self.assertEqual(result["items"][0]["target"], target)
                 if target is not None:
                     self.assertEqual(read_checkpoint(notion.pages[0])[0], target)
+                    if reason is None:
+                        self.assertFalse(result["items"][0]["write_notion"] or
+                                         result["items"][0]["write_project"])
                 else:
                     self.assertEqual(result["items"][0]["note"], "초기 정렬")
                     self.assertEqual(na.read_text(notion.pages[0], CHECKPOINT), "")
+
+    def test_s1_s1b_s1c_settle_closed_legacy_baselines(self):
+        for history in ("reconstructed", "unknown_facts"):
+            for baseline in ("완료", "취소"):
+                for case, status, reason in (
+                        ("S1", "진행 중", None), ("S1b", "백로그", None),
+                        ("S1c", "완료", "COMPLETED")):
+                    with self.subTest(case=case, history=history, baseline=baseline):
+                        # Given: S1b starts unresolved; the PM then aligns the boards.
+                        github, notion, project = scenario(
+                            history, baseline, "진행 중",
+                            "백로그" if case == "S1b" else "진행 중", reason=reason)
+                        legacy = na.read_text(notion.pages[0], "동기화 내부 상태")
+                        if case == "S1b":
+                            held = scan(github, notion, project)["items"][0]
+                            self.assertEqual(held["note"], "초기 정렬")
+                            self.assertFalse(held["write_notion"] or held["write_project"] or
+                                             held["write_checkpoint"])
+                            notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": status}}
+                        notion.calls.clear()
+                        project.calls.clear()
+                        # When: the next scan observes the agreed statuses or current closure.
+                        result = scan(github, notion, project)
+                        # Then: one scan records exact current facts; OPEN status is not rewritten.
+                        plan = result["items"][0]
+                        self.assertEqual(result["counts"]["failed"], 0)
+                        self.assertEqual(plan["target"], status)
+                        self.assertTrue(plan["write_checkpoint"])
+                        if reason is None:
+                            self.assertFalse(plan["write_notion"] or plan["write_project"])
+                            self.assertFalse(any(mutation for _, _, mutation in project.calls))
+                            self.assertFalse(any(
+                                method == "PATCH" and "작업 상태" in body["properties"]
+                                for method, _, body in notion.calls))
+                        self.assertEqual(read_checkpoint(notion.pages[0]), (
+                            status, {"state": "CLOSED" if reason else "OPEN",
+                                     "reason": reason, "ready": False}))
+                        self.assertEqual(na.read_select(notion.pages[0], "작업 상태"), status)
+                        self.assertEqual(project.items[0]["fieldValues"]["nodes"][0]["optionId"],
+                                         OPTIONS[status])
+                        self.assertEqual(na.read_text(notion.pages[0], "동기화 내부 상태"), legacy)
+                        notion.calls.clear()
+                        project.calls.clear()
+                        scan(github, notion, project)
+                        self.assertFalse(any(mutation for _, _, mutation in project.calls))
+                        self.assertFalse(any(method == "PATCH" or path == "/pages"
+                                             for method, path, _ in notion.calls))
