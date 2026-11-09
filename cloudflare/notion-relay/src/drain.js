@@ -72,8 +72,10 @@ export class Drain {
   }
   async periodic(){
     const now=this.now();
+    const interval=Number(this.env.PERIODIC_MIN_SECONDS??'600');
+    requireValue(Number.isSafeInteger(interval)&&interval>=600,'PERIODIC_INTERVAL_INVALID',503);
     const latest=await this.db.prepare('SELECT MAX(created_at) AS at FROM sync_requests').first();
-    if(latest.at!==null&&now-latest.at<300)return {rate_limited:true};
+    if(latest.at!==null&&now-latest.at<interval)return {rate_limited:true};
     if(await this.github.syncInFlight())return {pending:true};
     const expectedSHA=await this.github.mainSHA();await this.github.workflow();
     const id=this.newID();
@@ -84,7 +86,7 @@ export class Drain {
         SELECT ?,?,'[]',?,'PREPARING',?,?
         WHERE EXISTS(SELECT 1 FROM request_slot WHERE singleton=1 AND request_id IS NULL)
         AND NOT EXISTS(SELECT 1 FROM sync_requests WHERE created_at>?)`)
-        .bind(id,now,expectedSHA,now,now,now-300),
+        .bind(id,now,expectedSHA,now,now,now-interval),
       this.db.prepare(`UPDATE request_slot SET request_id=? WHERE singleton=1 AND request_id IS NULL
         AND EXISTS(SELECT 1 FROM sync_requests WHERE request_id=?)`).bind(id,id),
     ]);
@@ -93,6 +95,11 @@ export class Drain {
     return {pending:Boolean(request)};
   }
   async prunePeriodic(){
+    const now=this.now();
+    const reservation=await this.db.prepare(`UPDATE relay_meta SET last_periodic_prune_at=?
+      WHERE singleton=1 AND (last_periodic_prune_at IS NULL OR last_periodic_prune_at<=?)`)
+      .bind(now,now-3600).run();
+    if(reservation.meta.changes!==1)return;
     // Only successful, receipt-free periodic records older than seven days.
     // Preserve all ambiguous/failed requests and all helper/webhook evidence.
     const eligible=`SELECT r.request_id FROM sync_requests r
@@ -101,7 +108,7 @@ export class Drain {
       AND NOT EXISTS(SELECT 1 FROM receipts e WHERE e.request_id=r.request_id)
       AND EXISTS(SELECT 1 FROM sync_requests newer
         WHERE newer.phase='ACTIVATED' AND newer.created_at>r.created_at)`;
-    const cutoff=this.now()-7*86400;
+    const cutoff=now-7*86400;
     await this.db.batch([
       this.db.prepare(`DELETE FROM run_observations WHERE request_id IN (${eligible})`).bind(cutoff),
       this.db.prepare(`DELETE FROM result_chunks WHERE request_id IN (${eligible})`).bind(cutoff),

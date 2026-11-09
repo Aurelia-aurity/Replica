@@ -17,6 +17,7 @@ import notion_api as na
 from sync_simple_apply import project_snapshot
 from sync_simple_fakes import CONFIG, PAGE, GitHub, Notion, Project, REST, checkpoint, text
 from sync_simple_state import CHECKPOINT
+from test_sync_simple_state import pull
 
 
 ID = "11111111-1111-4111-8111-111111111111"
@@ -52,6 +53,50 @@ def relay():
 
 
 class OrdinaryRequestTests(unittest.TestCase):
+    def test_ordinary_rest_budget_for_54_issues_and_47_prs(self):
+        from types import SimpleNamespace
+        github, project = GitHub(), Project()
+        for index in range(53):
+            row = copy.deepcopy(github.issues[0])
+            row.update(id=f"I_{1000 + index}", databaseId=1000 + index, number=1000 + index,
+                       url=f"https://github.com/{gp.REPOSITORY}/issues/{1000 + index}")
+            github.issues.append(row)
+        for index in range(47):
+            row = pull()
+            row.update(id=f"PR_{2000 + index}", databaseId=3000 + index, legacy_issue_id=4000 + index,
+                       number=2000 + index, url=f"https://github.com/{gp.REPOSITORY}/pull/{2000 + index}")
+            github.pulls.append(row)
+        project.source_issues = {row["id"]: row for row in github.issues}
+        notion = Notion(internal=checkpoint(github))
+        remote = REST(github)
+        original = remote.request
+        calls = []
+        def request(path):
+            calls.append(path)
+            return run() if "/actions/runs/" in path else original(path)
+        remote.request = request
+        callback = relay()
+        callback.post.side_effect = lambda path, value: (
+            relay().post.return_value if path == "/claim" else {"stored": True, "sealed": True})
+        settings = {**env(), "GITHUB_TOKEN": "synthetic", "PROJECT_TOKEN": "synthetic",
+                    "NOTION_TOKEN": "synthetic"}
+        with tempfile.TemporaryDirectory() as directory:
+            old = os.getcwd()
+            try:
+                os.chdir(directory)
+                with patch.dict(os.environ, settings, clear=True), \
+                     patch.object(ss, "load_config", return_value=CONFIG), \
+                     patch.object(gp, "GraphQLClient", side_effect=[github, project]), \
+                     patch.object(gp, "RESTClient", return_value=remote), \
+                     patch.object(na, "NotionClient", return_value=notion), \
+                     patch.object(ordinary, "PinnedRelay", return_value=callback), \
+                     patch.object(subprocess, "run", return_value=SimpleNamespace(stdout=SHA)):
+                    self.assertEqual(ordinary.main([]), 0)
+                self.assertEqual(len(calls), 5)  # run binding + repository + 2 Issue pages + 1 PR page
+                self.assertEqual(len(json.loads(Path(ordinary.EVIDENCE_FILE).read_text())["entries"]), 54)
+            finally:
+                os.chdir(old)
+
     def test_cli_claim_drives_real_engine_and_reports_then_refuses_duplicate(self):
         from types import SimpleNamespace
         github, project = GitHub(), Project()

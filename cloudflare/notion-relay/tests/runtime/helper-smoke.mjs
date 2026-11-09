@@ -33,7 +33,7 @@ const mf=new Miniflare(convertV4MiniflareOptions({name:'replica-helper-runtime',
 }));
 try {
   const db=await mf.getD1Database('DB');
-  for(const name of ['0001_journal','0002_bootstrap','0003_requests']){
+  for(const name of ['0001_journal','0002_bootstrap','0003_requests','0004_periodic']){
     const sql=await readFile(`${root}/migrations/${name}.sql`,'utf8');
     for(const statement of sql.replace(/^--.*$/gm,'').split(';').map(x=>x.trim()).filter(Boolean))
       await db.prepare(statement).run();

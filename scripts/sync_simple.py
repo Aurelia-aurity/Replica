@@ -54,7 +54,7 @@ def status_fields(values):
 
 
 def sync(github, rest, project_client, notion, config, *, apply=False, env=None,
-         ordinary_claim=None, evidence=None):
+         ordinary_claim=None, evidence=None, scan_context=None):
     """Validate the entire scan before writes; independent items fail separately."""
     env = os.environ if env is None else env
     if env.get("SYNC_ORDINARY_REQUEST") == "true" or ordinary_claim is not None:
@@ -64,6 +64,9 @@ def sync(github, rest, project_client, notion, config, *, apply=False, env=None,
         ordinary_claim.validate(env)
     snapshot = gp.fetch_repository_facts(github, rest)
     project = project_snapshot(project_client, config, snapshot, refresh=True)
+    if scan_context is not None:
+        # Private caller context, deliberately excluded from the public report.
+        scan_context.update(facts=snapshot, project=project)
     source_id = config["notion_source_id"]
     na.check_schema(notion, source_id, STATUSES)
     index = index_rows(notion, source_id, snapshot)
@@ -127,8 +130,10 @@ def sync(github, rest, project_client, notion, config, *, apply=False, env=None,
                 plan["outcome"] = "needs_confirmation"
                 continue
             try:
-                _, _, entry = apply_issue(notion, project_client, config, issue, page, item,
-                                          plan, props, facts, now)
+                _, confirmed_item, entry = apply_issue(
+                    notion, project_client, config, issue, page, item, plan, props, facts, now)
+                if confirmed_item is not None:
+                    project["items"][issue["databaseId"]] = confirmed_item
                 plan["outcome"] = "confirmed" if entry else "needs_confirmation"
                 if entry and evidence is not None:
                     evidence.append(entry)

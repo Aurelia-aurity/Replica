@@ -18,7 +18,6 @@ import github_project as gp
 import notification_report as nr
 import notion_api as na
 import sync_simple as ss
-from sync_simple_apply import project_snapshot
 from sync_simple_state import CHECKPOINT, issue_facts, read_checkpoint
 from ordinary_claim import OrdinaryClaim
 
@@ -233,20 +232,19 @@ def main(argv=None):
                                   capture_output=True, text=True).stdout.strip()
         context = claim_context(env, rest, relay, checkout)
         observations = []
+        scan_context = {}
         result = ss.sync(github, rest, project_client, notion, config, apply=True, env=env,
-                         evidence=observations, ordinary_claim=context)
+                         evidence=observations, ordinary_claim=context, scan_context=scan_context)
+        Path("sync-simple-plan.json").write_text(json.dumps(result, ensure_ascii=False) + "\n",
+                                                encoding="utf-8")
         failed = result["counts"]["failed"] > 0
         nr.write(nr.FILE_NAME, env, kind=ss.notification_kind(result),
                  scan_complete=not failed, holds=[])
         with open(nr.FILE_NAME, encoding="utf-8") as source:
             report = nr.validate(json.load(source), run_id=context.run_id, attempt=1, sha=context.sha)
-        facts = gp.fetch_repository_facts(github, rest)
-        project = project_snapshot(project_client, config, facts, refresh=True)
-        entries = collect(observations, notion, facts, project, config)
+        entries = collect(observations, notion, scan_context["facts"], scan_context["project"], config)
         save_evidence(context, entries, report)
         deliver_evidence(relay, context, entries, report)
-        Path("sync-simple-plan.json").write_text(json.dumps(result, ensure_ascii=False) + "\n",
-                                                encoding="utf-8")
         print(json.dumps(result["counts"], ensure_ascii=False, sort_keys=True))
         return 1 if failed else 0
     except Exception:

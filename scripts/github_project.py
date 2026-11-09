@@ -206,6 +206,23 @@ def fetch_legacy_issue_ids(rest_client, issues, pulls):
     require(set(legacy_by_number) == set(graph_by_number),
             "GraphQL과 legacy /issues 전체 번호 집합 불일치")
 
+    pull_details, page = {}, 1
+    while pulls:
+        rows = rest_client.request(
+            f"/repos/{REPOSITORY}/pulls?state=all&sort=created&direction=asc&per_page=100&page={page}")
+        require(isinstance(rows, list), "GitHub REST PR 목록 형식 오류")
+        for row in rows:
+            require(isinstance(row, dict), "GitHub REST PR 행 형식 오류")
+            number = _validate_positive(row.get("number"), "GitHub REST PR 번호 오류")
+            require(number not in pull_details, "GitHub REST PR 번호 중복")
+            pull_details[number] = row
+        if len(rows) < 100:
+            break
+        page += 1
+        require(page < 100000, "GitHub REST PR 페이지 상한 초과")
+    require(set(pull_details) == {row["number"] for row in pulls.values()},
+            "GraphQL과 REST PR 전체 번호 집합 불일치")
+
     for number, (kind, row) in graph_by_number.items():
         legacy = legacy_by_number[number]
         expected_rest_state = "open" if row["state"] == "OPEN" else "closed"
@@ -216,13 +233,16 @@ def fetch_legacy_issue_ids(rest_client, issues, pulls):
             require(legacy["id"] == row["databaseId"],
                     "Issue GraphQL databaseId와 legacy /issues ID 불일치")
         else:
-            detail = rest_client.request(f"/repos/{REPOSITORY}/pulls/{number}")
+            detail = pull_details[number]
             require(isinstance(detail, dict) and detail.get("number") == number and
                     detail.get("node_id") == row["id"] and detail.get("id") == row["databaseId"],
                     "PR REST /pulls와 GraphQL ID 관계 불일치")
             require(detail.get("state") == legacy["state"] and
-                    type(detail.get("draft")) is bool and type(detail.get("merged")) is bool,
+                    type(detail.get("draft")) is bool and "merged_at" in detail,
                     "PR REST /pulls state/draft/merged 형식 불일치")
+            merged = detail["merged_at"] is not None
+            if merged:
+                parse_time(detail["merged_at"])
             base = detail.get("base")
             base_repo = base.get("repo") if isinstance(base, dict) else None
             require(isinstance(base_repo, dict) and base_repo.get("id") == REPOSITORY_ID,
@@ -235,8 +255,9 @@ def fetch_legacy_issue_ids(rest_client, issues, pulls):
                     "PR REST/GraphQL base repository·branch 불일치")
             require((detail["state"] == "open") == (row["state"] == "OPEN") and
                     detail["draft"] == row["isDraft"] and
-                    detail["merged"] == (row["state"] == "MERGED") and
-                    (not detail["merged"] or row.get("mergedAt") is not None),
+                    merged == (row["state"] == "MERGED") and
+                    (not merged or row.get("mergedAt") is not None and
+                     parse_time(detail["merged_at"]) == parse_time(row["mergedAt"])),
                     "PR REST와 GraphQL 상태 불일치")
         row["legacy_issue_id"] = legacy["id"]
     return legacy_by_number

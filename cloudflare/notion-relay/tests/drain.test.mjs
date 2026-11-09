@@ -173,16 +173,29 @@ test('periodic full scan dispatches without webhook receipts and uses the same d
   assert.equal(counts().correlations,1);
 });
 
-test('five-minute cadence is enforced across restarts and concurrent scheduled ticks',async()=>{
+test('ten-minute cadence is enforced across restarts and concurrent scheduled ticks',async()=>{
   const {db,env,drain,github,counts}=await setup();
   await activated(db);
-  drain.now=()=>300;
+  drain.now=()=>600;
   assert.deepEqual(await drain.tick({scheduled:true}),{rate_limited:true});
-  drain.now=()=>301;
-  const second=new Drain(env,{github,newID:()=>'44444444-4444-4444-8444-444444444444',now:()=>301});
+  drain.now=()=>601;
+  const second=new Drain(env,{github,newID:()=>'44444444-4444-4444-8444-444444444444',now:()=>601});
   await Promise.all([drain.tick({scheduled:true}),second.tick({scheduled:true})]);
   assert.equal(counts().dispatches,1);
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM sync_requests WHERE phase!='ACTIVATED'").first()).n,1);
+});
+
+test('configured cadence cannot bypass the safe minimum and a longer interval survives restart',async()=>{
+  for(const configured of ['0','300','599','NaN','600.5']){
+    const {drain,env,counts}=await setup();env.PERIODIC_MIN_SECONDS=configured;
+    await assert.rejects(drain.tick({scheduled:true}),{message:'PERIODIC_INTERVAL_INVALID'});
+    assert.equal(counts().dispatches,0);
+  }
+  const {drain,db,env,counts}=await setup();await activated(db);
+  env.PERIODIC_MIN_SECONDS='1200';drain.now=()=>1200;
+  assert.deepEqual(await drain.tick({scheduled:true}),{rate_limited:true});
+  drain.now=()=>1201;await drain.tick({scheduled:true});
+  assert.equal(counts().dispatches,1);
 });
 
 test('periodic dispatch respects remote in-flight runs, read failures and both stopped modes',async()=>{
@@ -213,4 +226,39 @@ test('periodic cleanup retains ambiguous records, receipt-linked history and new
   assert.equal(await db.prepare('SELECT * FROM sync_requests WHERE request_id=?').bind(old).first(),null);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM run_observations WHERE request_id=?').bind(old).first()).n,0);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM sync_requests').first()).n,3);
+});
+
+test('cleanup is attempted at most hourly across restarts and concurrent ticks',async()=>{
+  const {db,env,drain,github}=await setup();
+  let now=8*86400,batches=0;
+  drain.now=()=>now;
+  const batch=db.batch.bind(db);
+  db.batch=queries=>{batches++;return batch(queries);};
+  await drain.prunePeriodic();
+  assert.equal(batches,1);
+  const restarted=new Drain(env,{github,now:()=>now});
+  now+=3599;
+  await Promise.all([drain.prunePeriodic(),restarted.prunePeriodic()]);
+  assert.equal(batches,1);
+  now++;
+  await Promise.all([drain.prunePeriodic(),restarted.prunePeriodic()]);
+  assert.equal(batches,2);
+  assert.equal((await db.prepare('SELECT last_periodic_prune_at FROM relay_meta').first()).last_periodic_prune_at,now);
+});
+
+test('periodic query plans use indexes for time, eligible requests and receipt references',async()=>{
+  const {db,drain}=await setup();
+  const statements=[];
+  const prepare=db.prepare.bind(db);
+  db.prepare=sql=>{statements.push(sql);return prepare(sql);};
+  await drain.prunePeriodic();
+  await drain.periodic();
+  const max=statements.find(sql=>sql.startsWith('SELECT MAX(created_at)'));
+  const deletion=statements.find(sql=>sql.startsWith('DELETE FROM sync_requests'));
+  const maxPlan=db.sqlite.prepare('EXPLAIN QUERY PLAN '+max).all().map(row=>row.detail).join('\\n');
+  const prunePlan=db.sqlite.prepare('EXPLAIN QUERY PLAN '+deletion).all(1).map(row=>row.detail).join('\\n');
+  assert.match(maxPlan,/USING COVERING INDEX sync_requests_created/);
+  assert.match(prunePlan,/SEARCH r USING INDEX sync_requests_prune/);
+  assert.match(prunePlan,/SEARCH e USING COVERING INDEX receipts_request/);
+  assert.match(prunePlan,/SEARCH newer(?: EXISTS)? USING COVERING INDEX sync_requests_activated_created/);
 });

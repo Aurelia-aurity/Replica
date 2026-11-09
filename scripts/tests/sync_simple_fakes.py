@@ -105,22 +105,26 @@ class GitHub:
 class REST:
     def __init__(self, github):
         self.github = github
+        self.calls = []
 
     def request(self, path):
+        self.calls.append(path)
         if path == f"/repos/{gp.REPOSITORY}":
             return {"id": gp.REPOSITORY_ID, "full_name": gp.REPOSITORY}
         if "/issues?" in path:
+            start = (int(path.rsplit("page=", 1)[1]) - 1) * 100
             return [{"id": row.get("legacy_issue_id", row["databaseId"]), "node_id": row["id"],
                      "number": row["number"], "state": "open" if row["state"] == "OPEN" else "closed",
                      **({"pull_request": {}} if row in self.github.pulls else {})}
-                    for row in self.github.issues + self.github.pulls]
-        if "/pulls/" in path:
-            row = next(row for row in self.github.pulls if path.endswith("/" + str(row["number"])))
-            return {"id": row["databaseId"], "node_id": row["id"], "number": row["number"],
+                    for row in (self.github.issues + self.github.pulls)[start:start + 100]]
+        if "/pulls?" in path:
+            start = (int(path.rsplit("page=", 1)[1]) - 1) * 100
+            return [{"id": row["databaseId"], "node_id": row["id"], "number": row["number"],
                     "state": "open" if row["state"] == "OPEN" else "closed",
-                    "draft": row["isDraft"], "merged": row["state"] == "MERGED",
+                    "draft": row["isDraft"], "merged_at": row["mergedAt"],
                     "base": {"ref": row["baseRefName"], "repo": {
                         "id": gp.REPOSITORY_ID, "node_id": REPO}}}
+                    for row in self.github.pulls[start:start + 100]]
         raise AssertionError("Unexpected REST request")
 
 

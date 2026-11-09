@@ -21,7 +21,7 @@ export class LocalD1 {
 }
 export async function fixture(mode='ACTIVE') {
   const db=new LocalD1();
-  for(const name of ['0001_journal.sql','0002_bootstrap.sql','0003_requests.sql'])
+  for(const name of ['0001_journal.sql','0002_bootstrap.sql','0003_requests.sql','0004_periodic.sql'])
     db.sqlite.exec(await readFile(new URL(`../migrations/${name}`,import.meta.url),'utf8'));
   const env={DB:db,RELAY_MODE:mode,HELPER_REQUEST_KEY:'synthetic-helper-key-not-a-real-key-0000'};
   return {db,env};
