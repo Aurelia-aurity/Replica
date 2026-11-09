@@ -1,0 +1,62 @@
+{
+  "scope": "DEV_ONLY",
+  "source_manifest_sha256": "828002a0b603994a9c3e7f571b22ce18d8d500e5ea7fc5c950f46e3b4fe38a3e",
+  "artifacts_sha256": {
+    "corpus.json": "6c7ddb2e057a27ea4e3333ca11c530a1a4d125551426ef6800f103d73cd05885",
+    "style-sources.json": "90166139972d61ec9fa383782d1e85442bf9644973826e9212e5420074df4776",
+    "plans.json": "7ffb1fd55062870e9f4998120bae9d537d3afbfc2d3edbd888142d3b5537b04a",
+    "gold-context.json": "acc9841870c857a3206fe7cc5adbc1cb3e5600d708d3fef058a418ba0718c2da",
+    "evaluation-sidecar.json": "89579308a4e196371928ad8120337a608bdb575ee2b4dc49377f11acf653782b",
+    "event-ledger.json": "c7b0bbf5c7bde4a4c79b201c795bcca9a291bb4e86d9f4b4b4287cfdc7331179"
+  },
+  "authoring_code_sha256": {
+    "generate95.py": "f7d9154aba510d5435dea89fc5f2304a341a321378d5cb36e4648e1ba6eddc0b",
+    "synthetic95.py": "24282e3ff2df9c9178312439ba22a8e395134a0a2a0e58674bba7bba4df6a8b1",
+    "dev_schema.py": "0da2bc804832948bbf98fe6babf91c228205d435878834805364eb8ba3376930",
+    "templates95.json": "63b51a2fb6b204d6ca0e704e053dba18e3497a9af4046cef3cec13c39ee00a6f"
+  },
+  "prepared_pack_sha256": "f1fabc50f8d83b29c0b814f41d65f2f3bdea463d93097a9925498239ef9e9e50",
+  "prepared_pack_committed": false,
+  "prepared_pack_policy": "Stage the exact operator-local pack.json bound by this hash; do not regenerate on a GPU.",
+  "model": "Qwen/Qwen3-8B",
+  "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "encoder_revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+  "encoder_device": "cpu",
+  "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+  "tokenizer_config_sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+  "rows": 1440,
+  "token_maxima": {
+    "B": {
+      "evidence_tokens": 696,
+      "native_prompt_tokens": 1108
+    },
+    "C": {
+      "evidence_tokens": 446,
+      "native_prompt_tokens": 889
+    },
+    "S": {
+      "evidence_tokens": 696,
+      "native_prompt_tokens": 1373,
+      "style_tokens": 282
+    },
+    "P": {
+      "evidence_tokens": 880,
+      "native_prompt_tokens": 1328
+    }
+  },
+  "output_token_reserve": 160,
+  "context_cap": 4096,
+  "evidence_cap": 2000,
+  "style_cap": 400,
+  "S_B_factual_bytes_equal": 360,
+  "oracle_opened_during_preparation": false,
+  "answers_generated": 0,
+  "judges_called": 0,
+  "packages": {
+    "torch": "2.7.1",
+    "sentence-transformers": "5.1.2",
+    "tokenizers": "0.22.2",
+    "transformers": "4.57.1",
+    "numpy": "2.2.6"
+  }
+}
