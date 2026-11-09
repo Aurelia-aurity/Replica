@@ -5,24 +5,20 @@ Design and Offline Evaluation of a Personalized Dialogue System Based on User-Co
 [소속·이메일·영문 저자 표기 — 양식 조판 시 작성]
 
 ## 요약
-본 논문은 사용자 확정 기록을 활용하는 개인화 대화 시스템의 설계와 AI 구성요소의 오프라인 평가를 제시한다. 한국어 합성 기록으로 후보 모델과 프롬프트를 비교하고 질문 단위 기권·원기록 문맥 복원을 결합한 검색 v2를 평가했다. 보정 코퍼스에서 완전 슬롯 문항은 42/60에서 57/60으로 늘었다. 신규 사건군에서는 자동 판정(전체 문항)과 작성자 수동 채점(held-out 48건 표본, 조건당 16건)을 구분했다. 종단 간 서비스 연동은 진행 중이다.
+본 논문은 사용자 확정 기록 기반 개인화 대화 시스템의 설계와 한국어 합성 기록을 활용한 오프라인 평가를 보고한다. 질문 단위 검색 기권과 원기록 문맥 복원을 결합한 검색 v2를 평가했다. 설정 선택에 쓰지 않은 동일 페르소나의 신규 사건 평가 집합(held-out)에서 검색 v2(B)의 핵심 정답은 37/48로 무근거 입력(A)의 14/48보다 높았으나, 기록에 답이 없는 질문의 검색 기권은 0/10에 그쳤다. 작성자 1인의 수동 채점은 검증되지 않은 탐색적 결과이며, 종단 간 서비스 연동은 진행 중이다.
 
 ## 1. 개요
-개인 기록 대화는 기록에 없는 내용을 지어내거나 질문의 거짓 전제를 받아들일 수 있다. 사후 아바타에서는 동의·투명성·기록 통제도 고려해야 한다. 사용자 확정 기록은 사용자가 올린 내용을 전사하고 화자를 확인한 뒤, 사용자가 확정한 기록만 응답 근거로 쓰는 설계 방향이다. 말투 정보는 사실 근거와 분리한다. 기록 변경·삭제 전파가 실제로 이뤄지는지는 후속 검증 사항이며, 현재 검증 완료를 뜻하지 않는다.
+개인 기록 대화는 지어냄·거짓 전제 수용 위험이 있어 동의·투명성·기록 통제가 요구된다. 사용자 확정 기록은 업로드 자료의 전사문과 화자를 사용자가 최종 확인한 기록이다. 이 기록만 사실 근거로 쓰고 말투 정보는 분리하도록 설계했다. 업로더의 확정은 재현 대상자나 대화 참여자의 동의를 대체하지 않는다. 평가는 합성 기록에 한정되며 실제 사용자·유가족 대상 효용·유해성과 변경·삭제 전파의 실서비스 검증은 하지 않았다.
 
-RQ1은 한국어 합성 기록 대화에서 후보 모델별 과제 수행과 프롬프트 변경에 따른 거짓 전제 대응·핵심 정답·과잉 거절의 상충 관계를 묻는다. RQ2는 질문 단위 기권과 원기록 문맥 복원을 결합한 검색 v2의 보정 코퍼스 성능 및 신규 사건군 held-out의 무근거·검색·gold 조건을 자동·수동으로 평가한다.
+연구 질문은 두 가지다. RQ1: 한국어 합성 기록 질의응답(QA)에서 후보 모델의 과제 수행과 외부 벤치마크는 어떻게 구분되며, 프롬프트의 거짓 전제 방어 강화는 핵심 정답 유지 및 과잉 거절과 어떤 상충 관계를 보이는가? RQ2: 질문 단위 검색 기권과 원기록 문맥 복원을 결합한 검색 v2는 필요 사실 요소 포함률과 생성 응답 정확도에서 어떤 차이를 보이며, 신규 사건군에서 어떤 한계를 보이는가?
 
-기여는 세 가지다. C1은 여섯 후보 모델의 기록 QA·지시 이행·작성자 근거성과 외부 KoBEST를 분리하고 조건부 모델 추천의 근거와 한계를 제시한다. C2는 프롬프트 실험별 안전 정의를 유지하며 답변 정답·과잉 거절의 상충 관계를 보고한다. C3은 검색 v2 결과와 held-out 자동 전체 판정·작성자 수동 48건 표본을 구분한다.
+C1은 후보 모델의 기록 QA·지시 이행·근거성과 외부 벤치마크로 조건부 기준선 선정 근거와 한계를 제시한다. C2는 각 프롬프트 실험 내 사실 근거성 지표와 핵심 정답·과잉 거절의 상충 관계를 보고한다. C3은 결합 검색 구성의 신규 사건군 평가 결과와 미해결 실패 양상을 인과 주장 없이 보고한다.
 
 ## 2. 관련연구
-디지털 사후 아바타 연구는 상호 동의, 투명성, 서비스 종료 책임을 논의한다 [1]. RoleLLM은 역할 지식과 말투 모방을 다루며 [2], LoCoMo는 장기 대화의 사건·시간 기억을 평가한다 [3]. 본 연구는 이 문제의식을 기록 기반 시스템에 적용하되 장기 대화 적응이나 말투 프로필의 독립 효과를 검증하지 않는다.
-
-RAGAS는 검색 문맥과 생성 답변을 나눠 평가하고 [4], CREPE는 거짓 전제 질의를 다룬다 [5]. RAG 기반 unlearning 연구는 검색 자료 통제와 모델 가중치의 지식 삭제를 구분한다 [6]. 본 연구는 이 평가와 실험을 재현하지 않고 합성 기록의 기권·근거 슬롯·정답·지어냄을 살핀다.
-
-KoBEST는 개인 기록 근거성과 구별되는 외부 한국어 벤치마크다 [7]. 자동 판정과 사람 평가의 차이를 다룬 연구에 따라 [8], KoBEST와 자체 기록 평가 및 자동·수동 결과를 각각 구분한다. 결과는 합성 과제에 한정되며 새로운 범용 한국어 벤치마크를 제안하지 않는다.
+디지털 사후 아바타 연구는 동의·투명성·종료 책임을 강조하고 [1], RoleLLM [2]과 LoCoMo [3]는 역할 말투와 장기 대화 사건 기억을 다룬다. 본 연구는 한국어 사용자 확정 기록의 사건 구분과 답변 보류를 다룬다. 또한 검색·생성 분리 평가 [4], 거짓 전제 질의 [5], 검색 자료 통제 기반 지식 제한 [6]의 관점을 반영해 필요 사실 요소 포함 여부와 생성 응답의 사실성·지어냄을 분리 측정한다(단, RAGAs [4]는 미사용). KoBEST [7]와 자동 판정의 한계 [8]를 고려해 일반 한국어 성능과 기록 근거성, 자동·수동 평가를 구분한다.
 
 ## 3. 시스템 상세 설계
-전체 시스템 흐름은 그림 1과 같으며 AI 부분은 오프라인 검색 v2와 guarded 프롬프트로 구성된다. 검색 v2는 질문 단위 기권과 원기록 문맥 복원을 결합하고 생성 프롬프트를 고정해 평가했다. 변경·삭제 전파의 검증은 후속 과제로 남는다.
+전체 시스템 흐름은 그림 1과 같으며 오프라인 AI 실험과 서비스 연동 경로를 분리해 설계했다.
 [3.1 백엔드]
 FastAPI 백엔드는 앱 요청을 라우터·서비스·클라이언트·DB 모듈에서 처리한다. 앱은 Supabase Auth로 인증한 뒤 Bearer JWT를 보내고, 백엔드는 토큰에서 사용자 ID를 확인한다. 본문 ID는 권한 근거로 쓰지 않으며 앱은 DB에 직접 접근하지 않는다. 대화는 turn_id별 STT·AI·TTS 단계로 처리하고 백엔드가 DB에서 최근 20쌍을 조회해 AI에 전달한다. 재전송 때 완료된 단계는 재사용하고, 하나의 요청만 단계를 선점해 처리하며 시도 횟수가 일치할 때만 결과를 저장한다. 응답 음성은 저장하지 않고 TTS 실패 때 텍스트를 유지하며 AI 생성 표시를 제공한다.
 
@@ -44,36 +40,41 @@ FastAPI는 상태 확인, 대화방 생성, 텍스트·음성 대화, 답변 TTS
 [데이터베이스]
 원격 Supabase에 테이블 9개를 적용하고 Python 접근 함수 32개를 반영했다. 합성 자료와 임시 계정 2개로 저장·조회, 계정 분리, 일반 사용자 토큰의 직접 쓰기 및 서버 전용 함수 호출 차단, 턴 실행권·이전 시도 결과 거부, 확정본 검색·삭제 요청 기록 제외를 확인했다. 성능·파일 업로드·삭제 전파와 앱 E2E는 미검증 또는 연동 진행 중이다.
 
+### 평가 방법
+본 연구는 연구팀이 구성한 한국어 합성 기록·질문을 사용했다. 검색 v2는 nlpai-lab/KURE-v1의 L2 정규화 코사인 유사도를 쓰며, 최댓값이 임계값(0.5459) 미만이면 빈 근거를 반환(검색 기권)한다. 상위 3개 청크를 가져오되 대화는 전후 3턴, 일기는 원문 전체를 복원하고 초과 시 청크로 대체 후 낮은 점수 기록부터 제외해 근거 JSON을 Qwen3-8B 토크나이저 기준 2,000토큰 이하로 맞춘다. 임계값과 문맥 설정은 보정 코퍼스 개발 40문항(DEV40)에서 고정했다. 슬롯(필요한 사실 요소) 포함은 의미 함의가 아니라 사전 정의된 정답·별칭 문자열의 문자 그대로의 포함 여부로 측정한다. 생성기는 Qwen/Qwen3-8B와 guarded·페르소나 결합 프롬프트(r1)로 고정하고 탐욕적 디코딩(추론 모드 비활성, 최대 160토큰)으로 조건·질문당 1회 생성했다. 응답 평가는 사전 정의된 규칙과 대형언어모델(LLM) 기반의 1차 자동 판정을 결합하여 수행했으며 일부 응답에는 2차 자동 감사를 추가로 적용했다. 문체 및 종결어미 준수 여부는 내용 판정과 분리하여 별도로 검사했다. 차이는 기술적·탐색적 수치이며 유의성 검정은 하지 않았다.
+
 ### 4.2 모델 비교
-표 1은 여섯 후보의 기록 QA·지시 이행과 외부 KoBEST 결과를 정리한다. QA·지시 최고값보다 5%p 이내인 Qwen3-4B와 Qwen3-8B는 동률이다. KoBEST 평균은 Qwen3-4B가 59.62%, Qwen3-8B가 64.01%여서 Qwen3-8B를 조건부 추천했지만 서비스 모델은 미정이다. 후속 모델 재비교와 Qwen3.5-9B 개발 평가에서도 교체 근거가 확인되지 않아 조건부 기준선을 유지했다. QA·지시는 각 20문항×3라운드로 반복해 독립 표본이 아니다. 작성자 1인(120응답·480평점)의 근거성은 Qwen2.5-7B 4.10/5, Qwen3-8B 2.95/5로 차이를 보였다.
+표 1은 기록 QA·지시 이행·작성자 근거성과 KoBEST 결과다. QA·지시 이행 각각 최고값과 5%p 이내인 후보를 묶는 사전 선택 규칙에 따라 후보를 좁힌 뒤 KoBEST 우위로 Qwen3-8B를 후속 실험의 조건부 기준선으로 택했으나, 이는 통계적 동등성이 아니며 최종 서비스 모델은 미정이다. 작성자 근거성은 Qwen3-8B(2.95), Qwen2.5-7B(4.10)이며 이 차이는 KoBEST 점수로 상쇄되지 않는다. 후속 모델 재비교와 Qwen3.5-9B 개발 평가에서도 교체 근거가 확인되지 않아 조건부 기준선을 유지했다.
 
 표 1. 후보 모델의 합성 기록 평가와 외부 KoBEST 결과
 
 ### 4.3 프롬프트 실험
-표 2는 안전 정의가 다른 두 프롬프트 실험을 비교한다. 1차 안전은 위험 문항에서 전제 수용과 지어냄이 없는 상태다. guarded는 안전을 Qwen3에서 9/24에서 22/24로, Qwen2.5에서 15/24에서 22/24로 높였지만 대조 정답은 낮추고 과잉 거절은 늘렸다. 2차 안전은 근거성 3/5 이상이다. guarded-v3에서 안전은 73/80에서 66/80으로, 압박 거짓 전제 안전은 7/8에서 3/8로 낮아졌고 과잉 거절은 3/28에서 1/28로 줄었다. 안전 정의가 달라 두 지표는 합산하지 않는다. g7-calm은 말투 지시 후보이며 효과는 별도로 측정하지 않았다.
+표 2는 조작적 사실 근거성 정의가 다른 두 실험을 다루므로 수치를 합산하지 않는다. 1차 실험의 기준은 거짓 전제 수용과 지어냄이 전혀 없는 상태인 반면, 2차 실험의 기준은 근거성 3/5 이상 통과여서 일부 핵심 슬롯 누락을 허용한다. 두 실험 모두 거짓 전제 방어 강화와 대조군 정답 유지·과잉 거절 억제 사이의 상충을 보였다. 말투 지시 후보인 g7-calm은 18개 개발 조건 비교에서 선정되어 표 2의 지표를 측정했으나, 말투 지시만의 독립 효과는 분리하지 않았다.
 
-표 2. 프롬프트 실험별 안전 정의와 핵심 정답·과잉 거절
+표 2. 프롬프트 실험별 사실 근거성 기준과 핵심 정답·과잉 거절
 
 ### 4.4 검색 v2와 생성 평가
-표 3은 보정 코퍼스(페르소나 5·기록 100·질문 80)와 별도 held-out(페르소나 5·사건군 20·기록 40·질문 48)의 결과를 제시한다. 완전 슬롯 문항(필요 근거 슬롯 전체 포함)은 검색 v1에서 v2로 바뀌며 42/60에서 57/60으로, 포함 슬롯(검색된 필요 근거 슬롯 수)은 157/186에서 181/186으로 늘었다. 고정 프롬프트 생성 정답은 47/80에서 58/80으로 늘고 지어냄은 15/80에서 9/80으로 줄었다.
+표 3은 보정 코퍼스(페르소나 5명·기록 100건·80문항, DEV40+TEST40 합산 기술통계)와 동일 5개 페르소나 설정의 신규 사건군 held-out(사건군 20개·기록 40건·48문항) 결과를 요약한다.
 
-held-out에서는 A(근거 없음)·B(검색 v2)·C(gold 근거) 조건으로 생성했다. 자동 판정(전체 문항)에서 B의 정답은 37/48로 A의 14/48보다 높았고, 지어냄은 2/48로 A의 8/48보다 적었다. 작성자 수동 채점(held-out 48건 표본, 조건당 16건) 근거성 A/B/C는 3.06/4.75/4.88점이며 A 과잉 거절은 7/16이었다. 자연스러움은 A/B/C 5.00/4.81/4.94로, 수동·자동 판정 정의가 다르다. 해당 held-out에서 검색기는 무근거 질문 10개에서 빈 근거를 반환하지 못했다(0/10). 하게체 말높임 일치는 자동 판정에서 A/B/C 각 0/9, 수동 표본에서 총 0/9였다. C는 진단용이지 배포 알고리즘이나 엄밀한 상한이 아니며, held-out은 검색 변경의 독립 효과를 입증하지 않는다.
+보정 코퍼스(DEV40+TEST40 합산)의 결합 구성 관찰치에서 v1 대비 v2는 모든 필수 슬롯 완전 포함이 42/60에서 57/60으로, 핵심 정답이 47/80에서 58/80으로 증가했고 지어냄은 15/80에서 9/80으로 감소했다. 이와 구분되는 신규 사건군 held-out 자동 판정에서는 B의 핵심 정답이 37/48로 A(14/48)보다 높고 C(41/48)에 근접했으며, 지어냄은 B가 2/48로 A(8/48)보다 낮았으나 기록에 답이 없는 질문의 검색 기권은 0/10에 그쳤다. 이러한 보정 코퍼스 및 held-out 수치는 결합 구성의 기술적 비교일 뿐 개별 요소의 인과 효과를 뜻하지 않는다.
+
+held-out은 A(무근거 입력), B(문맥 복원 결합 검색 v2), C(평가용 정답 근거인 gold 입력) 조건을 비교하며, A는 기록에 답이 없는 질문(10문항)과 구별된다. C는 진단용 기준일 뿐 엄밀한 상한이 아니다. 자동 판정에서 핵심 정답은 전체 기록과 모든 필수 슬롯을 기준으로 채점하고, 근거 없는 추가 개인 사실은 별도로 지어냄으로 판정하며, 과잉 거절은 생성기가 실제 전달받은 근거를 기준으로 일상 대화 거절까지 포함한다. 반면 작성자 1인의 탐색적 수동 채점은 채점용 기록 원문을 기준으로 삼았으며, 조건별로 층화 추출한 서로 다른 16건씩 총 48개 응답(고유 32문항, 비대응 표본)을 평가했다. 수동 평균은 A/B/C 순으로 근거성 3.06/4.75/4.88, 자연스러움 5.00/4.81/4.94이며, 채점 일관성·평가자 간 일치도는 미검증이고 자동 판정의 타당성 검증을 대체하지 않는다. 하게체 일치는 자동 판정 A/B/C 각 0/9, 수동 표본 총 0/9였다. 한편 말높임 제어용 저랭크 적응(LoRA)은 세 차례 개발 평가에서 근거성과 안전한 답변 보류 기준을 충족하지 못해 도입을 보류했다.
 
 표 3. 보정 코퍼스 및 신규 사건군 held-out의 검색·생성 결과
 
 ## 5. 결론
-사용자 확정 기록만 근거로 삼는 대화 시스템을 설계하고 모델·프롬프트·검색 v2를 오프라인 평가했다. 프롬프트 강화는 안전과 정답·과잉 거절의 상충을 보였고 검색 v2는 슬롯 포함·정답을 높이고 지어냄을 줄여 지어내기·거짓 전제를 일부 완화했다. held-out 무근거 10문항에서 검색기는 빈 근거를 반환하지 못했다(0/10). 하게체 말높임 일치는 자동 판정에서 A/B/C 각 0/9, 수동 표본에서 총 0/9였다. 평가는 합성 자료와 작성자 1인 표본에 한정되며 서비스 연동은 진행 중이고 최종 서비스 모델은 미정이다. 말높임 LoRA는 세 차례 개발 평가에서 근거성·안전한 답 보류 기준을 충족하지 못해 도입을 보류했으며, 말투 프로필의 독립 효과는 검증하지 않았다.
+본 연구는 사용자 확정 기록 기반 개인화 대화 시스템을 설계하고 오프라인 평가를 통해 프롬프트의 사실 근거성·핵심 정답 유지·과잉 거절 간 상충 관계와 신규 사건군 held-out에서 무근거 입력(A) 대비 검색 v2 결합 구성(B)의 핵심 정답 향상을 확인했다. 보정 코퍼스의 v1·v2 차이는 문맥 복원·토큰 제한 등이 결합된 구성의 관찰치다. 신규 사건군 held-out의 B·A는 근거 제공 유무의 비교이므로 구·신 검색기의 직접 비교나 개별 요소의 독립 인과 효과, 실서비스 품질을 입증하지 않는다. 기록에 답이 없는 질문 10건에서 검색 기권은 0/10으로 실패했으나 10건 모두 지어냄이 발생한 것은 아니다. 검색 기권 개선과 실제 서비스 연동·동의·삭제 전파 검증이 필요하다.
 
 ## 사사
 본 연구는 과학기술정보통신부 및 정보통신기획평가원의 SW중심대학사업의 연구결과로 수행되었음 (2021-0-01082)
 본 과제(결과물)는 2026년도 교육부 및 대구광역시의 재원으로 대구앵커센터의 지원을 받아 수행된 지역성장 인재양성체계(앵커) COSS의 결과입니다.(2026-ANCHOR-03-001)
 
 ## 참고문헌
-[1] T. Hollanek, K. Nowaczyk-Basińska. Griefbots, Deadbots, Postmortem Avatars: on Responsible Applications of Generative AI in the Digital Afterlife Industry. Philosophy & Technology 37, 63 (2024). doi:10.1007/s13347-024-00744-w.
-[2] Z. M. Wang, Z. Peng, H. Que, et al. RoleLLM: Benchmarking, Eliciting, and Enhancing Role-Playing Abilities of Large Language Models. Findings ACL 2024, pp. 14743–14777 (2024). doi:10.18653/v1/2024.findings-acl.878.
-[3] A. Maharana, D.-H. Lee, S. Tulyakov, et al. Evaluating Very Long-Term Conversational Memory of LLM Agents. ACL 2024 Long Papers, pp. 13851–13870 (2024). doi:10.18653/v1/2024.acl-long.747.
-[4] S. Es, J. James, L. Espinosa-Anke, et al. RAGAS: Automated Evaluation of Retrieval Augmented Generation. EACL 2024 System Demos, pp. 150–158 (2024). doi:10.18653/v1/2024.eacl-demo.16.
-[5] X. V. Yu, S. Min, L. Zettlemoyer, et al. CREPE: Open-Domain Question Answering with False Presuppositions. ACL 2023 Long Papers, pp. 10457–10480 (2023). doi:10.18653/v1/2023.acl-long.583.
-[6] S. Wang, T. Zhu, D. Ye, et al. When Machine Unlearning Meets Retrieval-Augmented Generation (RAG): Keep Secret or Forget Knowledge? IEEE Trans. Dependable Secure Comput. 23(2), pp. 2030–2045 (2026). doi:10.1109/TDSC.2025.3620832.
-[7] M. Jang, D. Kim, D. S. Kwon, et al. KoBEST: Korean Balanced Evaluation of Significant Tasks. COLING 2022, pp. 3697–3708 (2022). https://aclanthology.org/2022.coling-1.325/
-[8] A. S. Thakur, K. Choudhary, V. S. Ramayapally, et al. Judging the Judges: Evaluating Alignment and Vulnerabilities in LLMs-as-Judges. GEM² 2025 Workshop, pp. 404–430 (2025). https://aclanthology.org/2025.gem-1.33/
+[1] T. Hollanek, K. Nowaczyk-Basińska. Griefbots, Deadbots, Postmortem Avatars: on Responsible Applications of Generative AI in the Digital Afterlife Industry. Philosophy & Technology, 37(2), Article 63, 2024. doi:10.1007/s13347-024-00744-w.
+[2] Z. M. Wang, Z. Peng, H. Que, et al. RoleLLM: Benchmarking, Eliciting, and Enhancing Role-Playing Abilities of Large Language Models. Findings of the Association for Computational Linguistics: ACL 2024, pp. 14743–14777, 2024. doi:10.18653/v1/2024.findings-acl.878.
+[3] A. Maharana, D.-H. Lee, S. Tulyakov, et al. Evaluating Very Long-Term Conversational Memory of LLM Agents. Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 13851–13870, 2024. doi:10.18653/v1/2024.acl-long.747.
+[4] S. Es, J. James, L. Espinosa Anke, et al. RAGAs: Automated Evaluation of Retrieval Augmented Generation. Proceedings of the 18th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pp. 150–158, 2024. doi:10.18653/v1/2024.eacl-demo.16.
+[5] X. Yu, S. Min, L. Zettlemoyer, et al. CREPE: Open-Domain Question Answering with False Presuppositions. Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 10457–10480, 2023. doi:10.18653/v1/2023.acl-long.583.
+[6] S. Wang, T. Zhu, D. Ye, et al. When Machine Unlearning Meets Retrieval-Augmented Generation (RAG): Keep Secret or Forget Knowledge? IEEE Transactions on Dependable and Secure Computing, 23(2), pp. 2030–2045, 2026. doi:10.1109/TDSC.2025.3620832.
+[7] M. Jang, D. Kim, D. S. Kwon, et al. KoBEST: Korean Balanced Evaluation of Significant Tasks. Proceedings of the 29th International Conference on Computational Linguistics, pp. 3697–3708, 2022. https://aclanthology.org/2022.coling-1.325/
+[8] A. S. Thakur, K. Choudhary, V. S. Ramayapally, et al. Judging the Judges: Evaluating Alignment and Vulnerabilities in LLMs-as-Judges. Proceedings of the Fourth Workshop on Generation, Evaluation and Metrics (GEM²), pp. 404–430, 2025. https://aclanthology.org/2025.gem-1.33/
