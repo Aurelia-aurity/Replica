@@ -2,7 +2,7 @@
 
 ## GitHub Project ↔ Notion
 
-`sync_simple.py`는 GitHub 이슈·PR 메타데이터와 6개 작업 상태(`백로그`·`준비 중`·`진행 중`·`검토 중`·`완료`·`취소`)를 GitHub Project와 Notion 데이터 소스 사이에서 전체 대조하며 `notion_sync.py`는 CLI 진입점입니다. GitHub 종료·재오픈·연결 PR 사실을 우선하고 한쪽 변경은 전파하며 양쪽이 서로 다르게 변경되면 Notion 값을 우선합니다. 마지막 확인 기준은 Notion의 숨김 `rich_text` 속성 `동기화 기준`에 `{v:1,status,facts:{closed,reason,ready}}` JSON으로 저장하고 Project → Notion 표시 속성 → `동기화 기준` 순서로 쓰기와 재조회 확인을 수행합니다. 영구 보류나 별도 shadow 모드는 두지 않으며 같은 엔진의 `--dry-run`과 공개 `sync-simple-plan` 실행 산출물로 실행 계획을 확인합니다. 자세한 규칙과 운영 전환 절차는 [동기화 운영 안내](../docs/architecture/notion-sync.md)를 참고하세요.
+`sync_simple.py`는 GitHub 이슈·PR 메타데이터와 6개 작업 상태(`백로그`·`준비 중`·`진행 중`·`검토 중`·`완료`·`취소`)를 GitHub Project와 Notion 데이터 소스 사이에서 전체 대조하며 `notion_sync.py`는 CLI 진입점입니다. GitHub 종료·재오픈·연결 PR 사실을 우선하고 한쪽 변경은 전파하며 양쪽이 서로 다른 유효한 값으로 변경되면 Notion 값을 우선합니다. 마지막 확인 기준은 Notion의 숨김 `rich_text` 속성 `동기화 기준`에 `{v:1,status,facts:{closed,reason,ready}}` JSON으로 저장하고 Project → Notion 표시 속성 → `동기화 기준` 순서로 쓰기와 재조회 확인을 수행합니다(무변경 행은 직접 Project 단건 재조회 1회 수행). 손상된 `동기화 기준`은 해당 Issue만 건너뛰고 고정된 `INVALID_CHECKPOINT` 코드와 Issue 번호만 보고하며 다른 정상 행은 계속 처리합니다. 영구 보류나 별도 shadow 모드는 두지 않으며 같은 계획 생성기를 쓰는 `--dry-run`과 공개 `sync-simple-plan` 실행 산출물(확정 결과와 분리된 Issue 메타데이터 갱신 필드명 및 PR `create`/`update`/`none` 계획 포함, 민감 원문 제외)로 실행 계획을 확인합니다. 자세한 규칙과 운영 전환 절차는 [동기화 운영 안내](../docs/architecture/notion-sync.md)를 참고하세요.
 
 ```sh
 python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
@@ -13,7 +13,7 @@ python3 -B scripts/notion_sync.py --dry-run
 
 ## 변경 기반 및 주기적 일반 동기화
 
-`ordinary_sync_request.py`는 정확한 `main` SHA·워크플로·저장소·실행자(actor)·첫 시도(attempt=1)와 Cloudflare Worker relay의 일회용 실행 허가를 확인한 뒤 `sync_simple.py` 전체 동기화를 실행하고 결과를 해시 체인 chunk와 seal로 보고합니다. 웹훅·helper 수신 요청뿐 아니라 Worker 분당 cron이 최소 300초 간격으로 요청하는 수신 ID 없는 주기적 전체 스캔도 동일한 일반 워크플로 경로를 사용합니다.
+`ordinary_sync_request.py`는 정확한 `main` SHA·워크플로·저장소·실행자·첫 시도(`attempt=1`)와 Cloudflare Worker relay의 일회용 실행 허가를 확인한 뒤 `sync_simple.py` 전체 동기화를 실행하고 이미 확보한 전체 동기화 사실 스냅샷과 확정된 Project 결과를 수집 단계에 그대로 재사용(저장소 중복 조회 생략)하며 콜백 전달 전에 계획 산출물을 먼저 저장한 뒤 해시 체인 chunk와 seal로 보고합니다. 웹훅·helper 수신 요청뿐 아니라 Worker 분당 cron이 `PERIODIC_MIN_SECONDS`(기본값 600초/10분, 600 미만 거부) 간격으로 요청하는 수신 ID 없는 주기적 전체 스캔도 동일한 일반 워크플로 경로를 사용합니다.
 
 일반 실행의 증거 콜백 전송이 실패했을 때는 원본 실행 산출물의 `notion-relay-evidence.json`을 사용해 저장된 콜백만 재전송할 수 있습니다. 이 명령은 실행 허가 요청이나 동기화 엔진을 다시 실행하지 않습니다.
 
