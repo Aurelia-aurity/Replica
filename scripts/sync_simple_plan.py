@@ -77,6 +77,8 @@ def plan_issue(issue, page, item, snapshot, config, *, archived=False):
         decision["note"] = decision["note"] or "확인 필요"
 
     target = decision["target"]
+    if item is None and target is not None:
+        decision["write_project"] = True
     eligible = not invalid_checkpoint and (page is not None or (target is not None and not archived))
     expected_notion = target if page is None or decision["write_notion"] else notion_status
     expected_project = target if item is None or decision["write_project"] else project_status

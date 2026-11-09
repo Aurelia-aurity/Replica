@@ -128,6 +128,14 @@ class ReviewFixTests(unittest.TestCase):
                 else:
                     self.assertEqual(self.notion.pages, [])
 
+    def test_review_rejection_initializes_missing_project_to_valid_legacy_baseline(self):
+        self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "검토 중"}}
+        self.project.items = []
+        report = self.sync()
+        self.assertEqual(report["counts"]["failed"], 0)
+        self.assertEqual(read_checkpoint(self.notion.pages[0]), ("백로그", OPEN))
+        self.assertEqual(self.project.items[0]["fieldValues"]["nodes"][0]["optionId"], OPTIONS["백로그"])
+
     def test_dry_run_metadata_plans_equal_apply_and_reveal_no_values(self):
         self.github.issues[0]["title"] = "PRIVATE_UPDATED_TITLE"
         self.github.pulls = [pull()]
