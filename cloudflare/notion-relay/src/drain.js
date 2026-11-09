@@ -70,11 +70,72 @@ export class Drain {
     await this.db.prepare(`UPDATE sync_requests SET phase=?,run_id=?,updated_at=? WHERE request_id=?
       AND phase='POSTING' AND claimed_at IS NULL`).bind(outcome.state,outcome.run_id,this.now(),request.request_id).run();
   }
-  async tick(){
+  async periodic(){
+    const now=this.now();
+    const latest=await this.db.prepare('SELECT MAX(created_at) AS at FROM sync_requests').first();
+    if(latest.at!==null&&now-latest.at<300)return {rate_limited:true};
+    if(await this.github.syncInFlight())return {pending:true};
+    const expectedSHA=await this.github.mainSHA();await this.github.workflow();
+    const id=this.newID();
+    // The slot and rate check are repeated in the INSERT transaction: simultaneous
+    // Cron invocations cannot create two requests or consume two dispatches.
+    await this.db.batch([
+      this.db.prepare(`INSERT INTO sync_requests(request_id,generation,receipt_ids,expected_sha,phase,created_at,updated_at)
+        SELECT ?,?,'[]',?,'PREPARING',?,?
+        WHERE EXISTS(SELECT 1 FROM request_slot WHERE singleton=1 AND request_id IS NULL)
+        AND NOT EXISTS(SELECT 1 FROM sync_requests WHERE created_at>?)`)
+        .bind(id,now,expectedSHA,now,now,now-300),
+      this.db.prepare(`UPDATE request_slot SET request_id=? WHERE singleton=1 AND request_id IS NULL
+        AND EXISTS(SELECT 1 FROM sync_requests WHERE request_id=?)`).bind(id,id),
+    ]);
+    const request=await this.active();
+    if(request?.request_id===id)await this.send(request);
+    return {pending:Boolean(request)};
+  }
+  async prunePeriodic(){
+    // Only successful, receipt-free periodic records older than seven days.
+    // Preserve all ambiguous/failed requests and all helper/webhook evidence.
+    const eligible=`SELECT r.request_id FROM sync_requests r
+      WHERE r.receipt_ids='[]' AND r.phase='ACTIVATED' AND r.updated_at<?
+      AND NOT EXISTS(SELECT 1 FROM request_slot s WHERE s.request_id=r.request_id)
+      AND NOT EXISTS(SELECT 1 FROM receipts e WHERE e.request_id=r.request_id)
+      AND EXISTS(SELECT 1 FROM sync_requests newer
+        WHERE newer.phase='ACTIVATED' AND newer.created_at>r.created_at)`;
+    const cutoff=this.now()-7*86400;
+    await this.db.batch([
+      this.db.prepare(`DELETE FROM run_observations WHERE request_id IN (${eligible})`).bind(cutoff),
+      this.db.prepare(`DELETE FROM result_chunks WHERE request_id IN (${eligible})`).bind(cutoff),
+      this.db.prepare(`DELETE FROM sync_requests WHERE request_id IN (${eligible})`).bind(cutoff),
+    ]);
+  }
+  async tick({scheduled=false}={}){
     // Existing terminal evidence is handled even when receipt/dispatch is stopped.
     const active=await this.active();
     if(active){
-      if(active.phase==='SEALED')return this.results.activate(active);
+      if(active.phase==='SEALED'){
+        const result=await this.results.activate(active);
+        if(result.fenced&&active.receipt_ids==='[]'){
+          await this.db.prepare(`UPDATE request_slot SET request_id=NULL WHERE singleton=1 AND request_id=?
+            AND EXISTS(SELECT 1 FROM sync_requests WHERE request_id=? AND phase='FAILED_FENCED')`)
+            .bind(active.request_id,active.request_id).run();
+        }
+        return result;
+      }
+      if(active.phase==='CLAIMED'&&active.receipt_ids==='[]'){
+        const run=validateRun(await this.github.getRun(active.run_id),active,this.env,active.run_id);
+        if(run.status==='completed'){
+          // A killed runner cannot deliver a seal. Keep its evidence, release only
+          // this receipt-free slot, and let a NEW claimed full scan retry effects.
+          await this.db.batch([
+            this.db.prepare(`UPDATE sync_requests SET phase='FAILED_TERMINAL',updated_at=?
+              WHERE request_id=? AND phase='CLAIMED'`).bind(this.now(),active.request_id),
+            this.db.prepare(`UPDATE request_slot SET request_id=NULL WHERE singleton=1 AND request_id=?
+              AND EXISTS(SELECT 1 FROM sync_requests WHERE request_id=? AND phase='FAILED_TERMINAL')`)
+              .bind(active.request_id,active.request_id),
+          ]);
+        }
+        return {pending:run.status!=='completed'};
+      }
       if(['POSTING','DISPATCH_UNKNOWN'].includes(active.phase)){
         await this.correlate(active);return {pending:true};}
       if(active.phase==='PREPARING'){
@@ -108,12 +169,13 @@ export class Drain {
       if(await this.classify(receipt))inspectedIDs.push(receipt.receipt_id);
     }
     if(currentMode!=='ACTIVE')return {dispatch_disabled:true};
-    if(!inspectedIDs.length)return {idle:true};
+    if(scheduled)await this.prunePeriodic();
+    if(!inspectedIDs.length)return scheduled?this.periodic():{idle:true};
     const candidates=await this.db.prepare(`SELECT * FROM receipts WHERE state='actionable'
       AND dispatch_count<3 AND receipt_id IN (${inspectedIDs.map(()=>'?').join(',')})
       ORDER BY generation LIMIT 10`).bind(...inspectedIDs).all();
     if(!candidates.results.length)return {idle:true};
-    requireValue((await this.db.prepare('SELECT COUNT(*) AS n FROM sync_requests').first()).n<1000,
+    requireValue((await this.db.prepare("SELECT COUNT(*) AS n FROM sync_requests WHERE receipt_ids!='[]'").first()).n<1000,
       'REQUEST_JOURNAL_CAPACITY',503);
     // No POST can occur before repository/main/workflow reads and durable intent.
     const expectedSHA=await this.github.mainSHA();await this.github.workflow();

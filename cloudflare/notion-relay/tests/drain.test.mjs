@@ -19,6 +19,7 @@ async function receipt(db,name='notion:signal',generation=1,source='notion'){
 async function setup(){
   const {db,env}=await fixture();let dispatches=0;let correlations=0;
   const github={mainSHA:async()=>'a'.repeat(40),workflow:async()=>{},
+    syncInFlight:async()=>false,
     dispatch:async()=>{dispatches++;return {state:'DISPATCH_UNKNOWN',run_id:null};},
     correlate:async()=>{correlations++;return {state:'DISPATCH_UNKNOWN',run_id:null};}};
   const drain=new Drain(env,{github,readPage:async()=>latest(),newID:()=>id,now:()=>100});
@@ -158,4 +159,58 @@ test('activated echo lookup fenced before receipt CAS cannot suppress new receip
   };
   await drain.tick();assert.equal(counts().dispatches,0);
   assert.equal((await db.prepare('SELECT state FROM receipts').first()).state,'queued');
+});
+
+test('periodic full scan dispatches without webhook receipts and uses the same durable claim slot',async()=>{
+  const {db,drain,counts}=await setup();
+  await drain.tick({scheduled:true});
+  const request=await db.prepare('SELECT * FROM sync_requests').first();
+  assert.equal(request.receipt_ids,'[]');
+  assert.equal(request.expected_sha,'a'.repeat(40));
+  assert.equal(request.phase,'DISPATCH_UNKNOWN');
+  await drain.tick({scheduled:true});
+  assert.equal(counts().dispatches,1);
+  assert.equal(counts().correlations,1);
+});
+
+test('five-minute cadence is enforced across restarts and concurrent scheduled ticks',async()=>{
+  const {db,env,drain,github,counts}=await setup();
+  await activated(db);
+  drain.now=()=>300;
+  assert.deepEqual(await drain.tick({scheduled:true}),{rate_limited:true});
+  drain.now=()=>301;
+  const second=new Drain(env,{github,newID:()=>'44444444-4444-4444-8444-444444444444',now:()=>301});
+  await Promise.all([drain.tick({scheduled:true}),second.tick({scheduled:true})]);
+  assert.equal(counts().dispatches,1);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM sync_requests WHERE phase!='ACTIVATED'").first()).n,1);
+});
+
+test('periodic dispatch respects remote in-flight runs, read failures and both stopped modes',async()=>{
+  for(const state of ['busy','unavailable','STOPPED','DRAINING']){
+    const {db,env,drain,github,counts}=await setup();
+    if(state==='busy')github.syncInFlight=async()=>true;
+    else if(state==='unavailable')github.syncInFlight=async()=>{throw Error('synthetic outage');};
+    else env.RELAY_MODE=state;
+    if(state==='unavailable')await assert.rejects(drain.tick({scheduled:true}));
+    else await drain.tick({scheduled:true});
+    assert.equal(counts().dispatches,0);
+    assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM sync_requests').first()).n,0);
+  }
+});
+
+test('periodic cleanup retains ambiguous records, receipt-linked history and newest confirmed evidence',async()=>{
+  const {db,drain}=await setup();
+  await activated(db);
+  const old='33333333-3333-4333-8333-333333333333';
+  for(const [request,phase,receipts] of [[id,'ACTIVATED','[]'],
+    ['44444444-4444-4444-8444-444444444444','CLAIMED','[]'],
+    ['55555555-5555-4555-8555-555555555555','ACTIVATED','["notion:old"]']]){
+    await db.prepare(`INSERT INTO sync_requests(request_id,generation,receipt_ids,expected_sha,phase,created_at,updated_at)
+      VALUES(?,1,?,?,?,2,2)`).bind(request,receipts,'a'.repeat(40),phase).run();
+  }
+  drain.now=()=>8*86400;
+  await drain.prunePeriodic();
+  assert.equal(await db.prepare('SELECT * FROM sync_requests WHERE request_id=?').bind(old).first(),null);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM run_observations WHERE request_id=?').bind(old).first()).n,0);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM sync_requests').first()).n,3);
 });

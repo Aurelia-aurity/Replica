@@ -17,14 +17,17 @@ import urllib.request
 from uuid import uuid4
 
 import github_project as gp
-import sync_engine as se
+import notion_api as na
+from sync_simple_apply import project_snapshot
+from sync_simple_state import issue_facts, key_for
 from ordinary_sync_request import PinnedRelay, canonical
 
+GENERAL_STATES = ("백로그", "준비 중", "진행 중")
 SOURCE_ID = "398c7ff6-9c66-43de-ba4d-3f2670b25a87"
 STATUS_FIELD_ID = "PVTSSF_lAHOBda_2c4BmKKVzhk0RA4"
 
 
-class MutationRejected(se.SyncError):
+class MutationRejected(gp.SyncError):
     pass
 
 
@@ -41,22 +44,22 @@ def digest(value):
 class LocalJournal:
     def __init__(self, directory, operation_id):
         self.directory = Path(directory)
-        se.require(not self.directory.is_symlink(), "helper 기록 디렉터리 결속 오류")
+        gp.require(not self.directory.is_symlink(), "helper 기록 디렉터리 결속 오류")
         self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.operation_id = se.identifier(operation_id)
-        se.require(self.operation_id == operation_id, "helper operation UUID 형식 오류")
+        self.operation_id = na.identifier(operation_id)
+        gp.require(self.operation_id == operation_id, "helper operation UUID 형식 오류")
         self.path = self.directory / (operation_id + ".json")
         self.lock_path = self.directory / (operation_id + ".lock")
 
     @contextmanager
     def locked(self):
-        se.require(not self.lock_path.is_symlink() and not self.path.is_symlink(), "helper 기록 symlink 거절")
+        gp.require(not self.lock_path.is_symlink() and not self.path.is_symlink(), "helper 기록 symlink 거절")
         fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         try:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
-                raise se.SyncError("같은 helper operation이 다른 프로세스에서 실행 중입니다") from None
+                raise gp.SyncError("같은 helper operation이 다른 프로세스에서 실행 중입니다") from None
             yield self
         finally:
             os.close(fd)
@@ -64,17 +67,17 @@ class LocalJournal:
     def load(self):
         if not self.path.exists():
             return None
-        se.require(self.path.stat().st_size <= 65536, "helper 기록 크기 초과")
+        gp.require(self.path.stat().st_size <= 65536, "helper 기록 크기 초과")
         with self.path.open(encoding="utf-8") as stream:
             value = json.load(stream)
-        se.require(isinstance(value, dict) and value.get("schema") == 1 and
+        gp.require(isinstance(value, dict) and value.get("schema") == 1 and
                    value.get("body", {}).get("operation_id") == self.operation_id,
                    "helper 기록 결속 오류")
         return value
 
     def save(self, value):
         raw = canonical(value).encode()
-        se.require(len(raw) <= 65536, "helper 기록 크기 초과")
+        gp.require(len(raw) <= 65536, "helper 기록 크기 초과")
         temporary = self.path.with_name(self.path.name + ".tmp")
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, "wb") as stream:
@@ -94,20 +97,21 @@ class SnapshotReader:
     def __call__(self, issue_number):
         facts = gp.fetch_repository_facts(self.github, self.rest)
         matches = [issue for issue in facts["issues"].values() if issue["number"] == issue_number]
-        se.require(len(matches) == 1, "helper Issue가 고정 저장소에서 확인되지 않습니다")
+        gp.require(len(matches) == 1, "helper Issue가 고정 저장소에서 확인되지 않습니다")
         issue = matches[0]
-        project = se._project_snapshot(self.project_client, self.config, facts, refresh_status=True)
+        project = project_snapshot(self.project_client, self.config, facts, refresh=True)
         item = project["items"].get(issue["databaseId"])
-        se.require(issue["state"] == "OPEN" and item is not None and
+        gp.require(issue["state"] == "OPEN" and item is not None and
                    not project.get("archived_items", {}).get(issue["databaseId"]) and
                    not item.get("is_archived"), "helper는 열린 Issue의 기존 활성 item만 처리합니다")
-        refs, eligible = se._linked_pr_facts(issue, facts)
-        se.require(not eligible and item["status_option_id"] in
-                   {self.config["status_options"][name] for name in se.GENERAL_STATES},
+        observed, fingerprint, _ = issue_facts(issue, facts)
+        gp.require(not observed["ready"] and item["status_option_id"] in
+                   {self.config["status_options"][name] for name in GENERAL_STATES},
                    "helper 상태 또는 검토 PR이 일반 변경과 충돌합니다")
         return {"issue_id": issue["databaseId"], "item_id": item["id"],
-                "stamp": se._status_stamp(item, self.config),
-                "source_fingerprint": se._status_facts_fingerprint(issue, refs)}
+                "stamp": {"field_id": self.config["status_field_id"], "option_id": item["status_option_id"],
+                          "value_id": item["status_value_id"], "updated_at": item["status_updated_at"]},
+                "source_fingerprint": fingerprint}
 
 
 def mutate_once(client, body, options):
@@ -120,16 +124,16 @@ def mutate_once(client, body, options):
     try:
         with client.opener.open(request, timeout=30) as response:
             raw = response.read(65537)
-            se.require(len(raw) <= 65536, "helper 변경 응답 크기 초과")
+            gp.require(len(raw) <= 65536, "helper 변경 응답 크기 초과")
             value = json.loads(raw)
     except urllib.error.HTTPError as error:
         status = error.code; error.close()
         if status in {401, 403}:
             raise MutationRejected("helper 인증/권한 단계에서 변경이 거절됐습니다") from None
-        raise se.SyncError("helper API 변경 결과 미확인") from None
+        raise gp.SyncError("helper API 변경 결과 미확인") from None
     except Exception:
-        raise se.SyncError("helper API 변경 결과 미확인") from None
-    se.require(isinstance(value, dict) and not value.get("errors") and
+        raise gp.SyncError("helper API 변경 결과 미확인") from None
+    gp.require(isinstance(value, dict) and not value.get("errors") and
                value.get("data", {}).get("updateProjectV2ItemFieldValue", {}).get(
                    "projectV2Item", {}).get("id") == body["item_id"],
                "helper 변경 응답 item 결속 미확인")
@@ -144,11 +148,11 @@ def deliver(journal, document, relay):
         response = relay.post(document["evidence_endpoint"], document["evidence"])
         if document["evidence_endpoint"] == "/agent-request":
             state = "CONFIRMED" if document["evidence"]["kind"] == "mutation" else "CONFIRMED_NOOP"
-            se.require(response.get("sync_queued") is True, "helper 수신 기록 미확인")
+            gp.require(response.get("sync_queued") is True, "helper 수신 기록 미확인")
         else:
             state = ("ABORTED" if document["evidence_endpoint"] == "/agent-abort" else
                      "REJECTED_FENCED" if document["evidence"]["outcome"] == "rejected" else "UNKNOWN_FENCED")
-        se.require(response.get("operation_id") == document["body"]["operation_id"] and
+        gp.require(response.get("operation_id") == document["body"]["operation_id"] and
                    response.get("binding") == document["binding"] and response.get("state") == state,
                    "helper 결과 응답 결속 오류")
         document["phase"] = state; journal.save(document)
@@ -162,18 +166,18 @@ def deliver(journal, document, relay):
 
 
 def run_helper(journal, relay, reader, mutate, *, issue_number, page_id, target, options, abort=False):
-    se.require(type(issue_number) is int and issue_number > 0 and target in se.GENERAL_STATES,
+    gp.require(type(issue_number) is int and issue_number > 0 and target in GENERAL_STATES,
                "helper는 일반 세 상태의 기존 Issue만 처리합니다")
-    page_id = se.identifier(page_id)
+    page_id = na.identifier(page_id)
     with journal.locked():
         document = journal.load()
         if document is None:
-            se.require(not abort, "helper 안전 취소에는 기존 operation 기록이 필요합니다")
+            gp.require(not abort, "helper 안전 취소에는 기존 operation 기록이 필요합니다")
             snapshot = reader(issue_number)
             body = {"operation_id": journal.operation_id, "repository_id": gp.REPOSITORY_ID,
                 "project_id": gp.EXPECTED_PROJECT_ID, "item_id": snapshot["item_id"],
                 "status_field_id": STATUS_FIELD_ID, "issue_id": snapshot["issue_id"],
-                "page_id": page_id, "sync_key": se.key_for(gp.REPOSITORY_ID, snapshot["issue_id"]),
+                "page_id": page_id, "sync_key": key_for(snapshot["issue_id"]),
                 "expected_before": snapshot["stamp"], "target": target,
                 "source_fingerprint": snapshot["source_fingerprint"]}
             document = {"schema": 1, "relay": relay.base, "issue_number": issue_number,
@@ -181,14 +185,14 @@ def run_helper(journal, relay, reader, mutate, *, issue_number, page_id, target,
                 "evidence_endpoint": None, "evidence": None}
             journal.save(document)
         body = document["body"]
-        se.require(document["relay"] == relay.base and document["issue_number"] == issue_number and
+        gp.require(document["relay"] == relay.base and document["issue_number"] == issue_number and
                    body["page_id"] == page_id and body["target"] == target and
                    document["binding"] == digest(body), "helper 재개 입력 또는 relay 결속이 달라졌습니다")
         bound = {"operation_id": body["operation_id"], "binding": document["binding"]}
         if abort:
             # Only the remote PREPARED CAS can prove safe abort, even after local ACK loss.
             response = relay.post("/agent-abort", bound)
-            se.require(response.get("state") == "ABORTED" and response.get("binding") == document["binding"] and
+            gp.require(response.get("state") == "ABORTED" and response.get("binding") == document["binding"] and
                        response.get("operation_id") == journal.operation_id, "helper 안전 취소 미확인")
             evidence(document, "/agent-abort", bound, "ABORTED"); journal.save(document)
             return deliver(journal, document, relay)
@@ -200,12 +204,12 @@ def run_helper(journal, relay, reader, mutate, *, issue_number, page_id, target,
             evidence(document, "/agent-outcome", payload, "MUTATION_AMBIGUOUS"); journal.save(document)
             return deliver(journal, document, relay)
         prepared = relay.post("/agent-prepare", body)
-        se.require(prepared.get("binding") == document["binding"] and prepared.get("operation_id") == journal.operation_id and
+        gp.require(prepared.get("binding") == document["binding"] and prepared.get("operation_id") == journal.operation_id and
                    prepared.get("state") == "PREPARED", "helper 예약 미확인")
         document["phase"] = "PREPARED"; journal.save(document)
         try:
             current = reader(issue_number)
-            se.require(current["issue_id"] == body["issue_id"] and current["item_id"] == body["item_id"] and
+            gp.require(current["issue_id"] == body["issue_id"] and current["item_id"] == body["item_id"] and
                        current["stamp"] == body["expected_before"] and
                        current["source_fingerprint"] == body["source_fingerprint"], "helper 변경 직전 사실이 달라졌습니다")
         except Exception:
@@ -220,7 +224,7 @@ def run_helper(journal, relay, reader, mutate, *, issue_number, page_id, target,
         code = "ACK_LOST"; outcome = "unknown"
         try:
             permission = relay.post("/agent-attempt", bound)
-            se.require(permission.get("operation_id") == journal.operation_id and
+            gp.require(permission.get("operation_id") == journal.operation_id and
                        permission.get("binding") == document["binding"] and
                        permission.get("state") == "ATTEMPTING" and permission.get("newly_authorized") is True,
                        "helper 신규 변경 허가 미확인")
@@ -228,7 +232,7 @@ def run_helper(journal, relay, reader, mutate, *, issue_number, page_id, target,
             mutate(body)
             code = "READBACK_MISMATCH"
             readback = reader(issue_number)
-            se.require(readback["issue_id"] == body["issue_id"] and readback["item_id"] == body["item_id"] and
+            gp.require(readback["issue_id"] == body["issue_id"] and readback["item_id"] == body["item_id"] and
                        readback["stamp"]["field_id"] == STATUS_FIELD_ID and
                        readback["stamp"]["option_id"] == options[target] and
                        readback["source_fingerprint"] == body["source_fingerprint"], "helper 변경 readback 미확인")
@@ -252,7 +256,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--page-id", required=True)
-    parser.add_argument("--target", choices=se.GENERAL_STATES, required=True)
+    parser.add_argument("--target", choices=GENERAL_STATES, required=True)
     parser.add_argument("--operation-id", default="")
     parser.add_argument("--journal", default=".replica-status-requests")
     parser.add_argument("--abort", action="store_true")
@@ -260,7 +264,7 @@ def main(argv=None):
     operation_id = args.operation_id or str(uuid4())
     try:
         env = os.environ
-        se.require(env.get("PROJECT_ID") == gp.EXPECTED_PROJECT_ID and
+        gp.require(env.get("PROJECT_ID") == gp.EXPECTED_PROJECT_ID and
                    env.get("PROJECT_OWNER_ID") == gp.EXPECTED_PROJECT_OWNER_ID and
                    env.get("PROJECT_STATUS_FIELD_ID") == STATUS_FIELD_ID and
                    env.get("NOTION_DATA_SOURCE_ID") == SOURCE_ID, "helper 고정 자원 설정 오류")

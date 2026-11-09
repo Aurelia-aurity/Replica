@@ -56,7 +56,9 @@ export class RunResults {
     requireValue(['POSTING','DISPATCHED','DISPATCH_UNKNOWN','CLAIMED'].includes(request.phase)&&
       run.status!=='completed','CLAIM_PHASE');
     const receipts=JSON.parse(request.receipt_ids);
-    requireValue(Array.isArray(receipts)&&receipts.length>0&&receipts.length<=10&&
+    // Empty receipts identify a trusted periodic full reconciliation. Authorization
+    // still binds the persisted request, exact main SHA, actor and one-time claim.
+    requireValue(Array.isArray(receipts)&&receipts.length<=10&&
       new Set(receipts).size===receipts.length,'CLAIM_RECEIPTS');
     const changed=await this.db.prepare(`UPDATE sync_requests SET phase='CLAIMED',run_id=?,
       claimed_at=?,updated_at=? WHERE request_id=? AND claimed_at IS NULL AND

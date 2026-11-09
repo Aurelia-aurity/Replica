@@ -8,8 +8,7 @@ import github_project as gp
 import notion_api as na
 import sync_simple as ss
 import sync_simple_state as state
-import sync_engine as legacy
-from sync_simple_fakes import CONFIG, NOW, REPO, GitHub, Notion, Project, REST, checkpoint, conn, page, text
+from sync_simple_fakes import CONFIG, LEGACY, NOW, REPO, GitHub, Notion, Project, REST, checkpoint, conn, page, text
 
 
 def pull():
@@ -79,9 +78,8 @@ class StateTests(unittest.TestCase):
         row = page(internal=checkpoint(github))
         saved = json.loads(na.read_text(row, "동기화 내부 상태"))
         snapshot = {"repository_node_id": REPO, "pulls": {901: ready, 903: draft}}
-        refs, eligible = legacy._linked_pr_facts(github.issues[0], snapshot)
-        expected_fingerprint = legacy._status_facts_fingerprint(github.issues[0], refs)
-        expected_ready_hash = legacy._digest([pr["id"] for pr in eligible])
+        expected_fingerprint = LEGACY["complex"]["baseline"]["facts_fingerprint"]
+        expected_ready_hash = LEGACY["complex"]["review_pr_hash"]
         github.issues[0]["title"] = "Changed cosmetic title"
         github.issues[0]["updatedAt"] = "2026-11-05T01:00:00Z"
         github.issues[0]["linked_prs"].reverse()

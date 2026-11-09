@@ -1,4 +1,4 @@
-"""Bind canonical rows and reconstruct read-only legacy status checkpoints."""
+"""Canonical row identity and independent successful status/facts checkpoints."""
 from __future__ import annotations
 
 import hashlib
@@ -11,6 +11,7 @@ from notion_api import bound_page, query_all, read_select, read_text
 from sync_rules import STATUSES
 
 KEY_RE = re.compile(r"gh:([1-9][0-9]*):issue:([1-9][0-9]*)\Z")
+CHECKPOINT = "동기화 기준"
 
 
 class LegacyCheckpoint(NamedTuple):
@@ -27,6 +28,41 @@ def digest(value):
 
 def key_for(issue_id):
     return f"gh:{gp.REPOSITORY_ID}:issue:{issue_id}"
+
+
+def checkpoint_text(status, facts):
+    return json.dumps({"v": 1, "status": status,
+                       "facts": {"closed": facts["state"] == "CLOSED",
+                                 "reason": facts["reason"], "ready": facts["ready"]}},
+                      ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def read_checkpoint(page):
+    """A malformed new checkpoint is not permission to reuse stale legacy state."""
+    raw = read_text(page, CHECKPOINT)
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        raise gp.SyncError("Sync checkpoint JSON invalid") from None
+    gp.require(isinstance(value, dict) and set(value) == {"v", "status", "facts"} and
+               type(value["v"]) is int and value["v"] == 1 and value["status"] in STATUSES,
+               "Sync checkpoint invalid")
+    facts = value["facts"]
+    gp.require(isinstance(facts, dict) and set(facts) == {"closed", "reason", "ready"} and
+               type(facts["closed"]) is bool and type(facts["ready"]) is bool and
+               (facts["reason"] is None or isinstance(facts["reason"], str)),
+               "Sync checkpoint facts invalid")
+    return value["status"], {"state": "CLOSED" if facts["closed"] else "OPEN",
+                             "reason": facts["reason"], "ready": facts["ready"]}
+
+
+def history(page, issue, config, observed):
+    saved = read_checkpoint(page) if page else None
+    if saved is not None:
+        return LegacyCheckpoint(saved[0], saved[1], None, "checkpoint")
+    return legacy_checkpoint(page, issue, config, observed)
 
 
 def index_rows(notion, source_id, snapshot):

@@ -69,6 +69,26 @@ class NotionTransportTests(unittest.TestCase):
         with self.assertRaisesRegex(gp.SyncError, "writes disabled"):
             client.request(gp.SET_STATUS_MUTATION, {}, mutation=True)
 
+    def test_explicit_write_client_sends_one_patch_and_never_retries_ambiguous_failure(self):
+        opener = Opener()
+        client = na.NotionClient("synthetic-token", allow_apply=True, opener=opener, sleep=lambda _: None)
+        payload = {"properties": {"작업 상태": {"select": {"name": "진행 중"}}}}
+        client.request("PATCH", f"/pages/{PAGE}", payload)
+        request = opener.requests[0][0]
+        self.assertEqual(request.full_url, f"https://api.notion.com/v1/pages/{PAGE}")
+        self.assertEqual(request.get_method(), "PATCH")
+        self.assertEqual(json.loads(request.data), payload)
+        opener.error = urllib.error.HTTPError("https://secret.invalid", 503, "private", {},
+                                               io.BytesIO(b"private token"))
+        with self.assertRaisesRegex(gp.SyncError, "^Notion HTTP 503; stopped$"):
+            client.request("PATCH", f"/pages/{PAGE}", payload)
+        self.assertEqual(len(opener.requests), 2)
+        for method, path in (("PATCH", f"/data_sources/{SOURCE}"),
+                             ("DELETE", f"/pages/{PAGE}"), ("PATCH", "//evil.invalid")):
+            with self.assertRaises(gp.SyncError):
+                client.request(method, path, payload)
+        self.assertEqual(len(opener.requests), 2)
+
     def test_query_pagination_preserves_archive_partition(self):
         # Given: two correctly shaped query pages, no wall-clock behavior.
         class Pages:

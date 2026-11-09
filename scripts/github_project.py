@@ -866,12 +866,6 @@ SET_STATUS_MUTATION = """mutation($project: ID!, $item: ID!, $field: ID!, $optio
     value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
 }"""
 
-CLEAR_STATUS_MUTATION = """mutation($project: ID!, $item: ID!, $field: ID!) {
-  clearProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field}) {
-    projectV2Item { id }
-  }
-}"""
-
 ADD_ISSUE_MUTATION = """mutation($project: ID!, $content: ID!) {
   addProjectV2ItemById(input: {projectId: $project, contentId: $content}) { item { id } }
 }"""
@@ -884,12 +878,6 @@ def set_project_status(client, project_id, item_id, field_id, option_id):
     require(isinstance(data.get("updateProjectV2ItemFieldValue"), dict), "Project Status 변경 응답 누락")
 
 
-def clear_project_status(client, project_id, item_id, field_id):
-    data, _ = client.request(CLEAR_STATUS_MUTATION,
-                             {"project": project_id, "item": item_id, "field": field_id}, mutation=True)
-    require(isinstance(data.get("clearProjectV2ItemFieldValue"), dict), "Project Status 비우기 응답 누락")
-
-
 def add_project_issue(client, project_id, content_id):
     data, _ = client.request(ADD_ISSUE_MUTATION,
                              {"project": project_id, "content": content_id}, mutation=True)
@@ -899,15 +887,3 @@ def add_project_issue(client, project_id, content_id):
     require(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"],
             "Project Issue 추가 응답 item ID 누락")
     return item["id"]
-
-
-def resolve_actor(client, login):
-    require(isinstance(login, str) and login and len(login) <= 39, "GitHub actor 형식 오류")
-    query = "query($login: String!) { user(login: $login) { databaseId login } }"
-    data, _ = client.request(query, {"login": login})
-    user = data.get("user")
-    require(isinstance(user, dict) and user.get("login", "").casefold() == login.casefold(),
-            "workflow actor를 확인할 수 없습니다")
-    user_id = _validate_positive(user.get("databaseId"), "workflow actor numeric ID 오류")
-    require(user_id == EXPECTED_PM_USER_ID, "보류 재개는 지정 PM actor만 수행할 수 있습니다")
-    return user_id
