@@ -122,7 +122,7 @@ POST /v1/persona/generate
 
 persona의 두 호칭은 AI가 요청용으로 생성하지 않고 백엔드·DB에서 읽은 사용자 편집 가능 값을 전달한다. provider_address는 style_profile.content.speech_style.address_terms의 자동 추출 후보를 사용자가 확인·수정한 값이며, 미설정이면 null이다. style_profile의 address_terms는 자동 추출 후보 목록으로 유지한다.
 
-카카오톡 내보내기의 "나"는 업로더인 정보 제공자(provider)이자 페르소나와 대화하는 사용자다. persona는 SC-04에서 사용자가 선택한 화자다. persona 역할의 근거만 페르소나 본인의 발화·사실의 출처로 취급한다. provider 발화는 함께 겪은 사건을 설명할 수 있지만 문맥이며 페르소나 본인의 발화가 아니다. other 발화는 문맥 전용이며 페르소나 본인의 사실 근거로 쓰지 않는다. AI는 provider·other의 발화를 페르소나에게 귀속하지 않는다. 백엔드는 화자가 섞인 청크를 분할해 각 evidence 항목에 하나의 화자 역할만 담아야 한다.
+persona는 SC-04에서 사용자가 선택한 화자이며 provider는 SC-04에서 사용자가 제공자로 고른 화자(업로더 본인, 페르소나와 대화하는 사용자)다. 카카오톡 Mac 내보내기는 화자를 "나"가 아닌 각자의 프로필 이름으로 표시하므로 백엔드는 SC-04 선택에 따라 persona와 provider 역할을 부여하고 나머지 화자는 other로 분류한다. 동일 인물을 persona와 provider로 중복 선택할 수 없으며 SC-04에서 비활성화한다. persona 역할의 근거만 페르소나 본인의 발화·사실의 출처로 취급한다. provider 발화는 함께 겪은 사건을 설명할 수 있지만 문맥이며 페르소나 본인의 발화가 아니다. other 발화는 문맥 전용이며 페르소나 본인의 사실 근거로 쓰지 않는다. AI는 provider·other의 발화를 페르소나에게 귀속하지 않는다. 백엔드는 화자가 섞인 청크를 분할해 각 evidence 항목에 하나의 화자 역할만 담아야 한다.
 
 백엔드 AI 모듈이 현재 적용 가능한 프로필을 읽고 질문 임베딩과 search_record_chunks로 근거를 선택한다. 이전 확정본·삭제 중 자료·다른 인물의 자료는 제외한다. style_profile.source_snapshot_id는 실제 저장된 프로필의 전체 출처 스냅샷을 가리킨다. 전체 출처 목록과 현재 접근 가능 여부는 백엔드에서 확인하며 대화 호출에 전체 기록 ID를 나열하지 않는다. style_profile.source_revision은 요청의 source_revision과 같아야 한다. 호출 준비 중 자료가 변경되면 그 호출에 사용할 스냅샷 일치 여부를 다시 확인한다. GPU는 DB의 현재 상태를 알지 못하므로 접근 권한·최신성 보장의 주체는 백엔드다. 생성 도중 삭제·자료 변경이 발생한 답변의 저장·전달 전 재확인도 백엔드가 맡는다.
 
