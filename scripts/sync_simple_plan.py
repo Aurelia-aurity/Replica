@@ -51,7 +51,13 @@ def plan_issue(issue, page, item, snapshot, config, *, archived=False):
 
     initial = {"target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
     decision = decide(last, notion_status, project_status, observed[0], previous)
-    if (history_kind not in {"checkpoint", "matching_fingerprint"} and
+    if (history_kind in {"reconstructed", "unknown_facts"} and
+            page is not None and item is not None and
+            notion_status in STATUSES and project_status in STATUSES and
+            notion_status != project_status):
+        # Approximate facts cannot choose between conflicting valid human edits.
+        decision = initial
+    elif (history_kind not in {"checkpoint", "matching_fingerprint"} and
             page is not None and item is not None and
             notion_status == project_status and notion_status in STATUSES):
         # Approximate migration history cannot replay transitions over equal sides.
@@ -70,7 +76,12 @@ def plan_issue(issue, page, item, snapshot, config, *, archived=False):
     if (history_kind != "checkpoint" and observed[0]["state"] == "OPEN" and
             decision["target"] == "검토 중" and not observed[0]["ready"]):
         # Neither equal-value nor missing-side initialization can bless unsupported review.
-        decision = initial
+        decision = (decide(last, notion_status, project_status, observed[0], None)
+                    if last in STATUSES and last != "검토 중" else initial)
+    if (history_kind == "checkpoint" and last == notion_status == project_status and
+            previous == observed[0] and na.read_text(page, "확인 필요") == "확인 필요"):
+        # Keep a rejection diagnostic until inputs change; unchanged scans write nothing.
+        decision["note"] = "확인 필요"
     if archived or invalid_checkpoint:
         decision = {"target": None, "write_project": False, "write_notion": False, "note": "확인 필요"}
     elif issue.get("stateReason") == "DUPLICATE" and not issue.get("duplicateOf"):
