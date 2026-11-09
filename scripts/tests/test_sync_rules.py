@@ -35,7 +35,7 @@ class RuleTests(unittest.TestCase):
                 if last != "검토 중" and "검토 중" in (notion, project):
                     target, wp, wn, note = last, project == "검토 중", notion == "검토 중", "확인 필요"
                 elif notion == "취소" and notion != last and project != notion:
-                    target, wp, wn, note = last, project != last, True, "확인 필요"
+                    target, wp, wn, note = project, False, True, "확인 필요"
                 else:
                     target = notion if notion != last else project
                     wp, wn, note = project != target, notion != target, ""
@@ -106,10 +106,10 @@ class RuleTests(unittest.TestCase):
     def test_invalid_notion_values_revert_table(self):
         # Given:
         cases = [
-            ("백로그", "bad", "진행 중", "백로그", True, True),
-            ("준비 중", None, "진행 중", "준비 중", True, True),
+            ("백로그", "bad", "진행 중", "진행 중", False, True),
+            ("준비 중", None, "진행 중", "진행 중", False, True),
             ("진행 중", "", "진행 중", "진행 중", False, True),
-            ("검토 중", "취소", "완료", "검토 중", True, True),
+            ("검토 중", "취소", "완료", "완료", False, True),
             (None, None, "진행 중", "진행 중", False, True),
             (None, "bad", "준비 중", "준비 중", False, True),
             (None, None, None, None, False, False),

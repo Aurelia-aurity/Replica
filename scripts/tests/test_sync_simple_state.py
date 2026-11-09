@@ -95,11 +95,11 @@ class StateTests(unittest.TestCase):
         self.assertEqual(previous, {"state": "OPEN", "reason": None, "ready": True})
         self.assertEqual(history, "matching_fingerprint")
 
-    def test_reopen_and_ready_transition_reconstruction_table(self):
+    def test_equal_migration_does_not_replay_reconstructed_transitions(self):
         # Given:
         for last, old_ready, ready_now, target in (
-                ("완료", False, False, "백로그"), ("완료", False, True, "검토 중"),
-                ("진행 중", False, True, "검토 중"), ("검토 중", True, False, "진행 중")):
+                ("완료", False, False, "완료"), ("완료", False, True, "완료"),
+                ("진행 중", False, True, "진행 중"), ("검토 중", True, False, None)):
             with self.subTest(last=last, old_ready=old_ready, ready_now=ready_now):
                 github = GitHub()
                 raw = json.loads(checkpoint(github, last))

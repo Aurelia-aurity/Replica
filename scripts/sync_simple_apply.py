@@ -84,8 +84,13 @@ def create_page(notion, config, metadata, status, now):
     return confirmed
 
 
-def apply_issue(notion, client, config, issue, page, item, plan, properties, facts, now):
+def apply_issue(notion, client, config, work, now):
     """Project -> Notion display -> equality readbacks -> durable checkpoint."""
+    issue, page, item = work.source, work.page, work.item
+    plan, properties = work.plan, work.properties
+    if plan["archived_project"]:
+        # Archive protects Project membership/status, not GitHub-owned metadata.
+        return apply_metadata(notion, config, work, now), item, None
     target = plan["target"]
     if page:
         page = checked_page(notion, config, page)
@@ -123,14 +128,15 @@ def apply_issue(notion, client, config, issue, page, item, plan, properties, fac
     if ((not plan["write_project"] and item["status_option_id"] != config["status_options"][target]) or
             (not plan["write_notion"] and na.read_select(page, "작업 상태") != target)):
         return page, item, None
-    # Verify even no-op rows; a list snapshot is not a successful reconciliation.
-    item = project_item(client, config, item["id"], issue)
-    gp.require(item["status_option_id"] == config["status_options"][target],
-               "Project changed before checkpoint")
-    page = checked_page(notion, config, page)
-    gp.require(na.read_select(page, "작업 상태") == target, "Notion changed before checkpoint")
-    raw = checkpoint_text(target, facts)
+    raw = checkpoint_text(target, work.facts)
     if na.read_text(page, CHECKPOINT) != raw:
+        # The initial fresh pair already verifies an unchanged checkpoint. Only a
+        # new checkpoint needs another equality check after possible display writes.
+        item = project_item(client, config, item["id"], issue)
+        gp.require(item["status_option_id"] == config["status_options"][target],
+                   "Project changed before checkpoint")
+        page = checked_page(notion, config, page)
+        gp.require(na.read_select(page, "작업 상태") == target, "Notion changed before checkpoint")
         page = patch_page(notion, config, page, {CHECKPOINT: text(raw)})
     # Only confirmed engine handling produces relay echo evidence.
     entry = {"page_id": na.identifier(page["id"]), "key": key_for(issue["databaseId"]),
@@ -141,7 +147,8 @@ def apply_issue(notion, client, config, issue, page, item, plan, properties, fac
     return page, item, entry
 
 
-def apply_pull(notion, config, page, properties, now):
+def apply_metadata(notion, config, work, now):
+    page, properties = work.page, work.properties
     if page is None:
         return create_page(notion, config, properties, None, now)
     if differences(page, properties):

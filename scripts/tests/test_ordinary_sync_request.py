@@ -106,8 +106,10 @@ class OrdinaryRequestTests(unittest.TestCase):
         remote.request = lambda path: run() if "/actions/runs/" in path else original(path)
         settings = {**env(), "GITHUB_TOKEN": "synthetic", "PROJECT_TOKEN": "synthetic",
                     "NOTION_TOKEN": "synthetic"}
-        for duplicate in (False, True):
-            with self.subTest(duplicate=duplicate), tempfile.TemporaryDirectory() as directory:
+        deliver = ordinary.deliver_evidence
+        for scenario in ("valid", "duplicate", "callback_failure"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                duplicate = scenario == "duplicate"
                 old = os.getcwd()
                 try:
                     os.chdir(directory)
@@ -115,6 +117,8 @@ class OrdinaryRequestTests(unittest.TestCase):
                     def respond(path, value):
                         if path == "/claim":
                             return {**relay().post.return_value, "newly_authorized": not duplicate}
+                        if scenario == "callback_failure":
+                            raise gp.SyncError("synthetic callback failure")
                         return {"stored": True, "sealed": True}
                     callback.post.side_effect = respond
                     before = (copy.deepcopy(notion.pages), copy.deepcopy(project.items))
@@ -124,9 +128,11 @@ class OrdinaryRequestTests(unittest.TestCase):
                          patch.object(gp, "RESTClient", return_value=remote), \
                          patch.object(na, "NotionClient", return_value=notion), \
                          patch.object(ordinary, "PinnedRelay", return_value=callback), \
+                         patch.object(ordinary, "deliver_evidence", side_effect=lambda *args:
+                                      deliver(*args, sleep=lambda _: None)), \
                          patch.object(subprocess, "run", return_value=SimpleNamespace(stdout=SHA)):
                         result = ordinary.main([])
-                    self.assertEqual(result, 1 if duplicate else 0)
+                    self.assertEqual(result, 0 if scenario == "valid" else 1)
                     if duplicate:
                         self.assertEqual((notion.pages, project.items), before)
                     else:
@@ -134,8 +140,10 @@ class OrdinaryRequestTests(unittest.TestCase):
                         self.assertEqual(saved["report"]["holds"], [])
                         self.assertEqual(saved["entries"][0]["status"], "진행 중")
                         self.assertTrue(saved["entries"][0]["reflection"])
-                        self.assertEqual([c.args[0] for c in callback.post.call_args_list],
-                                         ["/claim", "/result/chunk", "/result"])
+                        self.assertTrue(Path("sync-simple-plan.json").exists())
+                        if scenario == "valid":
+                            self.assertEqual([c.args[0] for c in callback.post.call_args_list],
+                                             ["/claim", "/result/chunk", "/result"])
                 finally:
                     os.chdir(old)
 
@@ -150,7 +158,7 @@ class OrdinaryRequestTests(unittest.TestCase):
         for key, value in {"GITHUB_RUN_ATTEMPT": "2", "GITHUB_REF": "refs/heads/feature",
                 "GITHUB_ACTOR_ID": "9", "GITHUB_DISPATCH_ACTOR_ID": "9",
                 "GITHUB_TRIGGERING_ACTOR": "different-user", "NOTION_SYNC_ENABLED": "false",
-                "NOTION_RELAY_ENABLED": "false", "SYNC_RESOLVE_ISSUES": "18",
+                "NOTION_RELAY_ENABLED": "false",
                 "SYNC_APPROVED_SHA": SHA, "SYNC_DRY_RUN": "true"}.items():
             with self.subTest(key=key):
                 current = env(); current[key] = value; callback = relay()

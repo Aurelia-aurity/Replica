@@ -60,7 +60,8 @@ def decide(last_synced: str | None, notion_status: str | None,
                       (notion_status == "취소" and notion_status != last_synced
                        and project_status != notion_status))
     if invalid_notion:
-        target = last_synced if last_synced in STATUSES else project_status
+        target = (project_status if project_status in STATUSES and project_status != last_synced else
+                  last_synced if last_synced in STATUSES else project_status)
         return {"target": target, "write_project": target is not None and project_status != target,
                 "write_notion": target is not None and notion_status != target, "note": "확인 필요"}
     if last_synced is None:

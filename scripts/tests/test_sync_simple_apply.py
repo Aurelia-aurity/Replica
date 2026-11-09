@@ -65,7 +65,7 @@ class WriterTests(unittest.TestCase):
         self.run_sync()
         first = self.writes()
         self.run_sync()
-        self.assert_converged("백로그")
+        self.assert_converged("진행 중")
         # The diagnostic may clear on the next clean scan; no status write may recur.
         patches = [payload["properties"].get("작업 상태")
                    for method, _, payload in self.notion.calls if method == "PATCH"]
@@ -89,6 +89,8 @@ class WriterTests(unittest.TestCase):
         raw = json.loads(checkpoint(self.github, "완료"))
         raw["baseline"]["facts_fingerprint"] = "0" * 64
         self.notion = Notion("완료", json.dumps(raw))
+        self.notion.pages[0]["properties"][CHECKPOINT] = text(checkpoint_text(
+            "완료", {"state": "CLOSED", "reason": "COMPLETED", "ready": False}))
         self.project = Project("완료")
         self.run_sync()
         self.assert_converged("백로그")
@@ -352,12 +354,13 @@ class WriterTests(unittest.TestCase):
         self.assertEqual(pr_page["properties"]["제목"]["title"][0]["text"]["content"], "Changed PR")
         self.assertEqual(na.read_text(pr_page, CHECKPOINT), "")
 
-    def test_invalid_new_checkpoint_fails_scan_instead_of_reusing_legacy(self):
+    def test_invalid_new_checkpoint_fails_only_its_row_without_reusing_legacy(self):
         for raw in ("{broken", '{"v":true,"status":"백로그","facts":{}}',
                     '{"v":1,"status":"백로그","facts":{"closed":0,"reason":null,"ready":false}}'):
             self.notion.pages[0]["properties"][CHECKPOINT] = text(raw)
-            with self.assertRaises(gp.SyncError):
-                self.run_sync()
+            report = self.run_sync()
+            self.assertEqual(report["items"][0]["diagnostic"], "INVALID_CHECKPOINT")
+            self.assertEqual(report["counts"]["failed"], 1)
             self.assertEqual(self.writes(), (0, 0))
 
     def test_wrong_page_or_project_readback_never_records_success(self):
