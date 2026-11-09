@@ -45,7 +45,7 @@ def migration_decision(last: str, notion_status: str | None, project_status: str
     initial = INITIAL_DECISION.copy()
     exact = decide(last, notion_status, project_status, facts, None)
     if last in {"완료", "취소"} and facts["state"] == "OPEN":
-        if (notion_status == project_status and notion_status in STATUSES and
+        if (notion_status == project_status and notion_status in STATUSES and notion_status != last and
                 (notion_status != "검토 중" or facts["ready"])):
             return decide(notion_status, notion_status, project_status, facts, None)
         return initial

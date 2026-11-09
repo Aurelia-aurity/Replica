@@ -109,8 +109,8 @@ class MigrationScenarioTests(unittest.TestCase):
         for baseline, current, ready, reason, target in (
                 ("완료", "진행 중", False, None, "진행 중"),
                 ("취소", "준비 중", False, None, "준비 중"),
-                ("완료", "완료", False, None, "완료"),
-                ("취소", "취소", False, None, "취소"),
+                ("완료", "완료", False, None, None),
+                ("취소", "취소", False, None, None),
                 ("완료", "검토 중", True, None, "검토 중"),
                 ("백로그", "준비 중", True, None, "준비 중"),
                 ("검토 중", "준비 중", False, None, "준비 중"),
@@ -131,6 +131,93 @@ class MigrationScenarioTests(unittest.TestCase):
                 else:
                     self.assertEqual(result["items"][0]["note"], "초기 정렬")
                     self.assertEqual(na.read_text(notion.pages[0], CHECKPOINT), "")
+
+    def test_r1_r2_r3b_unchanged_closed_baselines_require_alignment(self):
+        for case, history, baseline, ready in (
+                ("R1", "reconstructed", "완료", False),
+                ("R2", "unknown_facts", "취소", False),
+                ("R3b", "reconstructed", "완료", True)):
+            with self.subTest(case=case):
+                # Given: neither board changed after the legacy closure.
+                github, notion, project = scenario(
+                    history, baseline, baseline, baseline, ready=ready)
+                legacy = na.read_text(notion.pages[0], "동기화 내부 상태")
+                # When: applying twice without changing the inputs.
+                for second_scan in (False, True):
+                    notion.calls.clear()
+                    project.calls.clear()
+                    result = scan(github, notion, project)
+                    # Then: status/checkpoint writes stay blocked, including with a ready PR.
+                    plan = result["items"][0]
+                    self.assertEqual(result["counts"]["failed"], 0)
+                    self.assertEqual(plan["note"], "초기 정렬")
+                    self.assertIsNone(plan["target"])
+                    self.assertFalse(plan["write_notion"] or plan["write_project"] or
+                                     plan["write_checkpoint"])
+                    self.assertEqual(na.read_text(notion.pages[0], "확인 필요"), "확인 필요")
+                    self.assertEqual(na.read_text(notion.pages[0], CHECKPOINT), "")
+                    self.assertEqual(na.read_text(notion.pages[0], "동기화 내부 상태"), legacy)
+                    self.assertEqual(na.read_select(notion.pages[0], "작업 상태"), baseline)
+                    self.assertFalse(any(mutation for _, _, mutation in project.calls))
+                    self.assertFalse(any(
+                        method == "PATCH" and ("작업 상태" in body["properties"] or
+                                               CHECKPOINT in body["properties"])
+                        for method, _, body in notion.calls))
+                    if second_scan:
+                        self.assertFalse(any(method == "PATCH" or path == "/pages"
+                                             for method, path, _ in notion.calls))
+
+    def test_r11_board_alignment_recovers_unchanged_closed_baseline(self):
+        # Given: R1 is held; changing just Notion is not equal-value alignment.
+        github, notion, project = scenario("reconstructed", "완료", "완료", "완료")
+        scan(github, notion, project)
+        notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "백로그"}}
+        held = scan(github, notion, project)["items"][0]
+        self.assertEqual(held["note"], "초기 정렬")
+        self.assertFalse(held["write_notion"] or held["write_project"] or held["write_checkpoint"])
+        project.items[0]["fieldValues"]["nodes"][0]["optionId"] = OPTIONS["백로그"]
+        # When: the PM also aligns Project to the same non-terminal value.
+        plan = scan(github, notion, project)["items"][0]
+        # Then: current OPEN facts are checkpointed and the next scan writes nothing.
+        self.assertEqual(plan["target"], "백로그")
+        self.assertFalse(plan["write_notion"] or plan["write_project"])
+        self.assertTrue(plan["write_checkpoint"])
+        self.assertEqual(read_checkpoint(notion.pages[0]), (
+            "백로그", {"state": "OPEN", "reason": None, "ready": False}))
+        self.assertEqual(na.read_text(notion.pages[0], "확인 필요"), "")
+        notion.calls.clear()
+        project.calls.clear()
+        scan(github, notion, project)
+        self.assertFalse(any(mutation for _, _, mutation in project.calls))
+        self.assertFalse(any(method == "PATCH" or path == "/pages"
+                             for method, path, _ in notion.calls))
+
+    def test_r12_reclose_then_reopen_recovers_unchanged_closed_baseline(self):
+        # Given: R1 has no checkpoint until the issue is closed again.
+        github, notion, project = scenario("reconstructed", "완료", "완료", "완료")
+        scan(github, notion, project)
+        github.issues[0].update(state="CLOSED", stateReason="COMPLETED",
+                                closedAt="2026-11-05T00:00:00Z")
+        closed = scan(github, notion, project)["items"][0]
+        self.assertEqual(closed["target"], "완료")
+        self.assertEqual(read_checkpoint(notion.pages[0]), (
+            "완료", {"state": "CLOSED", "reason": "COMPLETED", "ready": False}))
+        # When: the now-exact history observes a later reopen.
+        github.issues[0].update(state="OPEN", stateReason=None, closedAt=None)
+        reopened = scan(github, notion, project)["items"][0]
+        # Then: the reopen transition is honored, followed by a zero-write scan.
+        self.assertEqual(reopened["target"], "백로그")
+        self.assertTrue(reopened["write_notion"] and reopened["write_project"])
+        self.assertEqual(na.read_select(notion.pages[0], "작업 상태"), "백로그")
+        self.assertEqual(project.items[0]["fieldValues"]["nodes"][0]["optionId"], OPTIONS["백로그"])
+        self.assertEqual(read_checkpoint(notion.pages[0]), (
+            "백로그", {"state": "OPEN", "reason": None, "ready": False}))
+        notion.calls.clear()
+        project.calls.clear()
+        scan(github, notion, project)
+        self.assertFalse(any(mutation for _, _, mutation in project.calls))
+        self.assertFalse(any(method == "PATCH" or path == "/pages"
+                             for method, path, _ in notion.calls))
 
     def test_s1_s1b_s1c_settle_closed_legacy_baselines(self):
         for history in ("reconstructed", "unknown_facts"):
