@@ -44,6 +44,9 @@ class ReviewFixTests(unittest.TestCase):
                 self.assertNotIn("Traceback", result.stderr)
                 self.assertIn("Notification report unavailable; run binding missing or invalid.", result.stderr)
                 self.assertFalse(report.exists())
+                if not flags and not extra_env:
+                    self.assertIn("Sync disabled", result.stdout)
+                    self.assertNotIn("Sync failed", result.stderr)
 
     def test_invalid_cell_is_named_without_leaking_and_other_issue_still_converges(self):
         self.notion.pages[0]["properties"][CHECKPOINT] = text("PRIVATE_BROKEN_JSON")
@@ -200,34 +203,75 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(self.project.items[0]["fieldValues"]["nodes"][0]["optionId"], OPTIONS["백로그"])
 
     def test_dry_run_metadata_plans_equal_apply_and_reveal_no_values(self):
+        # Given:
         self.github.issues[0]["title"] = "PRIVATE_UPDATED_TITLE"
         self.github.pulls = [pull()]
-        before = copy.deepcopy((self.notion.pages, self.project.items))
+        # When: compare the plans from the read-only and applying entry points.
         dry = self.sync(apply=False)
-        self.assertEqual((self.notion.pages, self.project.items), before)
-        self.assertEqual(dry["items"][0]["metadata_operation"], "update")
-        self.assertEqual(dry["items"][0]["metadata_fields"], ["제목"])
-        self.assertFalse(dry["items"][0]["write_notion"])
-        self.assertEqual(dry["pulls"][0]["metadata_operation"], "create")
-        self.assertEqual(dry["counts"]["planned_pr_creates"], 1)
         actual = self.sync()
+        # Then:
         for key in ("items", "pulls"):
             expected = [{k: v for k, v in row.items() if k != "outcome"} for row in dry[key]]
             observed = [{k: v for k, v in row.items() if k != "outcome"} for row in actual[key]]
             self.assertEqual(observed, expected)
         self.assertNotIn("PRIVATE_UPDATED_TITLE", json.dumps(dry) + ss.summary(dry))
+
+    def test_dry_run_exposes_metadata_operations_without_writes(self):
+        # Given:
+        self.github.issues[0]["title"] = "PRIVATE_UPDATED_TITLE"
+        self.github.pulls = [pull()]
+        before = copy.deepcopy((self.notion.pages, self.project.items))
+        # When:
+        dry = self.sync(apply=False)
+        # Then:
+        self.assertEqual((self.notion.pages, self.project.items), before)
+        self.assertFalse(any(mutation for _, _, mutation in self.project.calls))
+        self.assertFalse(any(method == "PATCH" or path == "/pages"
+                             for method, path, _ in self.notion.calls))
+        self.assertEqual(dry["items"][0]["metadata_operation"], "update")
+        self.assertEqual(dry["items"][0]["metadata_fields"], ["제목"])
+        self.assertFalse(dry["items"][0]["write_notion"])
+        self.assertEqual(dry["pulls"][0]["metadata_operation"], "create")
+        self.assertEqual(dry["counts"]["planned_pr_creates"], 1)
+
+    def test_applied_metadata_payload_fields_equal_the_plan(self):
+        # Given:
+        self.github.issues[0]["title"] = "PRIVATE_UPDATED_TITLE"
+        self.github.pulls = [pull()]
+        # When:
+        actual = self.sync()
+        # Then:
         status_fields = {"동기화 시각", CHECKPOINT, "작업 상태", "확인 필요"}
         issue_fields = set().union(*(set(payload["properties"]) - status_fields
             for method, path, payload in self.notion.calls if method == "PATCH" and path == f"/pages/{PAGE}"))
-        self.assertEqual(issue_fields, set(dry["items"][0]["metadata_fields"]))
+        self.assertEqual(issue_fields, set(actual["items"][0]["metadata_fields"]))
         pr_create = next(payload for method, path, payload in self.notion.calls
                          if method == "POST" and path == "/pages")
         self.assertEqual(set(pr_create["properties"]) - {"동기화 시각"},
-                         set(dry["pulls"][0]["metadata_fields"]))
+                         set(actual["pulls"][0]["metadata_fields"]))
+
+    def test_existing_pr_title_change_is_planned_as_metadata_update(self):
+        # Given:
+        self.github.pulls = [pull()]
+        self.sync()
         self.github.pulls[0]["title"] = "PRIVATE_PR_UPDATE"
+        # When:
         update = self.sync(apply=False)
+        # Then:
         self.assertEqual(update["pulls"][0]["metadata_operation"], "update")
         self.assertEqual(update["pulls"][0]["metadata_fields"], ["제목"])
+
+    def test_summary_lists_only_changed_metadata_but_json_retains_unchanged_rows(self):
+        # Given: a settled Issue alongside a new PR.
+        self.sync()
+        self.github.pulls = [pull()]
+        report = self.sync(apply=False)
+        # When:
+        rendered = ss.summary(report)
+        # Then:
+        self.assertEqual(report["items"][0]["metadata_operation"], "none")
+        self.assertNotIn("| Issue | #80 | none |", rendered)
+        self.assertIn("| PR | #81 | create |", rendered)
 
     def test_archived_project_keeps_active_notion_metadata_current_without_status_effects(self):
         self.sync()

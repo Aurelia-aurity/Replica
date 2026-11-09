@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
 import sync_simple as ss
+from sync_simple_plan import status_fields
 from sync_simple_fakes import CONFIG, FIELD, NOW, OPTIONS, SOURCE
 from sync_simple_fakes import GitHub, Notion, Project, REST, checkpoint, item, page
 
@@ -137,7 +138,7 @@ class EngineTests(unittest.TestCase):
         fields = ("notion", "project", "last_synced", "target")
         for value in (*OPTIONS, None, "PRIVATE_SYNTHETIC_STATUS"):
             # When:
-            serialized = json.dumps(ss.status_fields(dict.fromkeys(fields, value)), ensure_ascii=False)
+            serialized = json.dumps(status_fields(dict.fromkeys(fields, value)), ensure_ascii=False)
             decoded = json.loads(serialized)
             # Then:
             self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", serialized)

@@ -207,19 +207,20 @@ def fetch_legacy_issue_ids(rest_client, issues, pulls):
             "GraphQL과 legacy /issues 전체 번호 집합 불일치")
 
     pull_details, page = {}, 1
-    while pulls:
-        rows = rest_client.request(
-            f"/repos/{REPOSITORY}/pulls?state=all&sort=created&direction=asc&per_page=100&page={page}")
-        require(isinstance(rows, list), "GitHub REST PR 목록 형식 오류")
-        for row in rows:
-            require(isinstance(row, dict), "GitHub REST PR 행 형식 오류")
-            number = _validate_positive(row.get("number"), "GitHub REST PR 번호 오류")
-            require(number not in pull_details, "GitHub REST PR 번호 중복")
-            pull_details[number] = row
-        if len(rows) < 100:
-            break
-        page += 1
-        require(page < 100000, "GitHub REST PR 페이지 상한 초과")
+    if pulls:
+        while True:
+            rows = rest_client.request(
+                f"/repos/{REPOSITORY}/pulls?state=all&sort=created&direction=asc&per_page=100&page={page}")
+            require(isinstance(rows, list), "GitHub REST PR 목록 형식 오류")
+            for row in rows:
+                require(isinstance(row, dict), "GitHub REST PR 행 형식 오류")
+                number = _validate_positive(row.get("number"), "GitHub REST PR 번호 오류")
+                require(number not in pull_details, "GitHub REST PR 번호 중복")
+                pull_details[number] = row
+            if len(rows) < 100:
+                break
+            page += 1
+            require(page < 100000, "GitHub REST PR 페이지 상한 초과")
     require(set(pull_details) == {row["number"] for row in pulls.values()},
             "GraphQL과 REST PR 전체 번호 집합 불일치")
 

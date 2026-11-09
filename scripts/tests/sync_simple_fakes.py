@@ -105,10 +105,8 @@ class GitHub:
 class REST:
     def __init__(self, github):
         self.github = github
-        self.calls = []
 
     def request(self, path):
-        self.calls.append(path)
         if path == f"/repos/{gp.REPOSITORY}":
             return {"id": gp.REPOSITORY_ID, "full_name": gp.REPOSITORY}
         if "/issues?" in path:

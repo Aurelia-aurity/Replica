@@ -14,7 +14,7 @@ import notification_report as nr
 from sync_simple_apply import Changed, apply_issue, apply_metadata, project_snapshot
 from sync_rules import STATUSES
 from sync_simple_state import index_rows, key_for
-from sync_simple_plan import plan_issue, plan_pull, status_fields
+from sync_simple_plan import plan_issue, plan_pull
 
 
 class ProjectClient(gp.GraphQLClient):
@@ -142,8 +142,9 @@ def summary(report):
     lines.extend(["", "| Kind | Number | Metadata operation | Changed fields |",
                   "| --- | --- | --- | --- |"])
     for item in report["items"] + report["pulls"]:
-        lines.append(f"| {item['kind']} | #{item['number']} | {item['metadata_operation']} | "
-                     f"{', '.join(item['metadata_fields'])} |")
+        if item["metadata_operation"] != "none":
+            lines.append(f"| {item['kind']} | #{item['number']} | {item['metadata_operation']} | "
+                         f"{', '.join(item['metadata_fields'])} |")
     lines.extend(["", "Per-item outcomes and missing/archived rows are listed in the JSON artifact.",
                   "Initial alignment requires matching values selected by the PM.", ""])
     return "\n".join(lines)
@@ -168,9 +169,15 @@ def main(argv=None):
     try:
         enabled = env.get("NOTION_SYNC_ENABLED") == "true"
         if not enabled and not args.dry_run:
-            if args.notification_report:
-                nr.write(args.notification_report, env, kind="skipped")
             print("Sync disabled")
+            if args.notification_report:
+                try:
+                    nr.write(args.notification_report, env, kind="skipped")
+                except (OSError, ValueError, KeyError, TypeError, AttributeError,
+                        subprocess.SubprocessError):
+                    print("Notification report unavailable; run binding missing or invalid.",
+                          file=sys.stderr)
+                    return 1
             return 0
         config = load_config(env)
         report = sync(
