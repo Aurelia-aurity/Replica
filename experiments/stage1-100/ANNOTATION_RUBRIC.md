@@ -1,10 +1,22 @@
 # Speaker and temporal annotation - DRAFT / NOT FROZEN
 
 This adds semantic annotations, not a replacement grounding/style judge.
-No judge is executed in source-only QA. Exact existing hybrid Jev/Terra routing,
+The authorized #95 DEV check validates this annotator only, not #100 criteria.
+Exact existing hybrid Jev/Terra routing,
 audit sampling/fallback configuration and Terra style rubric must be bound by
 hash before future freeze. An old audit's aggregate disagreement rate does not
 define its sampling/fallback policy.
+
+Selected execution: `.local-work/judge-v2/stage100_route.py` and
+`semantic100.py`, lean Terra envelope, grounding/semantic/style batches20.
+`CRITERIA.md` specifies the field mapping of unchanged screening thresholds,
+25% proportional pass audit (seed77), and strict >5% any / >2% critical-field
+full-fallback policy for this new speaker/time route. Bind exact code/rubric/
+envelope identities before future freeze; current artifacts remain draft.
+After the initial labels, the discordant-pair-only policy in `CRITERIA.md`
+repeats BOTH B and A twice for each triggered question and takes the per-response
+fieldwise majority of three, including the primary speaker label. Keep initial
+and repeat labels and exact witnesses; no iterative selection and no C repeats.
 
 ## Blinding and inputs
 
