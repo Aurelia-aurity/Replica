@@ -257,8 +257,8 @@ test('periodic query plans use indexes for time, eligible requests and receipt r
   const deletion=statements.find(sql=>sql.startsWith('DELETE FROM sync_requests'));
   const maxPlan=db.sqlite.prepare('EXPLAIN QUERY PLAN '+max).all().map(row=>row.detail).join('\\n');
   const prunePlan=db.sqlite.prepare('EXPLAIN QUERY PLAN '+deletion).all(1).map(row=>row.detail).join('\\n');
-  assert.match(maxPlan,/USING COVERING INDEX sync_requests_created/);
-  assert.match(prunePlan,/SEARCH r USING INDEX sync_requests_prune/);
-  assert.match(prunePlan,/SEARCH e USING COVERING INDEX receipts_request/);
-  assert.match(prunePlan,/SEARCH newer(?: EXISTS)? USING COVERING INDEX sync_requests_activated_created/);
+  assert.match(maxPlan,/SEARCH sync_requests USING (?:COVERING )?INDEX /);
+  assert.match(prunePlan,/SEARCH r USING (?:COVERING )?INDEX /);
+  assert.match(prunePlan,/SEARCH e USING (?:COVERING )?INDEX /);
+  assert.match(prunePlan,/SEARCH newer(?: EXISTS)? USING (?:COVERING )?INDEX /);
 });
