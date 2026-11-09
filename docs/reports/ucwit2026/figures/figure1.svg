@@ -83,7 +83,7 @@
   <path d="M632 502V510" class="rule"/>
   <path d="M285 373H300V282H315" class="link"/>
   <rect id="generation" x="770" y="223" width="410" height="130" rx="3" class="experiment"/>
-  <text x="785" y="250" class="title" data-box="generation">생성 조건(고정 프롬프트)</text>
+  <text x="785" y="250" class="title" data-box="generation">Qwen3-8B 생성(고정 프롬프트)</text>
   <text x="785" y="282" data-box="generation">A: 무근거 입력(검색 생략)</text>
   <text x="785" y="310" class="bold" data-box="generation">B: 검색 v2 출력(기권 시 빈 근거)</text>
   <text x="785" y="338" data-box="generation">C: gold 근거(평가용 정답 근거)</text>
