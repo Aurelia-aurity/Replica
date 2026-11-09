@@ -35,6 +35,36 @@ def metadata_plan(page, properties, *, enabled=True):
             "metadata_operation": "create" if enabled and page is None else "update" if fields else "none"}
 
 
+def migration_decision(last, notion_status, project_status, facts, *, missing=False):
+    """Use exact inputs only; unsafe first-scan choices require PM alignment."""
+    initial = {"target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
+    exact = decide(last, notion_status, project_status, facts, None)
+    if last in {"완료", "취소"} and facts["state"] == "OPEN":
+        return initial
+    if not missing and last is None and (
+            notion_status != project_status or notion_status not in STATUSES):
+        return initial
+    if facts["state"] == "CLOSED":
+        return exact
+    if (notion_status in STATUSES and project_status in STATUSES and
+            notion_status != project_status):
+        restoration = (exact["note"] == "확인 필요" and exact["target"] == last and
+                       last in (notion_status, project_status))
+        if not restoration:
+            return initial
+    target = exact["target"]
+    if target == "검토 중" and not facts["ready"]:
+        return initial
+    if target is not None:
+        after_notion = target if exact["write_notion"] else notion_status
+        after_project = target if exact["write_project"] else project_status
+        if target not in STATUSES or (not missing and after_notion != after_project):
+            return initial
+    elif notion_status == project_status == "검토 중":
+        return initial
+    return exact
+
+
 def plan_issue(issue, page, item, snapshot, config, *, archived=False):
     observed = issue_facts(issue, snapshot)
     props = {**metadata("Issue", issue, key_for(issue["databaseId"])), **closure(issue)}
@@ -50,30 +80,27 @@ def plan_issue(issue, page, item, snapshot, config, *, archived=False):
         invalid_checkpoint = True
 
     initial = {"target": None, "write_project": False, "write_notion": False, "note": "초기 정렬"}
-    decision = decide(last, notion_status, project_status, observed[0], previous)
-    if (history_kind in {"reconstructed", "unknown_facts"} and
-            page is not None and item is not None and
-            notion_status in STATUSES and project_status in STATUSES and
-            notion_status != project_status):
-        # Approximate facts cannot choose between conflicting valid human edits.
-        decision = initial
-    elif (history_kind not in {"checkpoint", "matching_fingerprint"} and
-            page is not None and item is not None and
-            notion_status == project_status and notion_status in STATUSES):
-        # Approximate migration history cannot replay transitions over equal sides.
-        # Current closure facts still take precedence inside decide().
-        decision = decide(notion_status, notion_status, project_status, observed[0], observed[0])
-    elif last is None and page is not None and item is not None:
-        decision = initial
-    elif page is None or (item is None and last is None):
-        seed = notion_status or project_status or ("백로그" if page is None else None)
-        if seed not in STATUSES:
+    approximate = history_kind in {"reconstructed", "unknown_facts"}
+    if approximate:
+        decision = migration_decision(last, notion_status, project_status, observed[0],
+                                      missing=page is None or item is None)
+    else:
+        decision = decide(last, notion_status, project_status, observed[0], previous)
+        if (history_kind not in {"checkpoint", "matching_fingerprint"} and
+                page is not None and item is not None and
+                notion_status == project_status and notion_status in STATUSES):
+            decision = decide(notion_status, notion_status, project_status, observed[0], None)
+        elif last is None and page is not None and item is not None:
             decision = initial
-        else:
-            decision = decide(seed, seed, seed, observed[0], previous)
-            decision["write_project"] = decision["target"] is not None and project_status != decision["target"]
-            decision["write_notion"] = decision["target"] is not None and notion_status != decision["target"]
-    if (history_kind != "checkpoint" and observed[0]["state"] == "OPEN" and
+        elif page is None or (item is None and last is None):
+            seed = notion_status or project_status or ("백로그" if page is None else None)
+            if seed not in STATUSES:
+                decision = initial
+            else:
+                decision = decide(seed, seed, seed, observed[0], previous)
+                decision["write_project"] = decision["target"] is not None and project_status != decision["target"]
+                decision["write_notion"] = decision["target"] is not None and notion_status != decision["target"]
+    if (not approximate and history_kind != "checkpoint" and observed[0]["state"] == "OPEN" and
             decision["target"] == "검토 중" and not observed[0]["ready"]):
         # Neither equal-value nor missing-side initialization can bless unsupported review.
         decision = (decide(last, notion_status, project_status, observed[0], None)

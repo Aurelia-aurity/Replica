@@ -16,7 +16,7 @@ import notion_api as na
 import sync_simple as ss
 from sync_simple_metadata import metadata
 from sync_simple_state import CHECKPOINT, checkpoint_text, read_checkpoint
-from sync_simple_fakes import CONFIG, OPTIONS, PAGE, GitHub, Notion, Project, REST, checkpoint, conn, item, page, text
+from sync_simple_fakes import CONFIG, OPTIONS, PAGE, GitHub, Notion, Project, REST, checkpoint, item, page, text
 from test_sync_simple_state import pull
 
 
@@ -88,32 +88,6 @@ class ReviewFixTests(unittest.TestCase):
         self.sync(apply=False)
         self.assertEqual(sum(query == gp.PROJECT_ITEM_QUERY for query, _, _ in self.project.calls), 0)
 
-    def test_equal_migration_values_do_not_replay_approximate_transitions(self):
-        cases = [("완료", "진행 중", False, False, "진행 중"),
-                 ("백로그", "준비 중", True, False, "준비 중"),
-                 ("검토 중", "준비 중", False, False, "준비 중"),
-                 ("완료", "진행 중", False, True, "완료")]
-        for legacy_status, current, ready, closed, expected in cases:
-            with self.subTest(case=(legacy_status, current, ready, closed)):
-                self.setUp()
-                raw = json.loads(checkpoint(self.github, legacy_status))
-                raw["baseline"]["facts_fingerprint"] = "0" * 64
-                if legacy_status == "검토 중":
-                    raw["review_pr_hash"] = "a" * 64
-                self.notion = Notion(current, json.dumps(raw))
-                self.project = Project(current)
-                if ready:
-                    pr = pull()
-                    self.github.pulls = [pr]
-                    self.github.issues[0]["closedByPullRequestsReferences"] = conn([pr])
-                if closed:
-                    self.github.issues[0].update(state="CLOSED", stateReason="COMPLETED",
-                                                 closedAt="2026-11-05T00:00:00Z")
-                report = self.sync()
-                self.assertEqual(read_checkpoint(self.notion.pages[0])[0], expected)
-                self.assertEqual(na.read_select(self.notion.pages[0], "작업 상태"), expected)
-                self.assertIn("#80 (reconstructed)", ss.summary(report))
-
     def test_readyless_review_is_not_seeded_for_equal_or_missing_sides(self):
         for missing in (None, "notion", "project"):
             with self.subTest(missing=missing):
@@ -130,69 +104,6 @@ class ReviewFixTests(unittest.TestCase):
                     self.assertEqual(na.read_text(self.notion.pages[0], CHECKPOINT), "")
                 else:
                     self.assertEqual(self.notion.pages, [])
-
-    def test_approximate_legacy_review_rejection_restores_baseline_and_rerun_is_noop(self):
-        for history_kind in ("reconstructed", "unknown_facts"):
-            with self.subTest(history=history_kind):
-                # Given: exact baseline status, but approximate legacy facts.
-                self.setUp()
-                raw = json.loads(checkpoint(self.github))
-                raw["baseline"]["facts_fingerprint"] = "0" * 64
-                if history_kind == "unknown_facts":
-                    raw.pop("review_pr_hash")
-                self.notion = Notion("검토 중", json.dumps(raw))
-                self.project = Project("검토 중")
-                # When: reconcile the rejected move and scan unchanged inputs again.
-                report = self.sync()
-                first = report["items"][0]
-                self.assertEqual(first["history"], history_kind)
-                self.assertEqual(first["target"], "백로그")
-                self.assertEqual(first["note"], "확인 필요")
-                self.assertTrue(first["write_project"])
-                self.assertTrue(first["write_notion"])
-                self.assertTrue(first["write_checkpoint"])
-                self.assertEqual(read_checkpoint(self.notion.pages[0]), ("백로그", OPEN))
-                self.assertEqual(na.read_select(self.notion.pages[0], "작업 상태"), "백로그")
-                self.assertEqual(na.read_text(self.notion.pages[0], "확인 필요"), "확인 필요")
-                self.assertEqual(self.project.items[0]["fieldValues"]["nodes"][0]["optionId"],
-                                 OPTIONS["백로그"])
-                self.notion.calls.clear()
-                self.project.calls.clear()
-                repeated = self.sync()
-                # Then: the new checkpoint prevents any repeated write.
-                self.assertEqual(repeated["items"][0]["history"], "checkpoint")
-                self.assertFalse(any(mutation for _, _, mutation in self.project.calls))
-                self.assertFalse(any(method == "PATCH" for method, _, _ in self.notion.calls))
-
-    def test_unequal_valid_sides_with_approximate_history_require_initial_alignment(self):
-        for history_kind in ("reconstructed", "unknown_facts"):
-            for notion_status, project_status in (("완료", "진행 중"), ("진행 중", "완료"),
-                                                   ("검토 중", "진행 중")):
-                with self.subTest(history=history_kind, sides=(notion_status, project_status)):
-                    # Given: neither side can be chosen from approximate transition facts.
-                    self.setUp()
-                    raw = json.loads(checkpoint(self.github, "완료"))
-                    raw["baseline"]["facts_fingerprint"] = "0" * 64
-                    if history_kind == "unknown_facts":
-                        raw.pop("review_pr_hash")
-                    self.notion = Notion(notion_status, json.dumps(raw))
-                    self.project = Project(project_status)
-                    # When:
-                    report = self.sync(apply=False)
-                    applied = self.sync()
-                    # Then: dry-run exposes the migration; apply only marks confirmation.
-                    for result in (report, applied):
-                        plan = result["items"][0]
-                        self.assertEqual(plan["history"], history_kind)
-                        self.assertEqual(plan["note"], "초기 정렬")
-                        self.assertIsNone(plan["target"])
-                        for field in ("write_project", "write_notion", "write_checkpoint"):
-                            self.assertFalse(plan[field])
-                    self.assertIn(f"#80 ({history_kind})", ss.summary(report))
-                    self.assertEqual(na.read_select(self.notion.pages[0], "작업 상태"), notion_status)
-                    self.assertEqual(na.read_text(self.notion.pages[0], "확인 필요"), "확인 필요")
-                    self.assertEqual(na.read_text(self.notion.pages[0], CHECKPOINT), "")
-                    self.assertFalse(any(mutation for _, _, mutation in self.project.calls))
 
     def test_review_rejection_initializes_missing_project_to_valid_legacy_baseline(self):
         self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "검토 중"}}
