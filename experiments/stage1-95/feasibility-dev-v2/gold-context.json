@@ -1,0 +1,3125 @@
+{
+  "scope": "DEV_ONLY",
+  "evidence": {
+    "s95-new-000-q": [
+      {
+        "chunk_id": "682758b6-3fa1-5815-8e33-78b97c2c0715",
+        "record_id": "55d3c70f-7470-5310-98d8-177b3da3f813",
+        "text_version_id": "51a7dc76-705d-5506-813e-aaf373485daf",
+        "content": "2024-06-26 | Persona 000 (speaker_role=persona) | 2024-06-26 지역 미술관 기획전 관람, 2024-06-26, 09:00: 나는 평생학습관에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-001-q": [
+      {
+        "chunk_id": "84cd6c16-a9bb-5ab4-96ab-9182803aa994",
+        "record_id": "2b727df7-00e3-5379-97e3-d27949ce76bf",
+        "text_version_id": "331f6e7e-064a-56af-86c7-43fe9db5ad98",
+        "content": "2024-11-29 | Persona 001 (speaker_role=persona) | 2024-11-29 실크스크린 에코백 인쇄, 2024-11-29, 09:00: 나는 전시관에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-002-q": [
+      {
+        "chunk_id": "dbdc2152-3efe-50e3-92c5-73ebe6430dbe",
+        "record_id": "aa819d61-8ddf-5c98-af6c-c73635315f28",
+        "text_version_id": "8f326fae-209d-50e0-9940-fcd1f32201f6",
+        "content": "2023-09-06 | Persona 002 (speaker_role=persona) | 2023-09-06 스마트폰 사진 보정 강의, 2023-09-06, 09:00: 나는 전시관에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-003-q": [
+      {
+        "chunk_id": "2e76780c-932f-5b64-847b-b869f0671977",
+        "record_id": "59b4c21d-0529-504e-917d-6caa90eebbfa",
+        "text_version_id": "a5b3a93e-14f5-5924-8146-9c842ef47d7a",
+        "content": "2023-08-19 | Persona 003 (speaker_role=persona) | 2023-08-19 생태 습지 탐조 기행, 2023-08-19, 09:00: 나는 미술관에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-004-q": [
+      {
+        "chunk_id": "3981ab26-2536-510c-aac8-27d84e0ed7a7",
+        "record_id": "bfe4ca4e-c1db-538a-bdd8-2a8539586147",
+        "text_version_id": "d32c8531-aafb-5261-aa2c-60bb2f8f6344",
+        "content": "2023-02-27 | Persona 004 (speaker_role=persona) | 2023-02-27 다도 예절 체험 강좌, 2023-02-27, 09:00: 나는 천문대에서 에코백 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-005-q": [
+      {
+        "chunk_id": "dbb9f333-1378-59d6-becb-1827c459b4b8",
+        "record_id": "673c5940-b872-5375-a944-91c0880846d8",
+        "text_version_id": "dd9451ce-ffc0-5cbf-aa06-56670ecb7393",
+        "content": "2022-10-28 | Persona 005 (speaker_role=persona) | 2022-10-28 유리 공예 반지 제작, 2022-10-28, 09:00: 나는 전시관에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-006-q": [
+      {
+        "chunk_id": "04d72c7b-6265-5ba8-a18b-5d72019e3a3a",
+        "record_id": "1d7456c5-d817-5442-bba8-11ae4df159c9",
+        "text_version_id": "6cb4122b-a37f-510b-b0f9-acbd01a2a287",
+        "content": "2024-04-27 | Persona 006 (speaker_role=persona) | 2024-04-27 기초 수어 배움 교실, 2024-04-27, 09:00: 나는 요리교실에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-007-q": [
+      {
+        "chunk_id": "6f57f7b1-33df-5091-be63-4266d418142b",
+        "record_id": "d77033f3-b45f-583a-b834-7415810b7233",
+        "text_version_id": "bb499e5a-64cd-53c6-b4c9-387b7da00b7c",
+        "content": "2022-06-20 | Persona 007 (speaker_role=persona) | 2022-06-20 생활 목공 수리 기초, 2022-06-20, 09:00: 나는 식물원에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-008-q": [
+      {
+        "chunk_id": "1194837d-9b7e-5f38-91a8-3847544ba959",
+        "record_id": "8df61316-2fb4-5796-9994-9725b954e755",
+        "text_version_id": "65fbe0e0-b234-5e7d-a75b-ebe4341665df",
+        "content": "2022-10-07 | Persona 008 (speaker_role=persona) | 2022-10-07 드라이플라워 리스 만들기, 2022-10-07, 09:00: 나는 수목원에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-009-q": [
+      {
+        "chunk_id": "af798c3e-5e85-5a4a-a6ed-0a3f315c7555",
+        "record_id": "45fcfbf1-b6b1-53f9-8401-90b6dbf89028",
+        "text_version_id": "991a1afb-4939-5f25-9877-c36582fd398b",
+        "content": "2024-08-09 | Persona 009 (speaker_role=persona) | 2024-08-09 전통 매듭 팔찌 공예, 2024-08-09, 09:00: 나는 식물원에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-010-q": [
+      {
+        "chunk_id": "cd7860b8-454c-54d5-8d8b-322d576e0e25",
+        "record_id": "1306e507-da69-5bae-b206-13975d01b708",
+        "text_version_id": "10636e6c-27ab-573c-9a47-a58818659816",
+        "content": "2023-05-11 | Persona 010 (speaker_role=persona) | 2023-05-11 천문대 별자리 관측회, 2023-05-11, 09:00: 나는 평생학습관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-011-q": [
+      {
+        "chunk_id": "1aad9b42-af59-51be-9f2f-8295dac5a8b0",
+        "record_id": "507577cf-2d66-56a5-96ea-8c4a38628127",
+        "text_version_id": "87babe86-85d9-53c6-a136-00865b67aaf8",
+        "content": "2023-09-12 | Persona 011 (speaker_role=persona) | 2023-09-12 천문대 별자리 관측회, 2023-09-12, 09:00: 나는 시립도서관에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-012-q": [
+      {
+        "chunk_id": "bd7f02a2-3e78-506e-a74c-76ab6d9c769d",
+        "record_id": "905fc157-7e2b-5104-981e-d34b0f3d9525",
+        "text_version_id": "69f830f3-f540-5298-a641-e62cdbe41d08",
+        "content": "2023-09-25 | Persona 012 (speaker_role=persona) | 2023-09-25 식물 분갈이 원예 수업, 2023-09-25, 09:00: 나는 미술관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-013-q": [
+      {
+        "chunk_id": "1ed78618-062f-5687-8c03-f83bfa568c78",
+        "record_id": "86606bd9-9ba6-5d34-b07c-b023c1949299",
+        "text_version_id": "b2214ffa-8926-5270-b461-88ec6cfdf732",
+        "content": "2023-11-24 | Persona 013 (speaker_role=persona) | 2023-11-24 도심 야경 사진 출사, 2023-11-24, 09:00: 나는 폐교문화공간에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-014-q": [
+      {
+        "chunk_id": "be998001-9f5d-5173-a364-0bb27f8544bb",
+        "record_id": "f02a4271-b106-5e6f-a45d-eff81d4311df",
+        "text_version_id": "7c742ced-5f4b-5d39-8439-695bb6455895",
+        "content": "2023-07-13 | Persona 014 (speaker_role=persona) | 2023-07-13 전통 시장 장보기 탐방, 2023-07-13, 09:00: 나는 복합문화공간에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-015-q": [
+      {
+        "chunk_id": "b5190b97-be0e-5892-9bfe-c09807011651",
+        "record_id": "c8b8a37c-18b3-5b03-97c5-6d634afd24c7",
+        "text_version_id": "1b43d56c-0efd-5145-a0e3-48099b378b3d",
+        "content": "2023-02-09 | Persona 015 (speaker_role=persona) | 2023-02-09 스마트폰 사진 보정 강의, 2023-02-09, 09:00: 나는 천문대에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-016-q": [
+      {
+        "chunk_id": "781a9dd9-4a7b-5cdd-aa8b-9277f1508cbf",
+        "record_id": "96f01891-73d8-5aec-acaf-f9ee0b52e96b",
+        "text_version_id": "33871e72-1aac-5db7-9620-7521e55c5cd9",
+        "content": "2024-08-28 | Persona 016 (speaker_role=persona) | 2024-08-28 스마트폰 사진 보정 강의, 2024-08-28, 09:00: 나는 청년센터에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-017-q": [
+      {
+        "chunk_id": "50055e1d-3765-59a1-9cd1-0bce1656cc8f",
+        "record_id": "23cccbd8-1b99-5e55-b20e-f443344479ad",
+        "text_version_id": "907bdade-2554-5287-b3fa-ef2c825ca4cb",
+        "content": "2023-05-08 | Persona 017 (speaker_role=persona) | 2023-05-08 수채화 풍경 드로잉, 2023-05-08, 09:00: 나는 수목원에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-018-q": [
+      {
+        "chunk_id": "1e49629e-7a1a-57de-b375-4dfedbff8025",
+        "record_id": "208e164f-fc99-53fe-b225-14464de5a5b7",
+        "text_version_id": "cea5f0e9-705e-5cbc-9aca-753d88ce0a93",
+        "content": "2024-02-14 | Persona 018 (speaker_role=persona) | 2024-02-14 마크라메 월행잉 매듭, 2024-02-14, 09:00: 나는 공예공방에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-019-q": [
+      {
+        "chunk_id": "dc666649-0a04-5cf0-b7c9-9c099d72e822",
+        "record_id": "dbc809ec-04ca-53ee-b9f2-1af8bd384120",
+        "text_version_id": "e7974d60-67d8-5ed7-ad5e-208d330a1bf8",
+        "content": "2024-06-16 | Persona 019 (speaker_role=persona) | 2024-06-16 수제 비누 공방 체험, 2024-06-16, 09:00: 나는 구민회관에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-020-q": [
+      {
+        "chunk_id": "75e487d4-1708-55b0-80ec-84e04d841193",
+        "record_id": "2999ef67-be53-5f98-8350-4e5f64282411",
+        "text_version_id": "7aebe0e7-80ec-587b-baba-a05dd0206b9d",
+        "content": "2023-12-18 | Persona 020 (speaker_role=persona) | 2023-12-18 드라이플라워 리스 만들기, 2023-12-18, 09:00: 나는 마을회관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-021-q": [
+      {
+        "chunk_id": "e07cb16d-b362-5e94-8084-48b1cdfa22b7",
+        "record_id": "44bfedec-724b-51c0-8a40-332b80103c06",
+        "text_version_id": "adb8996b-15c9-50b1-b9d2-bc7acfd6b4e2",
+        "content": "2022-05-01 | Persona 021 (speaker_role=persona) | 2022-05-01 아나바다 플리마켓 운영, 2022-05-01, 09:00: 나는 미술관에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-022-q": [
+      {
+        "chunk_id": "92b85b7a-7eed-5231-852a-e1ff6dae0d11",
+        "record_id": "40fa5dc8-7d7b-5b9a-9a57-ffe6b53c76da",
+        "text_version_id": "b72abfbe-b28a-59e1-9923-51382ddf5e29",
+        "content": "2023-07-25 | Persona 022 (speaker_role=persona) | 2023-07-25 생태 습지 탐조 기행, 2023-07-25, 09:00: 나는 전통시장에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-023-q": [
+      {
+        "chunk_id": "a5b0af08-77c6-5be3-a537-e93cee3f3133",
+        "record_id": "431f35aa-3e81-5395-91ec-d085d6f3494c",
+        "text_version_id": "ae37d186-523a-57a4-9a9e-af3e394be067",
+        "content": "2022-06-09 | Persona 023 (speaker_role=persona) | 2022-06-09 고궁 야간 해설 투어, 2022-06-09, 09:00: 나는 목공방에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-024-q": [
+      {
+        "chunk_id": "c02a765c-8d53-5124-afdd-6c1ca92d6473",
+        "record_id": "34e79356-92db-531f-a595-61400b43d01a",
+        "text_version_id": "b16d7d68-7f6b-5b12-bd97-323286420a2e",
+        "content": "2023-03-22 | Persona 024 (speaker_role=persona) | 2023-03-22 바리스타 핸드드립 실습, 2023-03-22, 09:00: 나는 커뮤니티센터에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-025-q": [
+      {
+        "chunk_id": "974a92e8-6257-5c00-9216-0e37cd8ba15b",
+        "record_id": "3cc232f9-b8ba-52d3-a187-04e977080622",
+        "text_version_id": "c85827e1-e743-5c6b-94b1-491260b2d3e5",
+        "content": "2023-09-07 | Persona 025 (speaker_role=persona) | 2023-09-07 지역 미술관 기획전 관람, 2023-09-07, 09:00: 나는 평생학습관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-026-q": [
+      {
+        "chunk_id": "162450bc-7922-50a4-bfd8-bc2776a84a8f",
+        "record_id": "f7dcd7c6-4941-5c35-85ae-afd3f766d231",
+        "text_version_id": "e55b5482-4423-5ef5-a9be-804519027f89",
+        "content": "2024-01-27 | Persona 026 (speaker_role=persona) | 2024-01-27 도자기 물레 성형, 2024-01-27, 09:00: 나는 도예공방에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-027-q": [
+      {
+        "chunk_id": "c2b34fcb-cd2c-5932-b9be-6d36abe9306f",
+        "record_id": "a7632de5-c9e0-5730-93ea-e8dbf73392af",
+        "text_version_id": "452185ea-1304-58b2-bfc9-bb84912f28c4",
+        "content": "2023-08-27 | Persona 027 (speaker_role=persona) | 2023-08-27 보드게임 교류 모임, 2023-08-27, 09:00: 나는 청소년수련관에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-028-q": [
+      {
+        "chunk_id": "3329e586-8539-5833-a059-e0831107cbad",
+        "record_id": "81466ec5-a849-5f94-8068-c74a903fd3c2",
+        "text_version_id": "a5c5027a-95ac-58ab-97ec-b9f845f56090",
+        "content": "2022-09-22 | Persona 028 (speaker_role=persona) | 2022-09-22 은점토 펜던트 세공, 2022-09-22, 09:00: 나는 전시관에서 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-029-q": [
+      {
+        "chunk_id": "dab9d3fd-bb46-5bc9-970b-d0c4ff0e1418",
+        "record_id": "96e3760e-ed4f-52ee-a63b-df749eab42bd",
+        "text_version_id": "73ee2ffb-ca44-5c84-bcb1-d690e8efeaae",
+        "content": "2023-06-21 | Persona 029 (speaker_role=persona) | 2023-06-21 수채화 풍경 드로잉, 2023-06-21, 09:00: 나는 천문대에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-030-q": [
+      {
+        "chunk_id": "92f1f766-3728-5ed9-ac56-cf8089501f7f",
+        "record_id": "e643bfab-ca00-5356-95bd-fd586949801d",
+        "text_version_id": "bdb2ccd8-475c-5022-ab74-4d0f368cb549",
+        "content": "2022-07-05 | Persona 030 (speaker_role=persona) | 2022-07-05 도심 야경 사진 출사, 2022-07-05, 09:00: 나는 북카페에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-031-q": [
+      {
+        "chunk_id": "90ab8588-fb8d-56e1-ac3a-b202f6be4767",
+        "record_id": "b3de56c6-d41a-5c91-b456-f54c09ae2c5f",
+        "text_version_id": "e1c3dfdf-0757-5680-ba9e-9eca39ee7ec4",
+        "content": "2024-04-21 | Persona 031 (speaker_role=persona) | 2024-04-21 베이킹 스콘 굽기 수업, 2024-04-21, 09:00: 나는 시민공원에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-032-q": [
+      {
+        "chunk_id": "523be71a-98bc-5c14-a26b-2682a65e05ce",
+        "record_id": "7b55de11-b7b9-578b-9f3d-e8e74ddf5370",
+        "text_version_id": "f956aca2-31f3-5102-903b-0bfcd787cc1a",
+        "content": "2023-03-10 | Persona 032 (speaker_role=persona) | 2023-03-10 전통 매듭 팔찌 공예, 2023-03-10, 09:00: 나는 전통시장에서 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-033-q": [
+      {
+        "chunk_id": "1a261220-c4ce-5d53-9931-967c1d1ae446",
+        "record_id": "611160cf-d90d-5587-8791-787eba2740ea",
+        "text_version_id": "c308aa4a-dce2-575f-87bb-85ed54ab5339",
+        "content": "2023-07-14 | Persona 033 (speaker_role=persona) | 2023-07-14 다도 예절 체험 강좌, 2023-07-14, 09:00: 나는 폐교문화공간에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-034-q": [
+      {
+        "chunk_id": "ed3015bb-1d5f-5dea-b12c-8fb3e10714cc",
+        "record_id": "c813d627-c067-5c23-a7e8-4b97cc6be13e",
+        "text_version_id": "3a20fce6-f140-5ebc-af4f-4ec8afb684c4",
+        "content": "2023-11-09 | Persona 034 (speaker_role=persona) | 2023-11-09 생태 습지 탐조 기행, 2023-11-09, 09:00: 나는 시립도서관에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-035-q": [
+      {
+        "chunk_id": "f1aec0ea-2e11-5395-b1b7-2cf4c2ff483a",
+        "record_id": "3c24fb4d-5900-5534-8ba5-0dcfd5d53913",
+        "text_version_id": "92da8e97-9ea8-5d53-b43f-2b009bfa7695",
+        "content": "2023-10-01 | Persona 035 (speaker_role=persona) | 2023-10-01 전통 한옥 마을 답사, 2023-10-01, 09:00: 나는 복합문화공간에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-036-q": [
+      {
+        "chunk_id": "29005d01-20a2-50e1-adab-5583e330602a",
+        "record_id": "2c0d8f06-69b7-5773-b9c8-78cbbde3f933",
+        "text_version_id": "3d313d62-1291-55c5-b61a-fedc6b025cdb",
+        "content": "2024-07-23 | Persona 036 (speaker_role=persona) | 2024-07-23 지역 미술관 기획전 관람, 2024-07-23, 09:00: 나는 커뮤니티센터에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-037-q": [
+      {
+        "chunk_id": "2032c95f-16b6-5660-ac35-8eb3d868393c",
+        "record_id": "455f8f05-ec40-5677-8cc1-f2de7a4c55d0",
+        "text_version_id": "cf1303e4-9d77-59dc-a66a-88fa095e13ad",
+        "content": "2024-02-12 | Persona 037 (speaker_role=persona) | 2024-02-12 고궁 야간 해설 투어, 2024-02-12, 09:00: 나는 천문대에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-038-q": [
+      {
+        "chunk_id": "3f7bc4ed-a52c-50bc-9ac6-27a7cedeace0",
+        "record_id": "3e3b426a-f4fb-5bef-b1a4-9103e6a381bd",
+        "text_version_id": "2fbff8ed-64ad-58f8-92d8-45e9618354f4",
+        "content": "2024-10-24 | Persona 038 (speaker_role=persona) | 2024-10-24 캘리그라피 엽서 쓰기, 2024-10-24, 09:00: 나는 화실에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-039-q": [
+      {
+        "chunk_id": "871a3994-a0ed-51e0-99c8-9ac42b851a31",
+        "record_id": "591e532f-6445-5544-bcb0-1cbe56e20b61",
+        "text_version_id": "9572aa99-a0c6-5f84-b81d-aa226b75b5ac",
+        "content": "2022-01-03 | Persona 039 (speaker_role=persona) | 2022-01-03 스테인드글라스 썬캐처 제작, 2022-01-03, 09:00: 나는 도예공방에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-040-q": [
+      {
+        "chunk_id": "bf6bdd0d-fd89-568a-ad41-de253594b7c7",
+        "record_id": "b210b716-1f7f-5e9f-8a97-58c0a9bc8e52",
+        "text_version_id": "a40cc470-fdd9-57be-94f9-6ecb0dd5bcb8",
+        "content": "2024-09-20 | Persona 040 (speaker_role=persona) | 2024-09-20 기초 수어 배움 교실, 2024-09-20, 09:00: 나는 북카페에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-041-q": [
+      {
+        "chunk_id": "dde2dd44-cf47-50ac-8568-0c3bb7e6a4d9",
+        "record_id": "d43fb72f-6b4d-5caf-8f06-0f21ee5dd4de",
+        "text_version_id": "43f2c4bd-2730-52bc-b305-db8c93bf9ad0",
+        "content": "2023-12-26 | Persona 041 (speaker_role=persona) | 2023-12-26 벽화 그리기 자원봉사, 2023-12-26, 09:00: 나는 구민회관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-042-q": [
+      {
+        "chunk_id": "52d5a80f-bbe8-5487-85bb-fffbd908bb09",
+        "record_id": "8a990ab8-d3b8-51ff-a808-6b0cccccd95f",
+        "text_version_id": "dc56911b-ab7f-5617-b9ff-d1c115371c71",
+        "content": "2024-08-22 | Persona 042 (speaker_role=persona) | 2024-08-22 박물관 유물 해설 청취, 2024-08-22, 09:00: 나는 마을회관에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-043-q": [
+      {
+        "chunk_id": "7d2f429b-1e4d-5e94-92f8-3783625cc731",
+        "record_id": "f3623b80-95b5-550c-bcb2-2684d525e7c6",
+        "text_version_id": "d7a2a06b-59bb-57d2-a497-17ebbf072e14",
+        "content": "2023-08-04 | Persona 043 (speaker_role=persona) | 2023-08-04 유리 공예 반지 제작, 2023-08-04, 09:00: 나는 작은도서관에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-044-q": [
+      {
+        "chunk_id": "65aacacf-b789-5488-b300-55b52fde2a33",
+        "record_id": "8198181b-f07f-5e95-a584-70c45cffad62",
+        "text_version_id": "be9a923f-fef4-51ef-bb93-86fedb0553c0",
+        "content": "2022-03-12 | Persona 044 (speaker_role=persona) | 2022-03-12 라탄 바구니 엮기, 2022-03-12, 09:00: 나는 문화센터에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-045-q": [
+      {
+        "chunk_id": "1187eeb0-7e1c-5c7e-a996-75f3e6c6d760",
+        "record_id": "61c204b3-fd94-5da2-888d-bb564a10f01d",
+        "text_version_id": "191a57c9-0048-5574-87dc-d2dd229e0895",
+        "content": "2023-06-11 | Persona 045 (speaker_role=persona) | 2023-06-11 항구 마을 도보 여행, 2023-06-11, 09:00: 나는 문화센터에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-046-q": [
+      {
+        "chunk_id": "4a48fc4e-62d3-5b03-aff5-a9ad00856701",
+        "record_id": "b091c43e-5972-58ee-a1d6-fba014ed3270",
+        "text_version_id": "4ad88978-5a9e-52ef-a493-d6a18de41a27",
+        "content": "2024-06-13 | Persona 046 (speaker_role=persona) | 2024-06-13 지역 미술관 기획전 관람, 2024-06-13, 09:00: 나는 폐교문화공간에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-047-q": [
+      {
+        "chunk_id": "ab5df3d2-9bfa-566b-a407-0668ff68ad9a",
+        "record_id": "fee3b4ee-6525-515d-9d7c-03f768a36c86",
+        "text_version_id": "e7f7fac1-ece3-5ba6-bd67-8df0c5ac4a5a",
+        "content": "2024-01-02 | Persona 047 (speaker_role=persona) | 2024-01-02 벽화 그리기 자원봉사, 2024-01-02, 09:00: 나는 구민회관에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-048-q": [
+      {
+        "chunk_id": "08da36f3-677d-5dcf-98d8-e6a438df2157",
+        "record_id": "ceecc03e-104e-51fa-95d9-c0001ebd3a42",
+        "text_version_id": "61fe87c9-ca51-5a45-8f3b-3352f59cf295",
+        "content": "2024-04-11 | Persona 048 (speaker_role=persona) | 2024-04-11 근대 건축물 골목 투어, 2024-04-11, 09:00: 나는 전시관에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-049-q": [
+      {
+        "chunk_id": "79a1606e-90c2-52a3-9f99-d79110e1900e",
+        "record_id": "7d071824-bb12-5ed8-95d4-a19b29059f5b",
+        "text_version_id": "ac63a8e8-05e8-5b92-8eea-ab6e3c6adc66",
+        "content": "2022-07-15 | Persona 049 (speaker_role=persona) | 2022-07-15 근대 건축물 골목 투어, 2022-07-15, 09:00: 나는 시립도서관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-050-q": [
+      {
+        "chunk_id": "66f53881-4c68-59d9-85c7-1cc05d5b3995",
+        "record_id": "4dcf98ca-307f-511d-a114-1dee0a490c7c",
+        "text_version_id": "f3375bbd-7a14-5b14-92af-3909f87a0555",
+        "content": "2024-01-04 | Persona 050 (speaker_role=persona) | 2024-01-04 바리스타 핸드드립 실습, 2024-01-04, 09:00: 나는 한옥마을에서 에코백 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-051-q": [
+      {
+        "chunk_id": "ba637911-1fa5-5aa5-8267-b46541ce39bd",
+        "record_id": "cc1f454d-193a-545f-a137-2a8a6d7fa30a",
+        "text_version_id": "8efe23ab-80f0-5873-abd4-88ef09bc7a5f",
+        "content": "2023-01-23 | Persona 051 (speaker_role=persona) | 2023-01-23 지역 미술관 기획전 관람, 2023-01-23, 09:00: 나는 전시관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-052-q": [
+      {
+        "chunk_id": "603dfc03-bef7-5db9-a5c8-23d25c35b57d",
+        "record_id": "8367f698-8028-5451-bc98-86cce5c92d4d",
+        "text_version_id": "d7fd17f0-ab6d-5189-b083-4261b939ec09",
+        "content": "2023-01-05 | Persona 052 (speaker_role=persona) | 2023-01-05 항구 마을 도보 여행, 2023-01-05, 09:00: 나는 문화센터에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-053-q": [
+      {
+        "chunk_id": "d7e74b4f-0c96-53a6-88e3-2a229fa75783",
+        "record_id": "3d1904dd-cbcb-5270-a268-9cce921cde8f",
+        "text_version_id": "8028f30a-7e44-5b2f-87b9-b9a0c172c79c",
+        "content": "2022-04-02 | Persona 053 (speaker_role=persona) | 2022-04-02 항구 마을 도보 여행, 2022-04-02, 09:00: 나는 식물원에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-054-q": [
+      {
+        "chunk_id": "5efe6d83-b0e0-5b07-ae0e-aeec8ba9d7bb",
+        "record_id": "fa902120-c45f-53d3-9d46-e4ad72e1a7dc",
+        "text_version_id": "34962a35-7524-5abf-93f6-9bbda513bf08",
+        "content": "2024-01-20 | Persona 054 (speaker_role=persona) | 2024-01-20 다도 예절 체험 강좌, 2024-01-20, 09:00: 나는 해안산책로에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-055-q": [
+      {
+        "chunk_id": "8a42af5a-5af5-544d-84c9-84d95334bf4b",
+        "record_id": "87f63579-42f6-507a-bc01-8b2665b97eef",
+        "text_version_id": "26f96878-8ed4-51e1-9a26-c1902e0c55d9",
+        "content": "2022-02-04 | Persona 055 (speaker_role=persona) | 2022-02-04 전통 시장 장보기 탐방, 2022-02-04, 09:00: 나는 박물관에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-056-q": [
+      {
+        "chunk_id": "a0050562-160f-5cd6-bd4a-3904d6fa954c",
+        "record_id": "2c8680f6-4c98-5f49-99bb-6d5667790379",
+        "text_version_id": "37c456f6-79fd-5946-9488-3ccaf1a1f861",
+        "content": "2022-07-11 | Persona 056 (speaker_role=persona) | 2022-07-11 전통 매듭 팔찌 공예, 2022-07-11, 09:00: 나는 청년센터에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-057-q": [
+      {
+        "chunk_id": "b37c7707-0cfc-5f8e-ae3d-37256623007a",
+        "record_id": "ba4242f7-0ee6-55eb-98e4-c0dfa6f00dcb",
+        "text_version_id": "5c23b59f-5806-5f97-b2a2-4851bae942ab",
+        "content": "2023-04-07 | Persona 057 (speaker_role=persona) | 2023-04-07 수채화 풍경 드로잉, 2023-04-07, 09:00: 나는 미술관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-058-q": [
+      {
+        "chunk_id": "11d6d388-4cb0-5580-b149-3315b6a1b2cd",
+        "record_id": "cc2c2625-387b-582c-9ec4-ca427037decc",
+        "text_version_id": "c396afde-8efd-5006-934b-3664843a72a1",
+        "content": "2023-02-24 | Persona 058 (speaker_role=persona) | 2023-02-24 도시 양봉 체험 활동, 2023-02-24, 09:00: 나는 북카페에서 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-059-q": [
+      {
+        "chunk_id": "e4c582e2-3bd6-5705-abc6-01325fbd5e33",
+        "record_id": "d6f3bc39-aaef-5a5a-a85c-1fee443fe47b",
+        "text_version_id": "f5b4ffce-4d7d-56c4-9813-eda7a90f0612",
+        "content": "2023-02-20 | Persona 059 (speaker_role=persona) | 2023-02-20 박물관 유물 해설 청취, 2023-02-20, 09:00: 나는 해안산책로에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-060-q": [
+      {
+        "chunk_id": "8dfa19f5-d9f9-5167-b450-260101809cd6",
+        "record_id": "18f4cf5e-b9b4-5143-a8f8-22c9d905a686",
+        "text_version_id": "b70909bd-c06b-5da6-9a48-e7a9d6141eea",
+        "content": "2022-05-24 | Persona 060 (speaker_role=persona) | 2022-05-24 천문대 별자리 관측회, 2022-05-24, 09:00: 나는 폐교문화공간에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "28894404-de96-5dda-bfce-ccdb1c6ecf56",
+        "record_id": "e412624d-4b10-586f-a8e9-65d883038cf8",
+        "text_version_id": "213544ab-1a75-542b-af16-c2c1794e5a6c",
+        "content": "2022-05-31 | Persona 060 (speaker_role=persona) | 2022-05-24 독서 토론 소모임, 2022-05-31, 16:00: 나는 해안산책로에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-061-q": [
+      {
+        "chunk_id": "989c7a1b-6cf6-50d3-9784-59d3bf9c4333",
+        "record_id": "49fb0374-65ed-56a5-9809-577a46434aec",
+        "text_version_id": "695d717f-b64a-5fed-8fb8-36258118a518",
+        "content": "2024-12-26 | Persona 061 (speaker_role=persona) | 2024-12-26 주민 합창단 정기 연습, 2024-12-26, 09:00: 나는 청년센터에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "60feae53-1d34-55ea-9e5a-290320595ab2",
+        "record_id": "0e81cf80-3e4a-5f25-846a-a9aeb7abadc9",
+        "text_version_id": "8377b5ef-e400-5696-bee4-20c3b3a80c4c",
+        "content": "2025-01-02 | Persona 061 (speaker_role=persona) | 2024-12-26 근대 건축물 골목 투어, 2025-01-02, 16:00: 나는 작은도서관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-062-q": [
+      {
+        "chunk_id": "b692bb07-c4ae-5575-a97c-85abe8693662",
+        "record_id": "68fb453d-94de-5454-9a00-27e012f6d5dd",
+        "text_version_id": "58d81d20-ee49-55d0-99a7-7b8103ce86c5",
+        "content": "2023-10-08 | Persona 062 (speaker_role=persona) | 2023-10-08 동네 플로깅 모임, 2023-10-08, 09:00: 나는 요리교실에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "04a3f558-fb73-5942-ab61-cdd28b3bfe85",
+        "record_id": "c443892e-02b3-572c-a128-a4cbeba2fc04",
+        "text_version_id": "0b7b4e0d-f989-5611-bfb9-9d50b7f05a3e",
+        "content": "2023-10-15 | Persona 062 (speaker_role=persona) | 2023-10-08 수목원 숲길 산책, 2023-10-15, 16:00: 나는 수목원에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-063-q": [
+      {
+        "chunk_id": "02ffb4e4-f0ab-509e-bdab-c2958a8ae82d",
+        "record_id": "5e402dc3-7684-5e21-a894-fbf96560bb68",
+        "text_version_id": "712abb50-1e60-5c83-b494-3c4418a7c99d",
+        "content": "2023-10-31 | Persona 063 (speaker_role=persona) | 2023-10-31 스테인드글라스 썬캐처 제작, 2023-10-31, 09:00: 나는 시민공원에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "b4b67d51-5273-58c5-b03b-dcd62ee62ebc",
+        "record_id": "3010bede-3a6c-5b66-8ba5-f14f5814c8a3",
+        "text_version_id": "e6694a47-9b5f-58a6-9141-3a0c63ebb0cf",
+        "content": "2023-11-07 | Persona 063 (speaker_role=persona) | 2023-10-31 고궁 야간 해설 투어, 2023-11-07, 16:00: 나는 커뮤니티센터에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-064-q": [
+      {
+        "chunk_id": "226d0923-18ba-5139-8bf8-7f0642df94a6",
+        "record_id": "6037c171-2740-5b85-bcaa-01ed1a190ea6",
+        "text_version_id": "ab0fe103-93f8-5f59-b5b5-1f87c5373d87",
+        "content": "2024-05-05 | Persona 064 (speaker_role=persona) | 2024-05-05 바리스타 핸드드립 실습, 2024-05-05, 09:00: 나는 전통시장에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "c0f7eaa8-5c95-59fa-b7a5-237d9ce4311f",
+        "record_id": "3c3b61e5-90b7-5856-9608-9bff200ea1e6",
+        "text_version_id": "d9545c14-6c4b-5a6e-8b5c-21d240ea94a5",
+        "content": "2024-05-12 | Persona 064 (speaker_role=persona) | 2024-05-05 박물관 유물 해설 청취, 2024-05-12, 16:00: 나는 한옥마을에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-065-q": [
+      {
+        "chunk_id": "bac89219-1b9f-5e7e-bdf3-38aaf92ce054",
+        "record_id": "3996465a-7ec1-502b-b34d-47b03326659f",
+        "text_version_id": "d2403d8a-1766-52ae-8625-0fb3a302e400",
+        "content": "2024-09-01 | Persona 065 (speaker_role=persona) | 2024-09-01 아크릴화 원데이 클래스, 2024-09-01, 09:00: 나는 문화센터에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "562ded43-688a-5e80-ab9f-d1b407fe4d0f",
+        "record_id": "852ff8b8-4e96-5fa5-8e9b-d883dfe21724",
+        "text_version_id": "274bc97a-73b4-5c8a-8d0e-bd4a5e7dd8f8",
+        "content": "2024-09-08 | Persona 065 (speaker_role=persona) | 2024-09-01 캘리그라피 엽서 쓰기, 2024-09-08, 16:00: 나는 폐교문화공간에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-066-q": [
+      {
+        "chunk_id": "ce136d16-1c15-5be6-9470-94be0c51a3a0",
+        "record_id": "695d1ab5-0a9b-5b8d-a564-c866988bcc72",
+        "text_version_id": "35e15552-d5cd-5fee-ad93-3c0e1233534d",
+        "content": "2023-07-08 | Persona 066 (speaker_role=persona) | 2023-07-08 전통 시장 장보기 탐방, 2023-07-08, 09:00: 나는 마을회관에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "aa07802b-6fd4-541a-8150-17d2e070864b",
+        "record_id": "4aae2418-6317-5447-9847-c2da4300b79f",
+        "text_version_id": "16083fcb-a29b-583b-b460-eb6d9b78d881",
+        "content": "2023-07-15 | Persona 066 (speaker_role=persona) | 2023-07-08 도시 양봉 체험 활동, 2023-07-15, 16:00: 나는 공예공방에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-067-q": [
+      {
+        "chunk_id": "ad0da99a-5116-53a8-969f-9105c0ab3157",
+        "record_id": "f68c0f15-624e-5734-970c-543332082e56",
+        "text_version_id": "460bdc54-3774-5e2a-9b34-e205b69c3bc8",
+        "content": "2023-11-01 | Persona 067 (speaker_role=persona) | 2023-11-01 항구 마을 도보 여행, 2023-11-01, 09:00: 나는 해안산책로에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "9fd1ae1a-2642-57ec-9c0b-7333e88fba6d",
+        "record_id": "b7bb05f9-1f81-5894-8022-a00f5be280a1",
+        "text_version_id": "5e881843-6e7c-5205-a7d4-f28c529f5fcc",
+        "content": "2023-11-08 | Persona 067 (speaker_role=persona) | 2023-11-01 은점토 펜던트 세공, 2023-11-08, 16:00: 나는 해안산책로에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-068-q": [
+      {
+        "chunk_id": "661d4825-5205-52d5-9654-1eb3c1a9a6c6",
+        "record_id": "68f38473-1dab-50cb-ac7e-a9930cb97193",
+        "text_version_id": "520b534a-e693-57f6-9e41-adf2647b28f2",
+        "content": "2024-08-25 | Persona 068 (speaker_role=persona) | 2024-08-25 아크릴화 원데이 클래스, 2024-08-25, 09:00: 나는 요리교실에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "73633dbf-484f-5842-8189-3a3dd4523356",
+        "record_id": "e402a57b-870e-5d50-bff5-1ecf87965184",
+        "text_version_id": "980f23e8-f4f5-522b-a9c1-0c57750a3cc0",
+        "content": "2024-09-01 | Persona 068 (speaker_role=persona) | 2024-08-25 유리 공예 반지 제작, 2024-09-01, 16:00: 나는 해안산책로에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-069-q": [
+      {
+        "chunk_id": "a7107ed0-975f-56f6-9b21-22f5daacb6c4",
+        "record_id": "6940a02b-b7e1-50a6-b444-f60bcf9103e0",
+        "text_version_id": "f53e403f-de5c-5886-a189-14e7df8b3fc9",
+        "content": "2022-02-18 | Persona 069 (speaker_role=persona) | 2022-02-18 드라이플라워 리스 만들기, 2022-02-18, 09:00: 나는 복합문화공간에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "efb86292-4408-5950-b488-ea990671eeaf",
+        "record_id": "38506b08-f734-5e44-b832-71ed1fd26e6c",
+        "text_version_id": "e1dc2e46-342d-5a39-a190-a7b2ea3150ed",
+        "content": "2022-02-25 | Persona 069 (speaker_role=persona) | 2022-02-18 자전거 자가 정비 교육, 2022-02-25, 16:00: 나는 요리교실에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-070-q": [
+      {
+        "chunk_id": "b467a16a-8068-5a5c-b30c-7e386fe5c8d8",
+        "record_id": "69084b50-a000-5fcb-9a96-815bda916b9c",
+        "text_version_id": "dc7de5ca-ace4-502e-8339-f1b48e92aaa4",
+        "content": "2023-09-26 | Persona 070 (speaker_role=persona) | 2023-09-26 벽화 그리기 자원봉사, 2023-09-26, 09:00: 나는 생태공원에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "38721663-228a-5bae-92df-cc5df0e10141",
+        "record_id": "29bf90c0-48b7-544f-a386-26cdab217af2",
+        "text_version_id": "3d9fa833-9aa0-5f03-b979-fc0c8bfde263",
+        "content": "2023-10-03 | Persona 070 (speaker_role=persona) | 2023-09-26 캘리그라피 엽서 쓰기, 2023-10-03, 16:00: 나는 작은도서관에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-071-q": [
+      {
+        "chunk_id": "9dcf65d6-b8bf-5dac-8c18-25e46a79e977",
+        "record_id": "160dd9cb-e3c3-5af9-b6b4-bbd280455d3d",
+        "text_version_id": "e59feed9-aca7-51eb-b275-997315dfa52c",
+        "content": "2023-03-29 | Persona 071 (speaker_role=persona) | 2023-03-29 해안 둘레길 트레킹, 2023-03-29, 09:00: 나는 복합문화공간에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f6935219-2708-5b1a-adf3-ce071a640a6f",
+        "record_id": "d172b0e3-4f3e-553b-8165-67ba932b3cb6",
+        "text_version_id": "25f67c09-696e-58db-8518-dab873a61995",
+        "content": "2023-04-05 | Persona 071 (speaker_role=persona) | 2023-03-29 항구 마을 도보 여행, 2023-04-05, 16:00: 나는 작은도서관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-072-q": [
+      {
+        "chunk_id": "d79172ad-8789-5e0a-b185-7e2332e48b5e",
+        "record_id": "f5a168e4-623a-5f4d-907a-259af2e80afd",
+        "text_version_id": "903607ce-a3ea-5884-a759-f12c55672b47",
+        "content": "2023-12-28 | Persona 072 (speaker_role=persona) | 2023-12-28 아나바다 플리마켓 운영, 2023-12-28, 09:00: 나는 수목원에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5e870d9e-5ade-5169-9cee-ef446b6ca280",
+        "record_id": "2ecd4f76-690a-5458-bc9b-771e380f504e",
+        "text_version_id": "0e3d538f-1a5f-5e73-8130-f547279835d8",
+        "content": "2024-01-04 | Persona 072 (speaker_role=persona) | 2023-12-28 실크스크린 에코백 인쇄, 2024-01-04, 16:00: 나는 전시관에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-073-q": [
+      {
+        "chunk_id": "a19fb55b-362d-5fc9-97db-ab919432ac23",
+        "record_id": "63b130f7-1df9-5032-ae62-3298b400fd64",
+        "text_version_id": "89594504-8bc0-5545-b073-7f595c7a7593",
+        "content": "2022-04-09 | Persona 073 (speaker_role=persona) | 2022-04-09 캘리그라피 엽서 쓰기, 2022-04-09, 09:00: 나는 시립도서관에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "223b9f5d-d457-5992-a96f-ecabf0d45a9e",
+        "record_id": "76515db1-ca25-58be-b694-3c4f30b8e196",
+        "text_version_id": "238faea5-1dc6-5b02-bcb6-aa368674cb89",
+        "content": "2022-04-16 | Persona 073 (speaker_role=persona) | 2022-04-09 주민 합창단 정기 연습, 2022-04-16, 16:00: 나는 시민공원에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-074-q": [
+      {
+        "chunk_id": "2c9311bd-a2eb-5ada-b7a9-03387fb1dd27",
+        "record_id": "8ff38f45-6d80-5136-a730-a75c7863041f",
+        "text_version_id": "26d00a60-7284-5c0c-8667-343303dde6d5",
+        "content": "2023-11-12 | Persona 074 (speaker_role=persona) | 2023-11-12 도자기 물레 성형, 2023-11-12, 09:00: 나는 미술관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "81d9f355-cd23-5b86-be5b-3b2068e87fba",
+        "record_id": "e4dd6fb7-8e36-5298-8ff0-d6afe3bf56de",
+        "text_version_id": "9f7e8288-091a-5863-8877-76208c1b7edf",
+        "content": "2023-11-19 | Persona 074 (speaker_role=persona) | 2023-11-12 전통 시장 장보기 탐방, 2023-11-19, 16:00: 나는 천문대에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-075-q": [
+      {
+        "chunk_id": "95186413-f16f-5c85-9d13-7d7977b2c14d",
+        "record_id": "22877d0a-b8e3-5e5c-894a-d091fce66de9",
+        "text_version_id": "bf914a6d-682a-5ccc-855e-4fd0696a5adb",
+        "content": "2022-08-08 | Persona 075 (speaker_role=persona) | 2022-08-08 독서 토론 소모임, 2022-08-08, 09:00: 나는 북카페에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "28dbdf19-d226-505d-89a6-5aa8b2de1cba",
+        "record_id": "bfd64a10-1c06-50cd-9007-a80b5e785055",
+        "text_version_id": "89a1c365-5ee7-5cd4-9a99-ed4042e44715",
+        "content": "2022-08-15 | Persona 075 (speaker_role=persona) | 2022-08-08 근대 건축물 골목 투어, 2022-08-15, 16:00: 나는 문화센터에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-076-q": [
+      {
+        "chunk_id": "2fa5cf72-df4b-51e2-9c21-aac30f84842a",
+        "record_id": "914031f1-4856-59df-9d49-89945cde1683",
+        "text_version_id": "b937b2ac-5eea-5272-b600-cd9606931893",
+        "content": "2023-01-04 | Persona 076 (speaker_role=persona) | 2023-01-04 폐선 철길 자전거 라이딩, 2023-01-04, 09:00: 나는 작은도서관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "ef29f10f-e3d4-554f-bc2d-132ec731f920",
+        "record_id": "d1578cc9-c602-5727-bcb7-0f1d8f1158ec",
+        "text_version_id": "e2e9b765-77ca-5d84-a507-f45d94425e20",
+        "content": "2023-01-11 | Persona 076 (speaker_role=persona) | 2023-01-04 라탄 바구니 엮기, 2023-01-11, 16:00: 나는 평생학습관에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-077-q": [
+      {
+        "chunk_id": "b7159862-78ba-5f7b-85f2-adcf14cc6347",
+        "record_id": "47ec58c6-60c6-5e3f-b314-713d4a82c6d5",
+        "text_version_id": "39c96f29-e964-5776-98ac-83a3dadddc9e",
+        "content": "2022-08-12 | Persona 077 (speaker_role=persona) | 2022-08-12 아크릴화 원데이 클래스, 2022-08-12, 09:00: 나는 도예공방에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "1343a8e0-db18-564e-88fd-4759d6a98cb0",
+        "record_id": "2a462810-9fc0-51d1-b2e6-5f00417e2615",
+        "text_version_id": "23293c2b-712c-5192-834c-7c2243e9cc1c",
+        "content": "2022-08-19 | Persona 077 (speaker_role=persona) | 2022-08-12 전통 매듭 팔찌 공예, 2022-08-19, 16:00: 나는 화실에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-078-q": [
+      {
+        "chunk_id": "c652c5d7-88aa-5c10-b4f4-f1cc8ff44846",
+        "record_id": "a8e386f7-3a32-57a2-b96e-b194df5a12b2",
+        "text_version_id": "ea7bbd40-c63a-5b7f-bd60-64ed0a58d7b7",
+        "content": "2022-04-24 | Persona 078 (speaker_role=persona) | 2022-04-24 수제 비누 공방 체험, 2022-04-24, 09:00: 나는 마을회관에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "28beb771-243a-54bb-b071-c1a2f1f64f02",
+        "record_id": "27b30b93-9860-5ed3-8022-4744a6ce12ed",
+        "text_version_id": "0fcbd1d0-107b-568d-9ffa-f70fbc4e4851",
+        "content": "2022-05-01 | Persona 078 (speaker_role=persona) | 2022-04-24 가죽 키링 만들기, 2022-05-01, 16:00: 나는 화실에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-079-q": [
+      {
+        "chunk_id": "ba8c72e8-723e-574a-a763-8cd1bb0a6f06",
+        "record_id": "4d571487-5122-5660-bbbe-472d4d3fb3d0",
+        "text_version_id": "3ab21312-a901-5da3-a95c-2ced63aab728",
+        "content": "2024-01-06 | Persona 079 (speaker_role=persona) | 2024-01-06 유기견 보호소 산책 봉사, 2024-01-06, 09:00: 나는 식물원에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e084a891-8d1e-5692-bcc4-b9a0abc18c9c",
+        "record_id": "53e8b45a-94d7-5afa-a934-f38fa12e616d",
+        "text_version_id": "b2e2548c-4c55-5d65-9450-f152ecc869d2",
+        "content": "2024-01-13 | Persona 079 (speaker_role=persona) | 2024-01-06 가죽 키링 만들기, 2024-01-13, 16:00: 나는 커뮤니티센터에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-080-q": [
+      {
+        "chunk_id": "c1e30c35-db45-5b78-85bb-58f71f022c34",
+        "record_id": "941d7f54-8829-51c7-bd3d-451ab3cd21c7",
+        "text_version_id": "444651ef-200d-5ccc-9db5-cbf71f50b352",
+        "content": "2024-10-31 | Persona 080 (speaker_role=persona) | 2024-10-31 스테인드글라스 썬캐처 제작, 2024-10-31, 09:00: 나는 문화센터에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "0122f0df-d24e-51a2-897e-9c6c96c81338",
+        "record_id": "bc11c5d4-5c9c-530e-a741-310619f61a80",
+        "text_version_id": "ca747552-5dba-5ff0-9fd8-1b7dd1a7afc9",
+        "content": "2024-11-07 | Persona 080 (speaker_role=persona) | 2024-10-31 박물관 유물 해설 청취, 2024-11-07, 16:00: 나는 해안산책로에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-081-q": [
+      {
+        "chunk_id": "6f58b9a3-9935-501a-9dbb-dc91f3005a99",
+        "record_id": "f86f2cdd-7abe-5aff-b8a0-4e499468d5b3",
+        "text_version_id": "3e7618d4-3eb8-5988-b352-48bc0a25f438",
+        "content": "2024-05-16 | Persona 081 (speaker_role=persona) | 2024-05-16 오일파스텔 일러스트 수업, 2024-05-16, 09:00: 나는 커뮤니티센터에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "9bc2f1b3-2afc-5776-bbd7-2cef49512abc",
+        "record_id": "1eac6d9d-220d-57b9-a71c-5fb0defb7d6f",
+        "text_version_id": "b7155135-d748-5c24-8eb8-6428959df0a9",
+        "content": "2024-05-23 | Persona 081 (speaker_role=persona) | 2024-05-16 독서 토론 소모임, 2024-05-23, 16:00: 나는 박물관에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-082-q": [
+      {
+        "chunk_id": "503af8f2-dd4f-5481-adf4-c95dca42576e",
+        "record_id": "c4af7840-636d-5fdd-a6b9-af0e96422b09",
+        "text_version_id": "223ac27d-7d54-54b8-ace1-a8668c798083",
+        "content": "2023-03-06 | Persona 082 (speaker_role=persona) | 2023-03-06 유리 공예 반지 제작, 2023-03-06, 09:00: 나는 공예공방에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "60084424-76c0-595d-b9a0-ef136133cf85",
+        "record_id": "2db2f582-e6ad-5100-8aae-51d6e577c345",
+        "text_version_id": "57488da2-c60a-5a37-8f2b-b05604482d50",
+        "content": "2023-03-13 | Persona 082 (speaker_role=persona) | 2023-03-06 도시 양봉 체험 활동, 2023-03-13, 16:00: 나는 작은도서관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-083-q": [
+      {
+        "chunk_id": "9575edae-8a84-547a-aa6f-429f607d7951",
+        "record_id": "f9470280-df96-5f97-8377-3928c00c0a46",
+        "text_version_id": "fec50dac-a355-5084-9025-fcf32a284658",
+        "content": "2023-05-13 | Persona 083 (speaker_role=persona) | 2023-05-13 벽화 그리기 자원봉사, 2023-05-13, 09:00: 나는 수목원에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "9cca54b5-fe22-5f0c-bcea-5f00b903008e",
+        "record_id": "adb7a9ac-4a10-5314-942f-4a04374c5c7b",
+        "text_version_id": "f1555b6b-ebfa-510e-a887-e647cd630849",
+        "content": "2023-05-20 | Persona 083 (speaker_role=persona) | 2023-05-13 주민 합창단 정기 연습, 2023-05-20, 16:00: 나는 청년센터에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-084-q": [
+      {
+        "chunk_id": "3c4a8649-8786-5561-8a8c-761b8508c4be",
+        "record_id": "b43db009-9841-57db-8e65-ae67a0c58a57",
+        "text_version_id": "a068b5f7-23e9-5e72-8f7f-f29ad44046e3",
+        "content": "2022-09-27 | Persona 084 (speaker_role=persona) | 2022-09-27 바리스타 핸드드립 실습, 2022-09-27, 09:00: 나는 수목원에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "cf849aa7-8c98-5e0b-afb7-c4b746370f5b",
+        "record_id": "87c54468-fe97-594a-8542-8a1ef8a4fabd",
+        "text_version_id": "bef48ca9-67ba-5049-afff-369c1e4d98bb",
+        "content": "2022-10-04 | Persona 084 (speaker_role=persona) | 2022-09-27 수채화 풍경 드로잉, 2022-10-04, 16:00: 나는 구민회관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-085-q": [
+      {
+        "chunk_id": "9761b4d1-b9e6-549a-b247-62625ef59b86",
+        "record_id": "14aa09b3-eba3-58b2-823c-21515178cf49",
+        "text_version_id": "59cb2dfb-582c-53a0-ae70-aad60c4461a9",
+        "content": "2024-07-27 | Persona 085 (speaker_role=persona) | 2024-07-27 생태 습지 탐조 기행, 2024-07-27, 09:00: 나는 시립도서관에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "4b7b5907-dfa5-5016-8f3f-b32bb979eff5",
+        "record_id": "7ccff354-78c3-5866-b56e-7362ae304f5a",
+        "text_version_id": "b17bc81b-56ec-56a7-9dfe-c7ac97993270",
+        "content": "2024-08-03 | Persona 085 (speaker_role=persona) | 2024-07-27 라탄 바구니 엮기, 2024-08-03, 16:00: 나는 마을회관에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-086-q": [
+      {
+        "chunk_id": "a546571c-203d-5b71-be44-74efcfb68429",
+        "record_id": "dfe61e39-45c6-5eea-b5ac-83a815493fbf",
+        "text_version_id": "ddbbc692-247d-5344-a8e2-462b3b46894b",
+        "content": "2023-04-16 | Persona 086 (speaker_role=persona) | 2023-04-16 캔들 홀더 조향 체험, 2023-04-16, 09:00: 나는 청년센터에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "3e972b89-468a-5573-8bfc-a9c3e38831b4",
+        "record_id": "5603bfcb-1185-54fb-9072-14de45947d66",
+        "text_version_id": "ecdd19f5-945f-5a06-9b44-cc2b33b80b99",
+        "content": "2023-04-23 | Persona 086 (speaker_role=persona) | 2023-04-16 기초 수어 배움 교실, 2023-04-23, 16:00: 나는 공예공방에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-087-q": [
+      {
+        "chunk_id": "2ecb784f-11ae-5ca1-9fb8-d2bf84b1e63a",
+        "record_id": "a133f312-f9a1-5536-b634-0bbc02ea6149",
+        "text_version_id": "0e12dec8-cc1e-5fd5-b3a7-fc450f59e146",
+        "content": "2022-09-16 | Persona 087 (speaker_role=persona) | 2022-09-16 수채화 풍경 드로잉, 2022-09-16, 09:00: 나는 전통시장에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "fc6a8a69-819e-5db9-b7fd-79a43ed6c7ec",
+        "record_id": "54dcef98-1296-5cf1-a53f-e81ac0082e16",
+        "text_version_id": "076cb3a7-1271-5b53-b5a4-2dcc9c0fe8ac",
+        "content": "2022-09-23 | Persona 087 (speaker_role=persona) | 2022-09-16 캘리그라피 엽서 쓰기, 2022-09-23, 16:00: 나는 미술관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-088-q": [
+      {
+        "chunk_id": "2fdbf2aa-852b-5954-8cc8-b50aeb8fa3db",
+        "record_id": "7a7b9be4-ae82-53f7-bfb5-6179be2bb327",
+        "text_version_id": "3921a8f0-952c-51fd-9b4f-5ac7227f9d91",
+        "content": "2022-02-01 | Persona 088 (speaker_role=persona) | 2022-02-01 스마트폰 사진 보정 강의, 2022-02-01, 09:00: 나는 수목원에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "0e1d0180-8b56-5aa8-a594-19d6c8d587ff",
+        "record_id": "b649e029-bca7-5d4a-85e7-ac3683c9240d",
+        "text_version_id": "79e5a2e3-1512-5c66-80f5-4ae3c6082ac4",
+        "content": "2022-02-08 | Persona 088 (speaker_role=persona) | 2022-02-01 스테인드글라스 썬캐처 제작, 2022-02-08, 16:00: 나는 화실에서 에코백 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-089-q": [
+      {
+        "chunk_id": "6c4c08d4-ba19-595a-ae77-27a4dd1b900f",
+        "record_id": "85d24f2e-c57a-5fdc-8841-b5b380eff198",
+        "text_version_id": "c057a92f-5f42-50e6-9a3a-4a4d66a370fd",
+        "content": "2023-02-11 | Persona 089 (speaker_role=persona) | 2023-02-11 아크릴화 원데이 클래스, 2023-02-11, 09:00: 나는 청년센터에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "fb7c0a11-6cec-596f-960d-7aff3ede676c",
+        "record_id": "394b41a6-4cf8-5bbb-a891-975a7d11428e",
+        "text_version_id": "d5414ce5-a892-53fc-9030-2464c2e58cc7",
+        "content": "2023-02-18 | Persona 089 (speaker_role=persona) | 2023-02-11 도심 야경 사진 출사, 2023-02-18, 16:00: 나는 목공방에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-090-q": [
+      {
+        "chunk_id": "be1712e7-50fe-5c06-ad85-69fb2f6fd7c9",
+        "record_id": "82633888-1504-564a-8dde-0bfb768fd188",
+        "text_version_id": "bf2624ee-084c-5263-a7c5-41415519d831",
+        "content": "2023-10-27 | Persona 090 (speaker_role=persona) | 2023-10-27 폐선 철길 자전거 라이딩, 2023-10-27, 09:00: 나는 공예공방에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "1e3d4a74-0acf-59cc-be82-7bb9ccaebc37",
+        "record_id": "8129cd17-2807-5365-b9db-d1cd3ee8a909",
+        "text_version_id": "8b239f0f-debe-5063-a388-6d650812087b",
+        "content": "2023-11-03 | Persona 090 (speaker_role=persona) | 2023-10-27 다도 예절 체험 강좌, 2023-11-03, 16:00: 나는 미술관에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-091-q": [
+      {
+        "chunk_id": "e3379c0d-f46b-5239-b3f8-706e6a6aabb2",
+        "record_id": "6ec29b58-9ea3-538c-beca-b4de49a3fd92",
+        "text_version_id": "b6ed8627-64d9-57e3-8f90-92e53334f375",
+        "content": "2022-05-12 | Persona 091 (speaker_role=persona) | 2022-05-12 전통 한옥 마을 답사, 2022-05-12, 09:00: 나는 평생학습관에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "7a1cb7df-8853-5c38-bbdc-501ac42cc5fc",
+        "record_id": "34402450-678c-555e-84ce-cfda684adad6",
+        "text_version_id": "14b8fbb6-b630-509b-b5a9-ed7a99658f88",
+        "content": "2022-05-19 | Persona 091 (speaker_role=persona) | 2022-05-12 생활 목공 수리 기초, 2022-05-19, 16:00: 나는 도예공방에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-092-q": [
+      {
+        "chunk_id": "78966b83-ff78-529e-97ca-2d76cae34ae4",
+        "record_id": "f916e046-d656-54b9-aca2-34a7e543a166",
+        "text_version_id": "fc6bf320-f7e7-5805-894c-c52921131d9f",
+        "content": "2023-03-08 | Persona 092 (speaker_role=persona) | 2023-03-08 목공 도마 제작, 2023-03-08, 09:00: 나는 마을회관에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "96001ad8-337a-534e-ac64-e43ad3cfefff",
+        "record_id": "5ba53c70-158d-5d90-877b-383c1f0bf87b",
+        "text_version_id": "2420d48e-5f0a-5b5e-b576-7702c2e21892",
+        "content": "2023-03-15 | Persona 092 (speaker_role=persona) | 2023-03-08 고궁 야간 해설 투어, 2023-03-15, 16:00: 나는 작은도서관에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-093-q": [
+      {
+        "chunk_id": "da891cce-0421-5b26-bf56-0454be54a5dc",
+        "record_id": "5b91f5c0-b42c-5e5d-b1f8-1d01d1290e09",
+        "text_version_id": "23bad1df-5823-5e94-aa32-4bc8d31b6fbb",
+        "content": "2024-11-03 | Persona 093 (speaker_role=persona) | 2024-11-03 동네 플로깅 모임, 2024-11-03, 09:00: 나는 시민공원에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "321084b3-6a2e-545e-bfa9-d7fb6f5cf5ca",
+        "record_id": "44bbf612-8b00-5c32-8d79-e92382a97cd7",
+        "text_version_id": "857be3d8-66f9-5720-8ec8-d907a7d316dc",
+        "content": "2024-11-10 | Persona 093 (speaker_role=persona) | 2024-11-03 지역 미술관 기획전 관람, 2024-11-10, 16:00: 나는 작은도서관에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-094-q": [
+      {
+        "chunk_id": "ed2b728b-d16b-533a-919a-8df02dd0608b",
+        "record_id": "8124c1d3-7fe7-5821-8649-65ea0043b9c1",
+        "text_version_id": "02897b4e-ad9d-59dc-88dd-d2ea09b246d7",
+        "content": "2024-10-29 | Persona 094 (speaker_role=persona) | 2024-10-29 스마트폰 사진 보정 강의, 2024-10-29, 09:00: 나는 복합문화공간에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "dd80700b-5c22-54f2-9629-ea61ff81dfce",
+        "record_id": "9fdd3546-27c0-5f94-8e96-9de339c5d4e4",
+        "text_version_id": "89680008-d4d6-53dd-86f6-e1b233f86784",
+        "content": "2024-11-05 | Persona 094 (speaker_role=persona) | 2024-10-29 도심 야경 사진 출사, 2024-11-05, 16:00: 나는 작은도서관에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-095-q": [
+      {
+        "chunk_id": "4dabe4d9-e0ef-5e4c-b263-b901a6a16130",
+        "record_id": "d1e2627e-26fd-5b33-80cd-a70445c34062",
+        "text_version_id": "1ba67f4e-25b5-53c8-9087-a4da14a7ea7b",
+        "content": "2023-10-24 | Persona 095 (speaker_role=persona) | 2023-10-24 벽화 그리기 자원봉사, 2023-10-24, 09:00: 나는 목공방에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "b7cbe0a3-370c-542a-9a41-ae916342abbc",
+        "record_id": "645858ba-1a4d-5b60-a646-7334e77aa2a8",
+        "text_version_id": "a66acdf1-e5f4-58fd-95fe-d7b023a30657",
+        "content": "2023-10-31 | Persona 095 (speaker_role=persona) | 2023-10-24 보드게임 교류 모임, 2023-10-31, 16:00: 나는 평생학습관에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-096-q": [
+      {
+        "chunk_id": "3ffc98c0-b4d9-54d2-b2a4-d52894fd9330",
+        "record_id": "1c073759-46d3-5c87-943c-8e0675afcea4",
+        "text_version_id": "8b0c8478-7121-5d73-bcfb-08cbf69754cd",
+        "content": "2022-04-04 | Persona 096 (speaker_role=persona) | 2022-04-04 목공 도마 제작, 2022-04-04, 09:00: 나는 박물관에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5abc6d8d-973f-5914-9605-2b0e19d6a3b8",
+        "record_id": "2fac802a-88f0-5cb8-8019-33a84b044bc5",
+        "text_version_id": "98c1158d-8d52-5b39-8034-5ee3557688ad",
+        "content": "2022-04-11 | Persona 096 (speaker_role=persona) | 2022-04-04 유리 공예 반지 제작, 2022-04-11, 16:00: 나는 천문대에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-097-q": [
+      {
+        "chunk_id": "89d04206-425f-58e4-a65a-17b17694462b",
+        "record_id": "79a0c49c-e992-5d38-81f8-933c1fc489a2",
+        "text_version_id": "4d379a9e-7499-5df7-bded-837d41834676",
+        "content": "2022-04-06 | Persona 097 (speaker_role=persona) | 2022-04-06 해안 둘레길 트레킹, 2022-04-06, 09:00: 나는 구민회관에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "afb35615-9c30-5ee2-9a27-20983d00aa86",
+        "record_id": "8af7db49-6b7d-5329-bc8a-417f4ac2acb7",
+        "text_version_id": "4bcc26ef-936a-552f-bbc4-5c42fe0dfd78",
+        "content": "2022-04-13 | Persona 097 (speaker_role=persona) | 2022-04-06 전통 매듭 팔찌 공예, 2022-04-13, 16:00: 나는 공예공방에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-098-q": [
+      {
+        "chunk_id": "ced94f81-bbf4-5488-a96a-57d2b7a31397",
+        "record_id": "84a64bac-61b9-584a-b4b3-aa9bf9d81c7d",
+        "text_version_id": "f581bae1-b383-5891-aaae-e6395d0ef16a",
+        "content": "2023-02-25 | Persona 098 (speaker_role=persona) | 2023-02-25 마크라메 월행잉 매듭, 2023-02-25, 09:00: 나는 구민회관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "324bc77d-01eb-5971-9343-752e6b245ace",
+        "record_id": "0722c2c9-304e-5885-a5d5-b6018fb54144",
+        "text_version_id": "e4c9bd17-afc5-5072-b2ac-f0a754bcf02e",
+        "content": "2023-03-04 | Persona 098 (speaker_role=persona) | 2023-02-25 캔들 홀더 조향 체험, 2023-03-04, 16:00: 나는 화실에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-099-q": [
+      {
+        "chunk_id": "542ad477-d8fc-570e-bc90-0169f43544f9",
+        "record_id": "655ffa4c-6dc8-5f1e-ab72-00af64f03ff1",
+        "text_version_id": "534040e6-8586-5288-a8a9-4aa6e1a9f869",
+        "content": "2022-06-03 | Persona 099 (speaker_role=persona) | 2022-06-03 오일파스텔 일러스트 수업, 2022-06-03, 09:00: 나는 문화센터에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f6de0369-b9c2-5a78-b8fa-c97135f9a032",
+        "record_id": "d2e3ffb6-d88a-5190-aea5-b0143f68835a",
+        "text_version_id": "fc6bfc4d-7344-5684-a01c-2497ab244216",
+        "content": "2022-06-10 | Persona 099 (speaker_role=persona) | 2022-06-03 폐선 철길 자전거 라이딩, 2022-06-10, 16:00: 나는 문화센터에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-100-q": [
+      {
+        "chunk_id": "4c7f39c6-1cb8-5b7b-976d-4314a6ac0ea3",
+        "record_id": "7eefc755-4a8d-5a75-9fc6-2bc873f506a2",
+        "text_version_id": "cecc621d-73cb-5c50-8b74-4bff1e71228a",
+        "content": "2022-07-03 | Persona 100 (speaker_role=persona) | 2022-07-03 수제 비누 공방 체험, 2022-07-03, 09:00: 나는 문화센터에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "93b50bd6-3f08-5f58-81a6-99f18182489a",
+        "record_id": "6e2018d3-d1d3-55a2-aef7-33df63d3b1af",
+        "text_version_id": "07ad99fa-a83c-53fe-a736-467fc26e0905",
+        "content": "2022-07-10 | Persona 100 (speaker_role=persona) | 2022-07-03 바리스타 핸드드립 실습, 2022-07-10, 16:00: 나는 요리교실에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-101-q": [
+      {
+        "chunk_id": "7e957c56-720c-5b66-849e-b6863d802d06",
+        "record_id": "10557c41-c4a3-5c5c-ad52-c25818f34201",
+        "text_version_id": "5926cd92-3075-5386-b3b3-55080eaea01b",
+        "content": "2024-03-28 | Persona 101 (speaker_role=persona) | 2024-03-28 스테인드글라스 썬캐처 제작, 2024-03-28, 09:00: 나는 화실에서 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5374a342-2bc8-5804-94c4-9505104c36d2",
+        "record_id": "e0dba26a-2450-5b58-af81-3f68684deb60",
+        "text_version_id": "c66307d7-6084-51dd-9c7e-6f100168bbbb",
+        "content": "2024-04-04 | Persona 101 (speaker_role=persona) | 2024-03-28 근대 건축물 골목 투어, 2024-04-04, 16:00: 나는 커뮤니티센터에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-102-q": [
+      {
+        "chunk_id": "c3ed2957-0c31-5a32-826e-03b0982e57f3",
+        "record_id": "26f45657-b15c-5432-b6af-80a429539fa4",
+        "text_version_id": "178a540c-7adf-5556-80ee-c5b684962459",
+        "content": "2023-07-18 | Persona 102 (speaker_role=persona) | 2023-07-18 지역 미술관 기획전 관람, 2023-07-18, 09:00: 나는 복합문화공간에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "c6a79938-e821-5042-9dee-2063a5fa0120",
+        "record_id": "4e45c707-9b7c-5d9c-930c-9d94b44ff821",
+        "text_version_id": "bb35d544-0ec1-5693-96a9-e0209b31b971",
+        "content": "2023-07-25 | Persona 102 (speaker_role=persona) | 2023-07-18 수제 비누 공방 체험, 2023-07-25, 16:00: 나는 생태공원에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-103-q": [
+      {
+        "chunk_id": "df90342b-73d1-523d-89d6-47d7c035e911",
+        "record_id": "11181360-1b01-5387-9e80-2dbd02cbb015",
+        "text_version_id": "2ceb1f73-b5d0-5407-8e9f-1994664dfe59",
+        "content": "2023-10-20 | Persona 103 (speaker_role=persona) | 2023-10-20 식물 분갈이 원예 수업, 2023-10-20, 09:00: 나는 수목원에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "b128eed5-76a2-5695-b8e3-c29ab3c5e8eb",
+        "record_id": "fed1d845-4e68-5802-8127-fe7a14d73e4f",
+        "text_version_id": "4209ee19-30a1-51b5-a335-aad7ef602d0b",
+        "content": "2023-10-27 | Persona 103 (speaker_role=persona) | 2023-10-20 라탄 바구니 엮기, 2023-10-27, 16:00: 나는 마을회관에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-104-q": [
+      {
+        "chunk_id": "c4bbddfe-5580-5a73-8919-5e723cc34de6",
+        "record_id": "0f0ff1d2-7af3-583e-86ba-d02e0abe3327",
+        "text_version_id": "27ed7506-d0ea-5b8b-9e1b-69b1249d633b",
+        "content": "2023-07-21 | Persona 104 (speaker_role=persona) | 2023-07-21 식물 분갈이 원예 수업, 2023-07-21, 09:00: 나는 미술관에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "58dfddfa-437b-578f-84e6-afcd0961a383",
+        "record_id": "0ebc90d7-87cf-578d-9194-8c2a6d97365a",
+        "text_version_id": "ba7a5d4f-f7b6-5f5e-8ac2-ac346239d189",
+        "content": "2023-07-28 | Persona 104 (speaker_role=persona) | 2023-07-21 마크라메 월행잉 매듭, 2023-07-28, 16:00: 나는 목공방에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-105-q": [
+      {
+        "chunk_id": "8d4029a2-b8d4-5656-867d-b6b6aca0e948",
+        "record_id": "47bdb915-0447-524f-9a80-fa2daec765f4",
+        "text_version_id": "b83801b5-9b14-5ae2-9bc1-2f5fe0750f25",
+        "content": "2022-07-21 | Persona 105 (speaker_role=persona) | 2022-07-21 목공 도마 제작, 2022-07-21, 09:00: 나는 작은도서관에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "afebdf69-c3dc-5d41-b9d4-18e520b48ac9",
+        "record_id": "04501f37-2997-5719-aaeb-c741bc15c986",
+        "text_version_id": "34c1e3df-c351-55b7-9392-5ad1335520f9",
+        "content": "2022-07-28 | Persona 105 (speaker_role=persona) | 2022-07-21 실크스크린 에코백 인쇄, 2022-07-28, 16:00: 나는 구민회관에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-106-q": [
+      {
+        "chunk_id": "5486b7c5-a8dd-5761-832d-70cc77e8e4d7",
+        "record_id": "c942e435-8b7a-56b1-aaaa-0f6719496982",
+        "text_version_id": "cbb161aa-4952-535d-b60f-5b3f01e29d5d",
+        "content": "2024-05-04 | Persona 106 (speaker_role=persona) | 2024-05-04 라탄 바구니 엮기, 2024-05-04, 09:00: 나는 해안산책로에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e8997883-8592-5828-a91e-677529381493",
+        "record_id": "fb80b9c9-e90c-5ea7-87ae-90d4bde3f5dc",
+        "text_version_id": "4e72f503-ecd7-58d8-adb6-d17a2abd2e60",
+        "content": "2024-05-11 | Persona 106 (speaker_role=persona) | 2024-05-04 기초 수어 배움 교실, 2024-05-11, 16:00: 나는 도예공방에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-107-q": [
+      {
+        "chunk_id": "11accbfc-69eb-5fb4-8fe0-f4b0d77b4968",
+        "record_id": "308196fc-fa6b-54d0-8757-60626fec04d1",
+        "text_version_id": "9e73b9c4-aa1c-5803-ad0f-cc8de1a2df3e",
+        "content": "2024-06-19 | Persona 107 (speaker_role=persona) | 2024-06-19 지역 미술관 기획전 관람, 2024-06-19, 09:00: 나는 시립도서관에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "2ffdc550-10e3-5b50-b3f1-f4ea6c283bfc",
+        "record_id": "adfb91cf-87c6-5cc9-8205-1450a7f8962f",
+        "text_version_id": "37df8203-8821-5785-9408-d2651069f3c2",
+        "content": "2024-06-26 | Persona 107 (speaker_role=persona) | 2024-06-19 근대 건축물 골목 투어, 2024-06-26, 16:00: 나는 전통시장에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-108-q": [
+      {
+        "chunk_id": "64c1a60e-8dd3-5612-b23b-346a45edd4a8",
+        "record_id": "eb650d71-7ea2-5585-a0fa-b329325d9eb7",
+        "text_version_id": "e60141ac-2aa1-5e6a-a4ff-34822325648b",
+        "content": "2023-11-19 | Persona 108 (speaker_role=persona) | 2023-11-19 주말 텃밭 가꾸기, 2023-11-19, 09:00: 나는 북카페에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f3d35d90-0575-5f03-a3d6-c898a02d796f",
+        "record_id": "6717711a-9480-54e5-865c-56584b3614a6",
+        "text_version_id": "d6caf96f-474d-56aa-a586-17923ce70160",
+        "content": "2023-11-26 | Persona 108 (speaker_role=persona) | 2023-11-19 바리스타 핸드드립 실습, 2023-11-26, 16:00: 나는 전통시장에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-109-q": [
+      {
+        "chunk_id": "cb981f5f-2a06-5a65-b4d9-0293d9a57e97",
+        "record_id": "da574af0-4c8f-5a2b-99bc-3701b2416e18",
+        "text_version_id": "69439744-3c2a-5940-8a61-911bc7a89a2d",
+        "content": "2024-06-22 | Persona 109 (speaker_role=persona) | 2024-06-22 유기견 보호소 산책 봉사, 2024-06-22, 09:00: 나는 커뮤니티센터에서 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e6184968-75b1-514c-a20f-62b2911ca7e1",
+        "record_id": "23e4908b-0b52-59d5-b586-8f77a68872b3",
+        "text_version_id": "8726e99b-4b78-5b0e-8469-90f4bd353171",
+        "content": "2024-06-29 | Persona 109 (speaker_role=persona) | 2024-06-22 자전거 자가 정비 교육, 2024-06-29, 16:00: 나는 미술관에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-110-q": [
+      {
+        "chunk_id": "9640cc15-9ada-5a1d-80cd-20cbb202b82d",
+        "record_id": "a0b0ea19-2081-5d60-b8b6-52e5aa850fc3",
+        "text_version_id": "d946a516-fc00-5d43-bef3-7a1b3c17c5ca",
+        "content": "2022-10-09 | Persona 110 (speaker_role=persona) | 2022-10-09 목공 도마 제작, 2022-10-09, 09:00: 나는 작은도서관에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "6a3fd83d-1d31-5e12-846e-dd4d619e488c",
+        "record_id": "17bac33f-209d-5607-80a4-d31ec0c85d3e",
+        "text_version_id": "ca753c8a-1870-5405-a34a-0833bed2bf2e",
+        "content": "2022-10-16 | Persona 110 (speaker_role=persona) | 2022-10-09 벽화 그리기 자원봉사, 2022-10-16, 16:00: 나는 북카페에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-111-q": [
+      {
+        "chunk_id": "f06a0a2e-3027-5a80-82cf-d52cd57a6f85",
+        "record_id": "4d4e95a2-b5e9-50a0-acdc-5de0f5e16f25",
+        "text_version_id": "d6184e93-22f1-559a-b362-222062a02603",
+        "content": "2022-06-04 | Persona 111 (speaker_role=persona) | 2022-06-04 바리스타 핸드드립 실습, 2022-06-04, 09:00: 나는 폐교문화공간에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e0cbaa06-70c6-5e4c-a21b-419ee5aa1047",
+        "record_id": "8fc33505-11e3-56a5-99d4-5cbba40116e9",
+        "text_version_id": "42673ace-8ec5-52eb-9f1f-eed9288c67fe",
+        "content": "2022-06-11 | Persona 111 (speaker_role=persona) | 2022-06-04 자전거 자가 정비 교육, 2022-06-11, 16:00: 나는 청소년수련관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-112-q": [
+      {
+        "chunk_id": "bc3efd6f-1fb9-5d29-9176-c1f122090f91",
+        "record_id": "fc4e9d75-3168-51c4-931a-4bda802cc1d9",
+        "text_version_id": "e675651c-7374-51da-a9c4-b4315d0b7654",
+        "content": "2022-12-10 | Persona 112 (speaker_role=persona) | 2022-12-10 스테인드글라스 썬캐처 제작, 2022-12-10, 09:00: 나는 해안산책로에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "2940b03a-168d-540e-aacd-12c1215933a9",
+        "record_id": "30b53a69-93de-505c-aac6-ee70c85dbfab",
+        "text_version_id": "1c8edac6-9704-5a1d-8077-d2a139fe5176",
+        "content": "2022-12-17 | Persona 112 (speaker_role=persona) | 2022-12-10 전통 시장 장보기 탐방, 2022-12-17, 16:00: 나는 요리교실에서 에코백 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-113-q": [
+      {
+        "chunk_id": "02ae4969-de6a-54f6-b371-712a189ad80f",
+        "record_id": "f810609f-6a3e-5210-b06c-e17d3a58693b",
+        "text_version_id": "f5a2af05-bfab-57f1-8409-b153fefe4e10",
+        "content": "2024-12-27 | Persona 113 (speaker_role=persona) | 2024-12-27 지역 미술관 기획전 관람, 2024-12-27, 09:00: 나는 작은도서관에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "ee1fdcc6-c2b7-5f5c-89d2-87d424e2a396",
+        "record_id": "1cd1abc5-693d-5d45-9ce7-e5ec2ef5c624",
+        "text_version_id": "3272b6c7-c182-5917-9445-02ff26d34015",
+        "content": "2025-01-03 | Persona 113 (speaker_role=persona) | 2024-12-27 고궁 야간 해설 투어, 2025-01-03, 16:00: 나는 커뮤니티센터에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-114-q": [
+      {
+        "chunk_id": "b8874a6d-ebef-5432-8ff8-bb4d841eb357",
+        "record_id": "39abc3db-961f-5488-beef-334278e5ee67",
+        "text_version_id": "dc3ebc03-7c9b-57b3-95ae-8457a9a5b24e",
+        "content": "2023-02-12 | Persona 114 (speaker_role=persona) | 2023-02-12 해안 둘레길 트레킹, 2023-02-12, 09:00: 나는 미술관에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "88a3424c-a046-5cea-a7d0-2942c55b13ed",
+        "record_id": "0c82fbe3-943a-5752-a173-6b945f5481ba",
+        "text_version_id": "ec2f4a52-8cda-57f6-8fda-ca7f96a3454c",
+        "content": "2023-02-19 | Persona 114 (speaker_role=persona) | 2023-02-12 천문대 별자리 관측회, 2023-02-19, 16:00: 나는 시민공원에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-115-q": [
+      {
+        "chunk_id": "eb62d4c2-079d-51ef-ab5f-8889317b21c8",
+        "record_id": "fe072584-ecad-53cc-aa11-e5af2c03dd98",
+        "text_version_id": "43ae022a-cba0-5553-bba0-39158950863c",
+        "content": "2023-07-20 | Persona 115 (speaker_role=persona) | 2023-07-20 유기견 보호소 산책 봉사, 2023-07-20, 09:00: 나는 목공방에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "104ced91-9b8b-5de6-b065-cabf2ea48c6e",
+        "record_id": "69b0213c-257e-5a87-9d35-8ef5fb135966",
+        "text_version_id": "a9be081d-3486-51c1-9c90-3bf0b6e6248c",
+        "content": "2023-07-27 | Persona 115 (speaker_role=persona) | 2023-07-20 수채화 풍경 드로잉, 2023-07-27, 16:00: 나는 청년센터에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-116-q": [
+      {
+        "chunk_id": "3d9b3232-8b7e-550d-bf4a-e7482f5f05e5",
+        "record_id": "b6c18cd0-e66e-54aa-81b2-896d1ab249e3",
+        "text_version_id": "80e22024-daf7-519d-a299-9e7d395d7649",
+        "content": "2023-02-22 | Persona 116 (speaker_role=persona) | 2023-02-22 주민 합창단 정기 연습, 2023-02-22, 09:00: 나는 청소년수련관에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d1df80dc-f252-58d3-80f3-5efde27e34a8",
+        "record_id": "4cab6431-193a-5428-8d3b-1922b570b172",
+        "text_version_id": "2ec6a58c-39fd-515d-8b06-c590e31b2985",
+        "content": "2023-03-01 | Persona 116 (speaker_role=persona) | 2023-02-22 자전거 자가 정비 교육, 2023-03-01, 16:00: 나는 시립도서관에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-117-q": [
+      {
+        "chunk_id": "a5e9895d-5104-50f1-a7b7-23173cc71764",
+        "record_id": "dab8e8bf-a6d7-5764-8707-93ed7d11750d",
+        "text_version_id": "6dbfaa71-70ad-50cb-84b4-54f5bb5356d8",
+        "content": "2023-06-13 | Persona 117 (speaker_role=persona) | 2023-06-13 드라이플라워 리스 만들기, 2023-06-13, 09:00: 나는 수목원에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "02c803a1-f584-566a-a950-088861554c2e",
+        "record_id": "08d4f2d0-0348-5842-8e5e-a103a0c418ce",
+        "text_version_id": "e8d8b9aa-f6a1-5a5b-9adb-61a8079a43d2",
+        "content": "2023-06-20 | Persona 117 (speaker_role=persona) | 2023-06-13 도자기 물레 성형, 2023-06-20, 16:00: 나는 수목원에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-118-q": [
+      {
+        "chunk_id": "cd8cca1f-5a55-5176-b4f1-9f5d3811eb88",
+        "record_id": "0c676886-4dfe-5da1-8776-a38fef5a5989",
+        "text_version_id": "651c69e2-83fe-534a-a91f-a6469724721e",
+        "content": "2023-04-14 | Persona 118 (speaker_role=persona) | 2023-04-14 주말 텃밭 가꾸기, 2023-04-14, 09:00: 나는 커뮤니티센터에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "2765d230-d60b-5ef7-a8d9-08ee523b751d",
+        "record_id": "49c5622f-63ff-5dd1-a44f-9f716facb0f1",
+        "text_version_id": "5003866f-9079-5bbf-84d2-4621e081ee2a",
+        "content": "2023-04-21 | Persona 118 (speaker_role=persona) | 2023-04-14 전통 시장 장보기 탐방, 2023-04-21, 16:00: 나는 청소년수련관에서 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-119-q": [
+      {
+        "chunk_id": "864c54fa-b5cb-5676-b9cc-d6b062f8d0ae",
+        "record_id": "59c6476e-5aa1-5f12-92d7-24284714dc0d",
+        "text_version_id": "4033a707-47f5-5d9d-88cf-c937c9ddff99",
+        "content": "2023-09-11 | Persona 119 (speaker_role=persona) | 2023-09-11 라탄 바구니 엮기, 2023-09-11, 09:00: 나는 박물관에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "fd401be7-b58b-5399-be8a-e23a42ee0af9",
+        "record_id": "8415f3f3-cdff-5f5f-a36f-69c03aa67907",
+        "text_version_id": "40bb59fe-d340-5460-8892-7e9956ec7973",
+        "content": "2023-09-18 | Persona 119 (speaker_role=persona) | 2023-09-11 근대 건축물 골목 투어, 2023-09-18, 16:00: 나는 전시관에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-120-q": [
+      {
+        "chunk_id": "00a6320e-2b98-5008-955f-f9309f17f695",
+        "record_id": "a4425ee1-9ba5-5e82-b882-08e2b34334b9",
+        "text_version_id": "ee0f05a0-ec5a-5259-9fc0-797cc05789b5",
+        "content": "2023-11-30 | Persona 120 (speaker_role=persona) | 2023-11-30 캔들 홀더 조향 체험, 2023-11-30, 09:00: 나는 천문대에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "19344dec-db2e-50c1-9936-6a0e3654aa8f",
+        "record_id": "8de549f2-de53-57da-99a0-8b2c2ed288cb",
+        "text_version_id": "df1f2108-5751-515a-87e9-ec204fb26a35",
+        "content": "2023-12-07 | Persona 120 (speaker_role=persona) | 2023-11-30 자전거 자가 정비 교육, 2023-12-07, 16:00: 나는 폐교문화공간에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-121-q": [
+      {
+        "chunk_id": "00d6e7a2-e0dd-5fbe-b946-bec7b5fc4ff5",
+        "record_id": "8c80f15b-dbab-58f5-96d9-c9ac9392a606",
+        "text_version_id": "c022bc15-e809-51d6-9878-ccf7f3257484",
+        "content": "2022-06-13 | Persona 121 (speaker_role=persona) | 2022-06-13 생태 습지 탐조 기행, 2022-06-13, 09:00: 나는 폐교문화공간에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "781b9605-09b9-5883-bb5a-0b0b1f573357",
+        "record_id": "d92a8f96-8696-5d45-bb16-07cc3ee8491e",
+        "text_version_id": "2cf2699a-68b0-5336-8fc7-fa27e93a50fc",
+        "content": "2022-06-20 | Persona 121 (speaker_role=persona) | 2022-06-13 보드게임 교류 모임, 2022-06-20, 16:00: 나는 작은도서관에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-122-q": [
+      {
+        "chunk_id": "937bd984-3708-5bcd-bda6-8e6d4f2386f8",
+        "record_id": "a47fb940-f3ad-5efd-bdef-c4fd92959c42",
+        "text_version_id": "8ee52d9a-949c-5f7d-8b0e-ece3dcf0d429",
+        "content": "2023-10-03 | Persona 122 (speaker_role=persona) | 2023-10-03 천문대 별자리 관측회, 2023-10-03, 09:00: 나는 한옥마을에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5696a862-c8c7-5b22-9438-02c58c897824",
+        "record_id": "3a46abf8-de2e-5ac9-be55-9b5deeafb7ee",
+        "text_version_id": "eeebe9ad-7b0c-5cee-a0ec-2a26626aca38",
+        "content": "2023-10-10 | Persona 122 (speaker_role=persona) | 2023-10-03 전통 매듭 팔찌 공예, 2023-10-10, 16:00: 나는 시립도서관에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-123-q": [
+      {
+        "chunk_id": "87a822b5-8aae-5896-83ba-74f316f17cb2",
+        "record_id": "6d490486-d372-54d7-be09-23f6d49c9bc2",
+        "text_version_id": "6b128382-2d7e-5f08-b276-f727e1c6613a",
+        "content": "2024-03-07 | Persona 123 (speaker_role=persona) | 2024-03-07 기초 수어 배움 교실, 2024-03-07, 09:00: 나는 전시관에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "58eee0e2-235f-5506-8bf7-9be3736481ca",
+        "record_id": "a387b72c-ef58-5173-9ba8-61d95bba6daa",
+        "text_version_id": "14027b18-3f58-562e-b71d-ee9ad3bfd2b4",
+        "content": "2024-03-14 | Persona 123 (speaker_role=persona) | 2024-03-07 자전거 자가 정비 교육, 2024-03-14, 16:00: 나는 청소년수련관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-124-q": [
+      {
+        "chunk_id": "63222f54-b0fd-5e35-8aff-c89c0f1c10fe",
+        "record_id": "d4044fb2-1413-511d-95d2-78152229e992",
+        "text_version_id": "8a0ac6af-ab9d-5554-addf-582411fc83cb",
+        "content": "2022-06-28 | Persona 124 (speaker_role=persona) | 2022-06-28 전통 시장 장보기 탐방, 2022-06-28, 09:00: 나는 복합문화공간에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d8fc7da8-d611-5617-bca8-def7a8adf9ee",
+        "record_id": "e9903e03-a63d-5c4a-92d9-a4a957a492fe",
+        "text_version_id": "9ab02ace-bd9a-5772-8092-0f18c4524d88",
+        "content": "2022-07-05 | Persona 124 (speaker_role=persona) | 2022-06-28 항구 마을 도보 여행, 2022-07-05, 16:00: 나는 수목원에서 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-125-q": [
+      {
+        "chunk_id": "591badf0-8d5d-5491-9b4c-554b86740141",
+        "record_id": "35dbe1af-4538-5c0f-a400-a7097da26520",
+        "text_version_id": "db8e1b76-b19b-5f16-9dce-e588259515e8",
+        "content": "2023-07-09 | Persona 125 (speaker_role=persona) | 2023-07-09 스마트폰 사진 보정 강의, 2023-07-09, 09:00: 나는 해안산책로에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "c0eaf82a-0d55-549b-9477-978e79268b61",
+        "record_id": "907c1277-ba92-5f1c-996d-0d996d5f2e5c",
+        "text_version_id": "76305741-d760-56bd-847b-fa85e2daf70c",
+        "content": "2023-07-16 | Persona 125 (speaker_role=persona) | 2023-07-09 기초 수어 배움 교실, 2023-07-16, 16:00: 나는 수목원에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-126-q": [
+      {
+        "chunk_id": "78196756-c93f-5ba2-b30c-a8f6f814edb3",
+        "record_id": "888b2d9a-fd63-5ea3-b022-0ab7f14745b4",
+        "text_version_id": "eb8b0510-5f2d-5498-883e-ff6bd8b700cf",
+        "content": "2024-01-21 | Persona 126 (speaker_role=persona) | 2024-01-21 실크스크린 에코백 인쇄, 2024-01-21, 09:00: 나는 박물관에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "a001ed7d-12ed-5aad-ba89-dcfa7d243e28",
+        "record_id": "ffb388d2-abc5-56a3-a22a-2f34782bf9a6",
+        "text_version_id": "b98b08e4-d878-5e03-9a73-84b6698e57e7",
+        "content": "2024-01-28 | Persona 126 (speaker_role=persona) | 2024-01-21 도시 양봉 체험 활동, 2024-01-28, 16:00: 나는 도예공방에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-127-q": [
+      {
+        "chunk_id": "3be1baf0-f18a-5b44-8f1a-fec8d3845670",
+        "record_id": "30c6c25e-1df7-5da7-b985-c7bd85eb6162",
+        "text_version_id": "ddc04cd3-271c-5518-b996-dd8db4e0f81e",
+        "content": "2023-03-01 | Persona 127 (speaker_role=persona) | 2023-03-01 해안 둘레길 트레킹, 2023-03-01, 09:00: 나는 도예공방에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "59079cc7-b044-532d-9aa9-8b516a7da176",
+        "record_id": "6d0c150e-89fd-5742-afef-87f4a4dc3976",
+        "text_version_id": "7c8ef70a-51be-5e6d-9b93-e7cbcc4260a2",
+        "content": "2023-03-08 | Persona 127 (speaker_role=persona) | 2023-03-01 박물관 유물 해설 청취, 2023-03-08, 16:00: 나는 커뮤니티센터에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-128-q": [
+      {
+        "chunk_id": "37c52181-9227-5e46-8d5b-e60665f76e72",
+        "record_id": "12a4a352-65c2-57ff-a515-80480fc1e968",
+        "text_version_id": "97bbc5d9-048c-5a6e-95e7-c665e9429c9a",
+        "content": "2024-03-19 | Persona 128 (speaker_role=persona) | 2024-03-19 수채화 풍경 드로잉, 2024-03-19, 09:00: 나는 폐교문화공간에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "b00d7456-3881-55b3-8d64-64d5f978f590",
+        "record_id": "9e2e7bfa-1496-5afb-ba28-a0f624a48c61",
+        "text_version_id": "3149c9f5-8aec-5594-bf87-7811c14a2bfa",
+        "content": "2024-03-26 | Persona 128 (speaker_role=persona) | 2024-03-19 수채화 풍경 드로잉, 2024-03-26, 16:00: 나는 시립도서관에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-129-q": [
+      {
+        "chunk_id": "5ae3b06d-7069-58bf-8edb-c6db6c1414a9",
+        "record_id": "57ea75a4-0a70-5ba2-a5da-f547606b2163",
+        "text_version_id": "10958c7e-c7d1-50dc-984b-1608cd30d752",
+        "content": "2024-07-28 | Persona 129 (speaker_role=persona) | 2024-07-28 생활 목공 수리 기초, 2024-07-28, 09:00: 나는 목공방에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "464db5e7-6bfa-5d69-ba53-df5e81bb485c",
+        "record_id": "9fc81de9-3f3a-56ce-b652-6ffc3d5b33a4",
+        "text_version_id": "ed891de2-3d94-52d6-8a97-4ec9e9124427",
+        "content": "2024-08-04 | Persona 129 (speaker_role=persona) | 2024-07-28 주말 텃밭 가꾸기, 2024-08-04, 16:00: 나는 화실에서 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-130-q": [
+      {
+        "chunk_id": "aa9177b7-769d-53e0-8965-b770f11b615c",
+        "record_id": "08ccbf24-a5d8-5db4-b4c9-4adae2e190ad",
+        "text_version_id": "4bce0395-0b8f-5443-8cc5-0cf945c34aa4",
+        "content": "2022-01-29 | Persona 130 (speaker_role=persona) | 2022-01-29 유리 공예 반지 제작, 2022-01-29, 09:00: 나는 작은도서관에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "dc024c5d-2a63-5765-8964-53b801dfec56",
+        "record_id": "d77b480a-286b-54cc-8b14-15e630b3d8bd",
+        "text_version_id": "9d9d39bc-f3ad-5336-bd58-708c5edcd188",
+        "content": "2022-02-05 | Persona 130 (speaker_role=persona) | 2022-01-29 스테인드글라스 썬캐처 제작, 2022-02-05, 16:00: 나는 폐교문화공간에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-131-q": [
+      {
+        "chunk_id": "4aab3b94-8535-550f-bd4e-11d63177883f",
+        "record_id": "da346b02-0c54-59af-b934-218235282b75",
+        "text_version_id": "647072d8-056b-5d3b-a1d5-c610e62a1957",
+        "content": "2023-09-22 | Persona 131 (speaker_role=persona) | 2023-09-22 지역 미술관 기획전 관람, 2023-09-22, 09:00: 나는 한옥마을에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f6133e03-9dc7-50dc-b2ad-77fc1f5fbeff",
+        "record_id": "d9dd700b-447c-5cfc-b047-d1f7d517efad",
+        "text_version_id": "de782afd-d1bb-5287-af09-d92cc48e2e79",
+        "content": "2023-09-29 | Persona 131 (speaker_role=persona) | 2023-09-22 천문대 별자리 관측회, 2023-09-29, 16:00: 나는 마을회관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-132-q": [
+      {
+        "chunk_id": "138adfff-ab32-5f1d-89bb-6c6ff81f16b5",
+        "record_id": "606bf9a7-5a57-5cdd-875e-87a9ae2166e7",
+        "text_version_id": "3d544dab-cbbb-52c6-93fa-8cbc6d71c638",
+        "content": "2023-10-04 | Persona 132 (speaker_role=persona) | 2023-10-04 마크라메 월행잉 매듭, 2023-10-04, 09:00: 나는 평생학습관에서 에코백 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f69690a0-30ca-5cbe-b65e-365cb9147054",
+        "record_id": "5c714f39-cd17-578c-a457-8c45ef5fc4c2",
+        "text_version_id": "b6b262a2-6ecc-5f88-b831-34aa83f6aefe",
+        "content": "2023-10-11 | Persona 132 (speaker_role=persona) | 2023-10-04 항구 마을 도보 여행, 2023-10-11, 16:00: 나는 요리교실에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-133-q": [
+      {
+        "chunk_id": "51a0ca0f-5d41-5d6d-85de-093385be139b",
+        "record_id": "5b4d9b51-356f-5f9b-96c1-dd9c2a2ec95e",
+        "text_version_id": "c4701620-3a32-54b2-b7c9-34f25817a253",
+        "content": "2022-05-22 | Persona 133 (speaker_role=persona) | 2022-05-22 지역 미술관 기획전 관람, 2022-05-22, 09:00: 나는 마을회관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d1f25ac1-800e-5bd3-a604-afbd8ab3d871",
+        "record_id": "dce785b1-3c41-57f5-b02e-6a8df803d6a7",
+        "text_version_id": "78235976-8d69-5f65-84fa-62eefba5021f",
+        "content": "2022-05-29 | Persona 133 (speaker_role=persona) | 2022-05-22 전통주 빚기 입문 강좌, 2022-05-29, 16:00: 나는 복합문화공간에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-134-q": [
+      {
+        "chunk_id": "d89c163c-b219-5e5e-a081-14464eb00915",
+        "record_id": "043cf91e-44f4-5c17-9269-d6b5fee6b7bb",
+        "text_version_id": "85ab50cb-c375-541c-8ea0-64488ca42829",
+        "content": "2022-06-30 | Persona 134 (speaker_role=persona) | 2022-06-30 박물관 유물 해설 청취, 2022-06-30, 09:00: 나는 구민회관에서 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d945605f-5d6e-599f-969e-fd933168e935",
+        "record_id": "d50ea11d-d320-50b0-a3c9-96453a5f83af",
+        "text_version_id": "6326510a-e2fd-5804-ab82-eeb7ca88283a",
+        "content": "2022-07-07 | Persona 134 (speaker_role=persona) | 2022-06-30 수채화 풍경 드로잉, 2022-07-07, 16:00: 나는 시민공원에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-135-q": [
+      {
+        "chunk_id": "556c76d2-7b03-543e-b1ff-8c6b2c0ca5c3",
+        "record_id": "33f543a5-7c5a-531f-8740-a9f2cb615534",
+        "text_version_id": "3ea45dd4-ee39-5dca-81b6-152c0bea5d78",
+        "content": "2024-11-07 | Persona 135 (speaker_role=persona) | 2024-11-07 근대 건축물 골목 투어, 2024-11-07, 09:00: 나는 청년센터에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e6ad4d63-6301-5545-9208-e257fec4e2f2",
+        "record_id": "69c6ff3f-7ea3-56fa-9b51-08df2a7dd5da",
+        "text_version_id": "38338337-92da-59fc-8c09-ec0dc56923ba",
+        "content": "2024-11-14 | Persona 135 (speaker_role=persona) | 2024-11-07 라탄 바구니 엮기, 2024-11-14, 16:00: 나는 구민회관에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-136-q": [
+      {
+        "chunk_id": "f16f2236-0288-5b45-a4ea-dcfba012d203",
+        "record_id": "32ae1006-a1e2-5dd7-99ad-9585d5aa8f4a",
+        "text_version_id": "2cd3c87d-8eb9-5f8c-b148-dbafca0d9600",
+        "content": "2024-03-30 | Persona 136 (speaker_role=persona) | 2024-03-30 드라이플라워 리스 만들기, 2024-03-30, 09:00: 나는 폐교문화공간에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e961a815-f2c7-54f6-9861-bde65ce4c991",
+        "record_id": "3a64ddcc-c639-5110-aaf7-e6c3736da0c4",
+        "text_version_id": "f85466bf-480c-52c0-8256-6200fd97818c",
+        "content": "2024-04-06 | Persona 136 (speaker_role=persona) | 2024-03-30 보드게임 교류 모임, 2024-04-06, 16:00: 나는 시립도서관에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-137-q": [
+      {
+        "chunk_id": "c8bc4803-9224-57b1-bfff-f89596c37e4b",
+        "record_id": "8df385cf-89c9-5bf7-9fc4-ee35ad54fa2e",
+        "text_version_id": "542f4602-b574-5ef4-aa09-6da9ca92d95d",
+        "content": "2023-05-15 | Persona 137 (speaker_role=persona) | 2023-05-15 근대 건축물 골목 투어, 2023-05-15, 09:00: 나는 생태공원에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "a02993ca-4148-50b4-a964-5a828e941842",
+        "record_id": "5526de35-ea21-5c14-b74d-4315a30dc852",
+        "text_version_id": "064bc99a-2143-5557-a44f-53b7d19db6d7",
+        "content": "2023-05-22 | Persona 137 (speaker_role=persona) | 2023-05-15 항구 마을 도보 여행, 2023-05-22, 16:00: 나는 생태공원에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-138-q": [
+      {
+        "chunk_id": "7816d01b-a81b-55d2-8cab-4c73f5054d02",
+        "record_id": "39305004-f3c5-5f7c-9e99-2ac927d02f15",
+        "text_version_id": "6d18a444-fef6-5bd2-aadc-6038c0f69892",
+        "content": "2023-09-18 | Persona 138 (speaker_role=persona) | 2023-09-18 전통 매듭 팔찌 공예, 2023-09-18, 09:00: 나는 마을회관에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "b05297bd-f230-5c2e-b84c-1930d9f1dfa9",
+        "record_id": "dc6a6b5c-3c5d-5fe5-b080-2d1fbc6e8577",
+        "text_version_id": "17fb2b8b-b990-55dd-9738-38ce9436e987",
+        "content": "2023-09-25 | Persona 138 (speaker_role=persona) | 2023-09-18 스마트폰 사진 보정 강의, 2023-09-25, 16:00: 나는 커뮤니티센터에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-139-q": [
+      {
+        "chunk_id": "e8a7099f-59de-5e73-8882-cc27c52c3668",
+        "record_id": "ade996c0-65c6-51a2-a5d0-72695cd0bdd3",
+        "text_version_id": "efe5bc74-7bec-5492-afb7-4b5f28cb59f8",
+        "content": "2024-12-22 | Persona 139 (speaker_role=persona) | 2024-12-22 실크스크린 에코백 인쇄, 2024-12-22, 09:00: 나는 시민공원에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "9711bd23-23f3-5247-a33d-e1b980c7230d",
+        "record_id": "e23cc00c-1aff-59a8-b3b9-5aa03fe02de4",
+        "text_version_id": "d449c46c-bbf4-5406-b2dd-23ada8a4e9cb",
+        "content": "2024-12-29 | Persona 139 (speaker_role=persona) | 2024-12-22 해안 둘레길 트레킹, 2024-12-29, 16:00: 나는 한옥마을에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-140-q": [
+      {
+        "chunk_id": "069cbe9d-93ab-50cd-91b1-8ad7f552a4b1",
+        "record_id": "74d7e592-ebf1-5664-9dc9-d0d9ddaf6dc3",
+        "text_version_id": "2986c67f-d495-57dc-b774-436b3dbf094c",
+        "content": "2023-04-12 | Persona 140 (speaker_role=persona) | 2023-04-12 스테인드글라스 썬캐처 제작, 2023-04-12, 09:00: 나는 미술관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "a927134a-0469-53f5-9cab-c123ac2ad1fa",
+        "record_id": "ed34d814-e2f8-5e2d-9bb6-de64e1cb3662",
+        "text_version_id": "c77285f8-6749-5b65-8bbd-7c64068c11a1",
+        "content": "2023-04-19 | Persona 140 (speaker_role=persona) | 2023-04-12 해안 둘레길 트레킹, 2023-04-19, 16:00: 나는 목공방에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-141-q": [
+      {
+        "chunk_id": "4df5c7e0-c56a-54a6-a308-a1c4f560995c",
+        "record_id": "44bed682-e05d-5bfe-8e5b-7945b165aee0",
+        "text_version_id": "427a2056-158f-525d-8745-761a1d55b1cb",
+        "content": "2022-12-20 | Persona 141 (speaker_role=persona) | 2022-12-20 오일파스텔 일러스트 수업, 2022-12-20, 09:00: 나는 박물관에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "c562d66d-862b-5d70-bfa4-c5a0bbd28ba9",
+        "record_id": "f201744d-a84f-50e6-b853-29dd17769496",
+        "text_version_id": "6503b660-27d6-5363-8780-9383f288cb77",
+        "content": "2022-12-27 | Persona 141 (speaker_role=persona) | 2022-12-20 해안 둘레길 트레킹, 2022-12-27, 16:00: 나는 공예공방에서 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-142-q": [
+      {
+        "chunk_id": "771ffa30-e3ba-57e5-8690-490043e0c31c",
+        "record_id": "2fdfd501-a4bf-5238-90fd-0a99fb3a10ce",
+        "text_version_id": "75f3ff82-5050-59b4-918b-70119f0c913c",
+        "content": "2023-07-23 | Persona 142 (speaker_role=persona) | 2023-07-23 폐선 철길 자전거 라이딩, 2023-07-23, 09:00: 나는 식물원에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e7bdeecf-c77b-51f6-b994-fb36dba3414f",
+        "record_id": "531ad8a8-0366-5eca-87d4-5bafbbb1f2b0",
+        "text_version_id": "c1c9c41d-1fcf-5e99-bfb8-c2c9bd222cb5",
+        "content": "2023-07-30 | Persona 142 (speaker_role=persona) | 2023-07-23 고궁 야간 해설 투어, 2023-07-30, 16:00: 나는 식물원에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-143-q": [
+      {
+        "chunk_id": "8751107e-8d4c-55db-a17b-e44f22cf8d3b",
+        "record_id": "20a5f523-7720-5dcb-a185-fb4c7c064268",
+        "text_version_id": "d5a80ce1-d6eb-5336-8b76-700073d588eb",
+        "content": "2024-03-23 | Persona 143 (speaker_role=persona) | 2024-03-23 보드게임 교류 모임, 2024-03-23, 09:00: 나는 전시관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "61ee005d-1056-550c-89fc-fa40909ffab0",
+        "record_id": "f3dc5382-fc25-5e52-a944-5241fccada33",
+        "text_version_id": "a0157f8f-5da4-5998-9473-dc81a9b00124",
+        "content": "2024-03-30 | Persona 143 (speaker_role=persona) | 2024-03-23 다도 예절 체험 강좌, 2024-03-30, 16:00: 나는 작은도서관에서 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-144-q": [
+      {
+        "chunk_id": "85af51bc-fb52-5f7e-bea5-26416e77176c",
+        "record_id": "b5e60903-83f1-5ba4-8951-0b44ed197e3c",
+        "text_version_id": "61ac369c-e3dd-570d-b24c-425a416fd020",
+        "content": "2022-11-29 | Persona 144 (speaker_role=persona) | 2022-11-29 천문대 별자리 관측회, 2022-11-29, 09:00: 나는 식물원에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e458f118-95ab-52ff-93a5-928a7d3d4e03",
+        "record_id": "53fd696e-ad75-529e-a7e5-70482535bd3b",
+        "text_version_id": "b4724e31-feec-5e86-a065-bffe7407b66a",
+        "content": "2022-12-06 | Persona 144 (speaker_role=persona) | 2022-11-29 생태 습지 탐조 기행, 2022-12-06, 16:00: 나는 시립도서관에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-145-q": [
+      {
+        "chunk_id": "a501c37f-8293-5964-9322-2413eeb7ea3a",
+        "record_id": "56a0ec9a-9499-5b50-b2fc-e4f38769ca3f",
+        "text_version_id": "ebac47b4-4718-54d8-b406-b1eba20f3901",
+        "content": "2022-07-24 | Persona 145 (speaker_role=persona) | 2022-07-24 다도 예절 체험 강좌, 2022-07-24, 09:00: 나는 평생학습관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "2cda59bf-704c-5565-a518-87ca80612e1a",
+        "record_id": "99c0b74e-3528-5dd2-b788-0c3f562c6575",
+        "text_version_id": "be5ccdbd-7dd2-5b78-a612-51fd3b7e7d1a",
+        "content": "2022-07-31 | Persona 145 (speaker_role=persona) | 2022-07-24 고궁 야간 해설 투어, 2022-07-31, 16:00: 나는 화실에서 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-146-q": [
+      {
+        "chunk_id": "50b874f8-74a0-5e02-a4cd-fe050bfba426",
+        "record_id": "80fd4c16-8d60-561e-83e6-760f7243f747",
+        "text_version_id": "cb78c716-fd72-53e5-bfd2-81cffa45c279",
+        "content": "2024-09-05 | Persona 146 (speaker_role=persona) | 2024-09-05 해안 둘레길 트레킹, 2024-09-05, 09:00: 나는 박물관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "af6d59ac-a31d-59f6-87a7-0e46da15b1be",
+        "record_id": "619c0806-5ae8-5742-9743-4a170d7d7394",
+        "text_version_id": "407f27a1-afad-5b75-a4eb-42b73ef83402",
+        "content": "2024-09-12 | Persona 146 (speaker_role=persona) | 2024-09-05 다도 예절 체험 강좌, 2024-09-12, 16:00: 나는 시민공원에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-147-q": [
+      {
+        "chunk_id": "c090279c-83ab-54a1-bc67-8ffd5d8e8a7b",
+        "record_id": "a873b026-64be-5d9e-86c6-9f235776d627",
+        "text_version_id": "12ee0451-fa06-51b8-bc36-e520794ef8b0",
+        "content": "2024-12-14 | Persona 147 (speaker_role=persona) | 2024-12-14 마크라메 월행잉 매듭, 2024-12-14, 09:00: 나는 전시관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e3927e6f-bc0c-5df5-8b3a-235bacdce9d7",
+        "record_id": "34a82915-dd4c-5442-a2d9-d0bfd1c8188f",
+        "text_version_id": "c517626a-826e-5894-a20a-c2599aef4870",
+        "content": "2024-12-21 | Persona 147 (speaker_role=persona) | 2024-12-14 고궁 야간 해설 투어, 2024-12-21, 16:00: 나는 목공방에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-148-q": [
+      {
+        "chunk_id": "0397543c-3266-5a22-8831-1909920ddb0b",
+        "record_id": "aebfe5ff-f5a2-5e54-b393-c162fe0680d1",
+        "text_version_id": "04d4e160-b7c0-529b-9b87-d2dc5847889f",
+        "content": "2023-08-16 | Persona 148 (speaker_role=persona) | 2023-08-16 벽화 그리기 자원봉사, 2023-08-16, 09:00: 나는 작은도서관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "1370a2ed-be60-5702-b5cf-ff8eb0cbb9ea",
+        "record_id": "d0bf0496-0c03-51e3-871f-00089e8a2830",
+        "text_version_id": "eaadc9b2-d25a-530b-b9da-7a6471a0e9c1",
+        "content": "2023-08-23 | Persona 148 (speaker_role=persona) | 2023-08-16 베이킹 스콘 굽기 수업, 2023-08-23, 16:00: 나는 청년센터에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-149-q": [
+      {
+        "chunk_id": "744d13a7-c7a7-5705-a39a-b43baba34c20",
+        "record_id": "c82926fb-f048-5c5c-9f8a-11df477f09bb",
+        "text_version_id": "5f5a0d8a-389f-5387-a1de-272058303338",
+        "content": "2024-11-14 | Persona 149 (speaker_role=persona) | 2024-11-14 식물 분갈이 원예 수업, 2024-11-14, 09:00: 나는 시민공원에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "90f91a34-15e3-5f80-95a3-9a8f90d7be5a",
+        "record_id": "d29646b5-d2a1-5d62-8ec4-f3beb87292f5",
+        "text_version_id": "ea529cd7-f5b7-5691-b913-a2fa9de5f277",
+        "content": "2024-11-21 | Persona 149 (speaker_role=persona) | 2024-11-14 스마트폰 사진 보정 강의, 2024-11-21, 16:00: 나는 박물관에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-150-q": [
+      {
+        "chunk_id": "74ef6ef0-3086-536b-a49d-456e3a38641c",
+        "record_id": "3541ca13-c316-5987-9cd5-3e6c3aca688d",
+        "text_version_id": "b1508a19-1391-525a-a3e4-0f15632647eb",
+        "content": "2022-04-18 | Persona 150 (speaker_role=persona) | 2022-04-18 다도 예절 체험 강좌, 2022-04-18, 09:00: 나는 식물원에서 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d4bd498d-9fd9-5512-8ce5-ee7087310eec",
+        "record_id": "2d3efc0d-12d0-5ad3-a738-cc02770e7b2e",
+        "text_version_id": "1030d2c0-80cd-5ea1-83c6-c0353a25bac2",
+        "content": "2022-04-25 | Persona 150 (speaker_role=persona) | 2022-04-18 캔들 홀더 조향 체험, 2022-04-25, 16:00: 나는 청소년수련관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-151-q": [
+      {
+        "chunk_id": "aa8ab652-7071-5f37-89d4-e646224d9739",
+        "record_id": "403c7ef3-cf10-58ee-9fff-255f00d85f8a",
+        "text_version_id": "6b2f6abc-9412-5070-a823-cdece364b943",
+        "content": "2024-06-10 | Persona 151 (speaker_role=persona) | 2024-06-10 수목원 숲길 산책, 2024-06-10, 09:00: 나는 공예공방에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e9ce5463-feae-5f03-8b4b-2531429e00b9",
+        "record_id": "a8f25550-c6d5-5512-a87a-b688bbacc4e9",
+        "text_version_id": "f7b2204e-674a-5196-a502-7484e8a99339",
+        "content": "2024-06-17 | Persona 151 (speaker_role=persona) | 2024-06-10 독서 토론 소모임, 2024-06-17, 16:00: 나는 마을회관에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-152-q": [
+      {
+        "chunk_id": "4dd68aad-9653-5622-8fd5-d446c4a37eab",
+        "record_id": "d8fe873e-d756-5598-ad36-3afaf5a3874f",
+        "text_version_id": "7461115a-4499-5861-8b57-1531a1c2f933",
+        "content": "2024-10-04 | Persona 152 (speaker_role=persona) | 2024-10-04 고궁 야간 해설 투어, 2024-10-04, 09:00: 나는 시민공원에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "73f1cff7-8c62-55d4-a966-e9c6dadb6f1d",
+        "record_id": "373b856a-5bf5-52f1-b2be-0331dade5ca8",
+        "text_version_id": "450d665b-2726-550a-81de-89f3d3c0a014",
+        "content": "2024-10-11 | Persona 152 (speaker_role=persona) | 2024-10-04 유기견 보호소 산책 봉사, 2024-10-11, 16:00: 나는 한옥마을에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-153-q": [
+      {
+        "chunk_id": "a04ce709-925d-51d7-9bce-7a8e9289b47b",
+        "record_id": "215628a0-063d-5cea-a52e-af0ca1a0dad8",
+        "text_version_id": "a945a405-cf87-5bb1-bbe2-d49c16febf35",
+        "content": "2024-12-08 | Persona 153 (speaker_role=persona) | 2024-12-08 도자기 물레 성형, 2024-12-08, 09:00: 나는 문화센터에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e6b1ea08-1b49-5889-a8ad-c2c4f29a3d95",
+        "record_id": "2d272fc9-d310-5a10-a9f6-fd29c5dcbdcb",
+        "text_version_id": "db020807-7a53-5842-a8db-49592242c930",
+        "content": "2024-12-15 | Persona 153 (speaker_role=persona) | 2024-12-08 스마트폰 사진 보정 강의, 2024-12-15, 16:00: 나는 전시관에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-154-q": [
+      {
+        "chunk_id": "086fc552-4217-5c07-ac77-a5bc7dd3b6e1",
+        "record_id": "546139e9-d4f6-553c-b9bf-dbb4b58f229c",
+        "text_version_id": "f10fa1c6-b4fc-50e8-a12e-68407c774861",
+        "content": "2024-02-29 | Persona 154 (speaker_role=persona) | 2024-02-29 도심 야경 사진 출사, 2024-02-29, 09:00: 나는 식물원에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f6067957-7cf4-51ff-8e64-31d1feb5ca84",
+        "record_id": "d094b6d6-6180-5d8b-b469-eb82b090a508",
+        "text_version_id": "29d293d1-42ce-50d4-b738-846e67797be8",
+        "content": "2024-03-07 | Persona 154 (speaker_role=persona) | 2024-02-29 고궁 야간 해설 투어, 2024-03-07, 16:00: 나는 미술관에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-155-q": [
+      {
+        "chunk_id": "6b8391c9-22fd-5cf9-8010-010b9ee38c87",
+        "record_id": "4a3a8237-9d1b-577d-a69f-49dd18576e35",
+        "text_version_id": "edcec287-7732-50b0-984f-f5c2d60eaa2c",
+        "content": "2022-07-20 | Persona 155 (speaker_role=persona) | 2022-07-20 해안 둘레길 트레킹, 2022-07-20, 09:00: 나는 문화센터에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "70b4640a-cad2-5d04-9ce5-e6fb24f8fc77",
+        "record_id": "deede033-e5c4-58d6-a3c5-70c2c446d352",
+        "text_version_id": "3a9bc810-eca6-51f4-be43-6a95b73b5da4",
+        "content": "2022-07-27 | Persona 155 (speaker_role=persona) | 2022-07-20 목공 도마 제작, 2022-07-27, 16:00: 나는 식물원에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-156-q": [
+      {
+        "chunk_id": "dde7834f-9133-5e18-bd69-85623f0def70",
+        "record_id": "3240ccd8-a92b-5e56-92f4-da658b505b00",
+        "text_version_id": "e64757ca-8751-5023-97a5-b139b9afc5fa",
+        "content": "2024-12-19 | Persona 156 (speaker_role=persona) | 2024-12-19 생태 습지 탐조 기행, 2024-12-19, 09:00: 나는 북카페에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "cfecc981-a693-58d1-a772-d11a6f977589",
+        "record_id": "ada0ef00-a0e8-5fda-839a-e46864bed2be",
+        "text_version_id": "3936c470-8e50-5a97-8b1a-dac1bf5c542e",
+        "content": "2024-12-26 | Persona 156 (speaker_role=persona) | 2024-12-19 캔들 홀더 조향 체험, 2024-12-26, 16:00: 나는 전시관에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-157-q": [
+      {
+        "chunk_id": "6e406866-ef45-530c-ae71-911d04ff5026",
+        "record_id": "1e10cf0b-b3ce-5a1e-a2af-fcdc3b38af68",
+        "text_version_id": "71c2372e-916d-56cd-8881-60968b5b474b",
+        "content": "2023-12-11 | Persona 157 (speaker_role=persona) | 2023-12-11 전통 매듭 팔찌 공예, 2023-12-11, 09:00: 나는 청소년수련관에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "9f0f9608-69a8-5c81-b066-d1cbfb06393b",
+        "record_id": "d62653e4-e2af-5cc1-bfe2-942ade03e19d",
+        "text_version_id": "408d0aec-179f-5181-ad6a-661512cb4e1d",
+        "content": "2023-12-18 | Persona 157 (speaker_role=persona) | 2023-12-11 실크스크린 에코백 인쇄, 2023-12-18, 16:00: 나는 마을회관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-158-q": [
+      {
+        "chunk_id": "f34ddd4e-aff8-5731-beef-7fd6222a3b94",
+        "record_id": "16dda5e9-57b0-52a9-a9c4-1f7f1b98f678",
+        "text_version_id": "46d55d14-4cd3-509d-a35b-bd571734823e",
+        "content": "2024-04-08 | Persona 158 (speaker_role=persona) | 2024-04-08 가죽 키링 만들기, 2024-04-08, 09:00: 나는 평생학습관에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "d602e1f7-ab6e-5d39-ba48-d79010fbaf9a",
+        "record_id": "833aa55f-2e23-51f1-8ae3-69e0e7aea3e0",
+        "text_version_id": "7ea816d5-ce13-5b5b-887b-f1ee23e2422f",
+        "content": "2024-04-15 | Persona 158 (speaker_role=persona) | 2024-04-08 전통주 빚기 입문 강좌, 2024-04-15, 16:00: 나는 청소년수련관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-159-q": [
+      {
+        "chunk_id": "1e12059a-a560-5c0e-b5c4-31ea6708577f",
+        "record_id": "e0b4b9fa-a10b-5292-8116-ce1b92687bbf",
+        "text_version_id": "854dcbd2-f035-5881-bbaa-6b50da18fcf6",
+        "content": "2022-06-15 | Persona 159 (speaker_role=persona) | 2022-06-15 수제 비누 공방 체험, 2022-06-15, 09:00: 나는 북카페에서 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "82b72fd7-8b48-59b4-ab66-2ff5ba1bf511",
+        "record_id": "6f805961-de47-5eed-a4e0-e71cd0e26972",
+        "text_version_id": "325ab8b7-e42d-56e6-9041-f34d3ece52d7",
+        "content": "2022-06-22 | Persona 159 (speaker_role=persona) | 2022-06-15 고궁 야간 해설 투어, 2022-06-22, 16:00: 나는 청년센터에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-160-q": [
+      {
+        "chunk_id": "54c5c49b-817d-5cf0-b998-9bd89730f9a2",
+        "record_id": "0f77c1cb-8321-5d48-b40e-04c70866b7e8",
+        "text_version_id": "b93adae4-39d4-528d-8079-c29d1ebe91f1",
+        "content": "2022-11-21 | Persona 160 (speaker_role=persona) | 2022-11-21 기초 수어 배움 교실, 2022-11-21, 09:00: 나는 전시관에서 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f67027d1-f4d5-5cac-81ae-7a48ad5920c7",
+        "record_id": "b42fe999-cd00-5edc-a634-1fa4bc3a6f6f",
+        "text_version_id": "a1233fc8-2585-5b93-bba2-5aead159af3d",
+        "content": "2022-11-28 | Persona 160 (speaker_role=persona) | 2022-11-21 캘리그라피 엽서 쓰기, 2022-11-28, 16:00: 나는 마을회관에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-161-q": [
+      {
+        "chunk_id": "2c20e70b-c89b-594d-b765-1ec6ea6cf298",
+        "record_id": "624bd699-1b1f-5890-a5c8-67009e653053",
+        "text_version_id": "916ba37a-fc0c-5045-82fd-c720b56ed601",
+        "content": "2024-12-29 | Persona 161 (speaker_role=persona) | 2024-12-29 도자기 물레 성형, 2024-12-29, 09:00: 나는 해안산책로에서 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f9dd329e-d706-5e60-afb4-2f7dfe3cac78",
+        "record_id": "dd0efc01-53b7-53fd-8c87-69235bc11b3e",
+        "text_version_id": "d62fa73f-93dc-5bc3-9ca7-b547d3023b66",
+        "content": "2025-01-05 | Persona 161 (speaker_role=persona) | 2024-12-29 벽화 그리기 자원봉사, 2025-01-05, 16:00: 나는 공예공방에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-162-q": [
+      {
+        "chunk_id": "44f1593b-b715-5bf8-b4bb-0256eb13679d",
+        "record_id": "2f2d9fda-3905-5f61-8d2a-948ab02bde92",
+        "text_version_id": "efe2c7a1-9faf-5b44-9816-12ea373d7967",
+        "content": "2022-12-09 | Persona 162 (speaker_role=persona) | 2022-12-09 스테인드글라스 썬캐처 제작, 2022-12-09, 09:00: 나는 구민회관에서 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "61c86e94-3d77-5230-94d8-48969c395835",
+        "record_id": "5229e9be-7e2b-5d71-a484-dc3c96f3a2c7",
+        "text_version_id": "c55d8afb-df27-5521-9f5c-6c0477641a88",
+        "content": "2022-12-16 | Persona 162 (speaker_role=persona) | 2022-12-09 도심 야경 사진 출사, 2022-12-16, 16:00: 나는 구민회관에서 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-163-q": [
+      {
+        "chunk_id": "7bd8f0b3-735b-53cc-9d12-996ce79d634d",
+        "record_id": "3ca6a680-21c4-5da1-a661-108c8b92a732",
+        "text_version_id": "5d355064-0530-5a8c-9234-2e17fa2eadce",
+        "content": "2023-12-20 | Persona 163 (speaker_role=persona) | 2023-12-20 목공 도마 제작, 2023-12-20, 09:00: 나는 공예공방에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "efc53b6e-da30-5e66-bdd0-e7f63fc21cbb",
+        "record_id": "24275050-523e-59a9-866c-698c2d7e08d6",
+        "text_version_id": "4dab5fd5-fb01-5674-b725-941fa6919232",
+        "content": "2023-12-27 | Persona 163 (speaker_role=persona) | 2023-12-20 은점토 펜던트 세공, 2023-12-27, 16:00: 나는 공예공방에서 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-164-q": [
+      {
+        "chunk_id": "f2622d55-c6cd-50bd-bb79-0c275f757b37",
+        "record_id": "18e4c54c-b542-58cd-8ae0-9f7a136fec0a",
+        "text_version_id": "01acd38d-d705-54e4-ac4f-c5d37dcc9a0c",
+        "content": "2023-03-16 | Persona 164 (speaker_role=persona) | 2023-03-16 전통 한옥 마을 답사, 2023-03-16, 09:00: 나는 마을회관에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "69b7e572-f736-585f-8ee8-f79e982223c6",
+        "record_id": "79b23780-9256-5e36-9ada-f79ee2a493db",
+        "text_version_id": "78ec73cb-b0c3-5520-8027-28c7a427dc2b",
+        "content": "2023-03-23 | Persona 164 (speaker_role=persona) | 2023-03-16 수채화 풍경 드로잉, 2023-03-23, 16:00: 나는 작은도서관에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-165-q": [
+      {
+        "chunk_id": "1edaa6be-f38e-5783-a87e-fb3c2c0932fd",
+        "record_id": "53976893-546e-5de6-bc10-304b382a6336",
+        "text_version_id": "5d1ba885-dab9-5384-8660-a68b3b202f3f",
+        "content": "2022-11-26 | Persona 165 (speaker_role=persona) | 2022-11-26 항구 마을 도보 여행, 2022-11-26, 09:00: 나는 전시관에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f12273df-bd45-5542-ada9-feea44c64caa",
+        "record_id": "5e0a6f48-2bd5-5ab0-b005-fea82dc96a5a",
+        "text_version_id": "4281ba38-5011-58c4-975e-951609842fc4",
+        "content": "2022-12-03 | Persona 165 (speaker_role=persona) | 2022-11-26 베이킹 스콘 굽기 수업, 2022-12-03, 16:00: 나는 도예공방에서 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-166-q": [
+      {
+        "chunk_id": "3c7ff1bb-0433-5a21-8073-0bee8f17d2db",
+        "record_id": "6bbf6243-6d3d-55ad-bcd7-d9605e4b69fe",
+        "text_version_id": "0b5e3c60-2683-50a9-b48c-23a39a86a2f3",
+        "content": "2024-09-17 | Persona 166 (speaker_role=persona) | 2024-09-17 생태 습지 탐조 기행, 2024-09-17, 09:00: 나는 전시관에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "6e083c99-ac8b-5357-95bb-53fbbd6985c9",
+        "record_id": "c59cb4c1-fca8-5536-bb61-21bf406b95ca",
+        "text_version_id": "46dab0a1-2c1e-5951-920e-1c5c0eefc7b8",
+        "content": "2024-09-24 | Persona 166 (speaker_role=persona) | 2024-09-17 수목원 숲길 산책, 2024-09-24, 16:00: 나는 평생학습관에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-167-q": [
+      {
+        "chunk_id": "3c98f7bb-f84f-511a-8e77-8c3ceaf75292",
+        "record_id": "f5aaad0e-f649-5402-bed8-7a9a1fec78df",
+        "text_version_id": "71a8ff4c-d8b0-5546-a83e-1889df730a08",
+        "content": "2022-12-16 | Persona 167 (speaker_role=persona) | 2022-12-16 아크릴화 원데이 클래스, 2022-12-16, 09:00: 나는 식물원에서 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "e43870f3-1d79-56a5-bed4-b298dc39455e",
+        "record_id": "ec9c0b2d-861a-5875-9848-4cfaf00cc52a",
+        "text_version_id": "86b6f9b3-3951-50c1-acb7-e6c96e519d6a",
+        "content": "2022-12-23 | Persona 167 (speaker_role=persona) | 2022-12-16 마크라메 월행잉 매듭, 2022-12-23, 16:00: 나는 시민공원에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-168-q": [
+      {
+        "chunk_id": "99a4e48a-d89b-5e28-a901-8bb5f90c4a9e",
+        "record_id": "d5447c6b-0050-56b5-bd64-e46b5c539138",
+        "text_version_id": "faf98ad0-40e3-5d8d-a142-513bfe0fdcca",
+        "content": "2023-04-29 | Persona 168 (speaker_role=persona) | 2023-04-29 드라이플라워 리스 만들기, 2023-04-29, 09:00: 나는 폐교문화공간에서 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "26fa35d1-76fc-54f3-a53f-01f100744f2a",
+        "record_id": "dd35df2a-2d2f-521a-be93-2709a2e5c64b",
+        "text_version_id": "1ce2cfef-9961-593d-b89f-98fa999e3286",
+        "content": "2023-05-06 | Persona 168 (speaker_role=persona) | 2023-04-29 박물관 유물 해설 청취, 2023-05-06, 16:00: 나는 청소년수련관에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-169-q": [
+      {
+        "chunk_id": "b648d2ec-1f89-5830-8035-99e1998ce96b",
+        "record_id": "7775b36e-c544-5d03-884e-c549a2d61bc8",
+        "text_version_id": "d49daf61-ba32-540b-9701-32d73f00702f",
+        "content": "2022-02-23 | Persona 169 (speaker_role=persona) | 2022-02-23 유기견 보호소 산책 봉사, 2022-02-23, 09:00: 나는 북카페에서 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "4f3fd971-053f-5dd2-baf5-26a21a0bcf0c",
+        "record_id": "d87c8559-0e9e-532f-b75d-760d2957537e",
+        "text_version_id": "d86a92ba-f717-5344-9853-752a9e78f8b5",
+        "content": "2022-03-02 | Persona 169 (speaker_role=persona) | 2022-02-23 전통 한옥 마을 답사, 2022-03-02, 16:00: 나는 복합문화공간에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-170-q": [
+      {
+        "chunk_id": "c58b7731-bda1-559b-95f2-848e24c2c482",
+        "record_id": "a3a2de56-a27c-5110-93a7-744d74c0b001",
+        "text_version_id": "351f64b8-d518-5420-8269-072acd341438",
+        "content": "2022-08-03 | Persona 170 (speaker_role=persona) | 2022-08-03 생활 목공 수리 기초, 2022-08-03, 09:00: 나는 복합문화공간에서 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5ff0b851-da49-55eb-ae01-d9050336b307",
+        "record_id": "b0f7ac8b-5fcf-56ac-a7fa-2153b2f458d7",
+        "text_version_id": "b10d47ca-a8c7-58c7-8134-5297e2deddaa",
+        "content": "2022-08-10 | Persona 170 (speaker_role=persona) | 2022-08-03 독서 토론 소모임, 2022-08-10, 16:00: 나는 복합문화공간에서 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-171-q": [
+      {
+        "chunk_id": "c894f7f4-7d7a-59f0-8e62-6f697c36038c",
+        "record_id": "31770640-39ba-5615-ac19-d6a4e8155859",
+        "text_version_id": "311bda0b-7ab4-58e8-a453-61bef68eb598",
+        "content": "2024-05-30 | Persona 171 (speaker_role=persona) | 2024-05-30 근대 건축물 골목 투어, 2024-05-30, 09:00: 나는 문화센터에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "86388e7b-3589-5345-b507-445fd83a9e2d",
+        "record_id": "ca78f4a4-c7a8-5d3a-b7cc-156480b069e5",
+        "text_version_id": "57e756b6-cf60-5b55-a3e1-4263c124c2dc",
+        "content": "2024-06-06 | Persona 171 (speaker_role=persona) | 2024-05-30 지역 미술관 기획전 관람, 2024-06-06, 16:00: 나는 한옥마을에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-172-q": [
+      {
+        "chunk_id": "17c99d65-653f-52f7-8b4c-9f08bb4542d5",
+        "record_id": "7b5d9a15-9e74-500c-9c93-0d1e66a3e752",
+        "text_version_id": "7a30fb57-5314-5e80-a154-ed21001d8478",
+        "content": "2022-08-10 | Persona 172 (speaker_role=persona) | 2022-08-10 박물관 유물 해설 청취, 2022-08-10, 09:00: 나는 목공방에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "df57e07e-bf79-5eb2-8234-ddc36ec32a2a",
+        "record_id": "2ab3225a-cfa5-529a-b880-fae0449f0f7a",
+        "text_version_id": "4d099224-c347-59d3-a2c9-3fb9ac431e3e",
+        "content": "2022-08-17 | Persona 172 (speaker_role=persona) | 2022-08-10 아크릴화 원데이 클래스, 2022-08-17, 16:00: 나는 시민공원에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-173-q": [
+      {
+        "chunk_id": "d7b86d42-899b-5408-b2c8-ea714c0af7d2",
+        "record_id": "bd47b0e6-0b5b-5b1e-bc01-9479baefd7d1",
+        "text_version_id": "67f3a63d-839e-5ba0-9991-a8b4bce9c68a",
+        "content": "2022-02-22 | Persona 173 (speaker_role=persona) | 2022-02-22 박물관 유물 해설 청취, 2022-02-22, 09:00: 나는 문화센터에서 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "54c39833-b758-5064-be2c-89373982bab9",
+        "record_id": "5541c86b-c25e-5ed1-bfd7-1cf8ddff0a3b",
+        "text_version_id": "57426761-08aa-5a20-ac83-242ce02498b6",
+        "content": "2022-03-01 | Persona 173 (speaker_role=persona) | 2022-02-22 도시 양봉 체험 활동, 2022-03-01, 16:00: 나는 시민공원에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-174-q": [
+      {
+        "chunk_id": "0f49e23b-7a8c-53e4-991f-120e128cbbdc",
+        "record_id": "b2a9af44-9197-5b18-81d2-3839b78a0f92",
+        "text_version_id": "2bbc49ed-378d-592b-8285-64c26deb64c3",
+        "content": "2024-05-31 | Persona 174 (speaker_role=persona) | 2024-05-31 유리 공예 반지 제작, 2024-05-31, 09:00: 나는 목공방에서 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "7f46a197-1afc-577a-b6e3-3fc281786c33",
+        "record_id": "c3602e43-5843-5c1e-b68d-cd6248397cc5",
+        "text_version_id": "38fe74e8-6bd7-5d5d-b715-db6f526aacb6",
+        "content": "2024-06-07 | Persona 174 (speaker_role=persona) | 2024-05-31 폐선 철길 자전거 라이딩, 2024-06-07, 16:00: 나는 구민회관에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-175-q": [
+      {
+        "chunk_id": "1f5c2e8f-d6d2-5244-b0bf-fdeb7455b86f",
+        "record_id": "a384bf42-30fd-5f04-80ca-2adf9b51b965",
+        "text_version_id": "134c0497-1f07-5942-a352-faa983e805f4",
+        "content": "2023-03-21 | Persona 175 (speaker_role=persona) | 2023-03-21 다도 예절 체험 강좌, 2023-03-21, 09:00: 나는 공예공방에서 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "811e2155-a4c1-5f77-a04e-14ec99af8866",
+        "record_id": "239ab79d-2145-5432-af45-8757440d0537",
+        "text_version_id": "5665601f-79eb-5c91-9fa9-1701d109c211",
+        "content": "2023-03-28 | Persona 175 (speaker_role=persona) | 2023-03-21 다도 예절 체험 강좌, 2023-03-28, 16:00: 나는 평생학습관에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-176-q": [
+      {
+        "chunk_id": "d65422a0-ce36-5ce5-a91a-aed2fa501b61",
+        "record_id": "aab3597c-727c-59b7-b763-8921f5fff20f",
+        "text_version_id": "0e3f677d-2b0a-5007-b88f-48511c7aa0b9",
+        "content": "2022-11-07 | Persona 176 (speaker_role=persona) | 2022-11-07 해안 둘레길 트레킹, 2022-11-07, 09:00: 나는 청년센터에서 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "07625c07-79dd-5934-ba81-395114e51178",
+        "record_id": "10a5c372-9473-5dab-9a27-03d1d76e7a13",
+        "text_version_id": "8ac8b3f9-e42c-52b4-949e-cc85c9706c99",
+        "content": "2022-11-14 | Persona 176 (speaker_role=persona) | 2022-11-07 유기견 보호소 산책 봉사, 2022-11-14, 16:00: 나는 공예공방에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-177-q": [
+      {
+        "chunk_id": "5b8ea4d8-c3e1-597f-be7f-63fae9e46618",
+        "record_id": "e671c625-a9dc-59b4-8458-d78c22040384",
+        "text_version_id": "6026e0c4-03f2-5741-bc7e-8f73c60adf82",
+        "content": "2024-06-20 | Persona 177 (speaker_role=persona) | 2024-06-20 동네 플로깅 모임, 2024-06-20, 09:00: 나는 평생학습관에서 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "eff69986-0fff-5d41-ba2e-e843e93729f4",
+        "record_id": "a560b96e-26c8-5c01-a832-e539d1ce6c81",
+        "text_version_id": "c82fb24d-d725-5876-b468-718368602e13",
+        "content": "2024-06-27 | Persona 177 (speaker_role=persona) | 2024-06-20 박물관 유물 해설 청취, 2024-06-27, 16:00: 나는 식물원에서 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-178-q": [
+      {
+        "chunk_id": "e8acdf18-50b2-5ee2-81c7-d342e63ed8d1",
+        "record_id": "92332a88-380a-59dc-b652-ac0f02930456",
+        "text_version_id": "3946fc89-d34e-50f2-b32c-bfaecc36650c",
+        "content": "2024-01-13 | Persona 178 (speaker_role=persona) | 2024-01-13 다도 예절 체험 강좌, 2024-01-13, 09:00: 나는 화실에서 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "5d547d92-ea7e-5448-9bd0-cb90b9b31786",
+        "record_id": "455298c7-6bfb-5df9-b233-e0fcfc236f73",
+        "text_version_id": "48b538f9-ffa5-5f7e-9fae-5b02ded89059",
+        "content": "2024-01-20 | Persona 178 (speaker_role=persona) | 2024-01-13 아나바다 플리마켓 운영, 2024-01-20, 16:00: 나는 복합문화공간에서 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-179-q": [
+      {
+        "chunk_id": "dedc1f96-a700-5910-a71d-b6e706f3ee55",
+        "record_id": "92bc119a-4601-5e08-9498-a8c666592147",
+        "text_version_id": "83d8ef31-fddc-56ff-9d02-482af312785b",
+        "content": "2022-12-25 | Persona 179 (speaker_role=persona) | 2022-12-25 항구 마을 도보 여행, 2022-12-25, 09:00: 나는 북카페에서 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      },
+      {
+        "chunk_id": "f9efb8ec-b97e-5931-af7e-24a25fded937",
+        "record_id": "2106a878-08e8-554a-94ee-28d6f6e4d1c6",
+        "text_version_id": "da1fae73-3179-5473-8ef9-6bd8ae418925",
+        "content": "2023-01-01 | Persona 179 (speaker_role=persona) | 2022-12-25 아나바다 플리마켓 운영, 2023-01-01, 16:00: 나는 목공방에서 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-180-q": [
+      {
+        "chunk_id": "dfcc118f-faf9-5761-a1e3-12d3bc01a446",
+        "record_id": "cf265c66-1f07-5639-9a52-5b4ebdf34cf1",
+        "text_version_id": "43f56b36-5a0a-556a-8f82-a16f78a241b3",
+        "content": "2023-12-23 | Persona 180 (speaker_role=persona) | 2023-12-22 보드게임 교류 모임, 2023-12-22, 09:00: 나는 복합문화공간에서 가위 없이 오직 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-181-q": [
+      {
+        "chunk_id": "e1041462-f2a9-5fff-a082-ca397ebedae9",
+        "record_id": "c9e2f029-b790-575f-b473-3c1076976e7d",
+        "text_version_id": "d438a7a2-9184-54f5-8d7d-98f86f1975ff",
+        "content": "2022-11-21 | Persona 181 (speaker_role=persona) | 2022-11-20 드라이플라워 리스 만들기, 2022-11-20, 09:00: 나는 미술관에서 가위 없이 오직 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-182-q": [
+      {
+        "chunk_id": "264ad3d9-ec34-5c03-890f-e9a2741ea72c",
+        "record_id": "ebe2404f-f0fe-54c1-b9ad-09a1a4f35ae2",
+        "text_version_id": "6c29a4e2-6f5f-51aa-8ea9-d7934f23aaf1",
+        "content": "2023-11-09 | Persona 182 (speaker_role=persona) | 2023-11-08 도자기 물레 성형, 2023-11-08, 09:00: 나는 구민회관에서 가위 없이 오직 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-183-q": [
+      {
+        "chunk_id": "02497b21-5819-57ed-ad08-9b84e59c679e",
+        "record_id": "71b217b6-e5f7-55f9-8274-982f9add3e21",
+        "text_version_id": "2ce93b4e-e9c6-5b2d-bfd4-75d9e75d1a26",
+        "content": "2022-04-20 | Persona 183 (speaker_role=persona) | 2022-04-19 전통 시장 장보기 탐방, 2022-04-19, 09:00: 나는 천문대에서 가위 없이 오직 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-184-q": [
+      {
+        "chunk_id": "b01639be-8434-5827-a29d-46f9504aa6a5",
+        "record_id": "3e98e955-275b-5f4b-9f67-b28aab6fb922",
+        "text_version_id": "f009959f-0fbe-57f8-bd10-d9c886bf401c",
+        "content": "2022-06-01 | Persona 184 (speaker_role=persona) | 2022-05-31 가죽 키링 만들기, 2022-05-31, 09:00: 나는 요리교실에서 가위 없이 오직 보조배터리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-185-q": [
+      {
+        "chunk_id": "5ae1516c-2fcc-5142-8c6b-e9d9eb610f1d",
+        "record_id": "8f08601a-768c-5605-9a5a-102c51f9f764",
+        "text_version_id": "08bf919d-e1e2-5468-b5bc-1526e65d6257",
+        "content": "2024-12-31 | Persona 185 (speaker_role=persona) | 2024-12-30 기초 수어 배움 교실, 2024-12-30, 09:00: 나는 한옥마을에서 가위 없이 오직 부채 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-186-q": [
+      {
+        "chunk_id": "579941bd-1f04-5ad0-b3ef-5bea31c3a0ee",
+        "record_id": "f9e8258e-ff1a-54e5-82ea-95c22449514c",
+        "text_version_id": "a4b6d8dd-e353-589d-9413-cdb84287dd1a",
+        "content": "2023-01-10 | Persona 186 (speaker_role=persona) | 2023-01-09 주민 합창단 정기 연습, 2023-01-09, 09:00: 나는 공예공방에서 가위 없이 오직 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-187-q": [
+      {
+        "chunk_id": "9545ddeb-3807-5bda-8192-e70dd8abef7b",
+        "record_id": "55b7a658-555e-5cb0-a6e6-75152d3a8a6b",
+        "text_version_id": "a6d37b8c-48f0-5bf4-9caa-007dc5964d64",
+        "content": "2023-07-20 | Persona 187 (speaker_role=persona) | 2023-07-19 전통주 빚기 입문 강좌, 2023-07-19, 09:00: 나는 복합문화공간에서 가위 없이 오직 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-188-q": [
+      {
+        "chunk_id": "66e73574-405b-5921-b975-7de07ef59c51",
+        "record_id": "94441f81-be5f-5927-a4c7-8c9f6ee4cea9",
+        "text_version_id": "910176de-0e35-530b-b528-4bea5f901e0f",
+        "content": "2023-11-16 | Persona 188 (speaker_role=persona) | 2023-11-15 벽화 그리기 자원봉사, 2023-11-15, 09:00: 나는 한옥마을에서 가위 없이 오직 카드지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-189-q": [
+      {
+        "chunk_id": "348113c1-e62c-5df8-97fa-385385643fe7",
+        "record_id": "960f7462-477c-54e4-813d-6a8a113037e4",
+        "text_version_id": "fc06c3f0-2a50-56cd-a42f-4cba5e642a76",
+        "content": "2023-12-07 | Persona 189 (speaker_role=persona) | 2023-12-06 아나바다 플리마켓 운영, 2023-12-06, 09:00: 나는 문화센터에서 가위 없이 오직 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-190-q": [
+      {
+        "chunk_id": "862ad73c-582c-58f3-ac3c-ca6f9e5605b0",
+        "record_id": "80f2901b-0735-56b0-a3b7-8569e23e4da4",
+        "text_version_id": "ee301ad4-7fcd-5430-bf9c-cfe930264c8b",
+        "content": "2023-01-02 | Persona 190 (speaker_role=persona) | 2023-01-01 폐선 철길 자전거 라이딩, 2023-01-01, 09:00: 나는 시립도서관에서 가위 없이 오직 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-191-q": [
+      {
+        "chunk_id": "4e3cf0a7-0b11-5fa6-bc51-689b448a185e",
+        "record_id": "a8440bde-113b-52c8-be60-ed12d149cdb3",
+        "text_version_id": "9c6d3def-a01b-55e6-9843-9004c2317b21",
+        "content": "2023-06-11 | Persona 191 (speaker_role=persona) | 2023-06-10 전통 한옥 마을 답사, 2023-06-10, 09:00: 나는 목공방에서 가위 없이 오직 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-192-q": [
+      {
+        "chunk_id": "27140972-6811-5ccb-9fd9-a2b62104a2ec",
+        "record_id": "1d41fcb8-9133-533a-a8ec-a16be3a7b560",
+        "text_version_id": "895df7f6-766a-5390-bdee-53c25362c0ba",
+        "content": "2024-03-10 | Persona 192 (speaker_role=persona) | 2024-03-09 수목원 숲길 산책, 2024-03-09, 09:00: 나는 작은도서관에서 가위 없이 오직 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-193-q": [
+      {
+        "chunk_id": "34f98564-bb45-5fa5-8774-9166911b5183",
+        "record_id": "e402194c-612a-5cfa-8155-03bf3875edb5",
+        "text_version_id": "7ec63aee-dee1-59ba-b33d-adf917567d00",
+        "content": "2024-08-20 | Persona 193 (speaker_role=persona) | 2024-08-19 바리스타 핸드드립 실습, 2024-08-19, 09:00: 나는 박물관에서 가위 없이 오직 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-194-q": [
+      {
+        "chunk_id": "beba6b81-9cea-515d-9a12-b67c6be54dd9",
+        "record_id": "b9d1fe54-11b8-5beb-bb29-4f2336c14efc",
+        "text_version_id": "f0ec5880-6260-5efc-b217-07676ca673c6",
+        "content": "2023-11-23 | Persona 194 (speaker_role=persona) | 2023-11-22 다도 예절 체험 강좌, 2023-11-22, 09:00: 나는 목공방에서 가위 없이 오직 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-195-q": [
+      {
+        "chunk_id": "678873c1-e558-5c5a-b4b2-2236a51c07ee",
+        "record_id": "22fc977a-f579-5b90-9b75-77fea85f16a1",
+        "text_version_id": "bde83df2-89cc-5876-839f-3e5fcb87faa8",
+        "content": "2024-08-19 | Persona 195 (speaker_role=persona) | 2024-08-18 바리스타 핸드드립 실습, 2024-08-18, 09:00: 나는 전시관에서 가위 없이 오직 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-196-q": [
+      {
+        "chunk_id": "ede23121-c7c1-5735-a081-63a115aadb81",
+        "record_id": "38e1c47f-56f6-5004-a05b-4f82283b10d4",
+        "text_version_id": "371de988-eb32-5ce3-a296-1cd0f8866254",
+        "content": "2023-05-21 | Persona 196 (speaker_role=persona) | 2023-05-20 목공 도마 제작, 2023-05-20, 09:00: 나는 요리교실에서 가위 없이 오직 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-197-q": [
+      {
+        "chunk_id": "359ca9d9-c092-5ab9-b4ab-ff83fac63268",
+        "record_id": "23efe52c-5f7e-5455-8f86-1b846e64d451",
+        "text_version_id": "898a0132-c9e2-5fbb-bf18-ef84463d46ff",
+        "content": "2022-04-26 | Persona 197 (speaker_role=persona) | 2022-04-25 다도 예절 체험 강좌, 2022-04-25, 09:00: 나는 도예공방에서 가위 없이 오직 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-198-q": [
+      {
+        "chunk_id": "3dc11ce4-46cc-51b0-bf70-048159733169",
+        "record_id": "57c6e815-da76-52e5-b5b4-935420bed5c9",
+        "text_version_id": "20e0fcca-6041-59b4-a3f3-26699ec97f77",
+        "content": "2022-09-12 | Persona 198 (speaker_role=persona) | 2022-09-11 해안 둘레길 트레킹, 2022-09-11, 09:00: 나는 폐교문화공간에서 가위 없이 오직 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-199-q": [
+      {
+        "chunk_id": "bb77d3ae-23fc-58d1-8875-1ed64c5c199a",
+        "record_id": "f8288e17-1a8f-51f2-a453-8a17a8fa595d",
+        "text_version_id": "75afd9fc-d023-5fdf-8e7d-3c54e3b267f7",
+        "content": "2022-06-24 | Persona 199 (speaker_role=persona) | 2022-06-23 동네 플로깅 모임, 2022-06-23, 09:00: 나는 작은도서관에서 가위 없이 오직 도시락통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-200-q": [
+      {
+        "chunk_id": "cfb70530-8930-52c2-addd-5c7d11f9bf12",
+        "record_id": "bdcf0ce5-38ab-5318-8c81-c6fbd00c534d",
+        "text_version_id": "9ba65e89-94ba-555e-8a60-f4909234ff15",
+        "content": "2022-09-15 | Persona 200 (speaker_role=persona) | 2022-09-14 캔들 홀더 조향 체험, 2022-09-14, 09:00: 나는 화실에서 가위 없이 오직 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-201-q": [
+      {
+        "chunk_id": "1d19db7b-9218-5a3f-ade2-901313e21bc5",
+        "record_id": "d136b932-46d3-5344-88a2-b6ea201566f8",
+        "text_version_id": "24001370-bc19-5001-ac65-b192a203b259",
+        "content": "2024-08-18 | Persona 201 (speaker_role=persona) | 2024-08-17 박물관 유물 해설 청취, 2024-08-17, 09:00: 나는 해안산책로에서 가위 없이 오직 앞치마 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-202-q": [
+      {
+        "chunk_id": "92cd3809-d1a1-5a93-a99b-0bb4540a9638",
+        "record_id": "7e92a91b-26a3-5be3-94ca-eff21873d8b6",
+        "text_version_id": "6a28a886-0f75-535a-ab3e-1d81eeb05542",
+        "content": "2023-01-31 | Persona 202 (speaker_role=persona) | 2023-01-30 전통 매듭 팔찌 공예, 2023-01-30, 09:00: 나는 해안산책로에서 가위 없이 오직 우산 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-203-q": [
+      {
+        "chunk_id": "b2df408b-112f-576c-a8fb-9f6aed3df76b",
+        "record_id": "6d487a3f-18a0-59e5-b76e-4fb6630dfa33",
+        "text_version_id": "3d5d8e84-91bd-538a-8379-bcfb23b02de4",
+        "content": "2022-02-10 | Persona 203 (speaker_role=persona) | 2022-02-09 유리 공예 반지 제작, 2022-02-09, 09:00: 나는 문화센터에서 가위 없이 오직 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-204-q": [
+      {
+        "chunk_id": "c7f5410f-a48c-519b-b51e-59ee4be78230",
+        "record_id": "5706c25c-a676-5cde-b612-9bd6e40c1002",
+        "text_version_id": "1c485e4f-4b56-543c-bb43-db5fd73eb8c3",
+        "content": "2022-09-21 | Persona 204 (speaker_role=persona) | 2022-09-20 동네 플로깅 모임, 2022-09-20, 09:00: 나는 해안산책로에서 가위 없이 오직 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-205-q": [
+      {
+        "chunk_id": "09fecff7-ad78-5547-b554-cc003fad6760",
+        "record_id": "691e5a44-7011-5c03-80b1-8e9294f810c9",
+        "text_version_id": "cc81d088-2fac-55c5-93ff-0b0e223af600",
+        "content": "2022-10-25 | Persona 205 (speaker_role=persona) | 2022-10-24 캔들 홀더 조향 체험, 2022-10-24, 09:00: 나는 청년센터에서 가위 없이 오직 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-206-q": [
+      {
+        "chunk_id": "def6783f-471d-579d-9b63-aaf704382c88",
+        "record_id": "83701280-5c62-5475-ac05-df2ca3dfa6fe",
+        "text_version_id": "c069f722-6bf8-5c47-8b4d-af7987ba49e0",
+        "content": "2022-08-07 | Persona 206 (speaker_role=persona) | 2022-08-06 캔들 홀더 조향 체험, 2022-08-06, 09:00: 나는 작은도서관에서 가위 없이 오직 마스크스트랩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-207-q": [
+      {
+        "chunk_id": "d40823de-20fd-555c-8214-b5d4c3462869",
+        "record_id": "1480f0d9-74ca-5337-8c62-ff2ce19caec1",
+        "text_version_id": "df9a1182-925a-5cef-bcf5-9a99ef680fc8",
+        "content": "2023-07-29 | Persona 207 (speaker_role=persona) | 2023-07-28 주말 텃밭 가꾸기, 2023-07-28, 09:00: 나는 전시관에서 가위 없이 오직 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-208-q": [
+      {
+        "chunk_id": "acb5d5b5-212a-59e3-bd17-6882628e65ff",
+        "record_id": "9f4a0a1f-6adf-59a1-b569-d6f4c7c63036",
+        "text_version_id": "719cb73d-986a-5476-ab3b-2b94b5350b45",
+        "content": "2024-09-05 | Persona 208 (speaker_role=persona) | 2024-09-04 스마트폰 사진 보정 강의, 2024-09-04, 09:00: 나는 공예공방에서 가위 없이 오직 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-209-q": [
+      {
+        "chunk_id": "b4ae7727-5796-5aac-a2bc-ee8034a7c263",
+        "record_id": "e247eb47-1739-593e-8a1d-225882bf5862",
+        "text_version_id": "c503788c-d0a1-51f5-ad0d-5e562e8e6696",
+        "content": "2023-12-11 | Persona 209 (speaker_role=persona) | 2023-12-10 고궁 야간 해설 투어, 2023-12-10, 09:00: 나는 전통시장에서 가위 없이 오직 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-210-q": [
+      {
+        "chunk_id": "4f83dfe2-ed86-569a-9de6-881109805bb1",
+        "record_id": "65a9af14-954c-5443-93e8-36f9edf5a25e",
+        "text_version_id": "e52884b5-267b-5bcf-becc-df705da101e4",
+        "content": "2024-12-18 | Persona 210 (speaker_role=persona) | 2024-12-17 생활 목공 수리 기초, 2024-12-17, 09:00: 나는 평생학습관에서 가위 없이 오직 줄자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-211-q": [
+      {
+        "chunk_id": "c76c8da3-c627-5803-8a2c-5094f8bcffab",
+        "record_id": "ebc9bbb0-0036-5b4e-8b2c-83f08e86a96c",
+        "text_version_id": "9bf660f4-ab9f-5f7e-90d1-a00ce90b5dd0",
+        "content": "2024-03-09 | Persona 211 (speaker_role=persona) | 2024-03-08 전통주 빚기 입문 강좌, 2024-03-08, 09:00: 나는 목공방에서 가위 없이 오직 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-212-q": [
+      {
+        "chunk_id": "48efb176-696e-5d54-9522-b33896a8b5e5",
+        "record_id": "67079b28-226f-5de2-951b-6effa8965edd",
+        "text_version_id": "16948ee8-237f-53ce-9f53-a1056970076a",
+        "content": "2022-04-13 | Persona 212 (speaker_role=persona) | 2022-04-12 은점토 펜던트 세공, 2022-04-12, 09:00: 나는 천문대에서 가위 없이 오직 열쇠고리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-213-q": [
+      {
+        "chunk_id": "f44c9339-49fd-53f1-8fc1-0f86b600cfc0",
+        "record_id": "2362b9e7-f69a-506e-bcc0-9c5a5f73b751",
+        "text_version_id": "0069ac06-1ed2-548d-b191-95aea3893c4c",
+        "content": "2022-08-02 | Persona 213 (speaker_role=persona) | 2022-08-01 생태 습지 탐조 기행, 2022-08-01, 09:00: 나는 박물관에서 가위 없이 오직 장갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-214-q": [
+      {
+        "chunk_id": "d1cc5bed-2aca-5e8a-aa80-31d1f742632f",
+        "record_id": "41024c88-235d-5002-aca8-13cc62a27915",
+        "text_version_id": "4e356c69-45f7-5edb-a427-7479e74c5c71",
+        "content": "2024-09-29 | Persona 214 (speaker_role=persona) | 2024-09-28 지역 미술관 기획전 관람, 2024-09-28, 09:00: 나는 시립도서관에서 가위 없이 오직 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-215-q": [
+      {
+        "chunk_id": "4663cf53-567a-57d0-aeab-58e736dbc20f",
+        "record_id": "510a77df-9dc2-564c-b410-a9f44d9bd9bf",
+        "text_version_id": "7d1dc821-f2b9-5ad3-a236-23a143333fe9",
+        "content": "2023-07-05 | Persona 215 (speaker_role=persona) | 2023-07-04 드라이플라워 리스 만들기, 2023-07-04, 09:00: 나는 작은도서관에서 가위 없이 오직 필통 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-216-q": [
+      {
+        "chunk_id": "a08da232-f83d-5421-bed5-5c3af1c24eed",
+        "record_id": "214a84e5-9271-54c3-9c4d-7fbc6618d8aa",
+        "text_version_id": "7af7956b-077e-59ef-aa85-ad4b58c43370",
+        "content": "2024-02-22 | Persona 216 (speaker_role=persona) | 2024-02-21 식물 분갈이 원예 수업, 2024-02-21, 09:00: 나는 한옥마을에서 가위 없이 오직 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-217-q": [
+      {
+        "chunk_id": "e257bf60-8119-5b43-949b-7b179fa522d6",
+        "record_id": "44c99baa-7a59-5473-b620-27a969c9da57",
+        "text_version_id": "c1d4b7d1-8f04-5cb5-a459-332d0adfa12b",
+        "content": "2022-06-13 | Persona 217 (speaker_role=persona) | 2022-06-12 실크스크린 에코백 인쇄, 2022-06-12, 09:00: 나는 공예공방에서 가위 없이 오직 동전지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-218-q": [
+      {
+        "chunk_id": "abacbea9-ff75-5cf8-a344-512a23c8d954",
+        "record_id": "9c8371ca-f8c1-5234-a77d-f003ea4aa3df",
+        "text_version_id": "f741817e-45ac-57ce-82fc-5e2b02e28879",
+        "content": "2023-09-18 | Persona 218 (speaker_role=persona) | 2023-09-17 주민 합창단 정기 연습, 2023-09-17, 09:00: 나는 복합문화공간에서 가위 없이 오직 머리끈 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-219-q": [
+      {
+        "chunk_id": "894329de-22e1-50e1-a4d4-5546db3d9cbf",
+        "record_id": "e02e73b8-238d-56f0-acb4-e5c96e2dc895",
+        "text_version_id": "28d94cf7-ab75-5e99-9048-0e004ac20e7c",
+        "content": "2022-12-07 | Persona 219 (speaker_role=persona) | 2022-12-06 천문대 별자리 관측회, 2022-12-06, 09:00: 나는 폐교문화공간에서 가위 없이 오직 무릎담요 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-220-q": [
+      {
+        "chunk_id": "cee6f948-13a0-5cc8-9391-d37e34589560",
+        "record_id": "01855335-6fcc-56c9-b136-192087910a8b",
+        "text_version_id": "af56866f-2c65-5ea0-8025-252e82488924",
+        "content": "2024-05-07 | Persona 220 (speaker_role=persona) | 2024-05-06 유리 공예 반지 제작, 2024-05-06, 09:00: 나는 전시관에서 가위 없이 오직 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-221-q": [
+      {
+        "chunk_id": "38a22341-225b-5b4d-ace6-cbaaa8fd8377",
+        "record_id": "67ee723f-82c5-583f-9a98-d748b5b7339d",
+        "text_version_id": "386539a8-db53-5474-903c-0343f36c4e79",
+        "content": "2022-05-14 | Persona 221 (speaker_role=persona) | 2022-05-13 드라이플라워 리스 만들기, 2022-05-13, 09:00: 나는 목공방에서 가위 없이 오직 파우치 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-222-q": [
+      {
+        "chunk_id": "b17b5320-1a48-5b08-a75f-3fad45cb2a81",
+        "record_id": "c667732a-ded3-5695-a495-642a704aced9",
+        "text_version_id": "74d2acb4-ff0e-5f93-b867-a1a9722abad2",
+        "content": "2024-04-08 | Persona 222 (speaker_role=persona) | 2024-04-07 마크라메 월행잉 매듭, 2024-04-07, 09:00: 나는 커뮤니티센터에서 가위 없이 오직 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-223-q": [
+      {
+        "chunk_id": "dbfdff4e-9823-566c-a5bb-7d71711ae368",
+        "record_id": "d7f4155d-ebac-51af-b4f6-0db83fe17a0f",
+        "text_version_id": "e958791d-24ea-52c0-b0a4-f3078f990c26",
+        "content": "2024-04-01 | Persona 223 (speaker_role=persona) | 2024-03-31 도심 야경 사진 출사, 2024-03-31, 09:00: 나는 폐교문화공간에서 가위 없이 오직 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-224-q": [
+      {
+        "chunk_id": "96ccd14a-91d8-5237-8d60-312acb7b736a",
+        "record_id": "bf364dc3-16e8-5a59-b425-8622897355d6",
+        "text_version_id": "c91754a0-810e-5c1d-9a76-3d1f7ac41516",
+        "content": "2024-11-25 | Persona 224 (speaker_role=persona) | 2024-11-24 지역 미술관 기획전 관람, 2024-11-24, 09:00: 나는 박물관에서 가위 없이 오직 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-225-q": [
+      {
+        "chunk_id": "28adf579-16df-54f2-b22d-74c04538a205",
+        "record_id": "702bfdb7-5b53-5fae-9950-e86123c2e3d9",
+        "text_version_id": "67f1d7f6-b946-5457-84d6-7bf22a882a1f",
+        "content": "2024-07-27 | Persona 225 (speaker_role=persona) | 2024-07-26 전통주 빚기 입문 강좌, 2024-07-26, 09:00: 나는 전통시장에서 가위 없이 오직 다이어리 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-226-q": [
+      {
+        "chunk_id": "c42702ea-6536-55b4-9062-2c8b42fbb7b7",
+        "record_id": "c5181ba7-a4d7-58d8-8bee-49f7920cee65",
+        "text_version_id": "23226c05-cfa7-59ce-afd8-f359ad1a1ce3",
+        "content": "2023-06-05 | Persona 226 (speaker_role=persona) | 2023-06-04 캘리그라피 엽서 쓰기, 2023-06-04, 09:00: 나는 요리교실에서 가위 없이 오직 수저세트 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-227-q": [
+      {
+        "chunk_id": "c6f64c0a-627c-50e0-8923-563d366e4215",
+        "record_id": "a7b1d551-ff4e-5a91-b240-df9fa710f94a",
+        "text_version_id": "f88955bf-0436-57bc-a2a7-b18f5d9abe2b",
+        "content": "2024-09-26 | Persona 227 (speaker_role=persona) | 2024-09-25 바리스타 핸드드립 실습, 2024-09-25, 09:00: 나는 천문대에서 가위 없이 오직 명함지갑 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-228-q": [
+      {
+        "chunk_id": "9f373655-a3f7-5f97-945a-8ad941867556",
+        "record_id": "37baffbf-eeaa-5539-99c7-53402bf0943d",
+        "text_version_id": "0c154bdd-017a-5118-a00b-d9490c00b609",
+        "content": "2022-10-06 | Persona 228 (speaker_role=persona) | 2022-10-05 오일파스텔 일러스트 수업, 2022-10-05, 09:00: 나는 문화센터에서 가위 없이 오직 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-229-q": [
+      {
+        "chunk_id": "9925e39b-4ac8-5241-9d0d-cebf35aee02d",
+        "record_id": "27221a53-d7d2-5af1-8188-91ff54cf1ce4",
+        "text_version_id": "a9611089-0c1a-5598-ad88-5dd97dada165",
+        "content": "2022-08-25 | Persona 229 (speaker_role=persona) | 2022-08-24 벽화 그리기 자원봉사, 2022-08-24, 09:00: 나는 전통시장에서 가위 없이 오직 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-230-q": [
+      {
+        "chunk_id": "75370ced-5f80-5bfb-97dc-bfb5696ef8e3",
+        "record_id": "f0e0c982-72dc-5618-a65b-45a304664c6b",
+        "text_version_id": "dfa89289-a55f-5988-a704-88ebf5bb32ec",
+        "content": "2024-03-13 | Persona 230 (speaker_role=persona) | 2024-03-12 드라이플라워 리스 만들기, 2024-03-12, 09:00: 나는 청년센터에서 가위 없이 오직 모자 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-231-q": [
+      {
+        "chunk_id": "4feec8d4-8cb9-57e3-ba2b-c1297cb9a5b5",
+        "record_id": "58930b76-1f0f-5db3-a72d-cee3eb96e00c",
+        "text_version_id": "a01a6ae0-67db-51c1-aec9-00b03cf77028",
+        "content": "2024-02-12 | Persona 231 (speaker_role=persona) | 2024-02-11 캔들 홀더 조향 체험, 2024-02-11, 09:00: 나는 천문대에서 가위 없이 오직 손수건 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-232-q": [
+      {
+        "chunk_id": "13c5fad2-849b-502d-8630-e30c51ea6aa0",
+        "record_id": "dfe8e514-3646-580b-8f18-5ed8b752b45f",
+        "text_version_id": "6126e976-0cc1-51ae-a9d2-4e40cd3d9fca",
+        "content": "2024-04-16 | Persona 232 (speaker_role=persona) | 2024-04-15 아나바다 플리마켓 운영, 2024-04-15, 09:00: 나는 도예공방에서 가위 없이 오직 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-233-q": [
+      {
+        "chunk_id": "6ee000ec-f342-5a4d-bda1-eb0254e6b221",
+        "record_id": "9786bfb6-939b-53c9-b931-268962f11b98",
+        "text_version_id": "93845c25-a76e-597d-82bb-1316ec8a1991",
+        "content": "2024-03-16 | Persona 233 (speaker_role=persona) | 2024-03-15 도심 야경 사진 출사, 2024-03-15, 09:00: 나는 천문대에서 가위 없이 오직 만년필 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-234-q": [
+      {
+        "chunk_id": "db6d7c09-93fe-5301-83c9-e8d1ff1375f9",
+        "record_id": "3d5615f7-f848-5d1c-9fe8-da78f657fc63",
+        "text_version_id": "4240f32f-6dde-5c77-9434-b84ad1ec9cab",
+        "content": "2022-04-16 | Persona 234 (speaker_role=persona) | 2022-04-15 생활 목공 수리 기초, 2022-04-15, 09:00: 나는 북카페에서 가위 없이 오직 손거울 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-235-q": [
+      {
+        "chunk_id": "8e74f40d-59da-5e2f-bc36-be6163cc6f05",
+        "record_id": "86b75919-4a74-5f7d-b8e6-9e5716591ec5",
+        "text_version_id": "cd94ee06-119d-547b-ae91-bc9c9bb5bf06",
+        "content": "2024-11-03 | Persona 235 (speaker_role=persona) | 2024-11-02 캔들 홀더 조향 체험, 2024-11-02, 09:00: 나는 생태공원에서 가위 없이 오직 보온병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-236-q": [
+      {
+        "chunk_id": "3df50c3c-5e9c-5612-bd29-1b3627ef04af",
+        "record_id": "94807954-a693-57b5-bd7f-242414fc739b",
+        "text_version_id": "8aed453d-0bd6-5e50-ae98-c448d3222f99",
+        "content": "2022-05-11 | Persona 236 (speaker_role=persona) | 2022-05-10 유리 공예 반지 제작, 2022-05-10, 09:00: 나는 폐교문화공간에서 가위 없이 오직 물병 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-237-q": [
+      {
+        "chunk_id": "73d589ff-337d-5bdc-a6eb-ba9400f36167",
+        "record_id": "fec76382-4fd4-5bb2-a456-aa564c3d17b6",
+        "text_version_id": "2a823f64-7567-5701-91df-2464cc78dd29",
+        "content": "2023-10-17 | Persona 237 (speaker_role=persona) | 2023-10-16 목공 도마 제작, 2023-10-16, 09:00: 나는 시립도서관에서 가위 없이 오직 책갈피 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-238-q": [
+      {
+        "chunk_id": "2e62eea0-d9d9-515c-9488-8f5cd46d7720",
+        "record_id": "274a90b1-4d33-5c38-ba18-5f06c006c272",
+        "text_version_id": "e402b44e-e094-5c35-b797-607525db9060",
+        "content": "2022-02-16 | Persona 238 (speaker_role=persona) | 2022-02-15 아크릴화 원데이 클래스, 2022-02-15, 09:00: 나는 평생학습관에서 가위 없이 오직 수첩 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-239-q": [
+      {
+        "chunk_id": "c1223b60-1d20-5962-8225-90a61a18e81a",
+        "record_id": "e24a58b1-166b-547e-a6a6-1c1722e69c6d",
+        "text_version_id": "427d4bd3-da24-56c7-b718-752a992a4aec",
+        "content": "2023-05-05 | Persona 239 (speaker_role=persona) | 2023-05-04 생태 습지 탐조 기행, 2023-05-04, 09:00: 나는 미술관에서 가위 없이 오직 안경집 하나만 사용했다.",
+        "speaker_role": "persona"
+      }
+    ],
+    "s95-new-240-q": [],
+    "s95-new-241-q": [],
+    "s95-new-242-q": [],
+    "s95-new-243-q": [],
+    "s95-new-244-q": [],
+    "s95-new-245-q": [],
+    "s95-new-246-q": [],
+    "s95-new-247-q": [],
+    "s95-new-248-q": [],
+    "s95-new-249-q": [],
+    "s95-new-250-q": [],
+    "s95-new-251-q": [],
+    "s95-new-252-q": [],
+    "s95-new-253-q": [],
+    "s95-new-254-q": [],
+    "s95-new-255-q": [],
+    "s95-new-256-q": [],
+    "s95-new-257-q": [],
+    "s95-new-258-q": [],
+    "s95-new-259-q": [],
+    "s95-new-260-q": [],
+    "s95-new-261-q": [],
+    "s95-new-262-q": [],
+    "s95-new-263-q": [],
+    "s95-new-264-q": [],
+    "s95-new-265-q": [],
+    "s95-new-266-q": [],
+    "s95-new-267-q": [],
+    "s95-new-268-q": [],
+    "s95-new-269-q": [],
+    "s95-new-270-q": [],
+    "s95-new-271-q": [],
+    "s95-new-272-q": [],
+    "s95-new-273-q": [],
+    "s95-new-274-q": [],
+    "s95-new-275-q": [],
+    "s95-new-276-q": [],
+    "s95-new-277-q": [],
+    "s95-new-278-q": [],
+    "s95-new-279-q": [],
+    "s95-new-280-q": [],
+    "s95-new-281-q": [],
+    "s95-new-282-q": [],
+    "s95-new-283-q": [],
+    "s95-new-284-q": [],
+    "s95-new-285-q": [],
+    "s95-new-286-q": [],
+    "s95-new-287-q": [],
+    "s95-new-288-q": [],
+    "s95-new-289-q": [],
+    "s95-new-290-q": [],
+    "s95-new-291-q": [],
+    "s95-new-292-q": [],
+    "s95-new-293-q": [],
+    "s95-new-294-q": [],
+    "s95-new-295-q": [],
+    "s95-new-296-q": [],
+    "s95-new-297-q": [],
+    "s95-new-298-q": [],
+    "s95-new-299-q": [],
+    "s95-new-300-q": [],
+    "s95-new-301-q": [],
+    "s95-new-302-q": [],
+    "s95-new-303-q": [],
+    "s95-new-304-q": [],
+    "s95-new-305-q": [],
+    "s95-new-306-q": [],
+    "s95-new-307-q": [],
+    "s95-new-308-q": [],
+    "s95-new-309-q": [],
+    "s95-new-310-q": [],
+    "s95-new-311-q": [],
+    "s95-new-312-q": [],
+    "s95-new-313-q": [],
+    "s95-new-314-q": [],
+    "s95-new-315-q": [],
+    "s95-new-316-q": [],
+    "s95-new-317-q": [],
+    "s95-new-318-q": [],
+    "s95-new-319-q": [],
+    "s95-new-320-q": [],
+    "s95-new-321-q": [],
+    "s95-new-322-q": [],
+    "s95-new-323-q": [],
+    "s95-new-324-q": [],
+    "s95-new-325-q": [],
+    "s95-new-326-q": [],
+    "s95-new-327-q": [],
+    "s95-new-328-q": [],
+    "s95-new-329-q": [],
+    "s95-new-330-q": [],
+    "s95-new-331-q": [],
+    "s95-new-332-q": [],
+    "s95-new-333-q": [],
+    "s95-new-334-q": [],
+    "s95-new-335-q": [],
+    "s95-new-336-q": [],
+    "s95-new-337-q": [],
+    "s95-new-338-q": [],
+    "s95-new-339-q": [],
+    "s95-new-340-q": [],
+    "s95-new-341-q": [],
+    "s95-new-342-q": [],
+    "s95-new-343-q": [],
+    "s95-new-344-q": [],
+    "s95-new-345-q": [],
+    "s95-new-346-q": [],
+    "s95-new-347-q": [],
+    "s95-new-348-q": [],
+    "s95-new-349-q": [],
+    "s95-new-350-q": [],
+    "s95-new-351-q": [],
+    "s95-new-352-q": [],
+    "s95-new-353-q": [],
+    "s95-new-354-q": [],
+    "s95-new-355-q": [],
+    "s95-new-356-q": [],
+    "s95-new-357-q": [],
+    "s95-new-358-q": [],
+    "s95-new-359-q": []
+  }
+}
