@@ -35,6 +35,8 @@ flutter run -d <기기ID> --dart-define-from-file=config/dev.android.json
 
 ## 실제 인증 연결
 
+Android Studio의 기본 `main.dart` 실행은 `config/auth.local.json`을 읽습니다. 더미 실행은 `main.dart (더미)`를 선택합니다. 실행 설정이 보이지 않으면 `mobile` 프로젝트를 다시 열어 `.run/`의 공유 설정을 불러오세요.
+
 `config/auth.example.json`을 `config/auth.local.json`으로 복사하고 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `BACKEND_BASE_URL`을 설정합니다. 앱과 백엔드는 같은 Supabase 프로젝트를 사용합니다.
 
 ```powershell
