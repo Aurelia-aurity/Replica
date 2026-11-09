@@ -17,6 +17,10 @@ from sync_simple_state import index_rows, key_for
 from sync_simple_plan import plan_issue, plan_pull
 
 
+BOUNDARY_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError,
+                   subprocess.SubprocessError)
+
+
 class ProjectClient(gp.GraphQLClient):
     """The same adapter is read-only unless this run explicitly enables writes."""
 
@@ -173,8 +177,7 @@ def main(argv=None):
             if args.notification_report:
                 try:
                     nr.write(args.notification_report, env, kind="skipped")
-                except (OSError, ValueError, KeyError, TypeError, AttributeError,
-                        subprocess.SubprocessError):
+                except BOUNDARY_ERRORS:
                     print("Notification report unavailable; run binding missing or invalid.",
                           file=sys.stderr)
                     return 1
@@ -200,14 +203,14 @@ def main(argv=None):
         return 1 if failed else 0
     except gp.SyncError as exc:
         print(str(exc), file=sys.stderr)
-    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError) as exc:
+    except BOUNDARY_ERRORS as exc:
         # Remote payloads and transport errors can contain credentials: fixed diagnostic only.
         print(f"Sync failed ({type(exc).__name__}); check configuration and remote schema.",
               file=sys.stderr)
     if args.notification_report:
         try:
             nr.write(args.notification_report, env, kind="failed", dry_run=args.dry_run)
-        except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
+        except BOUNDARY_ERRORS:
             print("Notification report unavailable; run binding missing or invalid.", file=sys.stderr)
     return 1
 
