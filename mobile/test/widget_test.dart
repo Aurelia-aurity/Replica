@@ -53,11 +53,8 @@ void main() {
     expect(find.textContaining('음성 재생을 제공하지 않습니다'), findsOneWidget);
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('음성 대화'));
-    await tester.pumpAndSettle();
-    expect(find.text('음성 화면 미리보기 · 마이크는 사용하지 않습니다.'), findsOneWidget);
-    await tester.tap(find.byTooltip('텍스트 대화로 전환'));
-    await tester.pumpAndSettle();
+    expect(find.byTooltip('음성 대화'), findsNothing);
+    expect(find.widgetWithIcon(IconButton, Icons.mic_none), findsNothing);
     expect(find.text('응답'), findsOneWidget);
   });
 
@@ -141,7 +138,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetViewInsets);
-    await tester.pumpWidget(const MaterialApp(home: ChatScreen(service: DemoChatService())));
+    await tester.pumpWidget(
+      const MaterialApp(home: ChatScreen(service: DemoChatService())),
+    );
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
     await tester.enterText(
       find.byType(TextField),
@@ -174,4 +173,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'touch outside dismisses keyboard without losing draft or blocking send',
+    (tester) async {
+      final service = ControlledService();
+      await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+      await tester.enterText(find.byType(TextField), '작성 중인 메시지');
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, true);
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText))
+            .focusNode
+            .hasFocus,
+        true,
+      );
+      await tester.tap(find.text('기록을 바탕으로 AI가 만든 대화예요'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText))
+            .focusNode
+            .hasFocus,
+        false,
+      );
+      expect(tester.testTextInput.isVisible, false);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '작성 중인 메시지',
+      );
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.tap(find.byTooltip('메시지 전송'));
+      await tester.pump();
+      expect(service.requests, ['작성 중인 메시지']);
+      service.pending.complete('합성 답변');
+      await tester.pumpAndSettle();
+      expect(find.text('합성 답변'), findsOneWidget);
+    },
+  );
 }
