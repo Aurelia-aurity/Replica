@@ -461,54 +461,166 @@ def test_tts_gives_up_after_three_tries_in_one_request(client, fake_db):
     assert fake_db.turns[turn_id]["tts_attempt"] == 1 and fake_db.turns[turn_id]["tts_status"] == "failed"
 
 
+class FakeClock:
+    """perf_counter만 흉내 내는 시계. TTS 호출이 걸린 시간만큼 직접 앞으로 돌린다(실제로 기다리지 않는다)."""
+
+    def __init__(self, now: float = 1000.0) -> None:
+        self.now = now
+
+    def perf_counter(self) -> float:
+        return self.now
+
+
+class RecordingTimeout:
+    """asyncio.timeout 대신 쓰는 기록용. 기다리지 않고 각 시도에 준 제한 시간만 모은다."""
+
+    def __init__(self) -> None:
+        self.delays: list[float] = []
+
+    def timeout(self, delay):
+        self.delays.append(delay)
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+class ClockTTS:
+    """시도마다 (걸린 시간, 결과 또는 예외)를 차례로 돌려주고, 걸린 시간만큼 가짜 시계를 앞으로 돌린다."""
+
+    def __init__(self, clock: FakeClock, *attempts) -> None:
+        self.clock, self.attempts, self.calls = clock, list(attempts), 0
+
+    async def synthesize(self, text):
+        took, outcome = self.attempts[min(self.calls, len(self.attempts) - 1)]
+        self.calls += 1
+        self.clock.now += took
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+BUDGET = stages.APP_WAIT_SECONDS - stages.RESPONSE_MARGIN_SECONDS  # 요청 시작 기준 TTS에 쓸 수 있는 시간(170초)
+OK_AUDIO = (b"RIFFok", "wav")
+
+
+def _synthesize(monkeypatch, attempts, *, already_spent: float = 0.0):
+    """가짜 시계·기록용 제한 시간으로 synthesize를 실행한다. (결과, TTS, 각 시도에 준 제한 시간)을 돌려준다."""
+    clock, timeouts = FakeClock(), RecordingTimeout()
+    monkeypatch.setattr(stages, "time", clock)  # turn_stages는 time.perf_counter만 쓴다
+    monkeypatch.setattr(stages, "asyncio", timeouts)  # turn_stages는 asyncio.timeout만 쓴다
+    tts = ClockTTS(clock, *attempts)
+    result = asyncio.run(stages.synthesize(tts, "답변", request_started=clock.now - already_spent))
+    return result, tts, timeouts.delays
+
+
+def test_each_tts_try_is_limited_to_the_remaining_time(monkeypatch):
+    result, tts, delays = _synthesize(monkeypatch, [(20, RuntimeError("x")), (30, RuntimeError("x")), (5, OK_AUDIO)])
+
+    assert result.ok and tts.calls == 3
+    assert delays == [BUDGET, BUDGET - 20, BUDGET - 50]
+
+
 def test_tts_retry_is_skipped_when_the_remaining_time_is_shorter_than_the_last_try(monkeypatch):
-    class SlowFailingTTS:
-        def __init__(self) -> None:
-            self.calls = 0
+    result, tts, delays = _synthesize(monkeypatch, [(100, RuntimeError("x"))])
 
-        async def synthesize(self, text):
-            self.calls += 1
-            await asyncio.sleep(0.05)
-            raise RuntimeError("down")
-
-    monkeypatch.setattr(stages, "APP_WAIT_SECONDS", stages.RESPONSE_MARGIN_SECONDS + 0.08)
-    tts = SlowFailingTTS()
-
-    result = asyncio.run(stages.synthesize(tts, "답변", request_started=time.perf_counter()))
-
-    assert not result.ok and tts.calls == 1  # 남은 약 0.03초가 직전 시도(0.05초)보다 짧아 건너뛴다
+    assert not result.ok and tts.calls == 1  # 남은 70초가 직전 시도(100초)보다 짧아 건너뛴다
+    assert delays == [BUDGET]
 
 
-def test_first_tts_try_is_made_even_when_no_time_is_left():
-    tts = FakeTTS((b"RIFFok", "wav"))
-    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5  # 앞 단계가 앱 대기 시간을 이미 다 썼다
+def test_first_tts_try_is_made_even_when_no_time_is_left(monkeypatch):
+    result, tts, delays = _synthesize(monkeypatch, [(1, OK_AUDIO)], already_spent=BUDGET + 15)
 
-    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
-
-    assert result.ok and len(tts.calls) == 1
+    assert result.ok and tts.calls == 1  # 앞 단계가 앱 대기 시간을 이미 다 썼다
+    assert delays == [stages.FIRST_TRY_MIN_SECONDS]
 
 
-def test_no_retry_when_no_time_is_left_after_the_first_try():
-    tts = FakeTTS(RuntimeError("down"))
-    long_ago = time.perf_counter() - stages.APP_WAIT_SECONDS - 5
+def test_first_tts_try_waits_the_minimum_when_less_than_the_minimum_is_left(monkeypatch):
+    # 남은 시간이 0보다 크지만 최소 대기(10초)보다 적은 경계
+    result, tts, delays = _synthesize(monkeypatch, [(5, RuntimeError("x"))], already_spent=BUDGET - 4)
 
-    result = asyncio.run(stages.synthesize(tts, "답변", request_started=long_ago))
+    assert delays == [stages.FIRST_TRY_MIN_SECONDS]  # 4초가 아니라 10초까지 기다린다
+    assert not result.ok and tts.calls == 1  # 첫 시도 뒤에는 남은 시간이 없어 재시도하지 않는다
 
-    assert not result.ok and len(tts.calls) == 1  # 첫 시도만 하고 재시도는 건너뛴다
+
+def test_no_retry_when_no_time_is_left_after_the_first_try(monkeypatch):
+    result, tts, delays = _synthesize(monkeypatch, [(2, RuntimeError("x"))], already_spent=BUDGET + 5)
+
+    assert not result.ok and tts.calls == 1  # 첫 시도만 하고 재시도는 건너뛴다
+    assert delays == [stages.FIRST_TRY_MIN_SECONDS]
 
 
-def test_tts_try_is_cut_off_at_the_remaining_time(monkeypatch):
-    class HangingTTS:
-        async def synthesize(self, text):
-            await asyncio.sleep(5)
+# --- 만료 기준 분리: 진행 중인 TTS는 앱 대기 시간 동안 닫지 않는다 (#64, PR #85 리뷰) ---
 
-    monkeypatch.setattr(stages, "APP_WAIT_SECONDS", stages.RESPONSE_MARGIN_SECONDS + 0.05)
-    monkeypatch.setattr(stages, "FIRST_TRY_MIN_SECONDS", 0.05)
-    started = time.perf_counter()
 
-    result = asyncio.run(stages.synthesize(HangingTTS(), "답변", request_started=started))
+def _pending_tts(fake_db, turn_id: str, seconds_ago: float) -> None:
+    fake_db.turns[turn_id].update(
+        tts_status="pending", tts_attempt=1, error_message=None,
+        tts_started_at=datetime.now(timezone.utc) - timedelta(seconds=seconds_ago),
+    )
 
-    assert not result.ok and time.perf_counter() - started < 1
+
+def test_pending_tts_inside_the_app_wait_time_is_not_closed_by_the_shorter_stage_limit(client, fake_db):
+    turn_id = _finished_text_turn(client, fake_db)
+    _, _, tts = use()
+    _pending_tts(fake_db, turn_id, 40)  # STT·LLM 기준(30초)은 넘었지만 앱 대기 시간(180초) 안이다
+
+    res = client.post(f"/chat/turns/{turn_id}/tts")
+
+    assert res.status_code == 409 and res.json()["error"]["code"] == "CONFLICT"
+    assert tts.calls == []  # 공급자를 다시 부르지 않는다
+    assert (fake_db.turns[turn_id]["tts_status"], fake_db.turns[turn_id]["tts_attempt"]) == ("pending", 1)
+
+
+def test_pending_tts_past_the_app_wait_time_is_closed_and_retried(client, fake_db):
+    turn_id = _finished_text_turn(client, fake_db)
+    _, _, tts = use()
+    _pending_tts(fake_db, turn_id, stages.TTS_STALE_SECONDS + 20)
+
+    res = client.post(f"/chat/turns/{turn_id}/tts")
+
+    assert res.status_code == 200 and len(tts.calls) == 1
+    assert (fake_db.turns[turn_id]["tts_status"], fake_db.turns[turn_id]["tts_attempt"]) == ("ready", 2)
+
+
+def test_another_turns_request_does_not_close_a_running_tts(client, fake_db):
+    running = _finished_text_turn(client, fake_db)
+    _pending_tts(fake_db, running, 40)
+    other_id = new_id()
+    body = {"session_id": fake_db.add_session(), "turn_id": other_id, "message": "다른 턴"}
+    assert client.post("/chat/text", json=body).status_code == 200
+    fake_db.turns[other_id].update(
+        answer_status="pending", answer=None, llm_started_at=datetime.now(timezone.utc) - timedelta(seconds=40)
+    )
+
+    again = client.post("/chat/text", json=body)  # 이 요청의 만료 호출이 사용자의 모든 턴을 대상으로 한다
+
+    assert again.status_code == 200 and fake_db.turns[other_id]["llm_attempt"] == 2  # LLM은 30초 기준으로 닫혔다
+    assert fake_db.turns[running]["tts_status"] == "pending"  # 진행 중인 TTS는 그대로다
+
+
+def test_stale_check_gives_tts_its_own_longer_cutoff(fake_db):
+    turn = asyncio.run(fake_db.create_chat_turn(fake_db.add_session(), new_id(), input_mode="text", question="질문"))
+    turn = {**turn, "answer_status": "pending"}
+
+    asyncio.run(stages.refresh_if_stale(fake_db, turn))
+
+    started_before, tts_started_before = fake_db.expire_calls[0]
+    stage_limit = get_settings().llm_timeout_seconds or stages.FALLBACK_STALE_SECONDS
+    assert (started_before - tts_started_before).total_seconds() == pytest.approx(
+        stages.TTS_STALE_SECONDS - stage_limit, abs=2
+    )
+
+
+def test_stale_check_does_nothing_when_no_stage_is_running(fake_db):
+    turn = asyncio.run(fake_db.create_chat_turn(fake_db.add_session(), new_id(), input_mode="text", question="질문"))
+
+    asyncio.run(stages.refresh_if_stale(fake_db, turn))
+
+    assert fake_db.expire_calls == []
 
 
 # --- 질문 길이: 16000자 상한은 실행권을 잡기 전에 막는다 (#64 F4) ---

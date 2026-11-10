@@ -339,8 +339,12 @@ class UserDatabase:
         return self._owned_one(await self._rpc("record_turn_total_ms", p_turn_id=_id(turn_id), p_stage=stage,
             p_attempt=_integer(attempt, minimum=1), p_total_ms=_integer(total_ms)))
 
-    async def expire_chat_stages(self, *, started_before: datetime) -> int:
-        result = await self._rpc("expire_chat_stages", p_started_before=_time(started_before, not_future=True))
+    async def expire_chat_stages(self, *, started_before: datetime, tts_started_before: datetime | None = None) -> int:
+        params = {"p_started_before": _time(started_before, not_future=True)}
+        if tts_started_before is not None:
+            # TTS만 더 오래 걸릴 수 있어 별도 기준을 줄 수 있다. 주지 않으면 SQL이 started_before를 TTS에도 쓴다.
+            params["p_tts_started_before"] = _time(tts_started_before, not_future=True)
+        result = await self._rpc("expire_chat_stages", **params)
         if type(result) is not int or result < 0:
             raise DatabaseError(code="invalid_response")
         return result
