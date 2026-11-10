@@ -32,9 +32,9 @@
 
 네트워크 오류·403은 로그인 상태를 해제하지 않으며 자동 재시도하지 않습니다. 전송 취소 자체를 구현한 것은 아니고, 이전 세션의 결과가 화면에 반영되지 않도록 하는 처리입니다. 기존 미연결 SDK 어댑터는 401로 해제된 화면을 갱신 이벤트로 재개하지 않고 명시적인 로그인에서 다시 허용합니다.
 
-## 참고한 초안과 한계
+## 참조 명세와 한계
 
-[docs/40-api-spec의 앱↔백엔드 API 명세](https://github.com/Aurelia-aurity/Replica/blob/docs/40-api-spec/contracts/app-backend/api-spec.md)는 합의 전 초안입니다. 이 작업은 그 문서의 401 오류 형태를 더미에서 처리하도록 준비한 것이며, 서버에 인증·RLS가 구현됐다는 뜻이 아닙니다.
+현재 참조 문서는 저장소의 [앱 ↔ 백엔드 API 명세](../contracts/app-backend/api-spec.md)입니다. 명세의 구현·제안·미정 상태를 구분해 사용합니다. 인증 계약은 Supabase JWT의 Bearer 헤더이며 로그인·회원가입 API는 백엔드에 없습니다. 앱 진입점의 실제 Supabase 연결은 로그인 통합 작업에 남아 있습니다. 이 문서의 401 검증은 더미·모의 응답으로 수행했으며 서버 인증·RLS를 검증한 결과가 아닙니다.
 
 실제 Supabase 환경, 토큰 저장·갱신 정책, 백엔드 인증 검사·RLS, 동의 저장, 기기 실행은 통합 단계에 남깁니다. 기존 SDK 어댑터 검사도 모의 HTTP 응답만 사용합니다. SDK 가입 응답 형태 참고: [공식 Flutter signUp 문서](https://supabase.com/docs/reference/dart/auth-signup).
 

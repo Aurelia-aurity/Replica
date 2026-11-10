@@ -59,6 +59,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   ChatReply? _reply;
   SpeechAudio? _audio;
   bool _starting = false,
+      _finishing = false,
       _ttsBusy = false,
       _permission = false,
       _retryable = false;
@@ -67,7 +68,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
 
   /// The last speech request got a 409: the server may still be synthesizing.
   bool _ttsConflict = false;
-  int _captureGeneration = 0, _playGeneration = 0;
+  int _captureGeneration = 0, _sendGeneration = 0, _playGeneration = 0;
+  bool _ownsSend(int generation) => mounted && generation == _sendGeneration;
   bool get _speechLocked =>
       _audio == null && (_reply?.speechAlreadySynthesized ?? false);
   bool get _busy =>
@@ -142,6 +144,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     _captureGeneration++;
+    _sendGeneration++;
     _playGeneration++;
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
@@ -185,6 +188,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       return;
     }
     final generation = ++_captureGeneration;
+    _sendGeneration++;
     setState(() {
       _starting = true;
       _error = null;
@@ -221,11 +225,12 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _captureFailed(Object error) async {
+    final generation = _captureGeneration;
     _timer?.cancel();
     try {
       await _recorder.cancel();
     } catch (_) {}
-    if (!mounted) return;
+    if (!mounted || generation != _captureGeneration) return;
     setState(() {
       _phase = VoicePhase.failed;
       _starting = false;
@@ -245,6 +250,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
 
   Future<void> _cancelRecording() async {
     _captureGeneration++;
+    _sendGeneration++;
+    _finishing = false;
     _timer?.cancel();
     if (mounted) {
       setState(() {
@@ -258,29 +265,33 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  bool _finishing = false;
   Future<void> _finish() async {
     if (!_recording || _starting) return;
     final generation = _captureGeneration;
     _finishing = true;
     _timer?.cancel();
     setState(() => _phase = VoicePhase.processing);
+    late final VoiceRecording recording;
     try {
-      final recording = await _recorder.stop();
+      recording = await _recorder.stop();
       if (!mounted || generation != _captureGeneration || _suspended) return;
       recording.validate();
-      _pending = recording;
-      await _send(recording);
     } catch (error) {
       if (mounted && generation == _captureGeneration) {
         await _captureFailed(error);
       }
+      return;
     } finally {
-      _finishing = false;
+      if (generation == _captureGeneration) _finishing = false;
     }
+    // Backgrounding cancels capture, but an uploaded turn keeps the UI locked
+    // until its response or timeout. It must not be treated as recorder work.
+    _pending = recording;
+    await _send(recording);
   }
 
   Future<void> _send(VoiceRecording recording) async {
+    final generation = ++_sendGeneration;
     setState(() {
       _phase = VoicePhase.processing;
       _error = null;
@@ -292,7 +303,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       final result = await (widget.service as VoiceChatService)
           .replyVoice(recording)
           .timeout(voiceRequestTimeout);
-      if (!mounted) return;
+      if (!_ownsSend(generation)) return;
       widget.onReply?.call(result);
       setState(() {
         _question = result.transcript;
@@ -306,7 +317,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _duration = Duration.zero;
       });
     } on BackendFailure catch (failure) {
-      if (!mounted ||
+      if (!_ownsSend(generation) ||
           failure.kind == BackendFailureKind.unauthenticated ||
           failure.kind == BackendFailureKind.staleSession) {
         return;
@@ -318,7 +329,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _error = failure.userMessage;
       });
     } on TimeoutException {
-      if (mounted) {
+      if (_ownsSend(generation)) {
         setState(() {
           _phase = VoicePhase.failed;
           _retryable = true;
@@ -330,7 +341,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (_ownsSend(generation)) {
         setState(() {
           _phase = VoicePhase.failed;
           _retryable = true;
