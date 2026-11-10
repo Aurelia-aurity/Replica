@@ -1,0 +1,2101 @@
+{
+  "producer": "sync_engine at 5e5ec34f; _make_metadata, _linked_pr_facts, _status_facts_fingerprint, new_issue_state",
+  "basic": {
+    "v": 2,
+    "repository_id": 1392442366,
+    "issue_id": 800,
+    "project_id": "PVT_kwHOBda_2c4BmKKV",
+    "project_item_id": "PVTI_80",
+    "migration_complete": false,
+    "reopen_baseline_id": null,
+    "reopen_last_id": null,
+    "review_cycle": 0,
+    "review_return_cycle": 0,
+    "review_pr_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "pending": null,
+    "hold": {
+      "code": "STATUS_CONFLICT",
+      "message": "not for artifact"
+    },
+    "resume": null,
+    "projection": null,
+    "baseline": {
+      "notion_status": "백로그",
+      "project": {
+        "field_id": "PVTSSF_fixture",
+        "option_id": "f75ad846",
+        "value_id": "PVTSV_fixture",
+        "updated_at": "2026-11-05T00:00:00Z"
+      },
+      "project_item_id": "PVTI_80",
+      "facts_fingerprint": "f0b252fd62733d77e8ca10179a4eb4550a3e92fa2519b026096ced474b80407f",
+      "observed_at": "2026-11-05T00:00:00Z"
+    },
+    "request": null,
+    "deferred_request": null,
+    "readback": null,
+    "notion_write": null
+  },
+  "complex": {
+    "v": 2,
+    "repository_id": 1392442366,
+    "issue_id": 800,
+    "project_id": "PVT_kwHOBda_2c4BmKKV",
+    "project_item_id": "PVTI_80",
+    "migration_complete": false,
+    "reopen_baseline_id": null,
+    "reopen_last_id": null,
+    "review_cycle": 0,
+    "review_return_cycle": 0,
+    "review_pr_hash": "6fbf34eeb44a3f8f7d40fdab48abda396e4078c8ec58e3759e84abd9681cbc9d",
+    "pending": null,
+    "hold": {
+      "code": "STATUS_CONFLICT",
+      "message": "not for artifact"
+    },
+    "resume": null,
+    "projection": null,
+    "baseline": {
+      "notion_status": "백로그",
+      "project": {
+        "field_id": "PVTSSF_fixture",
+        "option_id": "f75ad846",
+        "value_id": "PVTSV_fixture",
+        "updated_at": "2026-11-05T00:00:00Z"
+      },
+      "project_item_id": "PVTI_80",
+      "facts_fingerprint": "4df37d7afd28d705bf976628656c0b398722729f320f62f9802db7be1830a14d",
+      "observed_at": "2026-11-05T00:00:00Z"
+    },
+    "request": null,
+    "deferred_request": null,
+    "readback": null,
+    "notion_write": null
+  },
+  "empty_ready_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "metadata": [
+    {
+      "kind": "Issue",
+      "row": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "closedAt": null,
+        "state": "OPEN",
+        "stateReason": null,
+        "duplicateOf": null,
+        "author": null,
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [
+          {
+            "id": "PR_82",
+            "databaseId": 902,
+            "legacy_issue_id": 903,
+            "number": 82,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": true,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          },
+          {
+            "id": "PR_81",
+            "databaseId": 900,
+            "legacy_issue_id": 901,
+            "number": 81,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": false,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          }
+        ],
+        "reopens": [
+          {
+            "id": "RE_new",
+            "createdAt": "2026-11-04T00:00:00Z"
+          },
+          {
+            "id": "RE_old",
+            "createdAt": "2026-11-03T00:00:00Z"
+          }
+        ]
+      },
+      "key": "gh:1392442366:issue:800",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "#80 Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "Issue"
+          }
+        },
+        "번호": {
+          "number": 80
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/80"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Open"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:800"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "Issue",
+      "row": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "closedAt": null,
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "duplicateOf": null,
+        "author": null,
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [
+          {
+            "id": "PR_82",
+            "databaseId": 902,
+            "legacy_issue_id": 903,
+            "number": 82,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": true,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          },
+          {
+            "id": "PR_81",
+            "databaseId": 900,
+            "legacy_issue_id": 901,
+            "number": 81,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": false,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          }
+        ],
+        "reopens": [
+          {
+            "id": "RE_new",
+            "createdAt": "2026-11-04T00:00:00Z"
+          },
+          {
+            "id": "RE_old",
+            "createdAt": "2026-11-03T00:00:00Z"
+          }
+        ]
+      },
+      "key": "gh:1392442366:issue:800",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "#80 Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "Issue"
+          }
+        },
+        "번호": {
+          "number": 80
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/80"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Closed"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:800"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "Issue",
+      "row": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "closedAt": null,
+        "state": "CLOSED",
+        "stateReason": "NOT_PLANNED",
+        "duplicateOf": null,
+        "author": null,
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [
+          {
+            "id": "PR_82",
+            "databaseId": 902,
+            "legacy_issue_id": 903,
+            "number": 82,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": true,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          },
+          {
+            "id": "PR_81",
+            "databaseId": 900,
+            "legacy_issue_id": 901,
+            "number": 81,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": false,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          }
+        ],
+        "reopens": [
+          {
+            "id": "RE_new",
+            "createdAt": "2026-11-04T00:00:00Z"
+          },
+          {
+            "id": "RE_old",
+            "createdAt": "2026-11-03T00:00:00Z"
+          }
+        ]
+      },
+      "key": "gh:1392442366:issue:800",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "#80 Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "Issue"
+          }
+        },
+        "번호": {
+          "number": 80
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/80"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Closed"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:800"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "Issue",
+      "row": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "closedAt": null,
+        "state": "CLOSED",
+        "stateReason": "DUPLICATE",
+        "duplicateOf": null,
+        "author": null,
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [
+          {
+            "id": "PR_82",
+            "databaseId": 902,
+            "legacy_issue_id": 903,
+            "number": 82,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": true,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          },
+          {
+            "id": "PR_81",
+            "databaseId": 900,
+            "legacy_issue_id": 901,
+            "number": 81,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": false,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          }
+        ],
+        "reopens": [
+          {
+            "id": "RE_new",
+            "createdAt": "2026-11-04T00:00:00Z"
+          },
+          {
+            "id": "RE_old",
+            "createdAt": "2026-11-03T00:00:00Z"
+          }
+        ]
+      },
+      "key": "gh:1392442366:issue:800",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "#80 Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "Issue"
+          }
+        },
+        "번호": {
+          "number": 80
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/80"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Closed"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:800"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "Issue",
+      "row": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "closedAt": null,
+        "state": "CLOSED",
+        "stateReason": "UNKNOWN",
+        "duplicateOf": null,
+        "author": null,
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [
+          {
+            "id": "PR_82",
+            "databaseId": 902,
+            "legacy_issue_id": 903,
+            "number": 82,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": true,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          },
+          {
+            "id": "PR_81",
+            "databaseId": 900,
+            "legacy_issue_id": 901,
+            "number": 81,
+            "title": "Fixture PR",
+            "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+            "createdAt": "2026-11-05T00:00:00Z",
+            "updatedAt": "2026-11-05T00:00:00Z",
+            "mergedAt": null,
+            "state": "OPEN",
+            "isDraft": false,
+            "baseRefName": "main",
+            "baseRepository": {
+              "id": "R_replica",
+              "databaseId": 1392442366
+            },
+            "repository": {
+              "id": "R_replica"
+            },
+            "assignees": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "labels": {
+              "nodes": [],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            },
+            "closingIssuesReferences": {
+              "nodes": [
+                {
+                  "id": "I_80",
+                  "databaseId": 800,
+                  "number": 80,
+                  "repository": {
+                    "id": "R_replica"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              }
+            }
+          }
+        ],
+        "reopens": [
+          {
+            "id": "RE_new",
+            "createdAt": "2026-11-04T00:00:00Z"
+          },
+          {
+            "id": "RE_old",
+            "createdAt": "2026-11-03T00:00:00Z"
+          }
+        ]
+      },
+      "key": "gh:1392442366:issue:800",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "#80 Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "Issue"
+          }
+        },
+        "번호": {
+          "number": 80
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/80"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Closed"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:800"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "PR",
+      "row": {
+        "id": "PR_81",
+        "databaseId": 900,
+        "legacy_issue_id": 901,
+        "number": 81,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "mergedAt": null,
+        "state": "OPEN",
+        "isDraft": false,
+        "baseRefName": "main",
+        "baseRepository": {
+          "id": "R_replica",
+          "databaseId": 1392442366
+        },
+        "repository": {
+          "id": "R_replica"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "closingIssuesReferences": {
+          "nodes": [
+            {
+              "id": "I_80",
+              "databaseId": 800,
+              "number": 80,
+              "repository": {
+                "id": "R_replica"
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "author": null
+      },
+      "key": "gh:1392442366:issue:901",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "PR"
+          }
+        },
+        "번호": {
+          "number": 81
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/pull/81"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Open"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:901"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "PR",
+      "row": {
+        "id": "PR_81",
+        "databaseId": 900,
+        "legacy_issue_id": 901,
+        "number": 81,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "mergedAt": null,
+        "state": "OPEN",
+        "isDraft": true,
+        "baseRefName": "main",
+        "baseRepository": {
+          "id": "R_replica",
+          "databaseId": 1392442366
+        },
+        "repository": {
+          "id": "R_replica"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "closingIssuesReferences": {
+          "nodes": [
+            {
+              "id": "I_80",
+              "databaseId": 800,
+              "number": 80,
+              "repository": {
+                "id": "R_replica"
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "author": null
+      },
+      "key": "gh:1392442366:issue:901",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "PR"
+          }
+        },
+        "번호": {
+          "number": 81
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/pull/81"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Draft"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:901"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "PR",
+      "row": {
+        "id": "PR_81",
+        "databaseId": 900,
+        "legacy_issue_id": 901,
+        "number": 81,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "mergedAt": null,
+        "state": "CLOSED",
+        "isDraft": false,
+        "baseRefName": "main",
+        "baseRepository": {
+          "id": "R_replica",
+          "databaseId": 1392442366
+        },
+        "repository": {
+          "id": "R_replica"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "closingIssuesReferences": {
+          "nodes": [
+            {
+              "id": "I_80",
+              "databaseId": 800,
+              "number": 80,
+              "repository": {
+                "id": "R_replica"
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "author": null
+      },
+      "key": "gh:1392442366:issue:901",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "PR"
+          }
+        },
+        "번호": {
+          "number": 81
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/pull/81"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Closed"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:901"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "PR",
+      "row": {
+        "id": "PR_81",
+        "databaseId": 900,
+        "legacy_issue_id": 901,
+        "number": 81,
+        "title": "Synthetic title",
+        "url": "https://github.com/Aurelia-aurity/Replica/pull/81",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T01:02:37+09:00",
+        "mergedAt": "2026-11-05T00:00:00Z",
+        "state": "MERGED",
+        "isDraft": false,
+        "baseRefName": "main",
+        "baseRepository": {
+          "id": "R_replica",
+          "databaseId": 1392442366
+        },
+        "repository": {
+          "id": "R_replica"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "zeta"
+            },
+            {
+              "login": "alpha"
+            }
+          ]
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "z"
+            },
+            {
+              "name": "a"
+            }
+          ]
+        },
+        "closingIssuesReferences": {
+          "nodes": [
+            {
+              "id": "I_80",
+              "databaseId": 800,
+              "number": 80,
+              "repository": {
+                "id": "R_replica"
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "author": null
+      },
+      "key": "gh:1392442366:issue:901",
+      "expected": {
+        "제목": {
+          "title": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Synthetic title"
+              }
+            }
+          ]
+        },
+        "종류": {
+          "select": {
+            "name": "PR"
+          }
+        },
+        "번호": {
+          "number": 81
+        },
+        "GitHub URL": {
+          "url": "https://github.com/Aurelia-aurity/Replica/pull/81"
+        },
+        "GitHub 상태": {
+          "select": {
+            "name": "Merged"
+          }
+        },
+        "작성자": {
+          "rich_text": []
+        },
+        "담당자": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "alpha, zeta"
+              }
+            }
+          ]
+        },
+        "라벨": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "a, z"
+              }
+            }
+          ]
+        },
+        "GitHub 수정": {
+          "date": {
+            "start": "2026-11-04T16:02:00Z"
+          }
+        },
+        "동기화 키": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "gh:1392442366:issue:901"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "closure": [
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": null,
+        "state": "OPEN",
+        "stateReason": null,
+        "duplicateOf": null,
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": null
+        },
+        "대표 이슈": {
+          "url": null
+        }
+      }
+    },
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": "2026-11-05T00:00:00Z",
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "duplicateOf": null,
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": {
+            "name": "완료"
+          }
+        },
+        "대표 이슈": {
+          "url": null
+        }
+      }
+    },
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": "2026-11-05T00:00:00Z",
+        "state": "CLOSED",
+        "stateReason": "NOT_PLANNED",
+        "duplicateOf": null,
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": {
+            "name": "미계획"
+          }
+        },
+        "대표 이슈": {
+          "url": null
+        }
+      }
+    },
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": "2026-11-05T00:00:00Z",
+        "state": "CLOSED",
+        "stateReason": "DUPLICATE",
+        "duplicateOf": null,
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": {
+            "name": "중복"
+          }
+        },
+        "대표 이슈": {
+          "url": null
+        }
+      }
+    },
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": "2026-11-05T00:00:00Z",
+        "state": "CLOSED",
+        "stateReason": "DUPLICATE",
+        "duplicateOf": {
+          "id": "I_other",
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/1"
+        },
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": {
+            "name": "중복"
+          }
+        },
+        "대표 이슈": {
+          "url": "https://github.com/Aurelia-aurity/Replica/issues/1"
+        }
+      }
+    },
+    {
+      "issue": {
+        "id": "I_80",
+        "databaseId": 800,
+        "number": 80,
+        "title": "Synthetic",
+        "url": "https://github.com/Aurelia-aurity/Replica/issues/80",
+        "createdAt": "2026-11-05T00:00:00Z",
+        "updatedAt": "2026-11-05T00:00:00Z",
+        "closedAt": "2026-11-05T00:00:00Z",
+        "state": "CLOSED",
+        "stateReason": "UNKNOWN",
+        "duplicateOf": null,
+        "author": {
+          "login": "fixture"
+        },
+        "assignees": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "labels": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "timelineItems": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "closedByPullRequestsReferences": {
+          "nodes": [],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          }
+        },
+        "linked_prs": [],
+        "reopens": []
+      },
+      "expected": {
+        "종료 사유": {
+          "select": {
+            "name": "확인 필요"
+          }
+        },
+        "대표 이슈": {
+          "url": null
+        }
+      }
+    }
+  ]
+}

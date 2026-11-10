@@ -1,4 +1,4 @@
-"""Offline, Slurm GPU-only Qwen baseline. No API or automatic downloads."""
+"""Offline, Slurm GPU-only baseline. No API or automatic downloads."""
 import argparse
 import json
 import os
@@ -37,6 +37,12 @@ def read_settings(config_path, prompt, model_path, max_new_tokens=None):
     try:
         config = json.loads(Path(config_path).read_text(encoding="utf-8"))
         system = config["system_prompt"]
+        model_id = os.environ.get("REPLICA_MODEL_ID", config.get("model_id"))
+        revision = os.environ.get("REPLICA_MODEL_REVISION", config.get("model_revision"))
+        if model_id is not None and (not isinstance(model_id, str) or not model_id.strip()):
+            raise ValueError
+        if revision is not None and (not isinstance(revision, str) or not revision.strip()):
+            raise ValueError
         limit = config["max_new_tokens"] if max_new_tokens is None else max_new_tokens
         if not isinstance(system, str) or not system.strip():
             raise ValueError
@@ -54,8 +60,13 @@ def read_settings(config_path, prompt, model_path, max_new_tokens=None):
             raise ValueError
     except (OSError, ValueError, RuntimeError):
         raise BaselineError("MODEL_PATH") from None
-    return {"model_path": str(path), "system_prompt": system, "prompt": prompt,
-            "max_new_tokens": limit}
+    settings = {"model_path": str(path), "system_prompt": system, "prompt": prompt,
+                "max_new_tokens": limit, "model_id": model_id, "model_revision": revision}
+    if "enable_thinking" in config:
+        if type(config["enable_thinking"]) is not bool:
+            raise BaselineError("CONFIG")
+        settings["enable_thinking"] = config["enable_thinking"]
+    return settings
 
 
 def check_environment():
@@ -65,7 +76,8 @@ def check_environment():
         raise BaselineError("ALLOCATION")
 
 
-def infer(settings):
+def load_runtime(settings):
+    """Load and validate the local GPU runtime once for CLI or HTTP serving."""
     check_environment()
     os.environ["HF_HUB_OFFLINE"] = "1"
     try:
@@ -84,12 +96,15 @@ def infer(settings):
     except Exception:
         raise BaselineError("CUDA") from None
     try:
+        revision_options = ({"revision": settings["model_revision"]}
+                            if settings["model_revision"] is not None else {})
         tokenizer = AutoTokenizer.from_pretrained(
-            settings["model_path"], local_files_only=True, trust_remote_code=False)
+            settings["model_path"], local_files_only=True, trust_remote_code=False,
+            **revision_options)
         model = AutoModelForCausalLM.from_pretrained(
             settings["model_path"], dtype=torch.bfloat16, device_map={"": 0},
             local_files_only=True, trust_remote_code=False, use_safetensors=True,
-            attn_implementation="eager")
+            attn_implementation="eager", **revision_options)
         model.eval()
     except Exception:
         raise BaselineError("LOAD") from None
@@ -103,12 +118,18 @@ def infer(settings):
         raise
     except Exception:
         raise BaselineError("PLACEMENT") from None
+    return torch, GenerationConfig, tokenizer, model
+
+
+def infer(settings):
+    torch, GenerationConfig, tokenizer, model = load_runtime(settings)
     try:
         inputs = tokenizer.apply_chat_template(
             [{"role": "system", "content": settings["system_prompt"]},
              {"role": "user", "content": settings["prompt"]}],
             tokenize=True, add_generation_prompt=True, return_dict=True,
-            return_tensors="pt")
+            return_tensors="pt", **({"enable_thinking": settings["enable_thinking"]}
+                                    if "enable_thinking" in settings else {}))
         input_length = inputs["input_ids"].shape[1]
         if input_length + settings["max_new_tokens"] > model.config.max_position_embeddings:
             raise BaselineError("INPUT")
@@ -123,7 +144,7 @@ def infer(settings):
         raise BaselineError("INPUT") from None
     try:
         with torch.inference_mode():
-            outputs = model.generate(**inputs, generation_config=generation)
+            outputs = model.generate(**inputs, generation_config=generation, use_model_defaults=False)
         return tokenizer.decode(outputs[0, input_length:], skip_special_tokens=True)
     except Exception:
         raise BaselineError("GENERATE") from None

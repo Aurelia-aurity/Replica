@@ -11,7 +11,7 @@ const select=(id,name)=>({id,type:'select',select:name===null?null:{name}});
 function page(){return {object:'page',id,parent:{type:'data_source_id',data_source_id:SOURCE_ID},
   in_trash:false,properties:{'종류':select('kind','Issue'),
     '동기화 키':rich('key','gh:1392442366:issue:555'),'작업 상태':select('t:sk','진행 중'),
-    '동기화 내부 상태':rich('state','synthetic exact state text'),'메모':rich('memo','private-note')}};}
+    '동기화 기준':rich('state','synthetic exact state text'),'메모':rich('memo','private-note')}};}
 test('fixed current binding and exact stored-text digest without content leakage',async()=>{
   const value=await currentPage(page(),id,env);
   assert.equal(value.state_sha256,await sha256('synthetic exact state text'));
@@ -32,8 +32,8 @@ test('source, identity, archive, kind, key, property and shape failures stay unt
     p=>p.in_trash='false',
     p=>p.properties['종류'].select.name='PR',p=>p.properties['동기화 키']=rich('key','gh:1:issue:555'),
     p=>p.properties['작업 상태'].id='other',p=>p.properties['작업 상태'].select.name='unknown',
-    p=>p.properties['동기화 내부 상태'].rich_text[0].type='mention',
-    p=>p.properties['동기화 내부 상태'].rich_text[0].plain_text='different'];
+    p=>p.properties['동기화 기준'].rich_text[0].type='mention',
+    p=>p.properties['동기화 기준'].rich_text[0].plain_text='different'];
   for(const change of changes){const p=page();change(p);await assert.rejects(currentPage(p,id,env));}
 });
 test('terminal/null display values supported without expanding general helper targets',async()=>{

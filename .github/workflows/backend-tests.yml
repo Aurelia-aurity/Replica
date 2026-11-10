@@ -1,0 +1,41 @@
+name: Backend tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "infra/supabase/**"
+      - "contracts/**"
+      - ".github/workflows/backend-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "infra/supabase/**"
+      - "contracts/**"
+      - ".github/workflows/backend-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+      REPLICA_DB_LIVE_TEST: "0"
+      REPLICA_DB_MUTATING_TEST: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: "backend/requirements*.txt"
+      - run: python -m pip install -r backend/requirements-dev.txt
+      - run: pytest -q
+        working-directory: backend
