@@ -1,23 +1,54 @@
 ### VS Code REST Client 확장으로 각 요청 위의 "Send Request"를 누르면 실행됩니다.
+### 로그인이 필요한 요청은 아래 @token에 앱(또는 Supabase Auth)에서 받은 access token을 넣습니다. 이 값은 저장소에 올리지 않습니다.
 @base = http://localhost:8000
+@token = 여기에_access_token
 
-### 서버 상태 확인
+### 서버 상태 확인 (로그인 불필요)
 GET {{base}}/health
 
-### 텍스트 대화
-POST {{base}}/chat/text
+### 대화 상대 생성 → 응답의 id를 아래 요청이 자동으로 씁니다
+# @name createPersona
+POST {{base}}/personas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "엄마" }
+
+### 대화방 생성 (ai_notice_ack_at은 미래 시각이면 422)
+# @name createSession
+POST {{base}}/sessions
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "message": "엄마, 오늘 뭐 했어?",
-  "persona_id": null,
-  "history": []
+  "persona_id": "{{createPersona.response.body.id}}",
+  "ai_notice_ack_at": "{{$datetime iso8601}}"
 }
 
-### 음성 대화 (backend 폴더에 sample.m4a 같은 녹음 파일을 두고 파일명을 맞추세요)
+### 텍스트 대화 (turn_id는 보낼 때마다 새 UUID. 같은 질문을 재전송하려면 같은 값을 직접 붙여 넣습니다)
+POST {{base}}/chat/text
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "session_id": "{{createSession.response.body.id}}",
+  "turn_id": "{{$guid}}",
+  "message": "엄마, 오늘 뭐 했어?"
+}
+
+### 음성 대화 (backend 폴더에 sample.m4a 같은 녹음 파일을 두고 파일명을 맞추세요. 확장자와 내용 형식이 같아야 합니다)
 POST {{base}}/chat/voice
+Authorization: Bearer {{token}}
 Content-Type: multipart/form-data; boundary=----replica
 
+------replica
+Content-Disposition: form-data; name="session_id"
+
+{{createSession.response.body.id}}
+------replica
+Content-Disposition: form-data; name="turn_id"
+
+{{$guid}}
 ------replica
 Content-Disposition: form-data; name="file"; filename="sample.m4a"
 Content-Type: audio/mp4
@@ -25,8 +56,13 @@ Content-Type: audio/mp4
 < ./sample.m4a
 ------replica--
 
-### STT 단독 확인
+### 완료된 답변의 음성 합성·재시도 (turn_id는 위 대화 응답의 turn_id로 바꿉니다)
+POST {{base}}/chat/turns/00000000-0000-4000-8000-000000000000/tts
+Authorization: Bearer {{token}}
+
+### STT 단독 확인 (개발용. .env에 DEV_SPEECH_ROUTES=true가 필요하고, APP_ENV=dev이면 위 토큰도 필요합니다)
 POST {{base}}/stt
+Authorization: Bearer {{token}}
 Content-Type: multipart/form-data; boundary=----replica
 
 ------replica
@@ -36,8 +72,9 @@ Content-Type: audio/mp4
 < ./sample.m4a
 ------replica--
 
-### TTS 단독 확인 (응답이 음성 파일이라 REST Client에서는 크기만 보입니다. Swagger에서 재생해 보세요)
+### TTS 단독 확인 (개발용, 위와 같은 조건. 응답이 음성 파일이라 REST Client에서는 크기만 보입니다. Swagger에서 재생해 보세요)
 POST {{base}}/tts
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "text": "안녕, 밥은 먹었니?" }

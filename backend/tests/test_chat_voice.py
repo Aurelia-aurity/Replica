@@ -14,7 +14,7 @@ from app.core.config import get_settings
 from app.main import app
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS, FakeUserDB, busy_error, new_id
 
-AUDIO = b"fake-audio-bytes"
+AUDIO = bytes.fromhex("0000001866747970" "4d344120" "00000000" "4d344120" "6d703432")  # m4a 머리 시그니처를 가진 최소 바이트(업로드 검증 통과용)
 
 
 @pytest.fixture
@@ -218,9 +218,9 @@ def test_resend_with_failing_resynthesis_reports_tts_failed_without_touching_db(
 def test_same_turn_id_with_different_audio_is_rejected(client, fake_db):
     use()
     session_id, turn_id = fake_db.add_session(), new_id()
-    send_voice(client, session_id, turn_id, audio=b"first")
+    send_voice(client, session_id, turn_id, audio=AUDIO + b"first")
 
-    res = send_voice(client, session_id, turn_id, audio=b"second")
+    res = send_voice(client, session_id, turn_id, audio=AUDIO + b"second")
 
     assert res.status_code == 409 and res.json()["error"]["code"] == "TURN_ID_CONFLICT"
 
