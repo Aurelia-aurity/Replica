@@ -570,6 +570,7 @@ class ConversationChatService implements VoiceChatService {
   Object? _pendingTextAttempt;
   VoiceRecording? _pendingRecording;
   String? _pendingVoiceId;
+  Object? _pendingVoiceAttempt;
   @override
   bool get isDemo => service.isDemo;
   @override
@@ -621,14 +622,19 @@ class ConversationChatService implements VoiceChatService {
     }
     _pendingRecording = recording;
     final turnId = _pendingVoiceId!;
+    final attempt = Object();
+    _pendingVoiceAttempt = attempt;
     final result = await (service as VoiceConversationService).sendVoice(
       id,
       turnId,
       recording,
     );
-    if (_pendingVoiceId == turnId && identical(_pendingRecording, recording)) {
+    // Recording and turn ID are shared by retries; only the latest attempt
+    // owns cleanup, even if an earlier request succeeds after a caller timeout.
+    if (identical(_pendingVoiceAttempt, attempt)) {
       _pendingVoiceId = null;
       _pendingRecording = null;
+      _pendingVoiceAttempt = null;
     }
     return result;
   }
