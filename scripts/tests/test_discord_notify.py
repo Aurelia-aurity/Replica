@@ -3382,14 +3382,6 @@ class Contract(unittest.TestCase):
             bad = {**good, **change}
             with self.assertRaises(ValueError): nr.validate(bad)
 
-    def test_projection_resume_and_regular_reason(self):
-        rows = [({"properties": {"번호": {"number": 18}}},
-                 {"hold": {"code": "HOLD", "message": "private"}, "projection": {"private": "data"},
-                  "resume": {"display_pending": True}})]
-        self.assertEqual({x["reason_code"] for x in nr.collect_holds(rows)},
-                         {"HOLD", "PROJECTION_PENDING", "RESUME_DISPLAY_PENDING"})
-        self.assertNotIn("private", json.dumps(nr.collect_holds(rows)))
-
     def test_zip_single_member_and_path_traversal(self):
         for names, valid in (([nr.FILE_NAME], True), (["../" + nr.FILE_NAME], False),
                              ([nr.FILE_NAME, "extra"], False)):

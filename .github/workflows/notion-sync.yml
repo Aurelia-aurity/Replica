@@ -8,16 +8,6 @@ on:
         type: boolean
         required: true
         default: true
-      diagnose_date_readback:
-        description: 'dry-run에서 Issue #1 날짜 응답의 비밀 없는 형식 진단'
-        type: boolean
-        required: false
-        default: false
-      resolve_issue_numbers:
-        description: 'PM이 현재 Project 값을 승인한 보류 이슈 번호 (쉼표 구분)'
-        type: string
-        required: false
-        default: ''
       approved_sha:
         description: '검토한 전체 40자리 commit SHA (실행 SHA와 정확히 일치해야 함)'
         type: string
@@ -50,9 +40,8 @@ jobs:
           format('{0}', github.run_attempt) == '1' &&
           inputs.approved_sha == github.sha &&
           (github.ref == 'refs/heads/main' ||
-           (inputs.dry_run && inputs.resolve_issue_numbers == '' &&
-            (github.ref == 'refs/heads/fix/17-project-add-readback' ||
-             github.ref == 'refs/heads/feat/32-bidirectional-sync')))
+           (inputs.dry_run &&
+            github.ref == 'refs/heads/feat/101-sync-engine-cutover'))
         ) ||
         (
           github.event_name != 'workflow_dispatch' &&
@@ -69,14 +58,13 @@ jobs:
         env:
           SYNC_DISPATCH_REF: ${{ github.ref }}
           SYNC_DISPATCH_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
-          SYNC_DISPATCH_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
         run: |
           case "$SYNC_DISPATCH_REF" in
             refs/heads/main)
               ;;
-            refs/heads/fix/17-project-add-readback|refs/heads/feat/32-bidirectional-sync)
-              if [ "$SYNC_DISPATCH_DRY_RUN" != "true" ] || [ -n "$SYNC_DISPATCH_RESOLVE_ISSUES" ]; then
-                echo "Feature ref permits only a dry run without PM resume" >&2
+            refs/heads/feat/101-sync-engine-cutover)
+              if [ "$SYNC_DISPATCH_DRY_RUN" != "true" ]; then
+                echo "Feature ref permits only a dry run" >&2
                 exit 1
               fi
               ;;
@@ -100,12 +88,8 @@ jobs:
           PROJECT_STATUS_OPTIONS: ${{ vars.PROJECT_STATUS_OPTIONS }}
           PM_GITHUB_USER_ID: ${{ vars.PM_GITHUB_USER_ID }}
           NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
-          NOTION_CONTROL_PAGE_ID: ${{ vars.NOTION_CONTROL_PAGE_ID }}
           NOTION_SYNC_ENABLED: ${{ github.event_name == 'workflow_dispatch' && 'true' || vars.NOTION_SYNC_ENABLED }}
-          NOTION_BIDIRECTIONAL_ENABLED: ${{ vars.NOTION_BIDIRECTIONAL_ENABLED || 'false' }}
           SYNC_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
-          SYNC_DIAGNOSE_DATE_READBACK: ${{ inputs.diagnose_date_readback && 'true' || 'false' }}
-          SYNC_RESOLVE_ISSUES: ${{ inputs.resolve_issue_numbers }}
           SYNC_APPROVED_SHA: ${{ inputs.approved_sha }}
         run: |
           python3 -B - <<'PY'
@@ -113,16 +97,9 @@ jobs:
           import subprocess
           import sys
 
-          diagnose_date = os.environ.get("SYNC_DIAGNOSE_DATE_READBACK") == "true"
-          if diagnose_date and os.environ.get("SYNC_DRY_RUN") != "true":
-              raise SystemExit("--diagnose-date-readback requires --dry-run")
           args = ["--notification-report", "notion-notification-report.json"]
           if os.environ.get("SYNC_DRY_RUN") == "true":
               args.append("--dry-run")
-          if os.environ.get("SYNC_RESOLVE_ISSUES"):
-              args.extend(["--resolve-issue-numbers", os.environ["SYNC_RESOLVE_ISSUES"]])
-          if diagnose_date:
-              args.append("--diagnose-date-readback")
           subprocess.run([sys.executable, "-B", "scripts/notion_sync.py", *args], check=True)
           PY
       - name: Publish notification result
@@ -131,5 +108,13 @@ jobs:
         with:
           name: notion-notification-${{ github.run_id }}-${{ github.run_attempt }}
           path: notion-notification-report.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish sanitized plan and outcomes
+        if: always() && hashFiles('sync-simple-plan.json') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sync-simple-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: sync-simple-plan.json
           if-no-files-found: error
           retention-days: 30

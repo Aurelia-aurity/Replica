@@ -1,0 +1,177 @@
+{
+  "scope": "DEV_ONLY",
+  "synthetic_only": true,
+  "seed": 9508112026,
+  "families": 360,
+  "question_count": 360,
+  "self_honorific_probes": 180,
+  "style_leakage_probes": {
+    "count": 72,
+    "per_type_register_cell": 4,
+    "selection_rule": "zero-based cell_index % 5 == 1 (1,6,11,16); 36 honorific,36 non-honorific",
+    "examples": "one generic + one leakage example for probes; two generic examples otherwise"
+  },
+  "style_selection": "random.Random(9508112026 + ordinal), sample two generic examples without replacement",
+  "question_wording": "three variants per type, selected by zero-based cell_index % 3",
+  "event_sampling": "720 candidate triples sampled without replacement; 360 unique first triples/dates. False-premise auxiliary events are replaced by same-event old claims.",
+  "pool_sizes": {
+    "events": 48,
+    "places": 32,
+    "objects": 32,
+    "colors": 8
+  },
+  "generic_style_templates_per_register_intent": {
+    "반말": {
+      "recall": 8,
+      "correct": 8,
+      "unknown": 8,
+      "chat": 8
+    },
+    "해요체": {
+      "recall": 8,
+      "correct": 8,
+      "unknown": 8,
+      "chat": 8
+    },
+    "하게체": {
+      "recall": 8,
+      "correct": 8,
+      "unknown": 8,
+      "chat": 8
+    }
+  },
+  "cells": [
+    {
+      "type": "single",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "single",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "single",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "multi",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "multi",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "multi",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ambiguity",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ambiguity",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ambiguity",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "false_premise",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "false_premise",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "false_premise",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "unanswerable",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "unanswerable",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "unanswerable",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ordinary_chat",
+      "register": "반말",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ordinary_chat",
+      "register": "해요체",
+      "questions": 20,
+      "probes": 10
+    },
+    {
+      "type": "ordinary_chat",
+      "register": "하게체",
+      "questions": 20,
+      "probes": 10
+    }
+  ],
+  "criteria_sha256": "2ce2fd086a832c5a751b46ebff45aa19d3b66d5dc90ae42aac16b9f7499c19d1",
+  "artifacts_sha256": {
+    "corpus.json": "6c7ddb2e057a27ea4e3333ca11c530a1a4d125551426ef6800f103d73cd05885",
+    "style-sources.json": "90166139972d61ec9fa383782d1e85442bf9644973826e9212e5420074df4776",
+    "plans.json": "7ffb1fd55062870e9f4998120bae9d537d3afbfc2d3edbd888142d3b5537b04a",
+    "gold-context.json": "acc9841870c857a3206fe7cc5adbc1cb3e5600d708d3fef058a418ba0718c2da",
+    "evaluation-sidecar.json": "89579308a4e196371928ad8120337a608bdb575ee2b4dc49377f11acf653782b",
+    "event-ledger.json": "c7b0bbf5c7bde4a4c79b201c795bcca9a291bb4e86d9f4b4b4287cfdc7331179"
+  },
+  "authoring_code_sha256": {
+    "generate95.py": "f7d9154aba510d5435dea89fc5f2304a341a321378d5cb36e4648e1ba6eddc0b",
+    "synthetic95.py": "24282e3ff2df9c9178312439ba22a8e395134a0a2a0e58674bba7bba4df6a8b1",
+    "dev_schema.py": "0da2bc804832948bbf98fe6babf91c228205d435878834805364eb8ba3376930",
+    "templates95.json": "63b51a2fb6b204d6ca0e704e053dba18e3497a9af4046cef3cec13c39ee00a6f"
+  },
+  "oracle_access": "evaluation-sidecar.json is never read by preparation or generation",
+  "cohort_policy": "predeclared challenges; actual B recall and answer omissions must be measured",
+  "model": "Qwen/Qwen3-8B",
+  "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "encoder_revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+  "prompt": "r1",
+  "output_tokens": 160,
+  "dtype": "bfloat16",
+  "decoding": "greedy_nonthinking"
+}
