@@ -53,7 +53,7 @@ flutter run -d <기기ID> --dart-define-from-file=config/dev.local.json
 | `config/staging.example.json` | 스테이징 설정 예시 | HTTPS 예시 주소 |
 | `config/prod.example.json` | 운영 설정 예시 | HTTPS 예시 주소 |
 
-개발 설정 두 파일은 `APP_ENV=dev`, `AUTH_MODE=preview`를 명시합니다. 별도 설정 없이 실행하면 인증 모드는 `supabase`이지만, 현재 진입점은 실제 인증 클라이언트 대신 `UnconfiguredAuthService`를 선택합니다. Supabase SDK 초기화와 실제 인증 서비스 선택은 로그인 통합 작업에서 추가해야 합니다.
+개발 설정 두 파일은 `APP_ENV=dev`, `AUTH_MODE=preview`를 명시합니다. 별도 설정 없이 실행하면 인증 모드는 `supabase`이지만, 현재 `selectAuthService`는 실제 인증 클라이언트 대신 `UnconfiguredAuthService`를 선택합니다. 백엔드 주소나 인증 설정만 입력해도 실제 로그인이 활성화되는 것은 아닙니다.
 
 실제 휴대폰에서는 localhost가 휴대폰 자체를 가리킵니다. PC와 같은 네트워크의 PC 주소로 덮어쓰세요.
 
@@ -67,9 +67,9 @@ flutter run -d <기기ID> --dart-define=APP_ENV=dev --dart-define=AUTH_MODE=prev
 flutter run -d <기기ID> --dart-define=APP_ENV=prod --dart-define=BACKEND_BASE_URL=https://your-api.example.com
 ```
 
-`APP_ENV`는 `dev`, `staging`, `prod`만 허용하며 스테이징·운영에서는 HTTPS를 요구합니다. 설정은 빌드 시 반영되므로 변경 후 앱을 다시 실행해야 합니다. URL에 인증 정보·쿼리·프래그먼트를 넣지 마세요. 앱 설정에 비밀 API 키를 넣지 않습니다.
+`APP_ENV`는 `dev`, `staging`, `prod`만 허용하며 스테이징·운영에서는 HTTPS를 요구합니다. 설정은 빌드 시 반영되므로 변경 후 앱을 다시 실행해야 합니다. URL에 인증 정보·쿼리·프래그먼트를 넣지 마세요. 앱 설정에 비밀 API 키를 넣지 않습니다. Android 디버그 빌드는 로컬 HTTP 백엔드를 허용합니다.
 
-미리보기에서는 `MemoryConversationService`를 사용하므로 백엔드로 통신하지 않습니다. 로그인 작업이 비미리보기 `AuthService`와 세션을 주입하면 `AuthGate`가 `HttpConversationService`를 선택합니다. 이 어댑터는 현재 세션의 Bearer 토큰으로 상대·대화방·턴 조회, 생성·삭제, 텍스트·음성 질문 및 TTS를 요청합니다. Android 디버그 빌드는 로컬 HTTP 백엔드를 허용하며, 스테이징·운영은 HTTPS만 허용합니다.
+미리보기에서는 `MemoryConversationService`를 사용하므로 백엔드 주소로 통신하지 않습니다. 별도로 비미리보기 `AuthService`를 주입하고 인증 세션을 제공하면 `AuthGate`가 `HttpConversationService`를 선택합니다. 이 HTTP 구현은 `AppConfig.backendBaseUrl`과 인증 헤더를 사용해 대화방·턴 조회, 생성·삭제, 텍스트·음성 질문 및 TTS를 요청하도록 작성되어 있습니다. 실제 인증 서비스 연결과 서버 통합 검증은 남아 있으며, Android 네트워크 정책·iOS ATS·웹 CORS도 해당 실행 환경에서 확인해야 합니다.
 
 ## 현재 화면과 동작
 

@@ -15,8 +15,7 @@ Future<void> main() async {
   runApp(ReplicaApp(authService: selectAuthService(app, auth)));
 }
 
-/// Actual authentication bootstrapping belongs to the login integration.
-/// Conversation HTTP is activated when that work injects a non-preview auth.
+/// No real authentication client is activated until integration is agreed.
 AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
     app.environment == 'dev' && auth.mode == 'preview'
     ? PreviewAuthService()
