@@ -66,6 +66,17 @@ class PersonaTests(unittest.TestCase):
             self.assertEqual(call(port, baseline_request())[0], 200)
         self.assertEqual(engine.calls, 1)
 
+    def test_empty_or_blank_display_name_returns_400_without_generation(self):
+        for display_name in ("", " ", "\t\n"):
+            data = request()
+            data["persona"]["display_name"] = display_name
+            fake = FakePersona()
+            with self.subTest(display_name=display_name), serving(
+                    server.Service(Engine(), persona_generator=fake)) as port:
+                self.assertEqual(call(port, data, path=PATH),
+                                 (400, server.error_body(400, data["request_id"])))
+            self.assertEqual(fake.calls, 0)
+
     def test_raw_then_auth_then_structure_then_sizes_then_readiness(self):
         cases = [
             ({"Content-Length": "262145"}, b"", 413, None),
@@ -155,17 +166,17 @@ class PersonaTests(unittest.TestCase):
             contract.parse_request(data)
         contract.parse_request(dict(data, evidence=data["evidence"][:10]))
 
-    def test_integral_json_numbers_empty_profiles_and_q12_whitespace_names(self):
+    def test_integral_json_numbers_empty_profiles_and_whitespace_provider_address(self):
         data = request()
         data["max_new_tokens"] = 1.0
         data["source_revision"] = 3.0
-        data["persona"] = {"display_name": " ", "provider_address": "\t"}
+        data["persona"] = {"display_name": "엄마", "provider_address": "\t"}
         data["style_profile"]["content"]["speech_style"] = {
             key: [] for key in reversed(data["style_profile"]["content"]["speech_style"])}
         parsed = contract.parse_request(data)
         self.assertEqual(parsed.max_new_tokens, 1)
         self.assertEqual(parsed.style_profile.content.tone, ())
-        self.assertEqual(parsed.persona.display_name, " ")
+        self.assertEqual(parsed.persona.provider_address, "\t")
 
     def test_context_and_generator_failures_use_safe_envelopes(self):
         fake = FakePersona()

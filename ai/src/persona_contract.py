@@ -123,7 +123,7 @@ def parse_request(value: JSON) -> PersonaRequest:
                           "message", "history", "max_new_tokens", "style_profile", "evidence"})
     request_id, persona_id = uuid(data["request_id"]), uuid(data["persona_id"])
     names = fields(data["persona"], {"display_name", "provider_address"})
-    display = text(names["display_name"], nonblank=False)
+    display = text(names["display_name"])
     address_value = names["provider_address"]
     address = None if address_value is None else text(address_value, nonblank=False)
     revision = integer(data["source_revision"], 0)
