@@ -13,9 +13,9 @@ HERE: Final = Path(__file__).resolve().parent
 ROOT: Final = HERE.parents[1]
 
 
-def main(output: Path) -> None:
+def main(output: Path, seed: int = SEED, namespace: str = "s100-v3") -> None:
     """Write a new directory; all answer/oracle data stays physically separate."""
-    authored = author()
+    authored = author(seed, namespace)
     payloads = {
         name: value.model_dump_json(indent=2, by_alias=True) + "\n"
         for name, value in (
@@ -25,7 +25,7 @@ def main(output: Path) -> None:
         )
     }
     manifest = {
-        "scope": "DEV_ONLY", "status": "DRAFT_NOT_FROZEN", "seed": SEED,
+        "scope": "DEV_ONLY", "status": "DRAFT_NOT_FROZEN", "seed": seed,
         "families": 1320, "questions": 1320, "planned_generations": 3960,
         "pools": {"places": PLACES, "objects": OBJECTS, "activities": ACTIVITIES,
                   "surnames": SURNAMES, "given_names": GIVEN_NAMES},

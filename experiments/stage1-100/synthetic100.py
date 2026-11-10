@@ -82,7 +82,7 @@ class Authored100:
     sidecar: Sidecar100
 
 
-def author(seed: int = SEED) -> Authored100:
+def author(seed: int = SEED, namespace: str = "s100-v3") -> Authored100:
     """Never read old corpora, response files, retrieval scores, or private inputs."""
     rng = random.Random(seed)
     names = [surname + given for surname in SURNAMES for given in GIVEN_NAMES]
@@ -97,7 +97,7 @@ def author(seed: int = SEED) -> Authored100:
     rng.shuffle(cells)
     personas, records, questions, plans, identities, oracles = [], [], [], [], [], []
     for i, (kind, subtype, register) in enumerate(cells):
-        family = f"s100-v3-{i:04d}"
+        family = f"{namespace}-{i:04d}"
         pname, provider = names[2 * i:2 * i + 2]
         persona = Persona(
             persona_id=family, name=pname, display_name=pname, provider_address=None,
@@ -248,7 +248,8 @@ def author(seed: int = SEED) -> Authored100:
             distractor_ids=(cprovider.chunk_id,), unknowns=unknowns, correction=correction,
         ))
     sources = Sources(
-        dataset_id="stage100-dev-v3", personas=tuple(personas),
+        dataset_id="stage100-dev-v3" if namespace == "s100-v3" else namespace,
+        personas=tuple(personas),
         records=tuple(records), questions=tuple(questions),
     )
     plan = Plan100(cases=tuple(plans))
