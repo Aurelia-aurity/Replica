@@ -101,3 +101,32 @@ Tests cover B message byte identity against the actual #95 preparation path,
 O3 metadata-driven changes, fixed source counts/diversity/leakage, C source
 identity, manifest hashes, execution denial, and hand-computed scoring math.
 Synthetic source fixtures and scores are not measured model quality.
+
+## One confirmation (2026-11-10)
+
+`CONFIRM_CRITERIA.md` freezes ONE confirm-v3 run before responses. The same
+authoring logic/pools use seed 10009112027 and namespace `s100-c3`; DEV's five
+source artifacts still regenerate byte-identically. Freshness is zero identical
+joint family combinations and disjoint IDs, not disjoint names/templates.
+The source audit records 0 identical families/IDs, 414 reused provider pairs,
+and 302 repeated question rows (mostly the unchanged chat templates).
+
+```bash
+python experiments/stage1-100/generate100.py NEW_DATA_DIRECTORY \
+  --seed 10009112027 --namespace s100-c3
+python experiments/stage1-100/confirm_freshness100.py \
+  experiments/stage1-100/dev-v3 NEW_DATA_DIRECTORY NEW_FRESHNESS_JSON
+# After separately authorized judging, use THIS scorer for the confirmation:
+python experiments/stage1-100/scoring_confirm100.py \
+  NEW_DATA_DIRECTORY/plans.json RESOLVED_ANNOTATIONS NEW_SCORE_JSON
+```
+
+Primary, arms, model, retrieval, rubrics, 20/20/20 route and majority are unchanged.
+Only NI changes to signed net paired harm with the Tango score upper bound,
+one-sided alpha .0125 and the same margins; old CP harm limits remain descriptive.
+The confirmation scorer supplies the frozen output status without modifying the
+hash-bound historical DEV scorer. `retry_confirm100.py` generalizes the DEV
+checkpoint-resume wrapper: one identical-payload retry for structural or no-label
+capacity/transport failure; second failure is INCONCLUSIVE, never dropped labels.
+The local prepared command/receipt and submission evidence are kept outside git.
+No judges, additional generation jobs or service changes are implied.
