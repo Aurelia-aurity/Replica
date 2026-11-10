@@ -364,15 +364,19 @@ class _RecordsPanelState extends State<RecordsPanel> {
             ),
           );
     return InkWell(
-      onTap: () async {
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) =>
-                RecordReviewScreen(records: widget.controller, entry: entry),
-          ),
-        );
-        if (mounted) await widget.controller.refresh();
-      },
+      onTap: entry.inProgress
+          ? null
+          : () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => RecordReviewScreen(
+                    records: widget.controller,
+                    entry: entry,
+                  ),
+                ),
+              );
+              if (mounted) await widget.controller.refresh();
+            },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         child: LayoutBuilder(

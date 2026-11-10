@@ -71,10 +71,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
 
   bool get _waiting {
     final entry = c.value?.record ?? widget.entry;
-    return entry.status == RecordStatus.uploading ||
-        entry.status == RecordStatus.uploaded ||
-        entry.status == RecordStatus.processing ||
-        (c.confirmed && c.value?.profile == ReviewProfileState.processing);
+    return entry.inProgress;
   }
 
   /// Quietly re-reads the record while it is still being processed.
@@ -134,9 +131,8 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
     if (!await c.save(confirm: true) || !mounted) return;
     await widget.records.refresh();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('전사문을 확정했어요. 개인화 반영 상태를 확인해 주세요.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('전사문을 확정하고 저장했어요.')));
     Navigator.of(context).pop();
   }
 
@@ -194,11 +190,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
     final review = c.value;
     final entry = review?.record ?? widget.entry;
     final detail = c.confirmed || entry.textConfirmed || entry.confirmed;
-    final waiting = [
-      RecordStatus.uploading,
-      RecordStatus.uploaded,
-      RecordStatus.processing,
-    ].contains(entry.status);
+    final waiting = entry.inProgress;
     final failed = entry.status == RecordStatus.failed;
     return PopScope(
       canPop: !c.busy,
@@ -266,7 +258,9 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
                     ),
                     child: Text(
                       detail
-                          ? '전사문이 확정됐어요. 개인화 반영 여부는 아래 상태를 확인해 주세요.'
+                          ? entry.kind == RecordKind.text
+                                ? '텍스트 기록을 저장했어요.'
+                                : '확정한 전사문을 저장했어요.'
                           : '잘못 들린 부분을 고쳐 주세요. 확정한 전사문만 말투 프로필과 대화에 쓰여요.',
                       style: const TextStyle(fontSize: 14, height: 1.6),
                     ),
@@ -289,18 +283,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
                   if (!c.loading && review != null) ...[
                     if (failed)
                       _failed(entry)
-                    else if (waiting) ...[
-                      const LinearProgressIndicator(),
-                      const SizedBox(height: 12),
-                      const Text('전사 중이에요. 완료되면 내용을 확인할 수 있어요.'),
-                      TextButton(
-                        onPressed: _load,
-                        child: const Text('상태 새로고침'),
-                      ),
-                    ] else if (review.version == null) ...[
-                      const Text('아직 전사문이 없어요. 잠시 후 다시 확인해 주세요.'),
-                      TextButton(onPressed: _load, child: const Text('다시 확인')),
-                    ] else if (detail) ...[
+                    else if (detail) ...[
                       _detail(entry, review),
                       const SizedBox(height: 20),
                       OutlinedButton.icon(
@@ -312,6 +295,17 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
                         icon: const Icon(Icons.delete_outline),
                         label: const Text('이 기록 삭제'),
                       ),
+                    ] else if (waiting) ...[
+                      const LinearProgressIndicator(),
+                      const SizedBox(height: 12),
+                      const Text('전사 중이에요. 완료되면 내용을 확인할 수 있어요.'),
+                      TextButton(
+                        onPressed: _load,
+                        child: const Text('상태 새로고침'),
+                      ),
+                    ] else if (review.version == null) ...[
+                      const Text('아직 전사문이 없어요. 잠시 후 다시 확인해 주세요.'),
+                      TextButton(onPressed: _load, child: const Text('다시 확인')),
                     ] else ...[
                       if (c.needsResolution) _resolution(review.version!),
                       _editor(),
@@ -360,7 +354,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
                       style: FilledButton.styleFrom(
                         backgroundColor: replicaGreen,
                       ),
-                      child: Text(c.busy ? '저장 중…' : '확정하기'),
+                      child: Text(c.busy ? '반영 중' : '확정하기'),
                     ),
                   ),
               ],
@@ -880,14 +874,18 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
   }
 
   Widget _detail(RecordEntry entry, RecordReview review) {
-    final version = review.version!;
+    final version = review.version;
     final doc = TranscriptDocument.fromContent(
-      version.content,
-      base: version.segments,
+      version?.content ?? '',
+      base: version?.segments,
     );
-    final confirmedAt = version.confirmedAt ?? entry.confirmedAt;
-    final preview = version.content.replaceAll('\n', ' ');
-    final profile = review.profile;
+    final confirmedAt = version?.confirmedAt ?? entry.confirmedAt;
+    final preview =
+        version?.content.replaceAll('\n', ' ') ??
+        '본문을 준비하고 있어요. 잠시 후 다시 확인해 주세요.';
+    final profile = entry.confirmed
+        ? ReviewProfileState.reflected
+        : review.profile;
     final status = switch (profile) {
       ReviewProfileState.reflected => '반영됨',
       ReviewProfileState.processing => '반영 중',
@@ -981,7 +979,7 @@ class _RecordReviewScreenState extends State<RecordReviewScreen>
         replicaGreen,
         widget.records.service.isPreview
             ? '반영됨 · 미리보기 합성 결과'
-            : '반영됨 · 확정한 전사문의 말투 프로필과 검색 색인 반영을 확인했어요.',
+            : '반영됨 · 기록을 저장했어요.',
       ),
       ReviewProfileState.processing => (
         Icons.autorenew,

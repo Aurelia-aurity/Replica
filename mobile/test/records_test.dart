@@ -85,8 +85,11 @@ void main() {
     }
   });
 
-  test('ready draft record never claims confirmed personalization', () {
-    final record = RecordEntry.fromJson(recordJson('id', status: 'ready'));
+  test('ready audio draft still needs confirmation', () {
+    final record = RecordEntry.fromJson({
+      ...recordJson('id', status: 'ready'),
+      'kind': 'audio',
+    });
     expect(record.statusLabel, '확인 필요');
     expect(record.confirmed, isFalse);
   });
@@ -274,11 +277,11 @@ void main() {
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(find.text('기록이 등록됐어요.'), findsOneWidget);
+      expect(find.text('반영됨 · 기록을 저장했어요.'), findsOneWidget);
       await tester.tap(find.text('기록 목록 보기'));
       await tester.pumpAndSettle();
       expect(find.text('synthetic.txt'), findsOneWidget);
-      expect(find.text('확인 필요'), findsOneWidget);
+      expect(find.text('반영됨'), findsOneWidget);
       expect(find.text('텍스트 1'), findsOneWidget);
       await tester.tap(find.text('음성 0'));
       await tester.pumpAndSettle();

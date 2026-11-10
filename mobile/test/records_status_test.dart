@@ -9,7 +9,6 @@ import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/deletion_sheet.dart';
-import 'package:mobile/records/personalization.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_deletion.dart';
 import 'package:mobile/records/record_models.dart';
@@ -96,21 +95,6 @@ RecordEntry _ready(
 
 void main() {
   group('personalization state', () {
-    for (final evidence in ProfileEvidence.values) {
-      test('profile $evidence establishes availability only', () {
-        final state = derivePersonalization(evidence);
-        expect(
-          state,
-          evidence == ProfileEvidence.ready
-              ? ReviewProfileState.available
-              : ReviewProfileState.unknown,
-        );
-        expect(state, isNot(ReviewProfileState.reflected));
-        expect(state, isNot(ReviewProfileState.processing));
-        expect(state, isNot(ReviewProfileState.delayed));
-      });
-    }
-
     test('labels cover every state', () {
       final labels = {
         for (final s in ReviewProfileState.values)
@@ -123,7 +107,7 @@ void main() {
       };
       expect(labels, {
         ReviewProfileState.unknown: '확인 필요',
-        ReviewProfileState.available: '확정됨',
+        ReviewProfileState.available: '반영됨',
         ReviewProfileState.processing: '반영 중',
         ReviewProfileState.reflected: '반영됨',
         ReviewProfileState.delayed: '반영 지연',
@@ -186,7 +170,8 @@ void main() {
           }
           final records = [
             for (final id in ['A', 'B'])
-              recordJson(id, status: 'ready')..['original_name'] = '$id.txt',
+              ({...recordJson(id, status: 'ready'), 'kind': 'audio'})
+                ..['original_name'] = '$id.txt',
           ];
           if (path == '/records/A') {
             return http.Response(jsonEncode(records.first), 200);
@@ -306,7 +291,9 @@ void main() {
           }
           return http.Response(
             jsonEncode({
-              'items': [recordJson('A', status: 'ready')],
+              'items': [
+                ({...recordJson('A', status: 'ready'), 'kind': 'audio'}),
+              ],
             }),
             200,
           );
@@ -337,246 +324,6 @@ void main() {
       },
     );
 
-    for (final response in ['ready', 'null', 'error']) {
-      testWidgets(
-        'confirmed record stays unproven with profile $response and does not poll',
-        (tester) async {
-          final auth = ApiTestAuth();
-          addTearDown(auth.dispose);
-          await auth.signIn(
-            'preview.a@example.com',
-            PreviewAuthService.password,
-          );
-          final t = DateTime.utc(2026, 11, 1);
-          var requests = 0;
-          final client = MockClient((request) async {
-            requests++;
-            final path = request.url.path;
-            if (path.endsWith('style-profile')) {
-              return response == 'error'
-                  ? http.Response('{}', 503)
-                  : http.Response(
-                      response == 'null'
-                          ? 'null'
-                          : jsonEncode({
-                              'status': 'ready',
-                              'persona_id': 'persona',
-                              'updated_at': t
-                                  .add(const Duration(days: 100))
-                                  .toIso8601String(),
-                            }),
-                      200,
-                    );
-            }
-            if (path.endsWith('text-versions')) {
-              return http.Response(
-                jsonEncode({
-                  'items': [
-                    {
-                      'id': 'vA',
-                      'record_id': 'A',
-                      'revision': 1,
-                      'content': '확정한 합성 전사문',
-                      'status': 'confirmed',
-                      'updated_at': t.toIso8601String(),
-                      'confirmed_at': t.toIso8601String(),
-                    },
-                  ],
-                }),
-                200,
-                headers: {'content-type': 'application/json; charset=utf-8'},
-              );
-            }
-            final record = recordJson('A', status: 'ready');
-            if (path == '/records/A') {
-              return http.Response(jsonEncode(record), 200);
-            }
-            return http.Response(
-              jsonEncode({
-                'items': path == '/records' ? [record] : [],
-              }),
-              200,
-            );
-          });
-          addTearDown(client.close);
-          final service = ApiRecordService(
-            client: client,
-            baseUrl: Uri.parse('https://example.invalid'),
-            auth: auth,
-            personaId: 'persona',
-            fileTransport: Transfer(),
-            policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
-          );
-          expect(await service.list(), hasLength(1));
-          final controller = RecordController(service);
-          addTearDown(controller.dispose);
-          await controller.refresh();
-          expect(controller.entries.single.statusLabel, '확정됨');
-          expect(controller.hasPending, isFalse);
-          await tester.pumpWidget(
-            MaterialApp(
-              home: Scaffold(body: RecordsPanel(controller: controller)),
-            ),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('synthetic.txt'));
-          await tester.pumpAndSettle();
-          expect(find.text('기록 상세'), findsOneWidget);
-          expect(find.text('확정한 합성 전사문'), findsOneWidget);
-          expect(
-            find.textContaining('프로필·검색 색인 반영 상태는 확인이 필요해요.'),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('personalization-reflected')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const ValueKey('personalization-processing')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const ValueKey('personalization-delayed')),
-            findsNothing,
-          );
-          final before = requests;
-          await tester.pump(const Duration(minutes: 20));
-          expect(
-            requests,
-            before,
-            reason: 'availability does not imply processing',
-          );
-          expect(
-            find.textContaining('프로필·검색 색인 반영 상태는 확인이 필요해요.'),
-            findsOneWidget,
-          );
-        },
-      );
-    }
-
-    test(
-      'marks confirmed records without inferring reflection from timestamps',
-      () async {
-        final auth = ApiTestAuth();
-        addTearDown(auth.dispose);
-        await auth.signIn('preview.a@example.com', PreviewAuthService.password);
-        final t = DateTime.utc(2026, 11, 1, 12);
-        Object? profile; // null body, or a profile map
-        final hits = <String, int>{};
-        final client = MockClient((request) async {
-          final path = request.url.path;
-          hits.update(path, (n) => n + 1, ifAbsent: () => 1);
-          if (path == '/records') {
-            return http.Response(
-              jsonEncode({
-                'items': [
-                  recordJson('A', status: 'ready'),
-                  recordJson('B', status: 'ready'),
-                  recordJson('C', status: 'processing'),
-                ],
-              }),
-              200,
-            );
-          }
-          if (path == '/records/A/text-versions') {
-            return http.Response(
-              jsonEncode({
-                'items': [
-                  {
-                    'id': 'vA',
-                    'record_id': 'A',
-                    'revision': 1,
-                    'content': 'x',
-                    'status': 'confirmed',
-                    'updated_at': t.toIso8601String(),
-                    'confirmed_at': t.toIso8601String(),
-                  },
-                ],
-              }),
-              200,
-            );
-          }
-          if (path == '/records/B/text-versions') {
-            return http.Response(
-              jsonEncode({
-                'items': [
-                  {
-                    'id': 'vB',
-                    'record_id': 'B',
-                    'revision': 1,
-                    'content': 'x',
-                    'status': 'draft',
-                    'updated_at': t.toIso8601String(),
-                  },
-                ],
-              }),
-              200,
-            );
-          }
-          if (path == '/personas/persona/style-profile') {
-            return http.Response(jsonEncode(profile), 200);
-          }
-          return http.Response('{}', 404);
-        });
-        addTearDown(client.close);
-        final service = ApiRecordService(
-          client: client,
-          baseUrl: Uri.parse('https://example.invalid'),
-          auth: auth,
-          personaId: 'persona',
-          policy: const RecordPolicy(maxBytes: 1000, consentVersion: 'test'),
-          fileTransport: Transfer(),
-        );
-        Map<String, String> labels(List<RecordEntry> list) => {
-          for (final e in list) e.id: e.statusLabel,
-        };
-
-        expect(labels(await service.list()), {
-          'A': '확정됨',
-          'B': '확인 필요',
-          'C': '처리 중',
-        });
-        expect(hits['/records/A/text-versions'], 1);
-        expect(hits['/records/B/text-versions'], 1);
-
-        profile = {
-          'id': 'p',
-          'persona_id': 'persona',
-          'status': 'ready',
-          'updated_at': t.add(const Duration(minutes: 1)).toIso8601String(),
-        };
-        for (final profileAt in [
-          t.subtract(const Duration(days: 1)),
-          t,
-          t.add(const Duration(minutes: 1)),
-          t.add(const Duration(days: 100)),
-        ]) {
-          (profile as Map<String, Object?>)['updated_at'] = profileAt
-              .toIso8601String();
-          final list = await service.list();
-          expect(labels(list)['A'], '확정됨');
-          final confirmed = list.firstWhere((e) => e.id == 'A');
-          expect(confirmed.textConfirmed, isTrue);
-          expect(confirmed.confirmedAt, t);
-          expect(confirmed.personalization, ReviewProfileState.available);
-          expect(confirmed.inProgress, isFalse);
-        }
-        // Even consecutive list requests recheck confirmed and draft versions.
-        expect(hits['/records/A/text-versions'], 5);
-        expect(hits['/records/B/text-versions'], 5);
-        expect(hits['/records/C/text-versions'], isNull);
-        await service.list();
-        expect(hits['/records/B/text-versions'], 6);
-        expect(hits['/records/A/text-versions'], 6);
-
-        profile = null;
-        final later = (await service.list()).firstWhere((e) => e.id == 'A');
-        expect(later.statusLabel, '확정됨');
-        expect(later.personalization, ReviewProfileState.unknown);
-        expect(later.inProgress, isFalse);
-      },
-    );
-
     test(
       'a failed lookup leaves that record unconfirmed instead of failing',
       () async {
@@ -587,7 +334,9 @@ void main() {
           if (request.url.path == '/records') {
             return http.Response(
               jsonEncode({
-                'items': [recordJson('A', status: 'ready')],
+                'items': [
+                  ({...recordJson('A', status: 'ready'), 'kind': 'audio'}),
+                ],
               }),
               200,
             );
@@ -867,9 +616,10 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 50));
-      for (final label in ['반영 중', '반영 지연', '반영 실패', '반영됨', '확정됨', '확인 필요']) {
+      for (final label in ['반영 중', '반영 지연', '반영 실패', '확인 필요']) {
         expect(find.text(label), findsOneWidget, reason: label);
       }
+      expect(find.text('반영됨'), findsNWidgets(2));
       controller.stopPolling();
     });
   });

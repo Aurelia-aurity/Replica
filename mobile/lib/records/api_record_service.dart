@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 
 import '../auth/auth_service.dart';
 import '../services/backend_service.dart';
-import 'personalization.dart';
 import 'record_deletion.dart';
 import 'record_models.dart';
 import 'record_playback.dart';
@@ -177,37 +176,12 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       ..sort((a, b) => b.revision.compareTo(a.revision));
   }
 
-  /// Checks only persona-level availability. Timestamps cannot establish
-  /// whether the confirmed record's profile and search index are both ready.
-  Future<ProfileEvidence> _profileEvidence() async {
-    try {
-      final result = await _request(
-        'GET',
-        '/personas/$personaId/style-profile',
+  RecordEntry _confirmed(RecordEntry record, DateTime confirmedAt) =>
+      record.copyWith(
+        textConfirmed: true,
+        confirmedAt: confirmedAt,
+        personalization: ReviewProfileState.reflected,
       );
-      final body = jsonDecode(result.body);
-      if (body is Map && body['status'] == 'ready') {
-        return ProfileEvidence.ready;
-      }
-      return ProfileEvidence.none;
-    } on BackendFailure catch (failure) {
-      if (_fatal(failure)) rethrow;
-      return ProfileEvidence.unavailable;
-    } on FormatException {
-      /* Keep the confirmed text available if the profile reply is malformed. */
-      return ProfileEvidence.unavailable;
-    }
-  }
-
-  RecordEntry _confirmed(
-    RecordEntry record,
-    DateTime confirmedAt,
-    ProfileEvidence profile,
-  ) => record.copyWith(
-    textConfirmed: true,
-    confirmedAt: confirmedAt,
-    personalization: derivePersonalization(profile),
-  );
 
   @override
   Future<RecordReview> review(String recordId) async {
@@ -216,16 +190,19 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       throw StateError('Record missing');
     }
     if (record.status != RecordStatus.ready) {
-      return RecordReview(record: record);
+      return RecordReview(record: record, profile: record.personalization);
     }
     final versions = await _versions(recordId);
     final latest = versions.isEmpty ? null : versions.first;
     if (latest == null || latest.status != 'confirmed') {
-      return RecordReview(record: record, version: latest);
+      return RecordReview(
+        record: record,
+        version: latest,
+        profile: record.personalization,
+      );
     }
     final at = latest.confirmedAt ?? latest.updatedAt;
-    final profile = await _profileEvidence();
-    final enriched = _confirmed(record, at, profile);
+    final enriched = _confirmed(record, at);
     return RecordReview(
       record: enriched,
       version: latest,
@@ -346,7 +323,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     return _withConfirmation(records.values.toList());
   }
 
-  /// Rechecks each ready record's latest transcript and profile availability.
+  /// Rechecks each ready record's latest transcript confirmation.
   /// Confirmation evidence belongs only to this list request, since another
   /// device can create or confirm a new revision between requests.
   /// Looks at most a few records up at once;
@@ -376,12 +353,11 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       ]);
     }
     if (confirmedAt.isEmpty) return records;
-    final profile = await _profileEvidence();
     return [
       for (final record in records)
         if (record.status == RecordStatus.ready &&
             confirmedAt.containsKey(record.id))
-          _confirmed(record, confirmedAt[record.id]!, profile)
+          _confirmed(record, confirmedAt[record.id]!)
         else
           record,
     ];

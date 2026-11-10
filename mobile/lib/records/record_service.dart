@@ -207,7 +207,7 @@ class PreviewRecordService extends RecordService {
       version: version,
       profile: version.status == 'confirmed'
           ? ReviewProfileState.reflected
-          : ReviewProfileState.unknown,
+          : record.personalization,
     );
   }
 

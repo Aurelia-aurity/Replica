@@ -7,9 +7,8 @@ enum RecordStatus { uploading, uploaded, processing, ready, failed, deleting }
 
 /// How far a confirmed transcript has reached the personalization pipeline.
 ///
-/// The draft API has no per-record reflection evidence. It can establish only
-/// persona profile availability. Processing, reflection, delay and failure
-/// require explicit record-level evidence or synthetic preview data.
+/// For the current UI, reflected means text upload or audio transcript
+/// confirmation was saved successfully. Profile/index completion is separate.
 enum ReviewProfileState {
   unknown,
   available,
@@ -35,7 +34,11 @@ class RecordEntry {
     this.errorCode,
   }) : personalization =
            personalization ??
-           (confirmed
+           (confirmed ||
+                   (kind == RecordKind.text &&
+                       (status == RecordStatus.uploaded ||
+                           status == RecordStatus.processing ||
+                           status == RecordStatus.ready))
                ? ReviewProfileState.reflected
                : ReviewProfileState.unknown);
   final String id;
@@ -46,8 +49,7 @@ class RecordEntry {
   final int? sizeBytes;
   final int? durationSeconds;
 
-  /// A confirmed transcript. `ready` alone must never be read as confirmed or
-  /// reflected: the record object carries no confirmation evidence.
+  /// A server-confirmed transcript, separate from the stored-text UI badge.
   final bool textConfirmed;
   final DateTime? confirmedAt;
   final ReviewProfileState personalization;
@@ -55,15 +57,16 @@ class RecordEntry {
   /// Safe failure code from the server record (never a raw message).
   final String? errorCode;
 
-  /// Reflection into the personalization profile has been established.
+  /// Saved successfully according to the current UI completion rule.
   bool get confirmed => personalization == ReviewProfileState.reflected;
 
   bool get inProgress =>
-      status == RecordStatus.uploading ||
-      status == RecordStatus.uploaded ||
-      status == RecordStatus.processing ||
-      (status == RecordStatus.ready &&
-          personalization == ReviewProfileState.processing);
+      !confirmed &&
+      (status == RecordStatus.uploading ||
+          status == RecordStatus.uploaded ||
+          status == RecordStatus.processing ||
+          (status == RecordStatus.ready &&
+              personalization == ReviewProfileState.processing));
 
   RecordEntry copyWith({
     RecordStatus? status,
@@ -98,15 +101,19 @@ class RecordEntry {
   );
 
   String get statusLabel => switch (status) {
-    RecordStatus.uploading => '업로드 중',
-    RecordStatus.uploaded => '처리 대기',
-    RecordStatus.processing => kind == RecordKind.audio ? '전사 중' : '처리 중',
+    RecordStatus.uploading => kind == RecordKind.audio ? '전사 중' : '반영 중',
+    RecordStatus.uploaded || RecordStatus.processing =>
+      confirmed
+          ? '반영됨'
+          : kind == RecordKind.audio
+          ? '전사 중'
+          : '반영 중',
     RecordStatus.ready => switch (personalization) {
       ReviewProfileState.reflected => '반영됨',
       ReviewProfileState.processing => '반영 중',
       ReviewProfileState.delayed => '반영 지연',
       ReviewProfileState.failed => '반영 실패',
-      _ => textConfirmed ? '확정됨' : '확인 필요',
+      _ => textConfirmed ? '반영됨' : '확인 필요',
     },
     RecordStatus.failed => '실패',
     RecordStatus.deleting => '삭제 중',

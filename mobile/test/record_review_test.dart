@@ -254,7 +254,7 @@ void main() {
       expect(await c.save(confirm: true), isTrue);
       expect(drafts, isEmpty);
       expect(c.confirmed, isTrue);
-      expect(c.value!.profile, ReviewProfileState.unknown);
+      expect(c.value!.profile, ReviewProfileState.reflected);
     },
   );
   test(
@@ -312,7 +312,7 @@ void main() {
       await c.load();
       c.edit('  ');
       expect(c.canConfirm, isFalse);
-      expect(service.entry.withTextConfirmed().statusLabel, '확정됨');
+      expect(service.entry.withTextConfirmed().statusLabel, '반영됨');
     },
   );
   testWidgets(
@@ -349,10 +349,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('기록 상세'), findsOneWidget);
       expect(find.byType(TextField), findsNothing);
-      expect(
-        find.text('전사문은 확정됐어요. 이 기록의 프로필·검색 색인 반영 상태는 확인이 필요해요.'),
-        findsOneWidget,
-      );
+      expect(find.text('반영됨 · 미리보기 합성 결과'), findsOneWidget);
     },
   );
   testWidgets(
@@ -465,8 +462,11 @@ void main() {
       expect(v.status, 'confirmed');
       expect(confirms, 1);
       expect(patches, 1);
-      // A confirmed transcript does not establish profile/index completion.
-      expect((await api.review('record')).profile, ReviewProfileState.unknown);
+      // The current display rule treats confirmed storage as reflected.
+      expect(
+        (await api.review('record')).profile,
+        ReviewProfileState.reflected,
+      );
     },
   );
 }

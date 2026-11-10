@@ -732,7 +732,7 @@ void main() {
     testWidgets('conflict banner offers both choices and blocks confirming', (
       tester,
     ) async {
-      final service = Fixture(audio: false)..conflictOnSave = true;
+      final service = Fixture()..conflictOnSave = true;
       final records = RecordController(service);
       addTearDown(records.dispose);
       await pumpReview(tester, service, records);

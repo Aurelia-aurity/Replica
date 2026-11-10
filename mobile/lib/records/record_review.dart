@@ -245,10 +245,13 @@ class RecordReviewController extends ChangeNotifier {
           throw StateError('Invalid confirmation');
         }
         value = RecordReview(
-          record: value!.record,
+          record: value!.record.copyWith(
+            textConfirmed: true,
+            confirmedAt: version.confirmedAt,
+            personalization: ReviewProfileState.reflected,
+          ),
           version: version,
-          // Confirmation proves the text is saved, not profile/index readiness.
-          profile: ReviewProfileState.unknown,
+          profile: ReviewProfileState.reflected,
         );
       }
       drafts.remove(recordId);

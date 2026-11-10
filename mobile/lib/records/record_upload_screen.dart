@@ -290,11 +290,13 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                         ),
                       ),
                     if (c.uploadSucceeded)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 16),
                         child: Text(
-                          '기록이 등록됐어요.',
-                          style: TextStyle(
+                          _kind == RecordKind.text
+                              ? '반영됨 · 기록을 저장했어요.'
+                              : '기록을 저장했어요. 전사 상태는 목록에서 확인해 주세요.',
+                          style: const TextStyle(
                             color: replicaGreen,
                             fontWeight: FontWeight.w700,
                           ),
@@ -337,7 +339,7 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                           c.uploadSucceeded
                               ? '기록 목록 보기'
                               : busy
-                              ? '업로드 중…'
+                              ? (_kind == RecordKind.text ? '반영 중' : '전사 중')
                               : c.uploadError != null
                               ? '다시 시도'
                               : '올리기',
@@ -368,6 +370,11 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
     final transferring = upload?.stage == UploadStage.transfer;
     final percent = ((upload?.progress ?? 0) * 100).floor();
     return [
+      Text(
+        _kind == RecordKind.text ? '반영 중' : '전사 중',
+        key: const ValueKey('record-upload-status'),
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
       const SizedBox(height: 20),
       LinearProgressIndicator(
         key: const ValueKey('record-upload-progress'),
