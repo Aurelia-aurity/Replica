@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
 import sync_simple as ss
+from sync_simple_plan import status_fields
 from sync_simple_fakes import CONFIG, FIELD, NOW, OPTIONS, SOURCE
 from sync_simple_fakes import GitHub, Notion, Project, REST, checkpoint, item, page
 
@@ -49,7 +50,7 @@ class EngineTests(unittest.TestCase):
         report = self.run_sync()
         # Then:
         self.assertEqual(report["items"][0]["note"], "초기 정렬")
-        self.assertTrue(report["items"][0]["write_project"])
+        self.assertFalse(report["items"][0]["write_project"])
         self.assertEqual(self.project.items, before)
 
     def test_note_only_proposal_is_separate_from_status_write(self):
@@ -114,7 +115,8 @@ class EngineTests(unittest.TestCase):
     def test_two_issue_rows_keep_their_own_status_proposals(self):
         # Given:
         second = copy.deepcopy(self.github.issues[0])
-        second.update(id="I_82", databaseId=802, number=82)
+        second.update(id="I_82", databaseId=802, number=82,
+                      url=f"https://github.com/{gp.REPOSITORY}/issues/82")
         self.github.issues.append(second)
         second_page = page("완료")
         second_page["id"] = "00000000-0000-4000-8000-000000000082"
@@ -129,14 +131,14 @@ class EngineTests(unittest.TestCase):
         report = self.run_sync()
         # Then:
         self.assertEqual([(row["issue"], row["target"]) for row in report["items"]],
-                         [(80, "백로그"), (82, "완료")])
+                         [(80, "백로그"), (82, None)])
 
     def test_every_public_status_field_is_bounded_in_serialized_json(self):
         # Given:
         fields = ("notion", "project", "last_synced", "target")
         for value in (*OPTIONS, None, "PRIVATE_SYNTHETIC_STATUS"):
             # When:
-            serialized = json.dumps(ss.status_fields(dict.fromkeys(fields, value)), ensure_ascii=False)
+            serialized = json.dumps(status_fields(dict.fromkeys(fields, value)), ensure_ascii=False)
             decoded = json.loads(serialized)
             # Then:
             self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", serialized)
@@ -149,10 +151,12 @@ class EngineTests(unittest.TestCase):
         env = {"GITHUB_TOKEN": "fixture", "PROJECT_TOKEN": "fixture", "NOTION_TOKEN": "fixture",
                "PROJECT_ID": CONFIG["project_id"], "PROJECT_OWNER_ID": CONFIG["owner_id"],
                "PROJECT_STATUS_FIELD_ID": FIELD, "PROJECT_STATUS_OPTIONS": json.dumps(OPTIONS),
-               "NOTION_DATA_SOURCE_ID": SOURCE}
+               "NOTION_DATA_SOURCE_ID": SOURCE, "NOTION_SYNC_ENABLED": "true",
+               "PM_GITHUB_USER_ID": str(gp.EXPECTED_PM_USER_ID)}
         self.notion.pages[0]["properties"]["작업 상태"] = {"select": {"name": "PRIVATE_SYNTHETIC_STATUS"}}
         for mode in ([], ["--dry-run"]):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                self.notion = Notion("PRIVATE_SYNTHETIC_STATUS", checkpoint(self.github))
                 path = str(Path(directory) / "plan.json")
                 summary_path = str(Path(directory) / "summary.md")
                 with patch.dict(os.environ, {**env, "GITHUB_STEP_SUMMARY": summary_path}, clear=True), \
@@ -171,3 +175,13 @@ class EngineTests(unittest.TestCase):
                 self.assertEqual(row["notion"], "invalid")
                 self.assertTrue(row["notion_invalid"])
                 self.assertNotIn("PRIVATE_SYNTHETIC_STATUS", Path(summary_path).read_text(encoding="utf-8"))
+
+    def test_configuration_cannot_rebind_manual_pm_authority(self):
+        env = {"GITHUB_TOKEN": "fixture", "PROJECT_TOKEN": "fixture", "NOTION_TOKEN": "fixture",
+               "PROJECT_ID": CONFIG["project_id"], "PROJECT_OWNER_ID": CONFIG["owner_id"],
+               "PROJECT_STATUS_FIELD_ID": FIELD, "PROJECT_STATUS_OPTIONS": json.dumps(OPTIONS),
+               "NOTION_DATA_SOURCE_ID": SOURCE, "PM_GITHUB_USER_ID": "123"}
+        with self.assertRaises(gp.SyncError):
+            ss.load_config(env)
+        env["PM_GITHUB_USER_ID"] = str(gp.EXPECTED_PM_USER_ID)
+        self.assertEqual(ss.load_config(env), CONFIG)

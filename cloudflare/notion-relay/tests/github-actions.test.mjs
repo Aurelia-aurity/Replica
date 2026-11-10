@@ -141,3 +141,23 @@ test('changed token or designated actor requires fresh identity verification',as
   assert.equal(await app.token(),app.env.GITHUB_DISPATCH_TOKEN);
   assert.equal(calls.length,3);
 });
+
+test('periodic preflight detects either writer in every nonterminal run state',async()=>{
+  for(const status of ['queued','in_progress','waiting','pending','requested']){
+    for(const path of [WORKFLOW_PATH,'.github/workflows/notion-sync.yml']){
+      const {app}=transport(()=>assert.fail('no dispatch'));
+      const original=app.fetcher;
+      app.fetcher=(url,options)=>url.includes('/runs?status=')?
+        response({workflow_runs:url.includes(`status=${status}&`)?[{path,status}]:[]}):original(url,options);
+      assert.equal(await app.syncInFlight(),true);
+    }
+  }
+  const {app}=transport(()=>assert.fail('no dispatch'));
+  const original=app.fetcher;
+  app.fetcher=(url,options)=>url.includes('/runs?status=')?
+    response({workflow_runs:[]}):original(url,options);
+  assert.equal(await app.syncInFlight(),false);
+  app.fetcher=(url,options)=>url.includes('/runs?status=')?
+    response({workflow_runs:Array(100).fill({path:'other.yml',status:'queued'})}):original(url,options);
+  await assert.rejects(app.syncInFlight(),{message:'SYNC_RUN_LIST_INCOMPLETE'});
+});

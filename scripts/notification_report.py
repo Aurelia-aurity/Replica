@@ -76,23 +76,6 @@ def validate(report, *, run_id=None, attempt=None, sha=None):
     return report
 
 
-def collect_holds(rows):
-    result = set()
-    for row, state in rows:
-        if not state:
-            continue
-        number = row["properties"]["번호"]["number"]
-        codes = []
-        if state.get("hold"):
-            codes.append(state["hold"]["code"])
-        if state.get("projection"):
-            codes.append("PROJECTION_PENDING")
-        if (state.get("resume") or {}).get("display_pending"):
-            codes.append("RESUME_DISPLAY_PENDING")
-        result.update((number, code) for code in codes)
-    return [{"issue_number": n, "reason_code": c} for n, c in sorted(result)]
-
-
 def write(path, env, *, kind, dry_run=False, scan_complete=False, holds=(),
           observed_at=None, observation_uncertainty_seconds=None):
     # No source data, titles, raw errors or credentials enter this artifact.
