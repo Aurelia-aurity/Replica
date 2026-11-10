@@ -1,0 +1,176 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/auth/preview_auth_service.dart';
+import 'package:mobile/main.dart';
+import 'package:mobile/settings/settings_screen.dart';
+
+Future<void> openMenu(WidgetTester tester, String label) async {
+  await tester.scrollUntilVisible(
+    find.text(label),
+    180,
+    scrollable: find
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets(
+    'both entries select settings; notice review does not start chat',
+    (tester) async {
+      final auth = PreviewAuthService();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      await tester.pumpWidget(ReplicaApp(authService: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('계정'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        3,
+      );
+      expect(find.text(PreviewAuthService.emails.first), findsOneWidget);
+      expect(find.textContaining('가입일 정보 미제공'), findsOneWidget);
+      expect(find.text('11건'), findsNothing);
+
+      await openMenu(tester, 'AI 생성 안내 다시 보기');
+      expect(find.text('AI 생성 안내'), findsOneWidget);
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(find.text('대화 시작'), findsNothing);
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      await tester.tap(find.widgetWithText(NavigationDestination, '대화'));
+      await tester.pumpAndSettle();
+      expect(find.text('아직 나눈 대화가 없어요'), findsOneWidget);
+      await tester.tap(find.widgetWithText(NavigationDestination, '설정'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('텍스트로 대화'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckboxListTile), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, '대화 시작'))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('pending menus explain availability without simulated success', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SettingsScreen(isDemo: true)),
+    );
+    expect(find.text('이메일 정보 없음'), findsOneWidget);
+    await openMenu(tester, '기록 사용 동의 내역');
+    expect(find.text('동의 내역을 아직 확인할 수 없어요'), findsOneWidget);
+    expect(find.textContaining('회원가입 시 개인 기록 처리 동의'), findsOneWidget);
+    expect(find.text('0건'), findsNothing);
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    await openMenu(tester, '내 기록이 쓰이는 방식');
+    expect(find.text('사용 범위 안내 초안'), findsOneWidget);
+    expect(find.textContaining('모델 학습 사용 여부는 별도 결정'), findsOneWidget);
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    await openMenu(tester, '계정 삭제');
+    expect(find.text('계정 삭제는 아직 지원하지 않아요'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.widgetWithText(FilledButton, '삭제'), findsNothing);
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'logout cancellation, duplicate prevention and failure keep account',
+    (tester) async {
+      var calls = 0;
+      final pending = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsScreen(
+            isDemo: true,
+            accountEmail: 'synthetic@example.com',
+            onSignOut: () {
+              calls++;
+              return pending.future;
+            },
+          ),
+        ),
+      );
+      await openMenu(tester, '로그아웃');
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(calls, 0);
+      await openMenu(tester, '로그아웃');
+      await tester.tap(find.widgetWithText(FilledButton, '로그아웃'));
+      await tester.pump();
+      expect(calls, 1);
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, '로그아웃 중…'))
+            .onPressed,
+        isNull,
+      );
+      pending.completeError(StateError('synthetic failure'));
+      await tester.pumpAndSettle();
+      expect(find.text('로그아웃하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(find.text('synthetic@example.com'), findsOneWidget);
+    },
+  );
+
+  testWidgets('small screen, enlarged text and long email stay scrollable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(1.8)),
+          child: child!,
+        ),
+        home: SettingsScreen(
+          isDemo: true,
+          accountEmail: '${List.filled(70, 'a').join()}@example.com',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await openMenu(tester, '내 기록이 쓰이는 방식');
+    await tester.ensureVisible(find.text('닫기'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    await openMenu(tester, '계정 삭제');
+    await tester.ensureVisible(find.text('닫기'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+}

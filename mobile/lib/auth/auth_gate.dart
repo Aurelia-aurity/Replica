@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -141,8 +139,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                 recordService: records,
                 history: _conversationService(),
                 accountEmail: widget.auth.identity!.email,
-                onSignOut: () =>
-                    unawaited(widget.auth.signOut().catchError((Object _) {})),
+                onSignOut: widget.auth.signOut,
                 onExpireSession: widget.auth is PreviewAuthService
                     ? (widget.auth as PreviewAuthService).expireSession
                     : null,
