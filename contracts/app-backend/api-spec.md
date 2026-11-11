@@ -40,9 +40,9 @@
 | POST | [`/personas`](#a-persona-create) | 대화 상대 생성 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
 | GET | [`/personas · /personas/{persona_id}`](#a-persona-get) | 대화 상대 목록·상세 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
 | POST | [`/sessions`](#a-session-create) | 대화방 생성 | 구현 | baseline · #5, #6 |
-| GET | [`/sessions · /sessions/{session_id}`](#a-session-get) | 대화 이력 목록·상세 | 제안 | 고도화 2 · #12 |
-| GET | [`/sessions/{session_id}/turns`](#a-turns) | 대화방의 턴 목록 | 제안 | 고도화 2 · #12 |
-| DELETE | [`/sessions/{session_id}`](#a-session-del) | 대화 삭제 | 제안 | 고도화 2 · #12 |
+| GET | [`/sessions · /sessions/{session_id}`](#a-session-get) | 대화 이력 목록·상세 | 구현 | 고도화 2 · #12 |
+| GET | [`/sessions/{session_id}/turns`](#a-turns) | 대화방의 턴 목록 | 구현 | 고도화 2 · #12 |
+| DELETE | [`/sessions/{session_id}`](#a-session-del) | 대화 삭제 | 구현 | 고도화 2 · #12 |
 | POST | [`/records`](#a-record-create) | 기록 업로드 예약 | 제안 | 고도화 1 · #9 |
 | POST | [`/records/{record_id}/uploaded`](#a-record-uploaded) | 업로드 완료 알림 | 제안 | 고도화 1 · #9 |
 | GET | [`/records · /records/{record_id}`](#a-record-get) | 기록 목록·상세 | 제안 | 고도화 1 · #9, #10 |
@@ -452,7 +452,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-session-get"></a>
 
-#### `GET /sessions · /sessions/{session_id}` (제안) — 대화 이력 목록·상세
+#### `GET /sessions · /sessions/{session_id}` (구현) — 대화 이력 목록·상세
 
 | 항목 | 내용 |
 |---|---|
@@ -486,7 +486,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-turns"></a>
 
-#### `GET /sessions/{session_id}/turns` (제안) — 대화방의 턴 목록 (이어 보기)
+#### `GET /sessions/{session_id}/turns` (구현) — 대화방의 턴 목록 (이어 보기)
 
 | 항목 | 내용 |
 |---|---|
@@ -495,6 +495,8 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 내부 호출 | DB `list_turns(session_id, after_turn_no, limit)` |
 
 앱은 한 턴을 질문·응답 말풍선 두 개로 그립니다. 서버 내부 필드(`user_id`, `request_hash`, `*_attempt`, `*_started_at`)는 앱에 보내지 않습니다.
+
+조회할 때 진행 중(`pending`)인 단계가 있으면, 제한 시간을 넘긴 단계를 먼저 `failed`로 정리한 뒤 돌려줍니다(기준은 대화·TTS 요청이 쓰는 만료 기준과 같음). 서버가 요청 도중 멈춰 `pending`으로 남은 턴을 앱이 이 조회만으로 풀 수 있게 하기 위해서입니다. 정리에 실패해도 조회는 실패하지 않고 정리 전 상태를 돌려줍니다.
 
 ##### 요청
 
@@ -521,7 +523,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-session-del"></a>
 
-#### `DELETE /sessions/{session_id}` (제안) — 대화 삭제 (DB 행만)
+#### `DELETE /sessions/{session_id}` (구현) — 대화 삭제 (DB 행만)
 
 | 항목 | 내용 |
 |---|---|
@@ -541,6 +543,8 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | (본문 없음) | - | 204 No Content. 대화방과 그 턴의 DB 행만 삭제하며 파일·계정 삭제가 아님 |
+
+같은 대화방을 다시 삭제하거나 없는·남의 대화방이면 404 `NOT_FOUND`입니다.
 
 <a id="a-record-create"></a>
 
