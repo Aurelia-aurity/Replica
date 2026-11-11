@@ -1,97 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="190mm" height="84.87mm" viewBox="0 0 1200 536" role="img" aria-labelledby="title desc">
-  <title id="title">서비스 구성과 분리된 검색 v2 오프라인 실험</title>
-  <desc id="desc">상단은 구성요소 내부 구현·검증, Mock·데모, 연동 진행 중을 구분한 서비스 경로다. 하단은 합성 기록·질문의 보정 코퍼스와 같은 5개 페르소나의 신규 사건군 held-out, 검색 v2의 임계값 기권과 문맥 복원, 생성 조건 A/B/C, 검색 슬롯 지표 및 자동 전체 판정·작성자 1인 탐색적 표본 채점을 나타낸다. A는 검색을 생략하고 C는 평가용 gold 근거를 사용한다.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="190mm" height="75mm" viewBox="0 0 760 300" role="img" aria-labelledby="title desc">
+  <title id="title">검색 방식별 근거 구성과 답변 생성</title>
+  <desc id="desc">동일 질문과 사용자 확정 기록으로 검색 v1과 v2를 비교한다. v1은 유사도 상위 5개 청크를 근거로 직접 전달한다. v2는 KURE-v1의 L2 정규화 코사인 유사도로 검색하고 질문의 최고 유사도가 0.5459 미만이면 빈 근거를 반환한다. 기준 이상이면 상위 3개 결과로 원기록의 대화 전후 3턴 또는 일기 전문을 복원하고 길이를 조정하여 근거 JSON을 Qwen 2,000토큰 이내로 구성한다. 빈 근거와 복원 근거 모두 같은 근거 제한·말투 결합 프롬프트 및 고정 Qwen3-8B로 답변을 생성한다.</desc>
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
-      <path d="M0 1L8 5L0 9Z" fill="#111" stroke="none"/>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0L8 4L0 8Z" fill="#454545"/>
     </marker>
     <style>
-      text{font-family:"Apple SD Gothic Neo","Noto Sans CJK KR",sans-serif;fill:#111;font-size:20.5px}
-      .title{font-size:23px;font-weight:700}
-      .section{font-size:26px;font-weight:700}
-      .bold{font-weight:700}
-      .box{fill:white;stroke:#111;stroke-width:1.6}
-      .pending{fill:white;stroke:#111;stroke-width:1.6;stroke-dasharray:7 4}
-      .link{fill:none;stroke:#111;stroke-width:1.6;marker-end:url(#arrow)}
-      .dash{stroke-dasharray:7 4}
-      .rule{fill:none;stroke:#111;stroke-width:1.6}
-      .experiment{fill:#f6f6f6;stroke:#555;stroke-width:1.1}
-      .divider{stroke:#888;stroke-width:1}
+      text{font-family:"Apple SD Gothic Neo","Noto Sans CJK KR",sans-serif;font-size:13.5px;fill:#171717}
+      .heading{font-size:14px;font-weight:700}
+      .node{fill:#fff;stroke:#454545;stroke-width:1.1}
+      .evidence{fill:#ececec;stroke:#454545;stroke-width:1.1}
+      .edge{fill:none;stroke:#454545;stroke-width:1.2;marker-end:url(#arrow)}
+      .wire{fill:none;stroke:#454545;stroke-width:1.2}
+      .rule{fill:none;stroke:#8a8a8a;stroke-width:0.8}
     </style>
   </defs>
-  <rect width="1200" height="536" fill="white"/>
-  <!-- Service status applies inside each component, not to end-to-end operation. -->
-  <text x="20" y="33" class="section">서비스 경로</text>
-  <rect id="auth" x="250" y="10" width="190" height="32" rx="3" class="pending"/>
-  <text x="345" y="32" text-anchor="middle" data-box="auth">Supabase Auth</text>
-  <text x="465" y="32">STT·TTS Mock · ElevenLabs 연동 전</text>
-  <rect id="app" x="20" y="51" width="190" height="80" rx="3" class="box"/>
-  <rect x="25" y="56" width="180" height="70" rx="2" class="box"/>
-  <text x="115" y="84" text-anchor="middle" class="title" data-box="app">앱</text>
-  <text x="115" y="113" text-anchor="middle" data-box="app">Mock 인증·데모</text>
-  <rect id="backend" x="250" y="51" width="320" height="80" rx="3" class="box"/>
-  <text x="410" y="84" text-anchor="middle" class="title" data-box="backend">백엔드</text>
-  <text x="410" y="113" text-anchor="middle" data-box="backend">DB·AI Mock으로 내부 검증</text>
-  <rect id="db" x="610" y="51" width="260" height="80" rx="3" class="box"/>
-  <text x="740" y="84" text-anchor="middle" class="title" data-box="db">확정 기록 저장소</text>
-  <text x="740" y="113" text-anchor="middle" data-box="db">Supabase · 접근 제어 시험</text>
-  <rect id="gpu" x="910" y="39" width="270" height="106" rx="3" class="pending"/>
-  <text x="1045" y="65" text-anchor="middle" class="title" data-box="gpu">GPU 추론 서버</text>
-  <rect id="gpu-tested" x="918" y="76" width="254" height="36" rx="2" class="box"/>
-  <text x="1045" y="100" text-anchor="middle" data-box="gpu-tested">기본 추론 API 구현·GPU 시험</text>
-  <text x="1045" y="132" text-anchor="middle" data-box="gpu">서비스 모델 미정</text>
-  <path d="M210 69H230V26H250" class="link dash"/>
-  <path d="M210 91H250" class="link dash"/>
-  <path d="M570 91H610" class="link dash"/>
-  <path d="M570 118H590V145H890V91H910" class="link dash"/>
-  <path d="M20 162H64" class="rule"/>
-  <text x="75" y="169">실선: 서비스 내부 구현·검증</text>
-  <path d="M430 159.5H474M430 164.5H474" class="rule"/>
-  <text x="485" y="169">이중선: Mock·데모</text>
-  <path d="M745 162H789" class="rule dash"/>
-  <text x="800" y="169">점선: 연동 진행 중</text>
-  <line x1="20" y1="183" x2="1180" y2="183" class="rule"/>
-  <text x="20" y="211" class="section">오프라인 실험(서비스 경로와 분리)</text>
-  <!-- Three reading columns: inputs, retrieval mechanism, generation and evaluation. -->
-  <rect id="data" x="20" y="223" width="265" height="299" rx="3" class="experiment"/>
-  <text x="35" y="250" class="title" data-box="data">합성 기록·질문</text>
-  <text x="35" y="280" class="bold" data-box="data">보정 코퍼스 DEV / TEST</text>
-  <text x="35" y="305" data-box="data">페르소나 5 · 기록 100</text>
-  <text x="35" y="330" data-box="data">질문 DEV 40 / TEST 40</text>
-  <text x="35" y="355" data-box="data">검색 설정은 DEV에서 고정</text>
-  <line x1="35" y1="370" x2="270" y2="370" class="divider"/>
-  <text x="35" y="397" class="bold" data-box="data">held-out: 신규 사건군 20</text>
-  <text x="35" y="422" data-box="data">같은 페르소나 5개 유지</text>
-  <text x="35" y="447" data-box="data">새 기록 40 · 질문 48</text>
-  <text x="35" y="472" data-box="data">고정한 검색 설정 적용</text>
-  <rect id="retrieval" x="315" y="223" width="425" height="299" rx="3" class="experiment"/>
-  <text x="330" y="250" class="title" data-box="retrieval">검색 v2</text>
-  <text x="527" y="282" text-anchor="middle" data-box="retrieval">① 질문 임베딩(KURE-v1)</text>
-  <path d="M527 292V304" class="link"/>
-  <text x="527" y="326" text-anchor="middle" data-box="retrieval">② 최고 유사도와 임계값 0.5459 비교</text>
-  <path d="M527 337V350H412V363M527 350H632V363" class="rule"/>
-  <path d="M412 353V363" class="link"/>
-  <path d="M632 353V363" class="link"/>
-  <text x="412" y="388" text-anchor="middle" data-box="retrieval">미만: 검색 기권</text>
-  <text x="412" y="418" text-anchor="middle" data-box="retrieval">빈 근거 반환</text>
-  <text x="632" y="388" text-anchor="middle" data-box="retrieval">이상: ③ 상위 3개 결과</text>
-  <path d="M632 398V412" class="link"/>
-  <text x="632" y="437" text-anchor="middle" data-box="retrieval">④ 원기록 문맥 복원</text>
-  <text x="632" y="465" text-anchor="middle" data-box="retrieval">대화 앞뒤 3턴</text>
-  <text x="632" y="493" text-anchor="middle" data-box="retrieval">전체 2,000토큰 이내</text>
-  <path d="M412 429V510H752V310H770" class="link"/>
-  <path d="M632 502V510" class="rule"/>
-  <path d="M285 373H300V282H315" class="link"/>
-  <rect id="generation" x="770" y="223" width="410" height="130" rx="3" class="experiment"/>
-  <text x="785" y="250" class="title" data-box="generation">Qwen3-8B 생성(고정 프롬프트)</text>
-  <text x="785" y="282" data-box="generation">A: 무근거 입력(검색 생략)</text>
-  <text x="785" y="310" class="bold" data-box="generation">B: 검색 v2 출력(기권 시 빈 근거)</text>
-  <text x="785" y="338" data-box="generation">C: gold 근거(평가용 정답 근거)</text>
-  <path d="M975 353V368" class="link"/>
-  <rect id="eval" x="770" y="368" width="410" height="154" rx="3" class="experiment"/>
-  <text x="785" y="394" class="title" data-box="eval">평가</text>
-  <text x="785" y="422" data-box="eval">검색: 완전 슬롯 문항·포함 슬롯</text>
-  <text x="785" y="450" data-box="eval">자동 판정(전체 문항): 정답·지어냄</text>
-  <text x="785" y="478" data-box="eval">작성자 1인 탐색적 채점(held-out 48응답)</text>
-  <text x="785" y="506" data-box="eval">조건별 층화 16응답·완전 대응 아님</text>
+  <rect width="760" height="300" fill="#fff"/>
+
+  <!-- Shared question reaches retrieval and the same generator. -->
+  <path d="M88 24V8H679V36" class="edge"/>
+  <rect x="440" y="0" width="76" height="17" fill="#fff"/>
+  <text x="478" y="13" text-anchor="middle">동일 질문</text>
+  <rect x="12" y="24" width="154" height="64" class="node"/>
+  <text x="89" y="44" text-anchor="middle" class="heading">동일 질문</text>
+  <text x="89" y="63" text-anchor="middle" class="heading">사용자 확정 기록</text>
+  <text x="89" y="81" text-anchor="middle">원문·검색 청크</text>
+  <path d="M166 56H184" class="wire"/>
+  <path d="M184 56V48H205" class="edge"/>
+  <path d="M184 56V136H205" class="edge"/>
+  <circle cx="184" cy="56" r="2.4" fill="#454545"/>
+
+  <!-- v1 directly transfers retrieved chunks as evidence. -->
+  <rect x="205" y="24" width="380" height="48" class="evidence"/>
+  <text x="395" y="44" text-anchor="middle" class="heading">기존 검색 v1</text>
+  <text x="395" y="63" text-anchor="middle">유사도 상위 5개 청크를 근거로 직접 전달</text>
+  <path d="M585 48H610" class="edge"/>
+
+  <!-- v2 selects records, makes a query-level decision, then restores context. -->
+  <rect x="205" y="106" width="170" height="60" class="node"/>
+  <text x="290" y="125" text-anchor="middle" class="heading">개선 검색 v2</text>
+  <text x="290" y="143" text-anchor="middle">KURE-v1</text>
+  <text x="290" y="160" text-anchor="middle">L2 정규화 코사인</text>
+  <path d="M290 166V180" class="edge"/>
+  <path d="M290 180L365 215L290 250L215 215Z" class="node"/>
+  <text x="290" y="211" text-anchor="middle">질문 최고 유사도</text>
+  <text x="290" y="229" text-anchor="middle" class="heading">0.5459</text>
+
+  <path d="M365 215H390V132H415" class="edge"/>
+  <rect x="376" y="166" width="30" height="19" fill="#fff"/>
+  <text x="391" y="180" text-anchor="middle">미만</text>
+  <rect x="415" y="111" width="170" height="42" class="evidence"/>
+  <text x="500" y="137" text-anchor="middle" class="heading">빈 근거</text>
+
+  <path d="M290 250V263H415" class="edge"/>
+  <text x="370" y="258" text-anchor="middle">이상</text>
+  <rect x="415" y="190" width="170" height="86" class="evidence"/>
+  <text x="500" y="207" text-anchor="middle" class="heading">상위 3개 → 문맥 복원</text>
+  <text x="500" y="224" text-anchor="middle">대화 전후 3턴</text>
+  <text x="500" y="241" text-anchor="middle">또는 일기 전문</text>
+  <text x="500" y="258" text-anchor="middle">길이 조정 후 근거 JSON</text>
+  <text x="500" y="272" text-anchor="middle">≤ 2,000 Qwen 토큰</text>
+
+  <!-- Restoration reads original context, not merely the retrieved chunks. -->
+  <path d="M70 88V292H500V276" class="edge"/>
+  <rect x="94" y="281" width="183" height="18" fill="#fff"/>
+  <text x="185" y="295" text-anchor="middle">원기록에서 복원 문맥 공급</text>
+
+  <!-- Alternative evidence states join before common generation. -->
+  <path d="M585 132H597V233H585" class="wire"/>
+  <circle cx="597" cy="182" r="2.4" fill="#454545"/>
+  <path d="M597 182H610" class="edge"/>
+  <rect x="610" y="36" width="138" height="213" class="node"/>
+  <text x="679" y="61" text-anchor="middle" class="heading">공통 답변 생성</text>
+  <path d="M620 74H738" class="rule"/>
+  <text x="679" y="96" text-anchor="middle">동일 결합 프롬프트</text>
+  <text x="679" y="117" text-anchor="middle">근거 제한·말투 지시</text>
+  <path d="M679 129V149" class="edge"/>
+  <text x="679" y="174" text-anchor="middle" class="heading">Qwen3-8B 고정</text>
+  <text x="679" y="199" text-anchor="middle">빈 근거에서도 응답</text>
+  <path d="M679 211V230" class="edge"/>
+  <text x="679" y="243" text-anchor="middle" class="heading">응답</text>
 </svg>
