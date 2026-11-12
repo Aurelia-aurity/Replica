@@ -12,6 +12,64 @@ class EvidenceRecord {
   });
   final String fileName, excerpt;
   final DateTime date;
+
+  factory EvidenceRecord.fromJson(Map<String, dynamic> json) {
+    final fileName = json['file_name'];
+    final date = json['date'];
+    final excerpt = json['excerpt'];
+    final parsedDate = date is String ? DateTime.tryParse(date) : null;
+    if (fileName is! String ||
+        fileName.trim().isEmpty ||
+        parsedDate == null ||
+        excerpt is! String ||
+        excerpt.trim().isEmpty) {
+      throw const FormatException('Invalid evidence source');
+    }
+    return EvidenceRecord(
+      fileName: fileName.trim(),
+      date: parsedDate,
+      excerpt: excerpt.trim(),
+    );
+  }
+}
+
+class ReplyEvidence {
+  const ReplyEvidence(this.state, this.sources);
+  final EvidenceState state;
+  final List<EvidenceRecord> sources;
+
+  /// Missing evidence is deliberately different from an explicit `none`.
+  /// The backend must send `{status, items}` to make an evidence claim.
+  factory ReplyEvidence.fromJson(Map<String, dynamic> json) {
+    if (!json.containsKey('evidence') || json['evidence'] == null) {
+      return const ReplyEvidence(EvidenceState.unknown, []);
+    }
+    final payload = json['evidence'];
+    if (payload is! Map) throw const FormatException('Invalid evidence');
+    final status = payload['status'];
+    final rawItems = payload['items'];
+    if (status == 'unavailable' || status == 'unknown') {
+      return const ReplyEvidence(EvidenceState.unknown, []);
+    }
+    if (rawItems != null && rawItems is! List) {
+      throw const FormatException('Invalid evidence items');
+    }
+    final items = <EvidenceRecord>[];
+    for (final item in rawItems ?? const <Object>[]) {
+      if (item is! Map) throw const FormatException('Invalid evidence item');
+      items.add(EvidenceRecord.fromJson(item.cast<String, dynamic>()));
+    }
+    if (status == 'none') {
+      if (items.isNotEmpty) {
+        throw const FormatException('No-evidence response has sources');
+      }
+      return const ReplyEvidence(EvidenceState.none, []);
+    }
+    if (status == 'available' && items.isNotEmpty) {
+      return ReplyEvidence(EvidenceState.available, List.unmodifiable(items));
+    }
+    throw const FormatException('Invalid evidence status');
+  }
 }
 
 class ChatReply {
@@ -20,15 +78,25 @@ class ChatReply {
     this.turnId,
     this.modelName,
     this.finishReason,
+    this.ttsStatus,
     this.timings = const {},
     this.evidence = EvidenceState.unknown,
     this.sources = const [],
   });
   final String text;
   final String? turnId, modelName, finishReason;
+
+  /// Backend `tts_status` (`pending`, `ready`, `failed`) when the payload
+  /// carried one; null when unknown or not requested yet.
+  final String? ttsStatus;
   final Map<String, int?> timings;
   final EvidenceState evidence;
   final List<EvidenceRecord> sources;
+
+  /// The backend already holds a finished synthesis for this turn. The TTS
+  /// endpoint answers 409 for such turns and the API has no download for the
+  /// stored audio, so only audio this app cached itself can be played again.
+  bool get speechAlreadySynthesized => ttsStatus == 'ready';
 
   factory ChatReply.fromJson(
     Map<String, dynamic> json, {
@@ -52,12 +120,18 @@ class ChatReply {
         timings[key] = value as int?;
       }
     }
+    final evidence = ReplyEvidence.fromJson(json);
     return ChatReply(
       text: json['answer'] as String,
       turnId: expectedTurnId,
       modelName: json['model_name'] as String?,
       finishReason: json['finish_reason'] as String?,
+      ttsStatus: json['tts_status'] is String
+          ? json['tts_status'] as String
+          : null,
       timings: Map.unmodifiable(timings),
+      evidence: evidence.state,
+      sources: evidence.sources,
     );
   }
 
@@ -66,6 +140,20 @@ class ChatReply {
     turnId: id,
     modelName: modelName,
     finishReason: finishReason,
+    ttsStatus: ttsStatus,
+    timings: timings,
+    evidence: evidence,
+    sources: sources,
+  );
+
+  /// Applies a newer server-side TTS state (e.g. from the turn list) to a
+  /// reply the app kept from an earlier request.
+  ChatReply withTtsStatus(String? status) => ChatReply(
+    text: text,
+    turnId: turnId,
+    modelName: modelName,
+    finishReason: finishReason,
+    ttsStatus: status,
     timings: timings,
     evidence: evidence,
     sources: sources,

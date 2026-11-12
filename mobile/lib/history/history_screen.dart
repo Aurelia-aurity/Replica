@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../chat/ai_disclosure_sheet.dart';
@@ -13,10 +15,78 @@ Future<void> openConversation(
   bool? voice,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
-    builder: (_) => ChatScreen(
-      service: ConversationChatService(service, conversation.id),
-      conversationName: service.isDemo ? '엄마' : '대화',
-      initialVoiceMode: voice ?? conversation.lastVoice,
+    builder: (_) => _ConversationRoute(
+      service: service,
+      conversation: conversation,
+      voice: voice ?? conversation.lastVoice,
+    ),
+  ),
+);
+
+class _ConversationRoute extends StatefulWidget {
+  const _ConversationRoute({
+    required this.service,
+    required this.conversation,
+    required this.voice,
+  });
+
+  final ConversationService service;
+  final Conversation conversation;
+  final bool voice;
+
+  @override
+  State<_ConversationRoute> createState() => _ConversationRouteState();
+}
+
+class _ConversationRouteState extends State<_ConversationRoute> {
+  late final ConversationChatService _chat;
+  late Conversation _conversation;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _conversation = widget.conversation;
+    _chat = ConversationChatService(widget.service, _conversation.id);
+    _scheduleRefresh();
+  }
+
+  void _scheduleRefresh() {
+    if (_conversation.pending) {
+      _refreshTimer = Timer(pendingTurnRefreshInterval, _refreshPendingTurns);
+    }
+  }
+
+  Future<void> _refreshPendingTurns() async {
+    try {
+      final latest = await widget.service.get(_conversation.id);
+      if (!mounted || latest.id != _conversation.id) return;
+      if (!latest.pending) {
+        setState(() => _conversation = latest);
+      }
+    } catch (_) {
+      // Keep the last confirmed status if history could not be refreshed.
+    } finally {
+      if (mounted) _scheduleRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversation = _conversation;
+    return ChatScreen(
+      // When the pending request finishes, display the newly fetched turns.
+      key: ObjectKey(conversation),
+      service: _chat,
+      conversationName:
+          conversation.personaName ?? (widget.service.isDemo ? '엄마' : '대화 상대'),
+      initialVoiceMode: widget.voice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
       initialReplies: conversation.replyMetadata,
@@ -24,23 +94,33 @@ Future<void> openConversation(
           ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
           : null,
       blockedReason: conversation.pending
-          ? '아직 처리 중인 메시지가 있어요. 이력으로 돌아가 새로고침해 주세요.'
+          ? '아직 처리 중인 메시지가 있어요. 상태를 다시 확인할 때까지 기다리거나 이력에서 새로고침해 주세요.'
           : null,
-    ),
-  ),
-);
+    );
+  }
+}
 
 Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
+  ConversationPersona? persona,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
     isDemo: service.isDemo,
   );
   if (acknowledgedAt == null || !context.mounted) return;
-  final conversation = await service.create(acknowledgedAt, voice: voice);
+  final personaService = service is PersonaConversationService
+      ? service as PersonaConversationService
+      : null;
+  final conversation = persona != null && personaService != null
+      ? await personaService.createForPersona(
+          persona.id,
+          acknowledgedAt,
+          voice: voice,
+        )
+      : await service.create(acknowledgedAt, voice: voice);
   if (!context.mounted) return;
   await openConversation(context, service, conversation, voice: voice);
 }
@@ -50,9 +130,11 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     required this.service,
     this.bottomNavigationBar,
+    this.selectedPersona,
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
+  final ConversationPersona? selectedPersona;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -148,7 +230,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       );
       if (voice == null || !mounted) return;
-      await startConversation(context, widget.service, voice: voice);
+      await startConversation(
+        context,
+        widget.service,
+        voice: voice,
+        persona: widget.selectedPersona,
+      );
       if (mounted) await _load();
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
