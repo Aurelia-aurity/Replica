@@ -8,7 +8,6 @@ from unittest.mock import Mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import github_project as gp
 import project_status_request as helper
-import sync_engine as se
 
 
 ID = "11111111-1111-4111-8111-111111111111"
@@ -28,17 +27,17 @@ class Relay:
         if path == "/agent-prepare":
             self.body = value; self.state = "PREPARED"
         elif path == "/agent-attempt":
-            if self.state != "PREPARED": raise se.SyncError("synthetic reservation already attempted")
+            if self.state != "PREPARED": raise gp.SyncError("synthetic reservation already attempted")
             self.state = "ATTEMPTING"
         elif path == "/agent-abort":
-            if self.state not in {"PREPARED", "ABORTED"}: raise se.SyncError("synthetic attempted fence")
+            if self.state not in {"PREPARED", "ABORTED"}: raise gp.SyncError("synthetic attempted fence")
             self.state = "ABORTED"
         elif path == "/agent-request":
             self.state = "CONFIRMED" if value["kind"] == "mutation" else "CONFIRMED_NOOP"
         elif path == "/agent-outcome":
             self.state = "REJECTED_FENCED" if value["outcome"] == "rejected" else "UNKNOWN_FENCED"
         if self.lose == path:
-            self.lose = None; raise se.SyncError("synthetic response loss")
+            self.lose = None; raise gp.SyncError("synthetic response loss")
         response = {"operation_id": ID, "binding": helper.digest(self.body), "state": self.state}
         if path == "/agent-attempt": response["newly_authorized"] = True
         if path == "/agent-request": response["sync_queued"] = True
@@ -107,7 +106,7 @@ class ProjectHelperTests(unittest.TestCase):
         def unknown(body):
             self.mutations += 1
             self.current = snapshot("준비 중")
-            raise se.SyncError("synthetic timeout; may have written")
+            raise gp.SyncError("synthetic timeout; may have written")
         self.assertEqual(self.invoke(mutate=unknown)["outcome"], "UNKNOWN_FENCED")
         self.current = snapshot("진행 중")
         self.invoke(); self.assertEqual(self.mutations, 1)
@@ -137,10 +136,10 @@ class ProjectHelperTests(unittest.TestCase):
 
     def test_same_operation_local_lock_and_changed_relay_binding_fail_before_mutation(self):
         with self.journal.locked():
-            with self.assertRaises(se.SyncError): self.invoke()
+            with self.assertRaises(gp.SyncError): self.invoke()
         self.assertEqual(self.mutations, 0)
         self.invoke(); self.relay.base = "https://other.synthetic.workers.dev"
-        with self.assertRaises(se.SyncError): self.invoke()
+        with self.assertRaises(gp.SyncError): self.invoke()
         self.assertEqual(self.mutations, 1)
 
     def test_source_changed_after_mutation_is_fenced_not_success(self):
@@ -150,10 +149,10 @@ class ProjectHelperTests(unittest.TestCase):
         self.assertEqual(self.mutations, 1)
 
     def test_invalid_terminal_target_and_missing_issue_abort_flag_do_not_write(self):
-        with self.assertRaises(se.SyncError):
+        with self.assertRaises(gp.SyncError):
             helper.run_helper(self.journal, self.relay, self.reader, self.mutate,
                 issue_number=18, page_id=PAGE, target="완료", options=gp.EXPECTED_STATUS_OPTIONS)
-        with self.assertRaises(se.SyncError): self.invoke(abort=True)
+        with self.assertRaises(gp.SyncError): self.invoke(abort=True)
         self.assertEqual(self.relay.calls, [])
 
 

@@ -239,6 +239,13 @@
           "minLength": 36,
           "maxLength": 36
         },
+        "speaker_role": {
+          "enum": [
+            "persona",
+            "provider",
+            "other"
+          ]
+        },
         "content": {
           "type": "string",
           "minLength": 1,
@@ -250,6 +257,7 @@
         "chunk_id",
         "record_id",
         "text_version_id",
+        "speaker_role",
         "content"
       ],
       "additionalProperties": false
@@ -405,6 +413,26 @@
           "minLength": 36,
           "maxLength": 36
         },
+        "persona": {
+          "type": "object",
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "provider_address": {
+              "type": ["string", "null"],
+              "minLength": 1,
+              "maxLength": 50
+            }
+          },
+          "required": [
+            "display_name",
+            "provider_address"
+          ],
+          "additionalProperties": false
+        },
         "source_revision": {
           "type": "integer",
           "minimum": 0
@@ -438,6 +466,7 @@
       "required": [
         "request_id",
         "persona_id",
+        "persona",
         "source_revision",
         "message",
         "history",

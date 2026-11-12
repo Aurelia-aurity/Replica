@@ -1,140 +1,123 @@
 # GitHub Project ↔ Notion 동기화
 
-> **현재 계약:** 사용자 화면 상태는 `백로그`·`준비 중`·`진행 중`·`검토 중`·`완료`·`취소`의 6개입니다. 양방향 요청은 기존 일반 상태 3개만 받습니다. Notion `요청 상태`와 `요청 처리` 선택지는 각각 기존 5개를 유지합니다. 실제 Project/Notion 변경과 운영 전환은 코드 리뷰와 별도 PM 승인 뒤 수행합니다.
+> **현재 계약:** 사용자 화면 상태는 `백로그`·`준비 중`·`진행 중`·`검토 중`·`완료`·`취소`의 6개입니다. GitHub 사실을 우선하고 한쪽만 변경되면 그 변경을 전파하며 양쪽이 서로 다른 값으로 변경되면 Notion 값을 우선합니다. 엔진의 영구 보류는 두지 않습니다. 실제 Project/Notion 변경과 운영 전환은 코드 리뷰와 별도 PM 승인 뒤 수행합니다.
 
-GitHub 이슈·PR의 종료·재오픈·연결 PR 사실을 우선합니다. 일반 작업 상태는 Project에서 변경하며, 양방향 전환 후 Notion 보드 이동도 변경 요청으로 처리합니다. Notion은 일정·메모·자료를 보존합니다. Python 표준 라이브러리와 GitHub Actions로 운영합니다.
+GitHub 이슈·PR의 종료·재오픈·연결 PR 사실을 우선합니다. 작업 상태는 GitHub Project와 Notion 보드 양쪽에서 변경할 수 있으며 `sync_simple.py`가 전체 대조를 수행하고 `notion_sync.py`가 실행 진입점입니다. `ordinary_sync_request.py`는 정확한 `main` SHA·워크플로·저장소·실행자·첫 번째 실행 시도(`attempt=1`)와 relay의 일회용 실행 허가를 검증한 뒤 전체 동기화를 호출하며 이미 확보한 전체 동기화 사실 스냅샷과 확정된 Project 결과를 수집 단계에서 그대로 재사용해 저장소 사실을 두 번 조회하지 않습니다. Notion은 일정·메모·페이지 본문과 사용자 정의 속성을 보존합니다. Python 3.9 호환 표준 라이브러리와 GitHub Actions로 운영합니다.
 
-## 팀 사용 방법
+## 팀 사용 방법 및 상태 규칙
 
-작업은 GitHub 이슈로 만들고 관련 PR에 `Closes #번호` 등 명시적인 종료 연결을 둡니다. 6개 작업 상태는 Replica GitHub Project와 동기화합니다. 기존 `NOTION_BIDIRECTIONAL_ENABLED` 값을 보존하며, 이 값이 true인 경우 백로그·준비 중·진행 중 사이 Notion 카드 이동을 요청으로 처리합니다. 역방향·단계 건너뛰기도 허용합니다. `취소`는 GitHub에서 검증한 종료 사실을 표시하는 종단 상태이며 요청 대상으로 받지 않습니다. 일정·메모·페이지 본문은 보존합니다.
-
-Notion 카드 이동은 변경 기반 relay가 전체 동기화 실행을 요청해 처리하며, 5분 예약 실행은 누락 복구용입니다. 반영 시간은 보장하지 않습니다. 감지 전에는 접수 표시가 없고 감지 후 반영 대기, 확인 완료 후 반영 완료로 표시합니다. 거절·충돌은 요청 상태와 사유를 남기고 유효한 GitHub 위치로 복원합니다. 중간 이동 이력은 저장하지 않습니다. 양쪽 다른 값의 변경 순서가 입증되지 않으면 PM 확인으로 넘깁니다. Notion 페이지 수정 시각이나 마지막 편집자를 상태 이동 시각·요청자로 추정하지 않습니다.
-
-공개 링크 편집을 유지하므로 외부인의 카드 이동도 요청이 될 수 있습니다. 내부 기록도 편집 가능하며 숨김·schema·hash는 승인 인증 수단이 아닙니다. 정상 PM 재개 경로는 numeric PM actor·새 workflow_dispatch·첫 attempt·triggering actor 일치 검사를 유지하지만 내부 기록 변조를 기술적으로 차단하지 않습니다. 쓰기 직전 재조회와 사후 확인을 수행하되 조건부 쓰기가 없는 짧은 경쟁 구간의 이동 손실 가능성은 남습니다. 상태와 종료 사유를 계산하는 기준은 [sync_engine.py](../../scripts/sync_engine.py), 운영·실행 절차는 이 문서를 따릅니다.
+작업은 GitHub 이슈로 만들고 관련 PR에 `Closes #번호` 등 같은 저장소 `main` 대상의 명시적인 종료 연결을 둡니다. 6개 작업 상태는 Replica GitHub Project와 Notion 데이터 소스 사이에서 동기화합니다.
 
 | 상태 | 기준 |
 | --- | --- |
 | 백로그 | 새 작업, 착수 준비 전 |
 | 준비 중 | 담당·범위·선행 작업 정리 중 |
 | 진행 중 | 작업 진행 중 |
-| 검토 중 | main에 종료 연결된 열린 PR이 리뷰 가능 |
-| 완료 | 이슈가 완료 사유로 종료됨 |
-| 취소 | 이슈가 미계획 또는 중복 사유로 종료됨 |
+| 검토 중 | 같은 저장소 `main`에 종료 연결된 열린 Draft가 아닌 PR이 있음 |
+| 완료 | 이슈가 `COMPLETED` 사유로 종료됨 |
+| 취소 | 이슈가 `NOT_PLANNED` 또는 `DUPLICATE` 사유로 종료됨 |
 
-새 이슈는 백로그, 재오픈은 리뷰 가능한 연결 PR이 있으면 검토 중, 없으면 백로그로 한 번 전환합니다. Draft는 제외합니다. 마지막 리뷰 가능한 PR이 없어지면 진행 중으로 한 번 복귀하며, 이후 팀원이 바꾼 일반 상태는 보존합니다. PR 병합 자체로 완료를 추정하지 않습니다.
+상태 결정과 전파 규칙은 다음과 같습니다.
 
-`COMPLETED` 종료는 `완료`, 확인된 `NOT_PLANNED`·`DUPLICATE` 종료는 `취소`로 표시합니다. 알 수 없거나 모순된 종료 사유는 추정하지 않고 기존 보류·확인 경로를 따릅니다. 일정은 보존합니다. 중복 대표 링크는 GitHub의 검증된 명시적 관계만 사용합니다. 링크가 없는 중복도 `취소`로 표시하고 대표 이슈 확인 안내를 남깁니다.
+1. **이슈 종료·재오픈 및 연결 PR 사실 우선:**
+   - GitHub 이슈가 `COMPLETED`로 닫히면 양쪽을 `완료`로 맞추고 `NOT_PLANNED` 또는 `DUPLICATE`로 닫히면 `취소`로 맞춥니다. 종료 사유를 알 수 없으면 상태를 쓰지 않고 `확인 필요`에 안내를 남깁니다.
+   - 닫혔던 이슈가 다시 열릴 때 같은 저장소 `main` 대상의 열려 있고 Draft가 아닌 종료 연결 PR이 있으면 `검토 중`, 없으면 `백로그`로 한 번 전환합니다.
+   - 열린 이슈에 조건을 만족하는 리뷰 가능한 첫 PR이 생기면 `검토 중`으로 한 번 전환하고 리뷰 가능한 마지막 PR이 사라지면 `진행 중`으로 한 번 전환합니다.
+   - 동기화 엔진은 어떤 경우에도 GitHub 이슈를 자동으로 닫거나 다시 열지 않습니다.
+2. **양방향 전파와 충돌 해결:**
+   - 마지막 동기화 기준(`동기화 기준`)과 비교해 Project와 Notion 중 한쪽만 바뀌었으면 바뀐 쪽의 값을 다른 쪽으로 전파합니다.
+   - 양쪽이 서로 다른 유효한 값으로 바뀌었으면 Notion 값을 우선해 Project에 반영합니다.
+3. **수동 `검토 중` 및 `취소` 제한:**
+   - 조건을 만족하는 리뷰 가능한 열린 PR이 없는데 어느 한쪽을 수동으로 `검토 중`으로 옮기면 마지막 동기화 기준 상태로 되돌리고 `확인 필요`를 남깁니다.
+   - Notion 상태가 유효하지 않거나 비어 있거나 열린 이슈에서 새로 일방적인 `취소` 변경이 발생했을 때, 동시에 유효한 Project 편집이 있으면 Project 값을 우선하고 Notion만 해당 유효한 Project 값으로 복원하며 `확인 필요`를 남깁니다. 그러한 유효한 동시 Project 편집이 없으면 알고 있는 기준선이나 참조 상태로 복원하고 `확인 필요`를 남깁니다. 이미 전파되어 양쪽이 `취소`로 같으면 체크포인트 저장에 실패했더라도 다음 실행에서 그 값을 유지합니다.
+   - 카드의 `확인 필요`는 고정된 안내 문구만 표시하므로, 구체적인 사유는 GitHub Actions의 실행 계획과 결과 산출물에서 확인합니다.
 
-종료 정보 모순·최초 이관 충돌은 `보류:` 안내를 표시하고 Project 상태를 보존합니다. 다른 정상 이슈는 계속 처리합니다. 값이 맞아져도 PM 지정 재개 전에는 보류를 해제하지 않습니다. 최초 이관 대상인 기존 열린 이슈의 상태가 미지정이고 검토·재오픈 자동 규칙도 적용되지 않으면 보류합니다. PM이 Project에서 백로그·준비 중·진행 중 중 하나를 정한 뒤 새 수동 실행으로 재개합니다.
+## 확인 필요 표시
 
-Issue 제목은 `#번호 원본 제목`, 담당자·라벨은 쉼표 구분 문자열로 표시합니다. PR은 메타데이터만 동기화하고 Issue 상태 규칙을 적용하지 않습니다. GitHub 본문·댓글·코드·이메일을 복사하지 않으며 기여도 점수는 계산하지 않습니다. Discord 전달은 별도 [알림 작업](../discord.md)이 담당하고 동기화 작업은 비밀 없는 실행 결과 artifact만 제공합니다.
+`확인 필요`는 특정 시점의 판단 결과를 알리는 고정 진단 표시입니다. 영구적인 보류나 쓰기 실패의 증거가 아닙니다. 거부된 상태 편집을 기준선으로 복원하고 체크포인트를 기록한 뒤에도 양쪽 보드 상태가 체크포인트와 일치하고 GitHub 상태·사유·ready 사실이 바뀌지 않는 동안에는 기존 `확인 필요` 표시를 유지합니다.
 
-## 화면 구성
+- 사용자가 확인을 마친 뒤 `확인 필요`를 직접 지우면 이후 스캔에서 관련 입력이 바뀌지 않는 한 해제된 상태를 유지합니다.
+- 이미 안정된 행에 사용자가 수동으로 `확인 필요`를 표시한 경우에도 동일하게 유지합니다.
+- 이후 상태나 GitHub 사실 입력이 변경되면 다음 정상 동기화 판단에서 표시가 해제되거나 새로운 진단 결과가 기록될 수 있습니다.
 
-상단은 **통합 보드 · 전체 이슈** 두 탭입니다. 보드는 6단계 순서를 사용하고 카드에 담당자·일정·라벨을 표시합니다. `취소` 빈 그룹 노출은 실제 rollout 화면에서 확인하며, 그 확인 전에는 보기를 임의로 바꾸지 않습니다. 번호는 제목에 포함합니다.
+요약 보고서의 `counts.needs_confirmation` 수치와 표의 `Note` 열에는 이미 정상 복원·안정화된 행에 남아 있는 `확인 필요` 표시도 포함됩니다. 해당 건수만으로 미해결 동기화 오류나 반영 실패가 발생했다고 해석하지 말고 각 항목의 실제 `outcome`, 쓰기 여부, 현재 실행 계획을 함께 확인해야 합니다.
 
-현재 board/calendar 필터는 Issue이며 상태가 있고, GitHub가 Open이거나 Closed/종료 사유 완료인 항목만 표시합니다. 검증된 미계획·중복 종료 Issue는 기존 종료 사유 조건에 따라 두 보기에서 빠지고, 전체 이슈에는 종료 사유·대표 링크·확인 안내와 함께 표시됩니다. 열린 Issue가 Project의 `취소` 값 때문에 PM 보류 중이면 Open 조건을 만족하므로 보드에 남을 수 있습니다. 필터는 유지하고 실제 rollout 화면에서 결과를 확인합니다.
+## 동기화 기준과 쓰기 순서
 
-보드에 Project 링크와 양방향 요청·처리 표시·공개 링크 편집 범위 안내를 둡니다. 접힌 운영 안내의 Sync 관리행은 제목에서 최근 전체 완료/부분 반영 결과와 시각을, 확인 필요에서 보류 개수·번호를, 동기화 시각에서 마지막 전체 성공 시각을 확인합니다. GitHub URL은 고정 Notion sync workflow로 연결됩니다. 자동화는 관리행의 요약만 갱신하며 개인 메모·일정·페이지 본문을 덮지 않습니다. 발표·회의 캘린더·개발 간트·마일스톤 DB는 변경하지 않습니다. 로딩 25개·빈 열·더보기·필터는 실제 UI에서 검증합니다.
+새 숨김 `rich_text` 속성인 `동기화 기준`에 `{v:1,status,facts:{closed,reason,ready}}` 형식의 압축 JSON으로 마지막 확인 상태를 기록합니다.
 
-## 설정
+- **쓰기 및 검증 순서:** 항목을 갱신할 때는 **Project 상태 변경(및 재조회 확인) → Notion 표시 속성 갱신(및 재조회 확인) → Notion `동기화 기준` 체크포인트 갱신(및 재조회 확인)** 순서로 진행합니다. 상태 변경이 없는 행은 전체 목록 조회 뒤 직접 Project 단건 재조회 1회로 확인하며 쓰기 대상 행은 쓰기 직전 상태·체크포인트 검증과 순서대로 재조회 확인을 유지합니다.
+- **손상된 기준선 격리와 부분 실패 처리:** `동기화 기준` 형식이 손상된 경우에는 과거 레거시 상태로 대체하지 않고 해당 Issue만 건너뛰며 데이터와 체크포인트를 수정하지 않습니다. 보고서와 표준 오류(`stderr`)에는 깨진 원문 대신 해당 Issue 번호와 고정된 `INVALID_CHECKPOINT` 진단 코드만 남기고 다른 유효한 행은 계속 처리합니다. 각 Notion PATCH 직전에 페이지를 다시 조회해 작업 상태나 체크포인트가 중간에 바뀌었으면 해당 항목은 이번 실행에서 건너뛰고 다음 전체 스캔에서 처리합니다. 엔진의 영구 보류는 두지 않습니다. 실패한 행이 하나라도 있으면 전체 실행은 실패로 끝나지만 완료된 계획 산출물에서 해당 행을 확인할 수 있습니다. 체크포인트 PATCH 요청이 수락된 뒤 응답만 유실된 경우 실제로는 저장되었을 수 있으나 해당 실행을 성공으로 보고하지는 않습니다.
 
-실행 설정은 Actions Variables, 토큰은 Secrets에 등록합니다. Notion 연결 ID는 공개 문서에 적지 않습니다. Project의 고정 식별자와 설정은 조회 결과로 함께 검증합니다. MCP/로컬 gh 로그인은 Actions 인증 성공의 근거가 아닙니다. 토큰 값을 채팅·파일·로그에 남기지 않습니다.
+## 이관과 항목 생성·보존
 
-| Secrets | 목적 |
-| --- | --- |
-| `PROJECT_TOKEN` | 지정 개인 Project 읽기·상태 변경 |
-| `NOTION_TOKEN` | 지정 Notion 데이터 소스 읽기·생성·수정 |
+이관 시에는 유효한 신규 체크포인트(`동기화 기준`)를 우선 사용합니다. 없을 때는 올바르게 바인딩된 유효한 레거시 `동기화 내부 상태`에서 알려진 마지막 상태를 가져옵니다. 레거시 상태가 `matching_fingerprint`이면 현재 사실(GitHub state/reason/ready)도 정확한 것으로 인정합니다. `reconstructed`나 `unknown_facts`인 경우에는 과거의 재오픈이나 ready 전환 이력을 증명하지 못합니다. 후자의 두 경우에는 `decide` 단계에서 이전 사실을 `None`으로 두고 알려진 마지막 상태와 현재 Notion·GitHub Project 상태 및 현재 GitHub 사실만을 사용합니다. 추정된 과거 전환은 다시 적용하지 않습니다.
 
-저장소 조회는 Actions의 읽기 전용 `GITHUB_TOKEN`을 사용하며 Project 토큰과 분리합니다. 접근 실패 시 다른 토큰으로 우회하지 않습니다.
+초기 정렬은 다음 조건에 따라 판정합니다.
 
-| Variables | 의미 |
-| --- | --- |
-| `NOTION_SYNC_ENABLED` | 전환 중 false, 운영 준비 후 true |
-| `NOTION_BIDIRECTIONAL_ENABLED` | Actions repository Variable. 현재 저장된 값을 전환 내내 보존합니다. true이면 기존 요청 흐름을 계속 처리하며, 무조건 false로 바꾸지 않습니다. 운영자가 rollout 중 일시 중지한 경우 검증 후 정확한 이전 값을 복원하고 readback합니다. |
-| `NOTION_DATA_SOURCE_ID` | 기존 데이터 소스 UUID |
-| `NOTION_CONTROL_PAGE_ID` | 기존 Sync 관리행 UUID |
-| `PROJECT_ID` | Just-Simple0의 비공개 Replica Project #4 node ID |
-| `PROJECT_OWNER_ID` | Project 소유자의 고정 node ID |
-| `PROJECT_STATUS_FIELD_ID` | Status single-select 필드 node ID |
-| `PROJECT_STATUS_OPTIONS` | 6개 상태 이름 → 실제 옵션 ID의 JSON 객체. 기존 5개 ID를 그대로 두고 `취소` ID는 Project 필드 readback 후에만 추가합니다. |
-| `PM_GITHUB_USER_ID` | 재개를 승인할 PM의 고정 numeric user ID |
+- **사용 가능한 기준선이 없는 기존 양쪽 보드**: 현재 두 보드의 값이 동일한 유효 상태인 경우에만 그 상태로 수렴합니다. 두 값이 다르거나 유효하지 않으면 현재 닫힌(CLOSED) 이슈를 포함해 기존 보드를 덮어쓰지 않고 초기 정렬을 요구합니다. 아래의 지원되지 않는 `검토 중` 상태도 초기 정렬 대상입니다.
+- **현재 OPEN 이슈에 닫힌 기준선(`완료`/`취소`)이 남아 있는 근사 이력**: GitHub 이슈는 `OPEN`인데 근사 이력(`reconstructed` / `unknown_facts`)의 직전 기준선이 과거 종료 상태(`완료` 또는 `취소`)에 머물러 있는 경우, GitHub Project와 Notion의 현재 카드 상태가 직전 기준선과 다른 동일한 유효 상태로 맞춰져 있을 때만 그 값을 새 기준선으로 기록합니다. 다만 `검토 중`은 해당 이슈의 리뷰 가능한 종료 연결 PR이 확인될 때만 허용됩니다. 세 곳 모두 기존 종료 상태와 똑같이 남아 있으면(`완료`/`완료`/`완료` 또는 `취소`/`취소`/`취소`) `초기 정렬` 및 `확인 필요` 상태를 유지하며 상태나 체크포인트를 덮어쓰지 않습니다. 양쪽 보드 상태가 불일치하거나 빈 값, 무효 값, 누락 항목이 있는 경우에는 초기 정렬 대상을 유지하며 상태 및 체크포인트 쓰기 없이 확인 필요 항목으로 분류합니다.
+- **유효한 레거시 기준선이 있는 닫힌 이슈**: 위 경우에 해당하지 않는 한 현재 `CLOSED`/`COMPLETED`는 `완료`로, `CLOSED`/`NOT_PLANNED` 또는 `DUPLICATE`는 `취소`로 수렴합니다. 현재 양쪽 보드 값이 서로 다르더라도 정확한 현재 사실을 그대로 적용합니다. 닫힘 사유를 알 수 없는 경우에는 상태 쓰기 없이 `확인 필요`만 남깁니다.
+- **근사 이력이 있는 OPEN 이슈에서 양쪽 보드가 서로 다른 유효 값인 경우**: 원칙적으로 초기 정렬을 요구합니다. 위의 닫힌 기준선이 남은 경우를 제외하고 한쪽 보드가 유효한 기준선을 유지하고 있으면 반대편의 부적격 변경을 해당 기준선으로 되돌리는 정확한 규칙 3 복원을 허용합니다.
+  - 예: 기준선이 `백로그`이고 리뷰 가능한 종료 연결 PR 없이 Notion이 `검토 중`, Project가 `백로그`이면 Notion만 `백로그`로 복원합니다(반대 방향이면 Project만 복원).
+  - 유지된 기준선 위에서 Notion만 단독으로 `취소`로 바꾼 경우에도 기준선으로 되돌립니다.
+  - 일반 상태의 기준선이 알려진 상태에서 리뷰 가능한 PR 없이 양쪽 모두 `검토 중`이 된 경우에도 해당 기준선으로 복원합니다.
+  - 반면 OPEN 이슈에 리뷰 가능한 종료 연결 PR이 없을 때 복원할 다른 유효 기준선도 없고 수렴할 미변경 보드도 없다면 `검토 중`을 초기 목표로 삼을 수 없습니다. 기준선 자체가 이미 `검토 중`이거나 기준선 없이 양쪽 모두 `검토 중`인데 리뷰 가능한 PR이 없으면 초기 정렬을 요구합니다.
+- **빈 값 또는 유효하지 않은 셀 처리**: 위의 닫힌 기준선이 남은 OPEN 이슈를 제외하면 빈 값·무효 셀이 모두 PM 개입을 요구하지는 않습니다. 정확한 입력만 사용하여 반대편의 유효한 현재 편집값이나 알려진 유효 기준선으로 복원하고 `확인 필요`를 표시합니다. 다만 거부된 쪽을 복원한 뒤에도 두 보드 값이 여전히 다르거나 참조할 목표 상태 자체가 유효하지 않다면 초기 정렬을 요구합니다.
+- **OPEN 이슈의 수동 `완료`/`취소`**: 일반적인 `OPEN` 이슈의 수동 `완료`/`취소` 처리 규칙은 기존과 동일합니다. `완료`는 일반 전파 규칙을 따르며 `취소`는 GitHub Project에서 변경되었거나 이미 양쪽 보드가 `취소`로 같을 때만 수용하고 Notion에서만 새로 바뀐 `취소`는 충돌 규칙 3에 따라 직전 기준선으로 되돌립니다(GitHub Project가 다른 유효 상태로 함께 변경된 경우 Project 값을 우선). 어느 경우든 동기화 엔진이 GitHub 이슈를 자동으로 닫지는 않으며 이 일반 수동 종료 규칙은 과거 종료 기준선이 남은 재오픈 이슈의 초기 정렬 규칙과 별개로 동작합니다.
 
-```json
-{"백로그":"option-backlog","준비 중":"option-ready","진행 중":"option-progress","검토 중":"option-review","완료":"option-done","취소":"operator-bound-cancel-option-id"}
-```
+초기 정렬로 판정되면 목표 상태는 `None`이 되고 Project·Notion 상태 및 체크포인트 쓰기는 생략됩니다. 실행 보고서 `Note`에는 `초기 정렬`, 카드에는 `확인 필요`가 기록되며 dry-run에서는 `Migration review` 항목으로 집계됩니다(일반 메타데이터 갱신은 계속 수행될 수 있습니다).
 
-위 옵션 ID는 설명용 값입니다. 실제 ID를 추정하지 말고 Project Status 필드의 실제 readback 결과에서 `취소` ID를 얻은 뒤 6개 이름·ID 전체를 비교합니다. 기존 5개 ID는 바꾸지 않습니다. Project 접근 권한이 있는 인증으로 아래 읽기 전용 쿼리를 실행하면 Project·Status 필드·옵션 ID를 확인할 수 있습니다. 기존 로컬 인증에 권한이 없다면 등록된 Actions secret을 꺼내지 말고 PM의 승인된 인증 경로에서 확인합니다.
+재오픈된 이슈가 과거 종료 기준선 때문에 초기 정렬로 남은 경우, PM이 현재 GitHub 이슈·연결된 PR 상태와 양쪽 보드 값, 직전 기준선을 직접 확인해 정리합니다. 다시 열린 이슈를 `완료`/`취소`로 두려면 이슈를 다시 닫고, 아니면 양쪽 카드를 같은 비종료 상태로 맞추면 다음 실행에서 기록됩니다(이때 `검토 중`으로 맞추려면 리뷰 가능한 종료 연결 PR이 먼저 있어야 합니다). GitHub Project 카드가 빠져 있다면 먼저 카드를 수동으로 추가한 뒤 Notion과 동일한 값으로 맞춰야 양쪽 일치 규칙이 적용됩니다. 조치 후에는 `--dry-run`으로 예상 전이를 먼저 확인하고 실제 스캔을 실행해 체크포인트가 갱신되었는지 검증합니다. 레거시 `동기화 내부 상태` 필드의 동작은 기존과 달라지지 않습니다. 이 과정에서 동기화 기준이나 동기화 내부 상태를 수동으로 수정하거나 삭제할 필요는 없습니다.
 
-```sh
-gh api graphql -f query='query { user(login: "Just-Simple0") { id projectV2(number: 4) { id number owner { ... on User { id login } } fields(first: 100) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } pageInfo { hasNextPage endCursor } } } } }'
-```
+- **누락 항목 생성 및 보관 항목 처리:** 한쪽에만 있는 항목은 알고 있는 유효한 쪽 또는 기준선 상태로 누락된 쪽(Project 카드 또는 Notion 페이지)을 생성합니다. 양쪽 모두 상태가 없는 새 열린 이슈는 `백로그`로 생성합니다. 다만 Notion 페이지가 없는데 유효한 목표 상태를 정할 수 없는 경우(종료 사유 불명 또는 지원되지 않는 리뷰 상태 등)에는 페이지를 새로 만들지 않고 보고서에만 기록합니다. 보관(archived)된 Project 아이템은 복구하거나 다시 추가하지 않고 Project 상태나 체크포인트도 바꾸지 않지만 이미 존재하는 활성 Notion Issue 페이지에는 GitHub 소유 메타데이터와 종료 필드를 계속 반영하며 작업 상태·체크포인트·사용자 필드는 건드리지 않습니다. Notion 페이지가 없고 Project 아이템이 보관된 경우에는 동기화 대상에서 제외합니다. Project에서 아이템을 보관이 아닌 단순 삭제(remove)하면 알고 있는 원본을 기준으로 다시 추가되므로, 동기화에서 제외하려면 반드시 보관(archive) 기능을 사용해야 합니다. 휴지통에 있는 Notion 페이지는 자동으로 다시 만들거나 복구하지 않습니다.
 
-hasNextPage가 true이면 후속 페이지를 읽어 Status 필드를 확인해야 합니다. field/option ID를 이름에서 추정하거나 API 권한 확인 없이 입력하지 않습니다.
- 팀원 Project 편집 권한은 저장소 collaborator 권한과 별도로 확인합니다.
+## 메타데이터와 화면 표시
 
-## 적용 순서
+- **식별자 및 REST 교차 검증:** Issue와 PR 모두 저장소 REST ID + legacy `/issues` ID 및 `종류` + `번호`로 대상을 식별합니다. REST PR 교차 검증은 PR마다 개별 `/pulls/{n}`을 호출하는 대신 페이지네이션된 `/pulls?state=all`(페이지당 100개)을 사용하며 식별자·상태·base 브랜치·병합 여부에 대한 모든 기존 검증을 유지합니다. 54개 Issue와 47개 PR로 구성된 결정론적 CLI 픽스처 기준 합성 호출 예산은 REST 요청 5회(실행 결속 확인 1회 + 저장소 조회 1회 + `/issues` 페이지 2회 + `/pulls` 목록 1회)이며 이는 합성 호출 수 계산치이고 실제 라이브 API 측정값은 아닙니다.
+- **표시 항목:** Issue 제목은 `#번호 원본 제목` 형식으로 맞추고 PR 제목은 원본을 유지합니다. 작성자, 정렬된 쉼표 구분 담당자·라벨, GitHub URL·상태·수정 시각, 동기화 키·시각, 이슈 종료 사유와 중복 대표 이슈 URL을 유지하며 변경된 값만 씁니다.
+- **시각 및 사용자 영역 보존:** 표시용 날짜(`GitHub 수정`, `동기화 시각`)는 UTC 분 단위로 기록합니다. 사용자가 작성하는 `일정`, `메모`, 페이지 본문 및 그 밖의 사용자 속성은 수정하지 않습니다.
+- **과거 필드 정리:** 기존 `동기화 내부 상태` 속성은 롤백을 위해 남겨 두되 새 엔진은 갱신하지 않습니다. 과거 요청 상태·요청 처리 필드, Pending create 기록, Sync 관리행 요약은 이력용으로만 남기며 더 이상 갱신하지 않습니다. 운영 전환 시 과거 Sync 관리행은 정상 상태 신호로 오해하지 않도록 숨기거나 이력용 행임을 표시합니다. 실행 결과는 GitHub Actions 보고서와 실행 산출물에서 확인합니다. 같은 엔진이 `--dry-run`을 지원하므로 별도 shadow 모드는 제거했고 구형 전체 엔진·보류·재개 CLI(`resolve_issue_numbers` 등)도 삭제했습니다.
 
-1. 코드 변경의 독립 리뷰와 보호된 `main` 반영 승인을 마친 뒤, 운영 담당자는 당시 Actions 설정값을 기록합니다. 자동 실행을 일시 중지하거나 설정을 바꾸면 이전의 정확한 값을 보존하고 검증 후 복원합니다. 양방향 설정은 현재 값이 true이므로 무조건 false로 바꾸지 않습니다.
-2. 새 consumer 코드를 반영합니다. 아직 기존 5개 Project 옵션과 Notion schema라면 새 consumer의 정확한 6개 옵션·schema 사전검사가 쓰기 없이 실패해야 합니다. 기존 consumer도 새 옵션이 추가되기 전까지는 기존 계약으로 동작합니다.
-3. PM이 Project의 동일 Status 필드에 `취소` 옵션을 추가하고 실제 ID를 읽습니다. Actions `PROJECT_STATUS_OPTIONS`에는 기존 5개 name/ID를 그대로 두고 읽은 `취소` ID만 추가합니다. 6개 전체의 실제 필드 readback과 Actions mapping이 일치하지 않으면 진행하지 않습니다.
-4. Notion `작업 상태`에 `취소` 옵션을 추가하고 readback합니다. `요청 상태`의 다섯 기존 작업 상태와 `요청 처리`의 다섯 처리 상태는 그대로 둡니다. 기존 board/calendar 필터가 취소를 제외하는지, 전체 이슈의 종료 사유·대표 링크가 보이는지, `hideEmptyGroups=false`에 따른 빈 취소 열을 실제 화면에서 확인합니다. 구체 화면을 본 뒤 PM이 필요한 보기 변경 여부를 결정합니다.
-5. 전체 원본을 대상으로 trusted `main`에서 dry-run을 실행합니다. `full_effect_report`는 현재 bidirectional 설정을 반영해 전체 Issue·PR·Notion·Project·기존 관리행·복구 상태의 잠재 효과 범위를 나타내며 정확한 실행 write 목록이 아닙니다. source·schema·설정·checkpoint drift가 있으면 다시 실행하고 새 범위를 승인받습니다. 관리행이 없거나 ID/key/type이 맞지 않으면 preflight는 쓰기 없이 실패하고 새 관리행을 만들지 않습니다. 전체 dry-run은 특정 Issue 번호로 제한되지 않습니다.
-6. 보고서 전체 범위에 대한 별도 PM 승인 후에만 전체 실행을 수행합니다. 기존 행 ID·메모·일정·본문, 같은 행에 대한 확인된 백필, 전체 source에서 새로 발견된 적격 Issue/PR 행, Project/Notion 결과, control summary와 복구 상태를 확인합니다. 모순·불명확한 종료 사유는 보류하며 덮어쓰지 않습니다.
-7. 검증 중 바꾼 설정이 있다면 처음 기록한 정확한 값을 복원하고 실제 readback합니다. 기존값이 true이면 true로 복원해 요청 흐름을 유지합니다. 새 Project/Notion 옵션을 삭제하는 대신 문제가 있으면 옵션을 유지하고 승인된 forward-fix를 적용합니다. 후속 반복 실행과 실제 화면을 확인하기 전에는 운영 완료로 기록하지 않습니다.
+## 실행 경계와 알림·증거 산출물
 
-코드 반영 뒤 아직 5개 Project 옵션/Notion 스키마라면 새 코드의 preflight는 쓰기 없이 실패합니다. Project `취소` 옵션 ID가 정확히 바인딩되고 Notion 작업 상태에 취소 선택지가 확인된 뒤에만 sync가 진행됩니다. 새 옵션을 삭제하는 방식으로 되돌리지 말고, 문제가 생기면 기존 설정을 보존한 채 forward-fix합니다.
+- **직렬화 및 실행 조건:** 두 워크플로(`notion-sync.yml`, `notion-sync-request.yml`)는 동일한 `replica-notion-sync` concurrency 그룹을 `cancel-in-progress: false`로 공유해 직렬 실행됩니다.
+- **수동 및 자동 실행:** PM 수동 실행(`workflow_dispatch`)은 입력한 `approved_sha`가 실행 SHA와 일치하고 실행 요청자(`actor`)와 `triggering_actor`가 PM 사용자 ID와 같으며 첫 번째 시도(`run_attempt == 1`)일 때만 허용됩니다. `main` 브랜치는 실제 반영과 dry-run을 모두 허용하고 `feat/101-sync-engine-cutover` 브랜치는 dry-run만 허용합니다. 기존의 5분 간격 GitHub `schedule`, `issues`, `pull_request_target` 트리거도 유지합니다.
+- **실행 산출물 및 알림 호환:** `--dry-run`과 실제 반영은 동일한 계획 생성기를 사용합니다. 공개 실행 산출물인 `sync-simple-plan`은 확정된 반영 결과와 구분하여 Issue 메타데이터 갱신 대상 필드 이름과 PR 생성·갱신·무변경(`create`/`update`/`none`) 계획을 포함하며 이슈 번호·제한된 상태 문자열·불리언·고정된 마커와 결과 코드만 담고 원본 제목·라벨·작성자·체크포인트 원문·본문·토큰은 노출하지 않습니다. 기존 `write_notion` 표시는 상태 쓰기 전용으로 유지합니다. 일반 요청 경로는 콜백 전달 전에 계획 산출물을 먼저 저장하므로 콜백 전송이 실패하더라도 계획 산출물이 남습니다. Discord 알림용 `notification-report`는 schema 2 형식을 유지하고 `holds=[]`를 전달해 실행 실패·복구 알림이 기존대로 동작하도록 합니다. Actions 환경 변수가 없을 때 선택적 알림 보고서 오류가 발생하면 임의의 실행 ID를 만들어내지 않고 트레이스백 없이 고정된 오류 메시지를 출력한 뒤 종료 코드 1로 종료합니다. 삭제된 `collect_holds`와 더 이상 쓰지 않는 재개·진단 환경 변수 검사를 제거한 것은 현재 활성 알림 계약을 바꾸지 않습니다. relay 증거 재전송 명령(`python3 -B scripts/ordinary_sync_request.py --deliver-evidence /absolute/path/notion-relay-evidence.json`)은 저장된 콜백 전달만 재시도하며 실행 허가 요청이나 동기화 엔진을 다시 실행하지 않습니다.
 
-## 실행·보류 재개
+## 주기적 요청과 Relay 연동
 
-```sh
-python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
-python3 -B scripts/notion_sync.py --help
-python3 -B scripts/notion_sync.py --dry-run
-```
+- **분당 cron과 주기적 요청 간격:** Cloudflare Worker의 분당 Cron Trigger(`scheduled()`)는 매분 실행되어 대기 중인 이벤트를 처리하고 주기적 실행 요청 간격 설정인 `PERIODIC_MIN_SECONDS`(기본값 600초/10분, 600 미만이나 잘못된 숫자 값은 거부) 이상 지났으면 주기적 전체 스캔을 요청합니다. 이 10분 간격은 Worker의 주기적 요청에만 적용되며 이벤트 기반 실행이나 별도의 GitHub 5분 예약 실행까지 10분당 1회로 제한하는 것은 아닙니다. 트랜잭션 기반 `request_slot` 및 주기 검사로 중복 cron POST를 막고 두 GitHub 워크플로 전체에 대해 원격 실행 중 여부를 확인합니다. 따라서 Project에서만 상태를 바꾼 경우에도 별도 웹훅 없이 주기적 스캔으로 반영됩니다. 다만 런타임·API·Actions 대기 시간 때문에 일정 시간 이내 즉시 반영을 보장하지는 않습니다. 위 결정론적 픽스처 규모에서 Worker 주기적 요청만 계산한 기본 예산은 시간당 최대 6회 실행·REST 요청 30회이며 GitHub 이벤트와 자체 예약 실행은 여기에 추가됩니다.
+- **주기적 요청 검증 및 복구:** 주기적 요청은 개별 수신 ID를 갖지 않지만 동일한 신뢰된 일반 워크플로와 `main` SHA·지정 사용자 결속·일회용 실행 허가·chunk·seal 검증을 그대로 사용합니다. 전달 여부가 불확실한 요청은 자동으로 재전송하지 않습니다. 수신 ID가 없는 주기적 실행이 명확히 실패로 끝난 경우 증거를 보존한 채 슬롯을 해제해 다음 새로운 전체 대조가 실행될 수 있게 합니다. 반면 기존 수신 기반 요청이나 전달 불확실 펜스는 운영자 복구가 필요합니다.
+- **D1 스키마 마이그레이션과 보존·정리 한도:** Worker 재배포 전에 반드시 새 D1 마이그레이션 `migrations/0004_periodic.sql`을 먼저 적용해야 합니다. 이 마이그레이션은 `created_at`, `(phase,receipt_ids,updated_at)`, `(phase,created_at)`, 수신 기반 요청 집계 및 `receipts(request_id)` 인덱스와 빈 값을 허용하는 열인 `relay_meta.last_periodic_prune_at`을 추가합니다. 정리는 재시작이나 동시 tick 사이에서도 유지되는 영속적 CAS 가드를 사용해 최대 1시간에 한 번만 시도합니다. 활성화된 더 최신 스캔이 존재할 때만 7일이 지난 참조되지 않는 비현재 성공 주기적 요청 기록을 정리하며 실패·불확실 기록과 helper·웹훅 증거는 보존합니다. 기존 상한(수신 기반 일반 요청 1,000건, helper 1,000건, 수신 19,000건, 실행당 관측 20,000행)은 유지하며 주기적 요청 이력은 일반 요청 누적 상한 밖에서 관리합니다. Cloudflare 무료 플랜의 실제 CPU·API·D1(`rows_read`·`rows_written`·저장 용량) 사용량과 실제 주기 간격은 아직 검증되지 않았으며 운영 전환 시 측정해야 합니다.
 
-로컬 실행은 안전하게 전달된 인증 환경이 이미 있을 때만 사용하고 Actions와 동시에 실행하지 않습니다. `NOTION_SYNC_ENABLED`가 비활성이면 일반 로컬 실행도 건너뜁니다. Actions 수동 실행에는 필수 `approved_sha`를 선택 ref의 전체 40자리 SHA와 똑같이 입력합니다. `main`, `fix/17-project-add-readback`, `feat/32-bidirectional-sync` 외 ref/tag, 비PM, actor와 triggering actor 불일치, 재실행, SHA 불일치는 checkout 전에 거부됩니다. 수동 실행만 동기화 프로세스에 enabled=true를 주며 `dry_run=true`는 읽기 전용입니다. 두 feature ref는 번호 없는 dry-run만 허용하고, 실제 쓰기와 번호 지정 보류 재개는 `main`에서만 허용합니다. feature ref 검증은 trusted `main`의 producer·consumer 및 schema2 보고서 검증을 대체하지 않습니다. 운영 dry-run과 제한 실제 검증은 trusted `main`의 동일한 전체 SHA를 사용합니다. 제한 실제 검증은 자동 동기화가 중지된 동안 repository Variable `NOTION_BIDIRECTIONAL_ENABLED=true` 및 수동 `dry_run=false`로 수행합니다. 설정을 바꿨다면 성공·실패와 관계없이 기록한 정확한 이전값으로 복원하며, 현재 true를 무조건 false로 바꾸지 않습니다.
+## 토큰 권한과 환경 변수
 
-PM이 GitHub 모순·Project 상태를 정리한 뒤 trusted `main` SHA의 Actions 수동 실행에서 resolve_issue_numbers에 `17,20`처럼 입력합니다. 전체 원본 dry-run 보고서를 사용하며, 현재 bidirectional 값을 보존합니다. 실제 재개는 동일한 보고와 source에 대한 별도 승인이 있어야 합니다. 번호는 중복 제거하고 잘못된 입력·비PM 실행·미보류 대상은 거부합니다. 취소 Project 상태는 유효한 재개 기준이 아니며 PM이 기존 절차에 따라 일반 Project 상태를 정한 뒤 새 승인으로 재개합니다. PM 승인은 모순된 종료 정보나 조회 실패를 무시하지 않습니다.
+- **토큰 분리:**
+   - Worker는 지정 사용자의 `GITHUB_DISPATCH_TOKEN`(classic PAT `repo` 범위, 또는 협업자 환경에서 지원되는 경우 Actions 쓰기 및 Contents/metadata 읽기 권한의 fine-grained PAT)만 사용합니다. 해당 계정은 저장소 push 권한과 Actions dispatch/읽기 권한이 있어야 하며 `/user` 조회로 numeric user ID를 확인합니다.
+   - Worker에는 Project나 Notion 쓰기 토큰을 두지 않으며 `NOTION_READ_TOKEN`은 지정된 데이터 소스만 읽는 읽기 전용 토큰입니다.
+   - GitHub Actions 워크플로는 저장소 읽기에 기본 `GITHUB_TOKEN`, Project 쓰기에 `PROJECT_TOKEN`, Notion 읽기·생성·수정에 `NOTION_TOKEN`을 사용합니다. 고정 호스트 검증, 리다이렉트 금지, 민감 정보 마스킹, `HELPER_REQUEST_KEY`와 `WORKFLOW_CALLBACK_KEY`(`NOTION_RELAY_CALLBACK_KEY`)의 HMAC 키 분리를 유지합니다.
+- **설정 변수:**
+   - Worker 변수: `GITHUB_WORKFLOW_ID`, `GITHUB_DISPATCH_ACTOR_ID`, `NOTION_KIND_PROPERTY_ID`, `NOTION_KEY_PROPERTY_ID`, `NOTION_TASK_PROPERTY_ID`, **`NOTION_STATE_PROPERTY_ID`(새 `동기화 기준` 속성 ID로 변경)**, 선택적 `PERIODIC_MIN_SECONDS`(기본값 600, 600 이상만 허용), `NOTION_WORKSPACE_ID`, `NOTION_INTEGRATION_ID`, `NOTION_SUBSCRIPTION_ID` 및 secret `NOTION_VERIFICATION_TOKEN`.
+   - GitHub 변수: `PROJECT_ID`, `PROJECT_OWNER_ID`, `PROJECT_STATUS_FIELD_ID`, `PROJECT_STATUS_OPTIONS`(6개 상태 매핑), `NOTION_DATA_SOURCE_ID`, `PM_GITHUB_USER_ID`, `NOTION_SYNC_ENABLED`.
+   - 일반 요청 워크플로 추가 변수: `NOTION_RELAY_ENABLED`, `NOTION_RELAY_URL`, `NOTION_RELAY_HOST`, `NOTION_RELAY_ACTOR_ID`, `NOTION_RELAY_WORKFLOW_ID` 및 secret `NOTION_RELAY_CALLBACK_KEY`.
+   - `NOTION_CONTROL_PAGE_ID`와 `NOTION_BIDIRECTIONAL_ENABLED`는 새 엔진에서 사용하지 않지만 롤백을 위해 기존 값을 보존합니다. 기존 스키마 필드를 삭제하거나 자격 증명을 임의로 바꾸지 않습니다.
 
-번호를 지정한 보류 재개는 PM이 새로 시작한 수동 실행의 첫 번째 시도에서만 승인으로 인정합니다. 원래 실행자와 현재 요청자의 numeric ID가 모두 PM인지 확인하며, 실행 시도 번호가 없거나 재실행이면 쓰기 전에 거부합니다. 실패 후 다시 승인하려면 기존 실행의 Re-run 대신 Run workflow에서 현재 값을 확인하고 번호를 새로 지정합니다.
+## PM 전환 및 롤백 절차
 
-승인 기록·checkpoint·Notion 표시·집계까지 확인한 뒤 재개 완료로 기록합니다. 일반 확인 안내는 보존합니다. 표시 복구가 미완료이면 보류 집계에 남기고 다음 실행에서 승인된 표시만 복구합니다.
+아래 외부 운영 전환 단계는 코드 구현에 포함되지 않으며 리뷰와 승인 후 PM이 순서대로 수행합니다.
 
-## 실패·보존
+1. 현재 GitHub·Worker 변수 값을 기록하고 모든 동기화 실행과 relay(`NOTION_SYNC_ENABLED`, `NOTION_RELAY_ENABLED`, Worker 모드)를 중지·드레인합니다.
+2. Notion 데이터 소스에 숨김 `rich_text` 속성 `동기화 기준`을 추가하고 타입과 속성 ID를 확인합니다. 과거 Sync 관리행은 상태 신호가 아니므로 숨기거나 이력용 행임을 표시합니다.
+3. **Worker 재배포 전에 먼저 D1 마이그레이션 `migrations/0004_periodic.sql`을 적용합니다.** 그다음 검토된 Worker 코드를 `STOPPED` 상태와 새 `NOTION_STATE_PROPERTY_ID`(`동기화 기준`)로 재배포하고 관련 변수를 맞춥니다.
+4. 승인된 브랜치에서 `--dry-run`을 실행하여 초기화 대상 및 비체크포인트 이슈 목록, 메타데이터, PR 연결 계획, 초기 정렬 필요 항목을 점검합니다. 초기 정렬이 필요한 항목은 PM이 위 복구 절차에 따라 조치한 뒤 다시 `--dry-run`을 실행해 계획이 정상 반영되었는지 확인합니다. 이후 다음 실제 전체 스캔에서 체크포인트가 정상 기록되는지 확인하며 작업 전반에서 `동기화 기준`과 `동기화 내부 상태` 두 내부 속성은 수동 삭제나 임의 수정 없이 그대로 보존합니다.
+5. 코드 리뷰와 승인이 끝난 뒤 `main`에 병합하고 `main` 동기화와 relay를 활성화한 뒤 첫 전체 스캔과 재조회 확인 결과를 확인하며 실제 D1 `rows_read`·`rows_written`·저장 용량을 측정합니다.
+6. 이후 새 이슈 생성, 각 쪽에서의 상태 편집, 양쪽 충돌(Notion 우선), PR 없는 `검토 중` 복원, 이슈 종료·재오픈, 후속 무변경 스캔, 주기적 cron 실행, 실패·복구 알림을 차례로 확인합니다.
 
-전체 조회·인증·스키마 검증 실패는 쓰기 전에 중단합니다. 적용 중 쓰기 결과가 불명확하면 추가 쓰기를 멈추고 영속 기록을 유지합니다. 전체 성공 시각은 모든 대상 처리가 성공할 때만 갱신합니다. 보류가 남으면 부분 결과를 기록합니다. 사전검증이나 안내 갱신이 실패하면 관리행 요약은 이전 값일 수 있으므로 GitHub URL이 있으면 해당 workflow를, URL이 비어 있으면 저장소 Actions에서 현재 실행 결과를 확인합니다.
+**롤백 절차:** 문제가 발생하면 모든 쓰기 경로와 relay를 먼저 중지·드레인합니다. 두 상태 속성(`동기화 기준`, `동기화 내부 상태`)과 기존 설정을 보존한 채, 승인된 절차에 따라 Worker의 `NOTION_STATE_PROPERTY_ID` 바인딩과 검증된 이전 코드로 되돌립니다. 새 엔진이 쓰기를 수행한 뒤에는 과거 `동기화 내부 상태` 기준선이 오래된 상태이므로, 구형 엔진을 바로 켜거나 두 엔진을 동시에 켜지 말고 상태 속성을 지우지도 말아야 합니다. 재가동 전에 반드시 기준선 차이를 점검하고 수동 정렬한 뒤 활성화합니다.
 
-Notion의 `GitHub 수정`과 `동기화 시각`은 UTC 분 단위로 표시하지만 source 시각, cutoff·이벤트, 내부 `last_success_at`/`last_result.at`은 전체 정밀도를 유지합니다. readback은 timezone-aware 단일 시각이 전송한 분 단위 instant와 정확히 같아야 하며, 초가 0이 아니거나 `end`/`time_zone`이 null이 아니면 실패합니다. 관리행 내부 성공 시각이 비어 있는 구형 상태의 기존 표시값은 보존합니다. `일정`·메모·본문은 이 표시 투영의 대상이 아닙니다.
+## 남은 한계와 미검증 범위
 
-Notion data source 조회는 모든 페이지의 `object=list`, `type=page_or_data_source`, `page_or_data_source` object, `results` 목록과 Boolean `has_more`를 검증합니다. `next_cursor` 키는 항상 있어야 하며, 다음 페이지가 있으면 비어 있지 않은 새 문자열, 마지막 페이지면 `null`이어야 합니다. `request_status`는 선택 필드입니다. 있으면 `type=complete`만 허용하고, 누락 외의 unknown/malformed 값과 `incomplete`는 쓰기 전에 거부합니다. `incomplete_reason`이 있으면 `query_result_limit_reached`만 인식합니다. active/archived 조회는 각각 독립적으로 10,000건 경계에 도달하면 전체 결과가 보장되지 않는 것으로 보고 거부합니다. dry-run 진단은 페이지 수·결과 개수·허용된 상태 범주·형식 유효성만 출력하며 원문, cursor, ID, credential은 기록하지 않습니다. 이전 실패 응답을 보관하지 않아 해당 실행에서 상태 필드가 누락됐는지 malformed였는지는 아직 확인되지 않았습니다.
-
-생성은 Pending create fence → Notion 행 식별 → add pending 영속 확인 → Project 추가 1회 → 성공 응답 item ID 즉시 영속 저장·readback → 직접 node와 전체 목록 관계 확인 → 초기 상태/checkpoint → 사용자 표시 순서입니다. 반환 ID는 확인 전에도 별도 readback 기록에 보존하며 confirmed 관계와 혼동하지 않습니다. ID 저장 확인 전에 관계 조회·초기화하지 않습니다. 성공 응답 저장 후 가시성 지연은 후속 실행 최대 3회 확인합니다. 네트워크 실패도 1회이며 조회 직전 고유 토큰과 횟수를 영속 확인합니다. 토큰 저장 후 중단은 예약 1회로 계산하며 같은 토큰을 중복 계산하지 않습니다. 즉시 readback 내부 재시도와 후속 3회 예산은 별개입니다.
-
-직접 ID·목록·대상 Issue·저장소·보관 상태·현재 요청/사실이 일치해야 계속합니다. 중복·다른 ID·명백한 모순은 즉시 PM 보류, 3회 실패는 ADD_READBACK_EXHAUSTED로 PM 확인입니다. 응답 ID가 없거나 저장 미확인이면 자동 읽기만 허용하고 PM이 재개합니다. 불확실한 add를 자동 재전송하지 않습니다. 기존 반환 ID 없는 legacy pending도 이 경계를 유지합니다.
-
-Issue 내부 상태 v2는 v1의 pending/hold/resume/projection/식별자와 checkpoint를 보존하고 baseline/request/readback/notion_write를 확장합니다. 기존 행의 최초 이관은 안정적인 양쪽 일치만 baseline으로 초기화합니다. 새 이슈는 자동 백로그 초기화의 쓰기와 readback을 확인한 뒤 baseline을 확정합니다. 양방향 전환 중 기존 행의 불일치나 미완료 작업을 자동 승자/새 요청으로 만들지 않습니다. 전송 직전에 sent를 영속 확인하며 재시작의 sent/uncertain은 결과 조회만 합니다. 모든 PATCH 전송 속성을 readback하고 하나라도 불일치면 완료/baseline을 확정하지 않습니다.
-
-문제가 생기면 옵션·관리행·키·내부 기록을 삭제하거나 초기값으로 덮지 않습니다. 운영 설정은 기록된 기존값으로 복원하고, 설정을 끄는 조치가 승인된 경우에도 검증 뒤 기존값을 다시 readback합니다. v2를 읽지 못하는 과거 SHA로 돌아가는 것만으로는 안전한 rollback이 아니므로, 새 코드를 보완하는 forward-fix를 우선합니다.
-
-Notion unique constraint·Project 원자적 CAS가 없어 다른 도구와의 동시 쓰기는 지원하지 않습니다. Actions는 하나의 concurrency 그룹으로 직렬화하며 쓰기 직전 재확인으로 경합을 감지합니다. 휴지통 전체 조회를 보장하지 않으므로 관리 항목은 삭제하지 말고 복구 후 실행합니다.
-
-## 변경 기반 relay 운영 (#38)
-
-Cloudflare Worker relay는 Notion 작업 상태 변경과 에이전트 helper의 확인된 Project 변경을 받아 위 실행 절차의 일반 전체 동기화를 요청합니다. Worker 자체는 Project나 Notion을 수정하지 않습니다. 5분 예약 전체 동기화는 누락된 이벤트를 복구하는 수단으로 유지합니다. GitHub 예약 실행은 실제로는 5분보다 훨씬 드물게 발생해 하루 5회 안팎으로 관찰됐으므로, 실제 주 경로는 relay입니다.
-
-2026-10-16(UTC)에 Worker는 `ACTIVE`와 분당 cron으로 배포됐고 `NOTION_RELAY_ENABLED=true`, Notion 웹훅 구독이 활성 상태입니다. 저장소의 `wrangler.jsonc`는 `STOPPED` 템플릿이고 실제 운영 설정은 운영자가 저장소 밖에서 관리합니다. 실제 확인(Issue #38)은 Notion 카드 이동이 Project에 약 6분, helper로 바꾼 Project 값이 Notion에 약 9분 뒤 반영됐고 두 경우 모두 보류는 없었습니다. 로컬·fault-injection 검사와 이 실제 확인을 구분해 기록하며, 자세한 값과 중지·재개 절차, PAT 교체, 알려진 한계는 [relay README](../../cloudflare/notion-relay/README.md#실제-환경-확인)에 있습니다. 무료 한도 사용량은 측정하지 않았습니다.
-
-동기화 엔진의 보류는 relay가 `ENGINE_HELD`로 보고합니다. 보류를 풀려면 위 "실행·보류 재개"의 PM 재개(`resolve_issue_numbers`)가 여전히 필요하며, 보류 중 다시 들어온 카드 요청은 PM 재개가 두 번 필요할 수 있습니다(`DEFERRED_REQUEST_PENDING` 처리, 이어서 현재 Project 값 승인).
-
-## #32 전환 검증
-
-이 절은 #32 당시의 전환 기록입니다. 현재 #39의 코드 수락과 실제 운영 전환은 위의 적용 순서 및 단계별 수락을 따릅니다. 기존 board/calendar 필터와 양방향 설정을 보존하고, 실제 화면·Actions/API 확인 전에는 운영 완료로 표시하지 않습니다.
-
-## 근거
-
-- [기술 계약](notion-sync-plan.md)
-- [GitHub Issues GraphQL](https://docs.github.com/en/graphql/reference/issues)
-- [GitHub Projects GraphQL](https://docs.github.com/en/graphql/reference/projects)
-- [Projects Actions 자동화](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/automating-projects-using-actions)
-- [Notion 요청 제한](https://developers.notion.com/reference/request-limits)
+- Notion 조건부 쓰기(CAS)나 서비스 간 트랜잭션이 없으므로 직전 재조회와 최종 쓰기 사이의 짧은 경합, Notion 페이지 생성 시 중복 방지 한계·가시성 지연·모호한 응답 가능성이 남습니다.
+- 공개 링크 편집이 열려 있으면 외부 편집자도 숨김 속성을 포함한 Notion 속성을 바꿀 수 있으며 숨김 속성이나 JSON 구조·해시는 인증 수단이 아닙니다.
+- 이번 작업에서는 원격 푸시·PR 반영·Worker 배포·워크플로 디스패치·외부 쓰기·실제 D1 스키마 마이그레이션을 수행하지 않았습니다. 현재 작업 트리에는 Miniflare가 설치되어 있지 않으며 외부 실제 API 호출, 등록된 Secrets·토큰 권한 범위, 실제 Notion/Project 스키마, 호스팅된 GitHub Actions 실행 산출물 생성, 알림 전달, 라이브 주기 간격 및 D1 쿼터(`rows_read`·`rows_written`·저장 용량)는 실환경에서 검증하지 않았습니다(과거 #38 당시의 구형 엔진 실환경 확인 기록과 구분합니다).

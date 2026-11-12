@@ -327,7 +327,11 @@ class UserDatabase:
         if total_ms is not None or finish_reason is not None or request_id is not None:
             extra = {"p_total_ms": total_ms, "p_finish_reason": finish_reason,
                      "p_request_id": None if request_id is None else _id(request_id)}
-        await self.get_turn(identifier)
+        turn = await self.get_turn(identifier)
+        if stage == "llm" and turn.get("llm_request_id") is not None and request_id is None:
+            # Linked attempts must use the caller's ID on success and failure.
+            # The SQL guard also checks under the row lock to cover read/write races.
+            raise ConflictError(code="55000")
         return self._owned_one(await self._rpc("finish_chat_stage_v2" if extra else "finish_chat_stage",
             p_turn_id=identifier, p_stage=stage, p_attempt=attempt, p_ok=ok, p_text=text,
             p_ms=elapsed_ms, p_error_code=error_code, **extra))
