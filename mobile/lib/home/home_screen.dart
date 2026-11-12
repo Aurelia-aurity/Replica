@@ -6,7 +6,6 @@ import '../history/history_screen.dart';
 import '../profile/persona_card.dart';
 import '../profile/persona_controller.dart';
 import '../profile/persona_flow.dart';
-import '../profile/speech_profile_screen.dart';
 import '../shared/conversation_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,16 +13,12 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.history,
     required this.personas,
-    this.onOpenRecordUpload,
     this.accountEmail,
     this.onSignOut,
     this.onExpireSession,
   });
   final ConversationService history;
   final PersonaController personas;
-
-  /// Opens SC-04 for the partner. Null until the records feature is connected.
-  final RecordUploadLauncher? onOpenRecordUpload;
   final String? accountEmail;
   final VoidCallback? onSignOut;
   final VoidCallback? onExpireSession;
@@ -90,13 +85,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _start({required bool voice}) async {
     if (_starting) return;
+    final name = widget.personas.current?.name;
+    if (name == null) {
+      _notice(partnerMissingNotice);
+      return;
+    }
     setState(() => _starting = true);
     try {
       await startConversation(
         context,
         widget.history,
         voice: voice,
-        conversationName: widget.personas.current?.name,
+        conversationName: name,
       );
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
@@ -112,6 +112,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openRecent(Conversation item) async {
     if (_starting) return;
+    final name = widget.personas.current?.name;
+    if (name == null) {
+      _notice(partnerMissingNotice);
+      return;
+    }
     setState(() => _starting = true);
     try {
       final latest = await widget.history.get(item.id);
@@ -120,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
           context,
           widget.history,
           latest,
-          conversationName: widget.personas.current?.name,
+          conversationName: name,
         );
       }
     } catch (_) {
@@ -205,11 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
               PersonaCard(
                 controller: widget.personas,
                 busy: _starting,
-                onOpenProfile: () => openPersonaEntry(
-                  context,
-                  widget.personas,
-                  onOpenRecordUpload: widget.onOpenRecordUpload,
-                ),
+                onCreate: () => openPersonaCreate(context, widget.personas),
                 onStartText: () => _start(voice: false),
                 onStartVoice: () => _start(voice: true),
               ),

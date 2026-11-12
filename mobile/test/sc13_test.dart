@@ -17,9 +17,8 @@ class Opened {
 /// Opens SC-13 from a plain page so cancel and back have somewhere to return.
 Future<Opened> openName(
   WidgetTester tester,
-  PersonaController controller, {
-  Persona? editing,
-}) async {
+  PersonaController controller,
+) async {
   final opened = Opened();
   await tester.pumpWidget(
     MaterialApp(
@@ -30,10 +29,7 @@ Future<Opened> openName(
               onPressed: () async {
                 opened.result = await Navigator.of(context).push<Persona>(
                   MaterialPageRoute(
-                    builder: (_) => PersonaNameScreen(
-                      controller: controller,
-                      editing: editing,
-                    ),
+                    builder: (_) => PersonaNameScreen(controller: controller),
                   ),
                 );
                 opened.returned = true;
@@ -50,10 +46,7 @@ Future<Opened> openName(
   return opened;
 }
 
-PersonaController newController(
-  FakePersonaService service, {
-  required WidgetTester tester,
-}) {
+PersonaController newController(FakePersonaService service) {
   final controller = PersonaController(service);
   addTearDown(controller.dispose);
   return controller;
@@ -64,23 +57,36 @@ bool saveEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(saveButton).onPressed != null;
 
 void main() {
-  testWidgets('new mode shows title, guidance and hint; save starts disabled', (
+  testWidgets('shows title, guidance and example; save starts disabled', (
     tester,
   ) async {
-    final service = FakePersonaService();
-    await openName(tester, newController(service, tester: tester));
-    expect(find.text('말투 프로필 만들기'), findsOneWidget);
-    expect(find.textContaining('아직 말투 프로필이 없어요'), findsOneWidget);
+    await openName(tester, newController(FakePersonaService()));
+    expect(find.text('프로필 만들기'), findsOneWidget);
+    expect(find.text('누구와\n대화하고 싶으세요?'), findsOneWidget);
+    expect(find.textContaining('바꿀 수 없어요'), findsOneWidget);
+    expect(find.textContaining('말투'), findsNothing);
+    expect(find.textContaining('학습'), findsNothing);
     expect(find.text('예: 엄마, 할머니, 민지'), findsOneWidget);
-    expect(find.text('0 / 20'), findsOneWidget);
+    expect(find.text('0 / 50'), findsOneWidget);
     expect(saveEnabled(tester), false);
+  });
+
+  testWidgets('there is no way to rename: the screen only creates', (
+    tester,
+  ) async {
+    await openName(tester, newController(FakePersonaService()));
+    expect(find.text('대화 상대 이름 수정'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      isEmpty,
+    );
   });
 
   testWidgets('blank and whitespace-only input cannot be saved', (
     tester,
   ) async {
     final service = FakePersonaService();
-    await openName(tester, newController(service, tester: tester));
+    await openName(tester, newController(service));
     await tester.enterText(find.byType(TextField), '    ');
     await tester.pump();
     expect(saveEnabled(tester), false);
@@ -96,11 +102,11 @@ void main() {
     tester,
   ) async {
     final service = FakePersonaService();
-    final controller = newController(service, tester: tester);
+    final controller = newController(service);
     final opened = await openName(tester, controller);
     await tester.enterText(find.byType(TextField), '  엄마  ');
     await tester.pump();
-    expect(find.text('6 / 20'), findsOneWidget);
+    expect(find.text('6 / 50'), findsOneWidget);
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
     expect(service.created.single.name, '엄마');
@@ -110,21 +116,20 @@ void main() {
     expect(find.byType(PersonaNameScreen), findsNothing);
   });
 
-  testWidgets('input is limited to 20 characters', (tester) async {
+  testWidgets('input is limited to 50 characters', (tester) async {
     final service = FakePersonaService();
-    await openName(tester, newController(service, tester: tester));
-    await tester.enterText(find.byType(TextField), '가' * 25);
+    await openName(tester, newController(service));
+    await tester.enterText(find.byType(TextField), '가' * 60);
     await tester.pump();
-    expect(find.text('20 / 20'), findsOneWidget);
+    expect(find.text('50 / 50'), findsOneWidget);
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
-    expect(service.created.single.name, '가' * 20);
-    expect(normalizePersonaName('가' * 21), isNull);
+    expect(service.created.single.name, '가' * 50);
   });
 
   testWidgets('cancel and back return without saving anything', (tester) async {
     final service = FakePersonaService();
-    final controller = newController(service, tester: tester);
+    final controller = newController(service);
     final opened = await openName(tester, controller);
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.tap(find.text('취소'));
@@ -147,10 +152,7 @@ void main() {
     tester,
   ) async {
     final service = FakePersonaService()..createGate = Completer<void>();
-    final opened = await openName(
-      tester,
-      newController(service, tester: tester),
-    );
+    final opened = await openName(tester, newController(service));
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.pump();
     await tester.tap(saveButton);
@@ -177,7 +179,7 @@ void main() {
     tester,
   ) async {
     final service = FakePersonaService()..createError = StateError('offline');
-    final controller = newController(service, tester: tester);
+    final controller = newController(service);
     final opened = await openName(tester, controller);
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.pump();
@@ -204,7 +206,7 @@ void main() {
     tester,
   ) async {
     final service = FakePersonaService()..createError = StateError('offline');
-    await openName(tester, newController(service, tester: tester));
+    await openName(tester, newController(service));
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.pump();
     await tester.tap(saveButton);
@@ -220,11 +222,11 @@ void main() {
   testWidgets('the example stays visible under the field while typing', (
     tester,
   ) async {
-    await openName(tester, newController(FakePersonaService(), tester: tester));
+    await openName(tester, newController(FakePersonaService()));
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.pump();
     expect(find.text('예: 엄마, 할머니, 민지'), findsOneWidget);
-    expect(find.text('2 / 20'), findsOneWidget);
+    expect(find.text('2 / 50'), findsOneWidget);
     // The label is its own text above the field, not a floating label.
     final label = find.text('대화 상대 이름 또는 호칭');
     expect(label, findsOneWidget);
@@ -237,7 +239,7 @@ void main() {
   testWidgets('cancel and save keep the 1 : 1.6 layout, 54 high', (
     tester,
   ) async {
-    await openName(tester, newController(FakePersonaService(), tester: tester));
+    await openName(tester, newController(FakePersonaService()));
     final cancel = tester.getSize(find.widgetWithText(OutlinedButton, '취소'));
     final save = tester.getSize(saveButton);
     expect(cancel.height, 54);
@@ -254,7 +256,7 @@ void main() {
       addTearDown(tester.view.resetViewPadding);
       addTearDown(tester.view.resetPadding);
       final service = FakePersonaService()..createError = StateError('offline');
-      await openName(tester, newController(service, tester: tester));
+      await openName(tester, newController(service));
       await tester.enterText(find.byType(TextField), '엄마');
       await tester.pump();
       await tester.tap(saveButton);
@@ -277,119 +279,18 @@ void main() {
     });
   }
 
-  testWidgets('rejected input explains itself without a retry loop', (
-    tester,
-  ) async {
+  testWidgets('rejected input explains itself', (tester) async {
     final service = FakePersonaService()
       ..createError = const BackendFailure(
         BackendFailureKind.generic,
         code: 'INVALID_INPUT',
       );
-    await openName(tester, newController(service, tester: tester));
+    await openName(tester, newController(service));
     await tester.enterText(find.byType(TextField), '엄마');
     await tester.pump();
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
     expect(find.text('입력한 내용을 확인해 주세요.'), findsOneWidget);
-  });
-
-  group('edit mode', () {
-    Future<(FakePersonaService, PersonaController, Opened)> openEdit(
-      WidgetTester tester, {
-      Set<PersonaFeature> supported = allFeatures,
-    }) async {
-      final service = FakePersonaService(
-        personas: const [Persona(id: 'p1', name: '엄마')],
-        profileValue: sampleProfile(),
-        supported: supported,
-      );
-      final controller = newController(service, tester: tester);
-      await controller.load();
-      final opened = await openName(
-        tester,
-        controller,
-        editing: controller.current,
-      );
-      return (service, controller, opened);
-    }
-
-    testWidgets('prefills the current name with edit title and guidance', (
-      tester,
-    ) async {
-      await openEdit(tester);
-      expect(find.text('대화 상대 이름 수정'), findsOneWidget);
-      expect(find.text('말투 프로필 만들기'), findsNothing);
-      expect(find.textContaining('그대로 유지돼요'), findsOneWidget);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        '엄마',
-      );
-      expect(find.text('2 / 20'), findsOneWidget);
-    });
-
-    testWidgets('saving renames only and keeps the profile', (tester) async {
-      final (service, controller, opened) = await openEdit(tester);
-      final before = controller.profile;
-      await tester.enterText(find.byType(TextField), ' 어머니 ');
-      await tester.pump();
-      await tester.tap(saveButton);
-      await tester.pumpAndSettle();
-      expect(service.renames, ['어머니']);
-      expect(service.created, isEmpty);
-      expect(opened.result!.name, '어머니');
-      expect(controller.current!.name, '어머니');
-      expect(controller.profile, same(before));
-    });
-
-    testWidgets('cancel keeps the existing name', (tester) async {
-      final (service, controller, opened) = await openEdit(tester);
-      await tester.enterText(find.byType(TextField), '다른 이름');
-      await tester.tap(find.text('취소'));
-      await tester.pumpAndSettle();
-      expect(opened.result, isNull);
-      expect(service.renames, isEmpty);
-      expect(controller.current!.name, '엄마');
-    });
-
-    testWidgets('saving an unchanged name sends nothing', (tester) async {
-      final (service, _, opened) = await openEdit(tester);
-      await tester.tap(saveButton);
-      await tester.pumpAndSettle();
-      expect(service.renames, isEmpty);
-      expect(opened.result!.name, '엄마');
-    });
-
-    testWidgets('failure keeps the typed name for another try', (tester) async {
-      final (service, controller, opened) = await openEdit(tester);
-      service.renameError = StateError('offline');
-      await tester.enterText(find.byType(TextField), '어머니');
-      await tester.pump();
-      await tester.tap(saveButton);
-      await tester.pumpAndSettle();
-      expect(find.textContaining('저장하지 못했어요'), findsOneWidget);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        '어머니',
-      );
-      expect(controller.current!.name, '엄마');
-      expect(opened.returned, false);
-    });
-
-    testWidgets('without a rename API the entry works but saving is blocked', (
-      tester,
-    ) async {
-      final (service, controller, _) = await openEdit(tester, supported: {});
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        '엄마',
-      );
-      expect(find.textContaining('서버 연결이 준비되면'), findsOneWidget);
-      await tester.enterText(find.byType(TextField), '어머니');
-      await tester.pump();
-      expect(saveEnabled(tester), false);
-      expect(service.renames, isEmpty);
-      expect(controller.current!.name, '엄마');
-    });
   });
 
   testWidgets('small screen with keyboard keeps field and buttons usable', (
@@ -400,9 +301,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetViewInsets);
-    await openName(tester, newController(FakePersonaService(), tester: tester));
+    await openName(tester, newController(FakePersonaService()));
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
-    await tester.enterText(find.byType(TextField), '아주아주아주긴 이름 호칭 입력 확인용');
+    await tester.enterText(find.byType(TextField), '아주아주아주긴 이름 호칭 입력 확인용 ' * 3);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(tester.getBottomRight(saveButton).dy, lessThanOrEqualTo(288));
@@ -413,8 +314,9 @@ void main() {
     expect(normalizePersonaName('  엄마 '), '엄마');
     expect(normalizePersonaName(' \n\t '), isNull);
     expect(normalizePersonaName(''), isNull);
-    expect(normalizePersonaName('가' * 20), '가' * 20);
-    expect(normalizePersonaName('👩‍👧' * 20), isNotNull);
-    expect(normalizePersonaName('👩‍👧' * 21), isNull);
+    expect(normalizePersonaName('가' * 50), '가' * 50);
+    expect(normalizePersonaName('가' * 51), isNull);
+    expect(normalizePersonaName('👩‍👧' * 50), isNotNull);
+    expect(normalizePersonaName('👩‍👧' * 51), isNull);
   });
 }

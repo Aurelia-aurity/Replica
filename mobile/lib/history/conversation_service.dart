@@ -32,9 +32,16 @@ abstract class VoiceConversationService implements DetailedConversationService {
 
 /// Owned by one login generation, never shared between accounts or persisted.
 class MemoryConversationService implements VoiceConversationService {
-  MemoryConversationService({required this.backend, required this.chat});
+  MemoryConversationService({
+    required this.backend,
+    required this.chat,
+    this.selectedPersonaId,
+  });
   final BackendService backend;
   final ChatService chat;
+
+  /// Id of the partner shown on the home card, like the HTTP service uses.
+  final String? Function()? selectedPersonaId;
   final _items = <String, Conversation>{};
   final _voiceReplies = <String, VoiceReply>{};
   @override
@@ -50,7 +57,7 @@ class MemoryConversationService implements VoiceConversationService {
         final now = DateTime.now();
         final item = Conversation(
           id: newConversationId(),
-          personaId: 'preview',
+          personaId: selectedPersonaId?.call() ?? 'preview',
           createdAt: now,
           updatedAt: now,
           acknowledgedAt: acknowledgedAt,

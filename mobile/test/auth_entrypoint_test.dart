@@ -61,7 +61,7 @@ void main() {
       if (env == 'dev' && mode == 'preview') {
         await tester.tap(find.byKey(const ValueKey('auth-submit')));
         await tester.pumpAndSettle();
-        expect(find.text('텍스트로 대화'), findsOneWidget);
+        expect(find.text('프로필을 만들어 주세요'), findsOneWidget);
       } else {
         expect(auth, isA<UnconfiguredAuthService>());
         expect(

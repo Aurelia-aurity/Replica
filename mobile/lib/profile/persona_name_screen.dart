@@ -7,16 +7,14 @@ import 'persona_controller.dart';
 import 'persona_models.dart';
 import 'persona_service.dart';
 
-/// SC-13 말투 프로필 만들기 · 대화 상대 이름 수정.
+/// SC-13 프로필 만들기: names the conversation partner.
 ///
-/// With [editing] null it creates a conversation partner; otherwise it renames
-/// [editing] and the profile items stay as they are. The screen pops with the
-/// saved [Persona]; cancelling or going back pops with nothing and changes
-/// nothing.
+/// A name cannot be changed once it is saved, so this screen only creates. It
+/// pops with the saved [Persona]; cancelling or going back pops with nothing
+/// and changes nothing.
 class PersonaNameScreen extends StatefulWidget {
-  const PersonaNameScreen({super.key, required this.controller, this.editing});
+  const PersonaNameScreen({super.key, required this.controller});
   final PersonaController controller;
-  final Persona? editing;
 
   @override
   State<PersonaNameScreen> createState() => _PersonaNameScreenState();
@@ -44,19 +42,15 @@ final _saveStyle = FilledButton.styleFrom(
 );
 
 class _PersonaNameScreenState extends State<PersonaNameScreen> {
-  late final _text = TextEditingController(text: widget.editing?.name ?? '');
+  final _text = TextEditingController();
   bool _saving = false;
   // One id per attempted name: a retry of the same save must not create a
   // second partner, a different name is a different request.
   String _requestId = newPersonaId();
   String? _requestName;
 
-  bool get _isEdit => widget.editing != null;
-  bool get _renameSupported => widget.controller.service.supportedFeatures
-      .contains(PersonaFeature.rename);
   String? get _name => normalizePersonaName(_text.text);
-  bool get _canSave =>
-      !_saving && _name != null && (!_isEdit || _renameSupported);
+  bool get _canSave => !_saving && _name != null;
 
   @override
   void dispose() {
@@ -70,9 +64,6 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
   }
 
   String _failureText(Object error) {
-    if (error is PersonaFeatureUnavailable) {
-      return '이름 수정은 서버 연결이 준비되면 사용할 수 있어요.';
-    }
     if (error is BackendFailure && error.code == 'INVALID_INPUT') {
       return '입력한 내용을 확인해 주세요.';
     }
@@ -86,19 +77,11 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     if (name == null || !_canSave) return;
     setState(() => _saving = true);
     try {
-      final Persona saved;
-      if (_isEdit) {
-        // Same name: nothing to send, just go back to SC-07.
-        saved = name == widget.editing!.name
-            ? widget.editing!
-            : await widget.controller.rename(name);
-      } else {
-        if (_requestName != name) {
-          _requestId = newPersonaId();
-          _requestName = name;
-        }
-        saved = await widget.controller.create(name, personaId: _requestId);
+      if (_requestName != name) {
+        _requestId = newPersonaId();
+        _requestName = name;
       }
+      final saved = await widget.controller.create(name, personaId: _requestId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       Navigator.of(context).pop(saved);
@@ -120,9 +103,7 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
               _noticeLift + MediaQuery.paddingOf(context).bottom,
             ),
             content: Text(_failureText(error)),
-            action: error is PersonaFeatureUnavailable
-                ? null
-                : SnackBarAction(label: '다시 시도', onPressed: _save),
+            action: SnackBarAction(label: '다시 시도', onPressed: _save),
           ),
         );
     }
@@ -130,7 +111,6 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _isEdit ? '대화 상대 이름 수정' : '말투 프로필 만들기';
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
@@ -138,9 +118,9 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         appBar: AppBar(
           backgroundColor: replicaBackground,
           surfaceTintColor: Colors.transparent,
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          title: const Text(
+            '프로필 만들기',
+            style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
         body: SafeArea(
@@ -157,33 +137,23 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _isEdit
-                                ? '이름이나 호칭을\n바꿔 볼까요?'
-                                : '누구의 말투로\n대화하고 싶으세요?',
-                            style: const TextStyle(
+                          const Text(
+                            '누구와\n대화하고 싶으세요?',
+                            style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Text(
-                            _isEdit
-                                ? '대화 상대의 이름이나 호칭을 바꿔요. 말투 프로필의 표현·호칭·끝맺음은 그대로 유지돼요.'
-                                : '아직 말투 프로필이 없어요. 학습시킬 대화 상대의 이름이나 호칭을 먼저 정해 주세요.',
-                            style: const TextStyle(
+                          const Text(
+                            '대화할 상대의 이름이나 호칭을 먼저 정해 주세요. 저장한 이름은 바꿀 수 없어요.',
+                            style: TextStyle(
                               color: Color(0xFF3D4743),
                               fontSize: 15,
                               height: 1.6,
                             ),
                           ),
-                          if (_isEdit && !_renameSupported) ...[
-                            const SizedBox(height: 16),
-                            const _Notice(
-                              '이름 수정은 서버 연결이 준비되면 사용할 수 있어요. 지금은 저장할 수 없어요.',
-                            ),
-                          ],
                           const SizedBox(height: 32),
                           // The label sits above the field and the example stays
                           // visible under it, as in the screen plan.
@@ -294,31 +264,4 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
       ),
     );
   }
-}
-
-class _Notice extends StatelessWidget {
-  const _Notice(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: aiAmberBackground,
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(Icons.info_outline, size: 18, color: aiAmber),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: aiAmber, fontSize: 13, height: 1.5),
-          ),
-        ),
-      ],
-    ),
-  );
 }

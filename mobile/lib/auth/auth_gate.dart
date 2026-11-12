@@ -57,7 +57,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final PersonaService service = factory != null
         ? factory()
         : widget.auth.isPreview
-        ? MemoryPersonaService.preview(backend: backend)
+        ? MemoryPersonaService(backend: backend)
         : HttpPersonaService(
             ApiClient(
               backend: backend,
@@ -71,13 +71,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   ConversationService _conversationService() {
     if (_history != null) return _history!;
     final backend = BackendService(widget.auth);
+    final personas = _personaController();
     if (widget.auth.isPreview) {
       return _history = MemoryConversationService(
         backend: backend,
         chat: widget.chat,
+        selectedPersonaId: () => personas.current?.id,
       );
     }
-    final personas = _personaController();
     return _history = HttpConversationService(
       backend: backend,
       baseUrl: AppConfig.fromEnvironment().backendBaseUrl,

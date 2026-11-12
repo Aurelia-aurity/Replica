@@ -14,6 +14,8 @@ import 'package:mobile/history/history_screen.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/backend_service.dart';
 
+import 'persona_test_support.dart';
+
 class TestAuth extends PreviewAuthService {
   @override
   Future<Map<String, String>> authorizationHeaders() async => {
@@ -166,6 +168,7 @@ void main() {
         ReplicaApp(authService: auth, chatService: InstantChat()),
       );
       await tester.pumpAndSettle();
+      await nameFirstPartner(tester);
       await tester.tap(find.text('음성으로 대화'));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(Checkbox));
@@ -502,7 +505,11 @@ void main() {
     tester,
   ) async {
     final service = TestHistory();
-    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('아직 나눈 대화가 없어요'), findsOneWidget);
     await tester.tap(find.text('새 대화').first);
@@ -525,7 +532,11 @@ void main() {
     tester,
   ) async {
     final service = TestHistory()..items = [conversation()];
-    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('새 대화'));
     await tester.pumpAndSettle();
@@ -550,7 +561,9 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
       await tester.pumpWidget(
-        MaterialApp(home: HistoryScreen(service: service)),
+        MaterialApp(
+          home: HistoryScreen(service: service, conversationName: '합성 상대'),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('새 대화').first);
@@ -578,7 +591,11 @@ void main() {
     tester,
   ) async {
     final service = TestHistory()..failList = true;
-    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('대화 이력을 불러오지 못했어요.'), findsOneWidget);
     service.failList = false;
@@ -609,7 +626,9 @@ void main() {
         ..items = [conversation()]
         ..failDelete = true;
       await tester.pumpWidget(
-        MaterialApp(home: HistoryScreen(service: service)),
+        MaterialApp(
+          home: HistoryScreen(service: service, conversationName: '합성 상대'),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.drag(
@@ -646,7 +665,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('합성 첫 질문 session-1'));
@@ -660,7 +683,11 @@ void main() {
 
   testWidgets('pending history blocks duplicate sends', (tester) async {
     final service = TestHistory()..items = [conversation(pending: true)];
-    await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('합성 첫 질문 session-1'));
     await tester.pumpAndSettle();
@@ -689,6 +716,7 @@ void main() {
         ReplicaApp(authService: auth, chatService: InstantChat()),
       );
       await tester.pumpAndSettle();
+      await nameFirstPartner(tester);
       await tester.tap(find.text('텍스트로 대화'));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(Checkbox));

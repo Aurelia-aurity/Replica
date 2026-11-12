@@ -6,19 +6,19 @@ import '../shared/conversation_widgets.dart';
 import 'conversation.dart';
 import 'conversation_service.dart';
 
-/// [conversationName] is the partner name set in SC-13; without one the
-/// previous fallback is kept.
+/// [conversationName] is the partner name set in SC-13. There is no stand-in
+/// title: a conversation is only opened once the partner has a name.
 Future<void> openConversation(
   BuildContext context,
   ConversationService service,
   Conversation conversation, {
   bool? voice,
-  String? conversationName,
+  required String conversationName,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
     builder: (_) => ChatScreen(
       service: ConversationChatService(service, conversation.id),
-      conversationName: conversationName ?? (service.isDemo ? '엄마' : '대화'),
+      conversationName: conversationName,
       initialVoiceMode: voice ?? conversation.lastVoice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
@@ -33,11 +33,15 @@ Future<void> openConversation(
   ),
 );
 
+/// Shown when a conversation is attempted without a named partner. The home
+/// card says what to do (create the profile, or retry loading it).
+const partnerMissingNotice = '대화 상대를 확인할 수 없어요. 홈에서 대화 상대를 확인해 주세요.';
+
 Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
-  String? conversationName,
+  required String conversationName,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
@@ -66,6 +70,8 @@ class HistoryScreen extends StatefulWidget {
   final Widget? bottomNavigationBar;
 
   /// Partner name shown at the top of the conversations opened from here.
+  /// Null while there is no partner (or it is not loaded): nothing can be
+  /// opened or started then.
   final String? conversationName;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -120,6 +126,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _start() async {
     if (_starting || _opening != null) return;
+    final name = widget.conversationName;
+    if (name == null) {
+      _notice(partnerMissingNotice);
+      return;
+    }
     setState(() => _starting = true);
     try {
       final voice = await showModalBottomSheet<bool>(
@@ -166,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         context,
         widget.service,
         voice: voice,
-        conversationName: widget.conversationName,
+        conversationName: name,
       );
       if (mounted) await _load();
     } catch (_) {
@@ -178,6 +189,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _open(Conversation item) async {
     if (_opening != null || _starting || _deleting.isNotEmpty) return;
+    final name = widget.conversationName;
+    if (name == null) {
+      _notice(partnerMissingNotice);
+      return;
+    }
     setState(() => _opening = item.id);
     try {
       final latest = await widget.service.get(item.id);
@@ -186,7 +202,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         context,
         widget.service,
         latest,
-        conversationName: widget.conversationName,
+        conversationName: name,
       );
       if (mounted) await _load();
     } catch (_) {

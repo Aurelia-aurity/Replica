@@ -22,8 +22,12 @@ void main() {
     tester,
   ) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
-    expect(find.text('엄마'), findsOneWidget);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
+    expect(find.text('합성 상대'), findsOneWidget);
     final disclosure = find.text('기록을 바탕으로 AI가 만든 대화예요');
     final initialPosition = tester.getTopLeft(disclosure);
     await tester.enterText(find.byType(TextField), '질문');
@@ -41,7 +45,11 @@ void main() {
     tester,
   ) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.enterText(find.byType(TextField), '질문');
     await tester.pump();
     await tester.tap(find.byTooltip('메시지 전송'));
@@ -62,7 +70,11 @@ void main() {
     tester,
   ) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     expect(find.textContaining('데모 모드'), findsOneWidget);
     expect(
       tester
@@ -96,7 +108,11 @@ void main() {
     tester,
   ) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.enterText(find.byType(TextField), '안녕');
     await tester.pump();
     await tester.tap(find.byTooltip('메시지 전송'));
@@ -115,7 +131,11 @@ void main() {
 
   testWidgets('failed message can be edited', (tester) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.enterText(find.byType(TextField), '수정할 메시지');
     await tester.pump();
     await tester.tap(find.byTooltip('메시지 전송'));
@@ -139,7 +159,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
-      const MaterialApp(home: ChatScreen(service: DemoChatService())),
+      const MaterialApp(
+        home: ChatScreen(service: DemoChatService(), conversationName: '합성 상대'),
+      ),
     );
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
     await tester.enterText(
@@ -164,7 +186,11 @@ void main() {
 
   testWidgets('request can finish after screen is disposed', (tester) async {
     final service = ControlledService();
-    await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(service: service, conversationName: '합성 상대'),
+      ),
+    );
     await tester.enterText(find.byType(TextField), '안녕');
     await tester.pump();
     await tester.tap(find.byTooltip('메시지 전송'));
@@ -178,7 +204,11 @@ void main() {
     'touch outside dismisses keyboard without losing draft or blocking send',
     (tester) async {
       final service = ControlledService();
-      await tester.pumpWidget(MaterialApp(home: ChatScreen(service: service)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatScreen(service: service, conversationName: '합성 상대'),
+        ),
+      );
       await tester.enterText(find.byType(TextField), '작성 중인 메시지');
       await tester.pumpAndSettle();
       expect(tester.testTextInput.isVisible, true);

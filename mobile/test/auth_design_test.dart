@@ -233,7 +233,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('auth-retry')));
     await tester.pumpAndSettle();
     expect(auth.calls, 2);
-    expect(find.text('텍스트로 대화'), findsOneWidget);
+    expect(find.text('프로필을 만들어 주세요'), findsOneWidget);
   });
 
   testWidgets('signup scrolls at 320px with keyboard and large text', (
