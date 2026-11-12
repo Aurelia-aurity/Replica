@@ -24,13 +24,39 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _starting = false;
+  bool _loadingPersonas = true;
   int _tab = 0;
   late Future<List<Conversation>> _recent;
+  List<ConversationPersona> _personas = const [];
+  ConversationPersona? _selectedPersona;
 
   @override
   void initState() {
     super.initState();
     _refreshRecent();
+    _loadPersonas();
+  }
+
+  Future<void> _loadPersonas() async {
+    if (widget.history is! PersonaConversationService) {
+      if (mounted) setState(() => _loadingPersonas = false);
+      return;
+    }
+    try {
+      final items = await (widget.history as PersonaConversationService)
+          .personas();
+      if (!mounted) return;
+      setState(() {
+        _personas = items;
+        _selectedPersona = items
+            .where((item) => item.id == _selectedPersona?.id)
+            .firstOrNull;
+        _selectedPersona ??= items.firstOrNull;
+        _loadingPersonas = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingPersonas = false);
+    }
   }
 
   void _refreshRecent() {
@@ -80,7 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_starting) return;
     setState(() => _starting = true);
     try {
-      await startConversation(context, widget.history, voice: voice);
+      await startConversation(
+        context,
+        widget.history,
+        voice: voice,
+        persona: _selectedPersona,
+      );
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
     } finally {
@@ -146,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_tab == 2) {
       return HistoryScreen(
         service: widget.history,
+        selectedPersona: _selectedPersona,
         bottomNavigationBar: _navigation(),
       );
     }
@@ -186,14 +218,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(color: Color(0xFFCAE0D6), fontSize: 12),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      '엄마',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w700,
+                    if (_personas.length > 1)
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          key: const ValueKey('persona-selector'),
+                          value: _selectedPersona?.id,
+                          dropdownColor: replicaGreen,
+                          iconEnabledColor: Colors.white,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          items: [
+                            for (final persona in _personas)
+                              DropdownMenuItem(
+                                value: persona.id,
+                                child: Text(persona.name),
+                              ),
+                          ],
+                          onChanged: _starting
+                              ? null
+                              : (id) => setState(
+                                  () => _selectedPersona = _personas
+                                      .where((item) => item.id == id)
+                                      .firstOrNull,
+                                ),
+                        ),
+                      )
+                    else
+                      Text(
+                        _selectedPersona?.name ??
+                            (_loadingPersonas ? '불러오는 중…' : '대화 상대 없음'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 12),
                     Text(
                       widget.history.isDemo
@@ -210,7 +272,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       builder: (context, constraints) {
                         final buttons = [
                           FilledButton.icon(
-                            onPressed: _starting
+                            onPressed:
+                                _starting ||
+                                    (widget.history
+                                            is PersonaConversationService &&
+                                        _selectedPersona == null)
                                 ? null
                                 : () => _start(voice: false),
                             style: FilledButton.styleFrom(
@@ -224,7 +290,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             label: const Text('텍스트로 대화'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: _starting
+                            onPressed:
+                                _starting ||
+                                    (widget.history
+                                            is PersonaConversationService &&
+                                        _selectedPersona == null)
                                 ? null
                                 : () => _start(voice: true),
                             style: OutlinedButton.styleFrom(

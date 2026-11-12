@@ -14,12 +14,15 @@ import 'package:mobile/chat/voice_recorder.dart';
 import 'package:mobile/chat/voice_screen.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 import 'history_test.dart' as fixtures;
 import 'sc09_test.dart' as sc09;
 
 VoiceRecording sampleRecording() => VoiceRecording(
-  bytes: pcmToWave(Uint8List.fromList([0, 64, 0, 192])),
+  bytes: pcmToWave(
+    Uint8List.fromList(List.generate(32000, (i) => i.isEven ? 0 : 64)),
+  ),
   duration: const Duration(seconds: 1),
 );
 VoiceReply sampleReply({bool ttsFailed = false}) => VoiceReply(
@@ -39,6 +42,7 @@ class Sc10Recorder implements VoiceRecorder {
   int starts = 0, cancels = 0, stops = 0, settings = 0;
   bool disposed = false;
   Object? startFailure, stopFailure;
+  Completer<VoiceRecording>? stopPending;
   Completer<void>? permissionPending;
   @override
   Stream<double> get levels => amplitudes.stream;
@@ -55,7 +59,7 @@ class Sc10Recorder implements VoiceRecorder {
   Future<VoiceRecording> stop() async {
     stops++;
     if (stopFailure != null) throw stopFailure!;
-    return sampleRecording();
+    return stopPending?.future ?? sampleRecording();
   }
 
   @override
@@ -79,7 +83,7 @@ class Sc10Recorder implements VoiceRecorder {
 
 class Sc10Service implements VoiceChatService {
   VoiceReply result = sampleReply();
-  Object? failure;
+  Object? failure, speechFailure;
   Completer<VoiceReply>? pending;
   int syntheses = 0;
   final recordings = <VoiceRecording>[];
@@ -93,6 +97,7 @@ class Sc10Service implements VoiceChatService {
   @override
   Future<SpeechAudio> synthesize(ChatReply reply) async {
     syntheses++;
+    if (speechFailure != null) throw speechFailure!;
     return SpeechAudio(sampleRecording().bytes, 'audio/wav');
   }
 
@@ -169,6 +174,7 @@ Future<void> mountVoice(
   Sc10Recorder recorder,
   Sc10Player player, {
   bool parent = false,
+  ValueChanged<VoiceReply>? onReply,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -185,6 +191,7 @@ Future<void> mountVoice(
               service: service,
               recorder: recorder,
               audioPlayer: player,
+              onReply: onReply,
             ),
     ),
   );
@@ -216,6 +223,257 @@ Future<void> acceptPlay(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'focus loss stops playback and replay requires fresh disclosure',
+    (tester) async {
+      final player = Sc10Player();
+      final service = Sc10Service();
+      await mountVoice(tester, service, Sc10Recorder(), player);
+      await startRecording(tester);
+      await finishRecording(tester);
+      await acceptPlay(tester);
+      player.failures.add(const AudioPlaybackInterrupted());
+      await tester.pumpAndSettle();
+      expect(find.textContaining('오디오 출력 변경으로'), findsOneWidget);
+      expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+      expect(player.plays, 1);
+      await tester.tap(find.byTooltip('답변 음성 재생'));
+      await tester.pumpAndSettle();
+      expect(find.text('합성한 목소리예요'), findsOneWidget);
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(player.plays, 1);
+      await acceptPlay(tester);
+      expect(player.plays, 2);
+      expect(service.syntheses, 0);
+    },
+  );
+
+  testWidgets('background while recorder stop is pending never uploads', (
+    tester,
+  ) async {
+    final recorder = Sc10Recorder()..stopPending = Completer<VoiceRecording>();
+    final service = Sc10Service();
+    await mountVoice(tester, service, recorder, Sc10Player());
+    await startRecording(tester);
+    await tester.tap(find.byTooltip('녹음 종료 후 전송'));
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    recorder.stopPending!.complete(sampleRecording());
+    await tester.pumpAndSettle();
+    expect(service.recordings, isEmpty);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+  });
+
+  for (final fails in [false, true]) {
+    testWidgets(
+      'background during voice request keeps capture locked until ${fails ? 'failure' : 'success'}',
+      (tester) async {
+        final response = Completer<VoiceReply>();
+        final service = Sc10Service()..pending = response;
+        final recorder = Sc10Recorder();
+        final player = Sc10Player();
+        var delivered = 0;
+        await mountVoice(
+          tester,
+          service,
+          recorder,
+          player,
+          onReply: (_) => delivered++,
+        );
+        await startRecording(tester);
+        await finishRecording(tester, pending: true);
+        expect(service.recordings, hasLength(1));
+
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.paused,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+          await tester.pump();
+        }
+        expect(recorder.cancels, 0);
+        expect(find.text('인식·응답 생성·음성 합성을 처리 중이에요.'), findsOneWidget);
+        expect(
+          tester
+              .widget<IconButton>(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is IconButton && widget.tooltip == '눌러서 말하기',
+                ),
+              )
+              .onPressed,
+          isNull,
+        );
+        await tester.tap(find.byTooltip('눌러서 말하기'));
+        await tester.pump();
+        expect(recorder.starts, 1);
+
+        if (fails) {
+          response.completeError(
+            const BackendFailure(
+              BackendFailureKind.generic,
+              code: 'STT_FAILED',
+              retryable: true,
+              stage: 'stt',
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(delivered, 0);
+          expect(find.text('같은 녹음 다시 전송'), findsOneWidget);
+          service.pending = null;
+          await tester.ensureVisible(find.text('같은 녹음 다시 전송'));
+          await tester.tap(find.text('같은 녹음 다시 전송'));
+          await tester.pumpAndSettle();
+          expect(service.recordings, hasLength(2));
+          expect(identical(service.recordings[0], service.recordings[1]), true);
+        } else {
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          await tester.pump();
+          response.complete(sampleReply());
+          await tester.pumpAndSettle();
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await tester.pump();
+        }
+        expect(delivered, 1);
+        expect(find.text('인식된 합성 질문'), findsOneWidget);
+        expect(player.plays, 0);
+      },
+    );
+  }
+
+  testWidgets('cancelled stop cannot release a newer stop on background', (
+    tester,
+  ) async {
+    final oldStop = Completer<VoiceRecording>();
+    final newStop = Completer<VoiceRecording>();
+    final recorder = Sc10Recorder()..stopPending = oldStop;
+    final service = Sc10Service();
+    await mountVoice(tester, service, recorder, Sc10Player());
+    await startRecording(tester);
+    await finishRecording(tester, pending: true);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    recorder.stopPending = newStop;
+    await startRecording(tester);
+    await finishRecording(tester, pending: true);
+    oldStop.complete(sampleRecording());
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(recorder.cancels, 2);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    newStop.complete(sampleRecording());
+    await tester.pumpAndSettle();
+    expect(service.recordings, isEmpty);
+  });
+
+  for (final fails in [false, true]) {
+    testWidgets(
+      'late ${fails ? 'error' : 'success'} after timeout cannot hide newer capture controls',
+      (tester) async {
+        final response = Completer<VoiceReply>();
+        final service = Sc10Service()..pending = response;
+        final recorder = Sc10Recorder();
+        final player = Sc10Player();
+        var delivered = 0;
+        await mountVoice(
+          tester,
+          service,
+          recorder,
+          player,
+          onReply: (_) => delivered++,
+        );
+        await startRecording(tester);
+        await finishRecording(tester, pending: true);
+        await tester.pump(voiceRequestTimeout);
+        await tester.pumpAndSettle();
+        service.pending = null;
+        await startRecording(tester);
+        expect(recorder.starts, 2);
+        if (fails) {
+          response.completeError(StateError('late failure'));
+        } else {
+          response.complete(sampleReply());
+        }
+        await tester.pump();
+        expect(find.byTooltip('녹음 종료 후 전송'), findsOneWidget);
+        expect(find.byTooltip('녹음 취소'), findsOneWidget);
+        expect(find.text('인식된 합성 질문'), findsNothing);
+        expect(delivered, 0);
+        await finishRecording(tester);
+        expect(service.recordings, hasLength(2));
+        expect(delivered, 1);
+        expect(find.text('인식된 합성 질문'), findsOneWidget);
+        expect(player.plays, 0);
+      },
+    );
+  }
+
+  testWidgets('recording interruption discards capture without upload', (
+    tester,
+  ) async {
+    final recorder = Sc10Recorder();
+    final service = Sc10Service();
+    await mountVoice(tester, service, recorder, Sc10Player());
+    await startRecording(tester);
+    recorder.failures.add(CaptureFailure.interrupted);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('통화나 다른 오디오로'), findsOneWidget);
+    expect(service.recordings, isEmpty);
+    expect(recorder.cancels, greaterThan(0));
+  });
+
+  test(
+    'recording validates MIME, name, duration, WAV header and encoded size',
+    () {
+      final valid = sampleRecording();
+      valid.validate();
+      for (final recording in [
+        VoiceRecording(
+          bytes: valid.bytes,
+          duration: valid.duration,
+          mimeType: 'audio/mpeg',
+        ),
+        VoiceRecording(
+          bytes: valid.bytes,
+          duration: valid.duration,
+          fileName: 'question.mp3',
+        ),
+        VoiceRecording(
+          bytes: valid.bytes,
+          duration: const Duration(seconds: 61),
+        ),
+        VoiceRecording(bytes: valid.bytes, duration: Duration.zero),
+      ]) {
+        expect(recording.validate, throwsA(isA<BackendFailure>()));
+      }
+      final damaged = Uint8List.fromList(valid.bytes)..[0] = 0;
+      expect(
+        () =>
+            VoiceRecording(bytes: damaged, duration: valid.duration).validate(),
+        throwsFormatException,
+      );
+      final tooLong = pcmToWave(Uint8List(16000 * 2 * 61));
+      expect(
+        () =>
+            VoiceRecording(bytes: tooLong, duration: valid.duration).validate(),
+        throwsFormatException,
+      );
+    },
+  );
+
   test(
     'late completion of an older recording cannot replace a newer retry ID',
     () async {
@@ -237,6 +495,53 @@ void main() {
       await retry;
     },
   );
+
+  for (final completesBeforeFailure in [true, false]) {
+    test(
+      'late voice success ${completesBeforeFailure ? 'before' : 'after'} a retry failure preserves the same recording turn ID',
+      () async {
+        final service = ControlledVoiceConversation();
+        final chat = ConversationChatService(service, 's');
+        final recording = sampleRecording();
+        final first = chat.replyVoice(recording);
+        // Timing out the caller leaves the underlying voice request running.
+        await expectLater(
+          first.timeout(Duration.zero),
+          throwsA(isA<TimeoutException>()),
+        );
+        final second = chat.replyVoice(recording);
+        expect(service.pending[1].id, service.pending[0].id);
+        final secondCheck = expectLater(second, throwsA(isA<BackendFailure>()));
+        if (completesBeforeFailure) {
+          service.pending[0].result.complete(sampleReply());
+          await first;
+        }
+        service.pending[1].result.completeError(
+          const BackendFailure(BackendFailureKind.network),
+        );
+        await secondCheck;
+        if (!completesBeforeFailure) {
+          service.pending[0].result.complete(sampleReply());
+          await first;
+        }
+
+        final retry = chat.replyVoice(recording);
+        expect(
+          service.pending.map((request) => request.id).toSet(),
+          hasLength(1),
+        );
+        service.pending[2].result.complete(sampleReply());
+        await retry;
+
+        // Success of the current attempt releases the ID for a new voice turn.
+        final next = chat.replyVoice(recording);
+        expect(service.pending[3].id, isNot(service.pending[2].id));
+        service.pending[3].result.complete(sampleReply());
+        await next;
+      },
+    );
+  }
+
   testWidgets('one-minute recording limit stops and sends once', (
     tester,
   ) async {
@@ -436,6 +741,45 @@ void main() {
   });
 
   test(
+    'first HTTP voice send preserves a non-retryable conflict and stage',
+    () async {
+      final auth = fixtures.TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
+        return fixtures.jsonResponse({
+          'error': {'code': 'CONFLICT', 'stage': 'llm', 'retryable': false},
+        }, status: 409);
+      });
+      addTearDown(client.close);
+      final service = ConversationChatService(
+        HttpConversationService(
+          backend: BackendService(auth),
+          baseUrl: Uri.parse('http://localhost:8000'),
+          client: client,
+        ),
+        'session-one',
+      );
+      final recording = sampleRecording();
+      await expectLater(
+        service.replyVoice(recording),
+        throwsA(
+          isA<BackendFailure>()
+              .having((error) => error.code, 'code', 'CONFLICT')
+              .having((error) => error.canRetry, 'canRetry', isFalse)
+              .having((error) => error.stage, 'stage', 'llm'),
+        ),
+      );
+      expect(requests, 1);
+    },
+  );
+
+  test(
     'voice upload rejects empty and oversized bytes before dispatch',
     () async {
       final auth = fixtures.TestAuth();
@@ -566,6 +910,95 @@ void main() {
   );
 
   testWidgets(
+    'reopened voice reply with stored speech is not requested again',
+    (tester) async {
+      final service = Sc10Service();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VoiceScreen(
+            conversationName: '합성 상대',
+            service: service,
+            recorder: Sc10Recorder(),
+            audioPlayer: Sc10Player(),
+            lastQuestion: '지난 질문',
+            lastReply: '저장된 답변',
+            lastReplyDetails: const ChatReply(
+              text: '저장된 답변',
+              turnId: 'voice-stored',
+              ttsStatus: 'ready',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('음성을 다시 받을 수 없어요'), findsOneWidget);
+      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+      expect(find.text('음성 다시 시도'), findsNothing);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.play_arrow),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(service.syntheses, 0);
+    },
+  );
+
+  testWidgets('unusable audio from a finished synthesis offers no retry', (
+    tester,
+  ) async {
+    final service = Sc10Service()
+      ..result = const VoiceReply(
+        transcript: '인식된 합성 질문',
+        reply: ChatReply(
+          text: '음성 대화 합성 답변',
+          turnId: 'voice-turn',
+          ttsStatus: 'ready',
+        ),
+        ttsFailed: true,
+      );
+    await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
+    await startRecording(tester);
+    await finishRecording(tester);
+    expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+    expect(find.text('음성 다시 시도'), findsNothing);
+    expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+    expect(service.syntheses, 0);
+  });
+
+  testWidgets(
+    'TTS can recover after a 409 without reopening the voice screen',
+    (tester) async {
+      final service = Sc10Service()
+        ..result = sampleReply(ttsFailed: true)
+        ..speechFailure = BackendFailure.fromResponse(
+          statusCode: 409,
+          body: {
+            'error': {'code': 'CONFLICT', 'retryable': false},
+          },
+        );
+      final player = Sc10Player();
+      await mountVoice(tester, service, Sc10Recorder(), player);
+      await startRecording(tester);
+      await finishRecording(tester);
+      expect(find.text('음성 다시 시도'), findsOneWidget);
+      await acceptPlay(tester);
+      expect(service.syntheses, 1);
+      expect(find.text('음성 다시 시도'), findsOneWidget);
+      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsNothing);
+      expect(player.plays, 0);
+      expect(find.text('음성 대화 합성 답변'), findsOneWidget);
+      service.speechFailure = null;
+      await acceptPlay(tester);
+      expect(service.syntheses, 2);
+      expect(service.recordings, hasLength(1));
+      expect(player.plays, 1);
+    },
+  );
+
+  testWidgets(
     'TTS partial failure keeps text and only retries speech, with disclosure',
     (tester) async {
       final service = Sc10Service()..result = sampleReply(ttsFailed: true);
@@ -583,6 +1016,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('답변 음성 재생'));
       await tester.pumpAndSettle();
+      expect(find.text('합성한 목소리예요'), findsOneWidget);
+      expect(player.plays, 1);
+      await tester.tap(find.widgetWithText(FilledButton, '재생'));
+      await tester.pumpAndSettle();
+      expect(player.plays, 2);
       expect(service.syntheses, 1);
     },
   );
@@ -605,8 +1043,7 @@ void main() {
       await tester.tap(find.byTooltip('음성 일시정지'));
       await tester.pumpAndSettle();
       expect(player.pauses, 1);
-      await tester.tap(find.byTooltip('답변 음성 재생'));
-      await tester.pumpAndSettle();
+      await acceptPlay(tester);
       expect(player.resumes, 1);
       tester.widget<Slider>(find.byType(Slider)).onChanged!(.5);
       await tester.pumpAndSettle();
@@ -619,7 +1056,7 @@ void main() {
   );
 
   testWidgets(
-    'pending response blocks duplicate capture, times out, ignores late response',
+    'pending response blocks duplicate capture, waits 200 seconds, ignores late response',
     (tester) async {
       final service = Sc10Service()..pending = Completer<VoiceReply>();
       final player = Sc10Player();
@@ -637,13 +1074,37 @@ void main() {
             .onPressed,
         isNull,
       );
+      const timeoutText = '음성 처리가 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.';
+      // The backend may retry TTS for ~170 seconds, so 30 seconds is not a failure.
+      // (Voice turns wait 200 seconds: the 180 second wait plus upload time.)
       await tester.pump(const Duration(seconds: 31));
+      expect(find.text(timeoutText), findsNothing);
+      await tester.pump(const Duration(seconds: 168));
+      expect(find.text(timeoutText), findsNothing);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
-      expect(find.text('응답을 받지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.text(timeoutText), findsOneWidget);
       service.pending!.complete(sampleReply());
       await tester.pumpAndSettle();
       expect(find.text('인식된 합성 질문'), findsNothing);
       expect(player.plays, 0);
+    },
+  );
+
+  testWidgets(
+    'resending a voice turn held back by the app shows a wait notice',
+    (tester) async {
+      final service = Sc10Service()
+        ..failure = const BackendFailure(
+          BackendFailureKind.generic,
+          code: speechInProgressCode,
+          retryable: true,
+        );
+      await mountVoice(tester, service, Sc10Recorder(), Sc10Player());
+      await startRecording(tester);
+      await finishRecording(tester);
+      expect(find.text('음성을 준비하는 중이에요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.text('같은 녹음 다시 전송'), findsOneWidget);
     },
   );
 
