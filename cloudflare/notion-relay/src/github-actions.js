@@ -67,6 +67,19 @@ export class GitHubActions {
       workflow.state==='active','WORKFLOW_BINDING',503);
   }
   async getRun(id){positive(id);return this.get(`${REPO}/actions/runs/${id}`);}
+  async syncInFlight(){
+    // Both writers share the same Actions concurrency group. Never enqueue a
+    // periodic run behind an existing run (which can displace another pending run).
+    const paths=new Set([WORKFLOW_PATH,'.github/workflows/notion-sync.yml']);
+    for(const status of ['queued','in_progress','waiting','pending','requested']){
+      const value=await this.get(`${REPO}/actions/runs?status=${status}&per_page=100`);
+      requireValue(Array.isArray(value.workflow_runs)&&value.workflow_runs.length<100,
+        'SYNC_RUN_LIST_INCOMPLETE',503);
+      if(value.workflow_runs.some(run=>paths.has(run.path?.split('@')[0])&&run.status!=='completed'))
+        return true;
+    }
+    return false;
+  }
   async dispatch(request){
     uuid(request.request_id);
     requireValue(Number.isSafeInteger(request.generation)&&request.generation>0,'DISPATCH_GENERATION');

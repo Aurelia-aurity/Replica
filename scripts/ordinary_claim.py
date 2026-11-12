@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 
 import github_project as gp
-import sync_engine as se
 
 WORKFLOW_PATH = ".github/workflows/notion-sync-request.yml"
 
@@ -21,7 +20,7 @@ class OrdinaryClaim:
                 "run_id": self.run_id, "sha": self.sha, "attempt": 1}
 
     def validate(self, env):
-        se.require(env.get("SYNC_ORDINARY_REQUEST") == "true" and
+        gp.require(env.get("SYNC_ORDINARY_REQUEST") == "true" and
                    env.get("NOTION_RELAY_ENABLED") == "true" and
                    env.get("NOTION_SYNC_ENABLED") == "true" and
                    env.get("GITHUB_ACTIONS") == "true" and
@@ -41,7 +40,6 @@ class OrdinaryClaim:
                    env.get("RELAY_REQUEST_ID") == self.request_id and
                    env.get("RELAY_GENERATION") == str(self.generation),
                    "일반 실행 요청의 고정 실행 문맥이 일치하지 않습니다")
-        se.require(not any(env.get(name) for name in
-                   ("SYNC_RESOLVE_ISSUES", "SYNC_APPROVED_SHA", "SYNC_DIAGNOSE_DATE_READBACK")) and
+        gp.require(not env.get("SYNC_APPROVED_SHA") and
                    env.get("SYNC_DRY_RUN") in (None, "false", ""),
-                   "일반 실행 요청에는 PM 재개/진단 입력을 사용할 수 없습니다")
+                   "일반 실행 요청에는 수동 실행 입력을 사용할 수 없습니다")
