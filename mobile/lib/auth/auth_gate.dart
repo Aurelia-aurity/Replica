@@ -8,13 +8,20 @@ import '../config/app_config.dart';
 import '../history/conversation_service.dart';
 import '../home/home_screen.dart';
 import '../services/backend_service.dart';
+import '../records/record_service.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
 import 'preview_auth_service.dart';
 
 /// Each account owns a separate navigation tree, including dialogs and drafts.
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.auth, required this.chat});
+  const AuthGate({
+    super.key,
+    required this.auth,
+    required this.chat,
+    this.recordServiceFactory,
+  });
+  final RecordService Function()? recordServiceFactory;
   final AuthService auth;
   final ChatService chat;
   @override
@@ -93,17 +100,33 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) widget.auth.checkSessionExpiry();
   }
 
+  VoidCallback _endDeletedAccountSession(int generation) => () {
+    unawaited(
+      widget.auth
+          .completeAccountDeletion(requestGeneration: generation)
+          .catchError((Object _) {}),
+    );
+  };
   @override
   Widget build(BuildContext context) {
     if (widget.auth.identity == null) return AuthScreen(service: widget.auth);
     return ScaffoldMessenger(
       key: ValueKey(_generation),
       child: NavigatorPopHandler<Object?>(
-        onPopWithResult: (_) => _navigator.currentState!.pop(),
+        onPopWithResult: (_) => _navigator.currentState!.maybePop(),
         child: Navigator(
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) => HomeScreen(
+              onAccountDeleted: _endDeletedAccountSession(
+                widget.auth.generation,
+              ),
+              recordService: SessionRecordService(
+                backend: BackendService(widget.auth),
+                delegate:
+                    widget.recordServiceFactory?.call() ??
+                    PreviewRecordService(),
+              ),
               history: _conversationService(),
               accountEmail: widget.auth.identity!.email,
               onSignOut: () =>
