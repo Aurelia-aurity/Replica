@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -11,8 +13,10 @@ import 'package:mobile/chat/voice_screen.dart';
 import 'package:mobile/history/conversation.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/history/history_screen.dart';
+import 'package:mobile/home/home_screen.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 class TestAuth extends PreviewAuthService {
   @override
@@ -100,6 +104,42 @@ class DetailedDeferredHistory extends DeferredHistory
       throw UnsupportedError('No speech in retry tests');
 }
 
+class PersonaHistory extends TestHistory implements PersonaConversationService {
+  final availablePersonas = const [
+    ConversationPersona(id: 'persona-1', name: '엄마'),
+    ConversationPersona(id: 'persona-2', name: '아빠'),
+  ];
+  String? selectedPersonaId;
+
+  @override
+  Future<List<ConversationPersona>> personas() async => availablePersonas;
+
+  @override
+  Future<Conversation> createForPersona(
+    String personaId,
+    DateTime acknowledgedAt, {
+    bool voice = false,
+  }) async {
+    selectedPersonaId = personaId;
+    creates++;
+    createdVoice = voice;
+    final persona = availablePersonas.singleWhere(
+      (item) => item.id == personaId,
+    );
+    final item = Conversation(
+      id: 'selected-$creates',
+      personaId: persona.id,
+      personaName: persona.name,
+      createdAt: acknowledgedAt,
+      updatedAt: acknowledgedAt,
+      acknowledgedAt: acknowledgedAt,
+      initialVoice: voice,
+    );
+    items.add(item);
+    return item;
+  }
+}
+
 Conversation conversation({
   String id = 'session-1',
   DateTime? date,
@@ -127,13 +167,17 @@ Conversation conversation({
   );
 }
 
-Map<String, dynamic> sessionJson(String id) => {
+Map<String, dynamic> sessionJson(
+  String id, {
+  String acknowledgedAt = '2026-10-28T01:00:00Z',
+  String personaId = 'persona-1',
+}) => {
   'id': id,
-  'persona_id': 'persona-1',
+  'persona_id': personaId,
   'title': null,
   'created_at': '2026-10-28T01:00:00Z',
   'updated_at': '2026-10-28T02:00:00Z',
-  'ai_notice_ack_at': '2026-10-28T01:00:00Z',
+  'ai_notice_ack_at': acknowledgedAt,
 };
 Map<String, dynamic> turnJson(int number) => {
   'turn_id': 'turn-$number',
@@ -203,6 +247,26 @@ void main() {
     },
   );
 
+  testWidgets('selected persona id and display name stay connected', (
+    tester,
+  ) async {
+    final service = PersonaHistory();
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(history: service)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('persona-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('아빠').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('텍스트로 대화'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('대화 시작'));
+    await tester.pumpAndSettle();
+    expect(service.selectedPersonaId, 'persona-2');
+    expect(find.text('아빠'), findsOneWidget);
+  });
+
   test('HTTP empty sessions retain their initial mode without adding draft API fields', () async {
     final auth = TestAuth();
     addTearDown(auth.dispose);
@@ -214,8 +278,10 @@ void main() {
       if (request.url.path == '/personas') {
         return jsonResponse({
           'items': [
-            {'id': 'persona-1', 'status': 'active'},
+            {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
           ],
+          'limit': 100,
+          'offset': 0,
         });
       }
       if (request.method == 'POST') {
@@ -225,7 +291,13 @@ void main() {
           'session_id',
           'ai_notice_ack_at',
         });
-        return jsonResponse(sessionJson('voice-session'), status: 201);
+        return jsonResponse(
+          sessionJson(
+            'voice-session',
+            acknowledgedAt: body['ai_notice_ack_at'] as String,
+          ),
+          status: 201,
+        );
       }
       if (request.url.path.endsWith('/turns')) {
         return jsonResponse({'items': [], 'limit': 100, 'after_turn_no': 0});
@@ -258,6 +330,68 @@ void main() {
     expect((await memory.get(voice.id)).lastVoice, true);
   });
 
+  test(
+    'HTTP session uses selected persona and confirms stored AI notice time',
+    () async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      var mismatch = false;
+      final client = MockClient((request) async {
+        if (request.url.path == '/personas') {
+          return jsonResponse({
+            'items': [
+              {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
+              {'id': 'persona-2', 'name': '아빠', 'status': 'active'},
+            ],
+            'limit': 100,
+            'offset': 0,
+          });
+        }
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['persona_id'], 'persona-2');
+        final acknowledgedAt = DateTime.parse(
+          body['ai_notice_ack_at'] as String,
+        );
+        return jsonResponse(
+          sessionJson(
+            'selected-session',
+            personaId: 'persona-2',
+            acknowledgedAt:
+                (mismatch
+                        ? acknowledgedAt.add(const Duration(seconds: 1))
+                        : acknowledgedAt)
+                    .toIso8601String(),
+          ),
+          status: 201,
+        );
+      });
+      addTearDown(client.close);
+      final service = HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+      );
+      final acknowledgedAt = DateTime.parse('2026-11-04T01:23:45+09:00');
+      final created = await service.createForPersona(
+        'persona-2',
+        acknowledgedAt,
+      );
+      expect(created.personaId, 'persona-2');
+      expect(created.personaName, '아빠');
+      expect(created.acknowledgedAt.isAtSameMomentAs(acknowledgedAt), true);
+
+      mismatch = true;
+      await expectLater(
+        service.createForPersona('persona-2', acknowledgedAt),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('date groups cover day, week, month and previous years', () {
     final now = DateTime(2026, 10, 28);
     expect(conversationDateGroup(now, now), '오늘');
@@ -281,6 +415,15 @@ void main() {
         expect(request.headers['Authorization'], 'Bearer synthetic-token');
         expect(request.url.queryParameters.containsKey('user_id'), false);
         paths.add(request.url.toString());
+        if (request.url.path == '/personas') {
+          return jsonResponse({
+            'items': [
+              {'id': 'persona-1', 'name': '엄마', 'status': 'active'},
+            ],
+            'limit': 100,
+            'offset': 0,
+          });
+        }
         if (request.url.path == '/sessions') {
           final offset = request.url.queryParameters['offset'];
           return jsonResponse({
@@ -365,6 +508,255 @@ void main() {
     );
     await chat.reply('합성 질문');
     expect(service.sends.single.session, 'same-session');
+  });
+
+  test('text resend preserves the server conflict and retry policy', () async {
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn(
+      PreviewAuthService.emails.first,
+      PreviewAuthService.password,
+    );
+    final turnIds = <Object?>[];
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      turnIds.add(body['turn_id']);
+      if (turnIds.length == 1) {
+        return jsonResponse({
+          'error': {'code': 'AI_TIMEOUT', 'retryable': true},
+        }, status: 504);
+      }
+      return jsonResponse({
+        'error': {'code': 'CONFLICT', 'retryable': false},
+      }, status: 409);
+    });
+    addTearDown(client.close);
+    final chat = ConversationChatService(
+      HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+      ),
+      'same-session',
+    );
+    await expectLater(
+      chat.reply('질문'),
+      throwsA(
+        isA<BackendFailure>().having(
+          (error) => error.canRetry,
+          'canRetry',
+          isTrue,
+        ),
+      ),
+    );
+    await expectLater(
+      chat.reply('질문'),
+      throwsA(
+        isA<BackendFailure>()
+            .having((error) => error.code, 'code', 'CONFLICT')
+            .having((error) => error.canRetry, 'canRetry', isFalse)
+            .having((error) => error.userMessage, 'message', contains('새로고침')),
+      ),
+    );
+    expect(turnIds, hasLength(2));
+    expect(turnIds[0], turnIds[1]);
+  });
+
+  test('409 on non-send requests keeps the CONFLICT code', () async {
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn(
+      PreviewAuthService.emails.first,
+      PreviewAuthService.password,
+    );
+    final client = MockClient(
+      (_) async => jsonResponse({
+        'error': {'code': 'CONFLICT', 'retryable': false},
+      }, status: 409),
+    );
+    addTearDown(client.close);
+    final service = HttpConversationService(
+      backend: BackendService(auth),
+      baseUrl: Uri.parse('http://localhost:8000'),
+      client: client,
+    );
+    await expectLater(
+      service.delete('session-1'),
+      throwsA(
+        isA<BackendFailure>()
+            .having((error) => error.code, 'code', 'CONFLICT')
+            .having((error) => error.canRetry, 'canRetry', isFalse),
+      ),
+    );
+  });
+
+  test('HTTP adapter waits 180s for text and TTS and 200s for voice', () async {
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn(
+      PreviewAuthService.emails.first,
+      PreviewAuthService.password,
+    );
+    final client = MockClient((_) => Completer<http.Response>().future);
+    addTearDown(client.close);
+    final service = HttpConversationService(
+      backend: BackendService(auth),
+      baseUrl: Uri.parse('http://localhost:8000'),
+      client: client,
+    );
+    // Returns the whole seconds elapsed when the call fails with [code].
+    int? timedOutAt(Future<Object?> Function() call, String code) {
+      int? at;
+      fakeAsync((time) {
+        var failed = false;
+        call().then(
+          (_) {},
+          onError: (Object error) {
+            if (error is BackendFailure && error.code == code) failed = true;
+          },
+        );
+        for (var seconds = 1; seconds <= 260 && !failed; seconds++) {
+          time.elapse(const Duration(seconds: 1));
+          if (failed) at = seconds;
+        }
+      });
+      return at;
+    }
+
+    expect(
+      timedOutAt(() => service.sendDetailed('s', 't', '질문'), 'AI_TIMEOUT'),
+      180,
+    );
+    expect(
+      timedOutAt(
+        () => service.synthesize(const ChatReply(text: '답변', turnId: 't')),
+        'SPEECH_TIMEOUT',
+      ),
+      180,
+    );
+    final recording = VoiceRecording(
+      bytes: pcmToWave(
+        Uint8List.fromList(List.generate(32000, (i) => i.isEven ? 0 : 64)),
+      ),
+      duration: const Duration(seconds: 1),
+    );
+    expect(
+      timedOutAt(
+        () => service.sendVoice('s', 'v', recording),
+        'SPEECH_TIMEOUT',
+      ),
+      200,
+    );
+    expect(
+      const BackendFailure(
+        BackendFailureKind.network,
+        code: 'SPEECH_TIMEOUT',
+        retryable: true,
+      ).userMessage,
+      '음성 처리가 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.',
+    );
+  });
+
+  group('speech requests while the backend may still be working', () {
+    http.Response speechOk(String turnId) => jsonResponse({
+      'turn_id': turnId,
+      'tts_status': 'ready',
+      'audio_base64': base64Encode([1, 2, 3]),
+      'audio_format': 'wav',
+    });
+    const reply = ChatReply(text: '답변', turnId: 'turn-a');
+    Matcher failsWith(String code) =>
+        throwsA(isA<BackendFailure>().having((e) => e.code, 'code', code));
+
+    Future<HttpConversationService> signedIn(
+      MockClient client,
+      DateTime Function() now,
+    ) async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      addTearDown(client.close);
+      return HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+        now: now,
+      );
+    }
+
+    test('a lost connection holds the next request until the wait is over', () async {
+      var now = DateTime(2026, 11, 5, 12);
+      var calls = 0;
+      var mode = 'drop';
+      final client = MockClient((request) async {
+        calls++;
+        if (mode == 'drop') throw http.ClientException('connection lost');
+        if (mode == 'fail') {
+          return jsonResponse({
+            'error': {'code': 'TTS_FAILED', 'retryable': true, 'stage': 'tts'},
+          }, status: 502);
+        }
+        return speechOk(request.url.pathSegments[2]);
+      });
+      final service = await signedIn(client, () => now);
+
+      await expectLater(service.synthesize(reply), failsWith('AI_UNAVAILABLE'));
+      expect(calls, 1);
+      // The backend may still be retrying, so a second request is not sent.
+      await expectLater(
+        service.synthesize(reply),
+        failsWith(speechInProgressCode),
+      );
+      now = now.add(const Duration(seconds: 179));
+      await expectLater(
+        service.synthesize(reply),
+        failsWith(speechInProgressCode),
+      );
+      expect(calls, 1);
+      // Another turn is not affected.
+      mode = 'ok';
+      await service.synthesize(const ChatReply(text: '다른', turnId: 'turn-b'));
+      expect(calls, 2);
+
+      now = now.add(const Duration(seconds: 2));
+      mode = 'fail';
+      await expectLater(service.synthesize(reply), failsWith('TTS_FAILED'));
+      expect(calls, 3);
+      // The backend answered, so it is done and the next request goes out now.
+      mode = 'ok';
+      final audio = await service.synthesize(reply);
+      expect(audio.bytes, [1, 2, 3]);
+      expect(calls, 4);
+    });
+
+    test(
+      'a request still in flight blocks a second one for the same turn',
+      () async {
+        var calls = 0;
+        final held = Completer<http.Response>();
+        final client = MockClient((request) {
+          calls++;
+          return calls == 1 ? held.future : Future.value(speechOk('turn-a'));
+        });
+        final service = await signedIn(client, DateTime.now);
+
+        final first = service.synthesize(reply);
+        await Future<void>.delayed(Duration.zero);
+        await expectLater(
+          service.synthesize(reply),
+          failsWith(speechInProgressCode),
+        );
+        expect(calls, 1);
+
+        held.complete(speechOk('turn-a'));
+        expect((await first).bytes, [1, 2, 3]);
+        expect((await service.synthesize(reply)).bytes, [1, 2, 3]);
+        expect(calls, 2);
+      },
+    );
   });
 
   for (final detailed in [false, true]) {
@@ -675,6 +1067,96 @@ void main() {
       isNull,
     );
   });
+
+  for (final voice in [false, true]) {
+    testWidgets(
+      'open conversation unlocks after confirmed completion (voice: $voice)',
+      (tester) async {
+        final created = DateTime.now().subtract(const Duration(days: 1));
+        final service = TestHistory()
+          ..items = [conversation(date: created, pending: true, voice: voice)];
+        await tester.pumpWidget(
+          MaterialApp(home: HistoryScreen(service: service)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('합성 첫 질문 session-1'));
+        await tester.pumpAndSettle();
+
+        final notice = find.textContaining('아직 처리 중인 메시지');
+        void expectBlocked(bool blocked) {
+          if (voice) {
+            final button = tester.widget<IconButton>(
+              find.byWidgetPredicate(
+                (widget) => widget is IconButton && widget.tooltip == '눌러서 말하기',
+              ),
+            );
+            expect(button.onPressed, blocked ? isNull : isNotNull);
+          } else {
+            expect(notice, blocked ? findsOneWidget : findsNothing);
+            expect(
+              tester.widget<TextField>(find.byType(TextField)).readOnly,
+              blocked,
+            );
+          }
+        }
+
+        expectBlocked(true);
+        service.failGet = true;
+        await tester.pump(pendingTurnRefreshInterval);
+        await tester.pumpAndSettle();
+        expectBlocked(true);
+        service.failGet = false;
+        await tester.pump(pendingTurnRefreshInterval);
+        await tester.pumpAndSettle();
+        expectBlocked(true);
+        expect(find.textContaining('이전에 처리하지 못한 메시지'), findsNothing);
+
+        service.items = [conversation(date: created, voice: voice)];
+        await tester.pump(pendingTurnRefreshInterval);
+        await tester.pumpAndSettle();
+        expectBlocked(false);
+        expect(find.text('저장된 합성 답변'), findsOneWidget);
+        if (!voice) {
+          await tester.enterText(find.byType(TextField), '잠금 해제 후 질문');
+          await tester.pump();
+          await tester.tap(find.byTooltip('메시지 전송'));
+          await tester.pumpAndSettle();
+          expect(service.sends.single.session, 'session-1');
+        }
+      },
+    );
+  }
+
+  test(
+    'turn list tts_status marks stored speech, even over a cached reply',
+    () {
+      final json = {...turnJson(1), 'tts_status': 'ready'};
+      final fresh = ConversationTurn.fromJson(json);
+      expect(fresh.replyDetails!.ttsStatus, 'ready');
+      expect(fresh.replyDetails!.speechAlreadySynthesized, isTrue);
+      // A reply kept from /chat/text has no tts_status; the turn list wins.
+      final cached = ConversationTurn.fromJson(
+        json,
+        replyDetails: const ChatReply(text: '답변 1', turnId: 'turn-1'),
+      );
+      expect(cached.replyDetails!.speechAlreadySynthesized, isTrue);
+      // No tts_status (never requested) or a failed one can still be requested.
+      for (final status in [null, 'failed']) {
+        final turn = ConversationTurn.fromJson({
+          ...turnJson(1),
+          'tts_status': status,
+        });
+        expect(turn.replyDetails!.speechAlreadySynthesized, isFalse);
+      }
+      final voice = ChatReply.fromJson({
+        'turn_id': 't',
+        'answer': '답변',
+        'is_ai_generated': true,
+        'tts_status': 'ready',
+      }, expectedTurnId: 't');
+      expect(voice.speechAlreadySynthesized, isTrue);
+    },
+  );
 
   testWidgets(
     'home stores and reopens history; account switch clears previous history',

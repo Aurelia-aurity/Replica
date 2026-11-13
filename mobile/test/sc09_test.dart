@@ -12,6 +12,7 @@ import 'package:mobile/chat/reply_audio_player.dart';
 import 'package:mobile/chat/reply_evidence.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/services/backend_service.dart';
+import 'package:mobile/services/request_timeouts.dart';
 
 import 'history_test.dart' as fixtures;
 
@@ -245,6 +246,75 @@ void main() {
     },
   );
 
+  testWidgets('reopened reply with stored speech is not requested again', (
+    tester,
+  ) async {
+    final service = Sc09Service();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(
+          service: service,
+          audioPlayer: Sc09Player(),
+          initialMessages: const [
+            (text: '지난 질문', isUser: true),
+            (text: '저장된 답변', isUser: false),
+          ],
+          initialReplies: const {
+            1: ChatReply(
+              text: '저장된 답변',
+              turnId: 'turn-stored',
+              ttsStatus: 'ready',
+            ),
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('듣기 불가'), findsOneWidget);
+    expect(find.text('듣기'), findsNothing);
+    expect(find.text('듣기 다시 시도'), findsNothing);
+    expect(find.textContaining('다시 받을 수 없어요'), findsOneWidget);
+    final button = tester.widget<OutlinedButton>(
+      find.ancestor(
+        of: find.text('듣기 불가'),
+        matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+    expect(service.syntheses, 0);
+  });
+
+  testWidgets('TTS can recover after a 409 without reopening the text screen', (
+    tester,
+  ) async {
+    final service = Sc09Service()
+      ..speechFailure = BackendFailure.fromResponse(
+        statusCode: 409,
+        body: {
+          'error': {'code': 'CONFLICT', 'retryable': false},
+        },
+      );
+    final player = Sc09Player();
+    await openAndSend(tester, service, player: player);
+    await acceptSpeech(tester);
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 1);
+    expect(find.text('듣기 불가'), findsNothing);
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(find.textContaining('아직 음성을 만드는 중일 수 있어요'), findsOneWidget);
+    expect(player.plays, 0);
+    expect(find.text('합성 답변'), findsOneWidget);
+    service.speechFailure = null;
+    await tester.tap(find.text('듣기 다시 시도'));
+    await tester.pumpAndSettle();
+    expect(find.text('합성한 목소리예요'), findsOneWidget);
+    expect(service.syntheses, 1);
+    await tester.tap(find.widgetWithText(FilledButton, '재생'));
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 2);
+    expect(player.plays, 1);
+  });
+
   testWidgets(
     'late TTS completion after leaving screen never starts playback',
     (tester) async {
@@ -306,11 +376,15 @@ void main() {
   );
 
   testWidgets(
-    '30-second timeout enables manual retry and ignores a late answer',
+    '180-second timeout enables manual retry and ignores a late answer',
     (tester) async {
       final service = Sc09Service()..replyPending = Completer<ChatReply>();
       await openAndSend(tester, service);
       await tester.pump(const Duration(seconds: 31));
+      expect(find.text('응답을 받지 못했어요.'), findsNothing);
+      await tester.pump(const Duration(seconds: 148));
+      expect(find.text('응답을 받지 못했어요.'), findsNothing);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
       expect(find.text('응답을 받지 못했어요.'), findsOneWidget);
       expect(service.sends, 1);
@@ -324,6 +398,39 @@ void main() {
       expect(find.text('합성 질문'), findsOneWidget);
     },
   );
+
+  testWidgets('TTS held back while the backend may still be working says so', (
+    tester,
+  ) async {
+    final service = Sc09Service()
+      ..speechFailure = const BackendFailure(
+        BackendFailureKind.generic,
+        code: speechInProgressCode,
+        retryable: true,
+      );
+    await openAndSend(tester, service, player: Sc09Player());
+    await acceptSpeech(tester);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아직 음성을 만드는 중일 수 있어요'), findsOneWidget);
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+  });
+
+  testWidgets('TTS waits past 30 seconds and gives up at 180 seconds', (
+    tester,
+  ) async {
+    final service = Sc09Service()..speechPending = Completer<SpeechAudio>();
+    await openAndSend(tester, service, player: Sc09Player());
+    await acceptSpeech(tester);
+    await tester.pump(const Duration(seconds: 31));
+    expect(find.text('음성 준비 중'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 148));
+    expect(find.text('음성 준비 중'), findsOneWidget);
+    expect(find.textContaining('재생하지 못했어요'), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(find.textContaining('재생하지 못했어요'), findsOneWidget);
+  });
 
   test('HTTP detailed reply preserves timing and finish reason and uses authenticated turn TTS', () async {
     final auth = fixtures.TestAuth();
@@ -366,6 +473,13 @@ void main() {
           ],
           'limit': 100,
           'after_turn_no': 0,
+        });
+      }
+      if (request.url.path == '/personas/persona-1') {
+        return fixtures.jsonResponse({
+          'id': 'persona-1',
+          'name': '엄마',
+          'status': 'active',
         });
       }
       return fixtures.jsonResponse(fixtures.sessionJson('session-1'));
@@ -425,6 +539,53 @@ void main() {
       );
     }
   });
+
+  test(
+    'explicit evidence maps file, date and excerpt while absence stays unknown',
+    () {
+      final base = {
+        'turn_id': 'turn-evidence',
+        'answer': '기록을 바탕으로 만든 합성 답변',
+        'is_ai_generated': true,
+        'finish_reason': 'stop',
+      };
+      final available = ChatReply.fromJson({
+        ...base,
+        'evidence': {
+          'status': 'available',
+          'items': [
+            {
+              'file_name': '합성-기록.txt',
+              'date': '2026-10-31T00:00:00+09:00',
+              'excerpt': '선택된 합성 원문 조각',
+            },
+          ],
+        },
+      }, expectedTurnId: 'turn-evidence');
+      expect(available.evidence, EvidenceState.available);
+      expect(available.sources.single.fileName, '합성-기록.txt');
+      expect(available.sources.single.excerpt, '선택된 합성 원문 조각');
+
+      final none = ChatReply.fromJson({
+        ...base,
+        'evidence': {'status': 'none', 'items': <Object>[]},
+      }, expectedTurnId: 'turn-evidence');
+      expect(none.evidence, EvidenceState.none);
+      expect(none.sources, isEmpty);
+
+      expect(
+        ChatReply.fromJson(base, expectedTurnId: 'turn-evidence').evidence,
+        EvidenceState.unknown,
+      );
+      expect(
+        () => ChatReply.fromJson({
+          ...base,
+          'evidence': {'status': 'available', 'items': <Object>[]},
+        }, expectedTurnId: 'turn-evidence'),
+        throwsFormatException,
+      );
+    },
+  );
 
   test('memory history retains evidence metadata when reopening', () async {
     final auth = fixtures.TestAuth();
