@@ -156,6 +156,11 @@ class RecordPlayerController extends ChangeNotifier {
   Future<void>? _opening;
   Future<void> _releasing = Future<void>.value();
   bool _disposed = false;
+  // Playback intent: every start or pause request bumps [_intent], so an
+  // asynchronous start can tell whether it was superseded while it waited.
+  int _intent = 0;
+  bool _wantsPlay = false;
+  int _starting = 0;
   PlayerPhase phase = PlayerPhase.idle;
   bool playing = false;
   bool simulated = false;
@@ -246,33 +251,57 @@ class RecordPlayerController extends ChangeNotifier {
     if (_disposed) return;
     phase = PlayerPhase.failed;
     playing = false;
+    _wantsPlay = false;
     _opening = null; // a later tap may try again
     unawaited(_releaseEngine());
     _changed();
   }
 
+  /// Records a new request to start playback and returns its intent. Any later
+  /// [pause] or start request supersedes it.
+  int _requestPlay() {
+    _wantsPlay = true;
+    return ++_intent;
+  }
+
+  /// Calls [RecordPlaybackEngine.play] for [intent]. If [pause] arrived while
+  /// the engine was starting, the engine is stopped again instead of being
+  /// reported as playing.
+  Future<void> _start(RecordPlaybackEngine engine, int intent) async {
+    _starting++;
+    try {
+      await engine.play();
+    } finally {
+      _starting--;
+    }
+    if (!_isCurrent(engine)) return;
+    if (intent != _intent) {
+      if (!_wantsPlay) await engine.pause();
+      return;
+    }
+    playing = true;
+  }
+
   Future<void> toggle() async {
     if (phase == PlayerPhase.loading) return;
+    if (playing) return pause();
+    final intent = _requestPlay();
     final opening = _ensureOpen();
     await opening;
-    if (!identical(opening, _opening)) return;
+    if (!identical(opening, _opening) || intent != _intent) return;
     final engine = _engine;
     if (_disposed || engine == null || phase != PlayerPhase.ready) return;
     try {
-      if (playing) {
-        await engine.pause();
+      if (duration != null && position >= duration!) {
+        await engine.seek(Duration.zero);
         if (!_isCurrent(engine)) return;
-        playing = false;
-      } else {
-        if (duration != null && position >= duration!) {
-          await engine.seek(Duration.zero);
-          if (!_isCurrent(engine)) return;
-          position = Duration.zero;
+        position = Duration.zero;
+        if (intent != _intent) {
+          _changed();
+          return;
         }
-        await engine.play();
-        if (!_isCurrent(engine)) return;
-        playing = true;
       }
+      await _start(engine, intent);
     } catch (_) {
       if (_isCurrent(engine)) _fail();
     }
@@ -281,9 +310,12 @@ class RecordPlayerController extends ChangeNotifier {
 
   Future<void> seekTo(Duration value, {bool play = false}) async {
     if (phase == PlayerPhase.loading) return;
+    // A plain seek is not a request to play, so a pause does not cancel it.
+    final intent = play && !playing ? _requestPlay() : null;
+    bool cancelled() => intent != null && intent != _intent;
     final opening = _ensureOpen();
     await opening;
-    if (!identical(opening, _opening)) return;
+    if (!identical(opening, _opening) || cancelled()) return;
     final engine = _engine;
     if (_disposed || engine == null || phase != PlayerPhase.ready) return;
     try {
@@ -292,10 +324,8 @@ class RecordPlayerController extends ChangeNotifier {
       await engine.seek(target);
       if (!_isCurrent(engine)) return;
       position = target;
-      if (play && !playing) {
-        await engine.play();
-        if (!_isCurrent(engine)) return;
-        playing = true;
+      if (intent != null && !playing && !cancelled()) {
+        await _start(engine, intent);
       }
     } catch (_) {
       if (_isCurrent(engine)) _fail();
@@ -303,15 +333,20 @@ class RecordPlayerController extends ChangeNotifier {
     _changed();
   }
 
+  /// Stops playback, including a start that is still opening the source or
+  /// waiting for the engine, so audio never begins after the caller paused.
   Future<void> pause() async {
+    final intent = ++_intent;
+    _wantsPlay = false;
     final engine = _engine;
-    if (engine == null || !playing) return;
+    if (engine == null || (!playing && _starting == 0)) return;
     try {
       await engine.pause();
     } catch (_) {
       /* The player is going away or already stopped. */
     }
-    if (!_isCurrent(engine)) return;
+    // A play requested after this pause owns the state now.
+    if (!_isCurrent(engine) || intent != _intent) return;
     playing = false;
     _changed();
   }

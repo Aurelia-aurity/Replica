@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -196,6 +197,30 @@ void main() {
       expect(controller.targetSpeaker, isNull);
       expect(controller.selected, isNull);
     });
+
+    test(
+      'an analysis finishing after local data is cleared is dropped',
+      () async {
+        final gate = Completer<void>();
+        final controller = RecordController(
+          PreviewRecordService(),
+          analyze: (file) async {
+            await gate.future;
+            return analyzeTextRecord(file);
+          },
+        );
+        addTearDown(controller.dispose);
+        controller.select(_text(_android));
+        expect(controller.analyzing, isTrue);
+        controller.clearLocalData();
+        gate.complete();
+        await pumpEventQueue();
+        expect(controller.selected, isNull);
+        expect(controller.analysis, isNull);
+        expect(controller.analyzing, isFalse);
+        expect(controller.needsSpeakers, isFalse);
+      },
+    );
   });
 
   testWidgets('SC-04 shows speakers, counts and blocks the same person', (

@@ -477,6 +477,94 @@ void main() {
       });
     }
 
+    group('pause cancels a pending start', () {
+      RecordPlayerController playerFor(FakeEngine engine) {
+        final player = RecordPlayerController(
+          resolve: () async =>
+              RecordAudioSource(url: Uri.parse('https://audio.invalid/a')),
+          engineFactory: (_) => engine,
+        );
+        addTearDown(player.dispose);
+        return player;
+      }
+
+      test('while the source is still opening', () async {
+        final opening = Completer<void>();
+        final engine = FakeEngine()..pendingOpen = opening;
+        final player = playerFor(engine);
+        final start = player.toggle();
+        await pumpEventQueue();
+        await player.pause();
+        opening.complete();
+        await start;
+        await pumpEventQueue();
+        expect(engine.plays, 0);
+        expect(player.playing, isFalse);
+        expect(player.phase, PlayerPhase.ready);
+        // An explicit play afterwards still works.
+        await player.toggle();
+        expect(engine.plays, 1);
+        expect(player.playing, isTrue);
+      });
+
+      test('while the engine is starting', () async {
+        final starting = Completer<void>();
+        final engine = FakeEngine()..pendingPlay = starting;
+        final player = playerFor(engine);
+        final start = player.toggle();
+        await pumpEventQueue();
+        expect(engine.plays, 1);
+        await player.pause();
+        starting.complete();
+        await start;
+        await pumpEventQueue();
+        expect(engine.pauses, greaterThanOrEqualTo(1));
+        expect(player.playing, isFalse);
+        engine.pendingPlay = null;
+        await player.toggle();
+        expect(engine.plays, 2);
+        expect(player.playing, isTrue);
+      });
+
+      test('while a seek before playing is pending', () async {
+        final seeking = Completer<void>();
+        final engine = FakeEngine();
+        final player = playerFor(engine);
+        await player.toggle();
+        await player.pause();
+        expect(engine.plays, 1);
+        engine.pendingSeek = seeking;
+        final seek = player.seekTo(const Duration(seconds: 30), play: true);
+        await pumpEventQueue();
+        await player.pause();
+        seeking.complete();
+        await seek;
+        await pumpEventQueue();
+        expect(engine.plays, 1);
+        expect(player.playing, isFalse);
+        expect(player.position, const Duration(seconds: 30));
+        engine.pendingSeek = null;
+        await player.seekTo(const Duration(seconds: 40), play: true);
+        expect(engine.plays, 2);
+        expect(player.playing, isTrue);
+      });
+
+      test('a play requested after the pause is kept', () async {
+        final starting = Completer<void>();
+        final engine = FakeEngine()..pendingPlay = starting;
+        final player = playerFor(engine);
+        final first = player.toggle();
+        await pumpEventQueue();
+        await player.pause();
+        engine.pendingPlay = null;
+        final second = player.toggle();
+        starting.complete();
+        await Future.wait([first, second]);
+        await pumpEventQueue();
+        expect(player.playing, isTrue);
+      });
+    });
+
     test('a source that cannot be opened fails and can be retried', () async {
       final engines = <FakeEngine>[];
       var attempts = 0;

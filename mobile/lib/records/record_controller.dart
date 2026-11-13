@@ -65,9 +65,9 @@ class RecordController extends ChangeNotifier {
     entries.clear();
     reviewDrafts.clear();
     selected = null;
-    analysis = null;
-    targetSpeaker = null;
-    providerSpeaker = null;
+    // Invalidates an analysis still reading the file so its late result
+    // cannot bring the speaker names back.
+    _resetAnalysis();
     attempt = null;
     consent = false;
   }
