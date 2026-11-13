@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="91.25mm" height="70mm" viewBox="0 0 365 280" role="img" aria-labelledby="title desc">
+  <title id="title">검색 방식별 근거 구성과 답변 생성</title>
+  <desc id="desc">동일 질문과 사용자 확정 기록으로 두 검색 방식을 비교한다. 청크 검색은 상위 5개 청크를 근거로 직접 전달한다. 문맥 복원 검색은 최고 유사도가 임계값 미만이면 빈 근거를 사용하고, 이상이면 상위 3개 청크를 시작점으로 원기록의 대화 전후 3턴 또는 일기 전문을 복원한다. 복원 문맥을 중복 제거하고 정규 청크로 병합한 뒤 전체 근거 JSON을 Qwen3-8B 토크나이저 기준 2,000토큰 이내로 맞춘다. 최종 근거는 3개 청크를 넘을 수 있다. 두 검색 방식 모두 동일 질문, 동일 결합 프롬프트(근거 제한과 말투 지시), 고정 Qwen3-8B로 답변을 생성하며 빈 근거에서도 응답한다. 정확한 인코더와 임계값은 본문 4.2절에 제시한다.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0L8 4L0 8Z" fill="#454545"/>
+    </marker>
+    <style>
+      text{font-family:"Apple SD Gothic Neo","Noto Sans CJK KR",sans-serif;font-size:13.2px;fill:#171717}
+      .heading{font-size:13.6px;font-weight:700}
+      .node{fill:#fff;stroke:#454545;stroke-width:1}
+      .evidence{fill:#ececec;stroke:#454545;stroke-width:1}
+      .edge{fill:none;stroke:#454545;stroke-width:1.1;marker-end:url(#arrow)}
+      .wire{fill:none;stroke:#454545;stroke-width:1.1}
+    </style>
+  </defs>
+  <rect width="365" height="280" fill="#fff"/>
+  <rect x="5" y="2" width="355" height="23" class="node"/>
+  <text x="182.5" y="18" text-anchor="middle" class="heading">동일 질문 · 사용자 확정 기록</text>
+  <path d="M182.5 25V31H57V37" class="edge"/>
+  <path d="M182.5 31H249V37" class="edge"/>
+
+  <rect x="5" y="37" width="104" height="54" class="evidence"/>
+  <text x="57" y="52" text-anchor="middle" class="heading">청크 검색</text>
+  <text x="57" y="68" text-anchor="middle">상위 5개 청크</text>
+  <text x="57" y="84" text-anchor="middle">근거로 직접 전달</text>
+
+  <rect x="138" y="37" width="222" height="37" class="node"/>
+  <text x="249" y="52" text-anchor="middle" class="heading">문맥 복원 검색</text>
+  <text x="249" y="68" text-anchor="middle">최고 유사도 ≥ 임계값?</text>
+  <path d="M172 74V91" class="edge"/>
+  <path d="M292 74V91" class="edge"/>
+  <rect x="138" y="76" width="32" height="14" fill="#fff"/>
+  <text x="154" y="87" text-anchor="middle">미만</text>
+  <rect x="249" y="76" width="37" height="14" fill="#fff"/>
+  <text x="268" y="87" text-anchor="middle">이상</text>
+  <rect x="138" y="91" width="68" height="29" class="evidence"/>
+  <text x="172" y="110" text-anchor="middle">빈 근거</text>
+  <rect x="224" y="91" width="136" height="32" class="node"/>
+  <text x="292" y="105" text-anchor="middle" class="heading">상위 3개 청크</text>
+  <text x="292" y="119" text-anchor="middle">복원 시작점</text>
+  <path d="M292 123V129H249V135" class="edge"/>
+  <rect x="138" y="135" width="222" height="35" class="node"/>
+  <text x="249" y="149" text-anchor="middle" class="heading">원기록 문맥 복원</text>
+  <text x="249" y="165" text-anchor="middle">대화 전후 3턴 · 일기 전문</text>
+  <path d="M249 170V178" class="edge"/>
+  <rect x="138" y="178" width="222" height="33" class="evidence"/>
+  <text x="249" y="192" text-anchor="middle">중복 제거·근거 통합 (3개 초과 가능)</text>
+  <text x="249" y="207" text-anchor="middle">전체 근거 JSON ≤ 2,000 Qwen 토큰</text>
+
+  <path d="M57 91V219H182.5" class="wire"/>
+  <path d="M138 105H122V219H182.5" class="wire"/>
+  <path d="M249 211V219H182.5" class="wire"/>
+  <circle cx="182.5" cy="219" r="2" fill="#454545"/>
+  <path d="M182.5 219V227" class="edge"/>
+  <rect x="5" y="227" width="355" height="45" class="node"/>
+  <text x="182.5" y="241" text-anchor="middle" class="heading">공통 답변 생성: Qwen3-8B 고정</text>
+  <text x="182.5" y="255" text-anchor="middle">동일 질문·결합 프롬프트(근거 제한+말투)</text>
+  <text x="182.5" y="269" text-anchor="middle">빈 근거에서도 응답</text>
+</svg>
