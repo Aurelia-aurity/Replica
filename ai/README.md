@@ -66,7 +66,15 @@ nvidia-smi
 
 ### 실행
 
-아래 명령은 GPU 노드의 저장소 루트에서 실행합니다. 저장소 파일을 학교 shared home에 먼저 복사해야 합니다. 자동 SSH 접속·업로드는 이 코드에 없습니다.
+현재 기본 설정을 사용하는 실행 예시입니다. `REPLICA_MODEL_PATH`에는 운영자가 준비한 Qwen3-8B 로컬 스냅샷을 지정합니다. 실행 문법만 보여 주며 새 GPU 실행 결과는 아닙니다. 저장소 파일을 학교 shared home에 먼저 복사해야 합니다. 자동 SSH 접속·업로드는 이 코드에 없습니다.
+
+```bash
+export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+printf '%s\n' '발표 준비로 긴장하는 대학생에게 세 문장으로 조언해줘.' | \
+  ~/replica-llm-venv/bin/python ai/src/baseline.py
+```
+
+다음은 Qwen2.5-7B-Instruct를 사용한 2026-10-09 과거 실행 명령입니다. 현재 기본 설정을 검증한 명령은 아닙니다.
 
 ```bash
 printf '%s\n' '발표 준비로 긴장하는 대학생에게 세 문장으로 조언해줘.' | \
@@ -106,11 +114,25 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 계약의 기준 소스는 병합된 `contracts/baseline` 및 `contracts/backend-ai/api-spec.md`의 섹션 1입니다. HTTP 테스트는 병합된 정식 예제를 사용하며 기존에 복사해 두었던 픽스처는 과거 기록용으로만 유지됩니다.
 
-**2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`).** 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 아래 운영 명령은 실행 예시입니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
+**과거 실행 기록:** 2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`). 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 이 기록은 아래 설정이나 현재 배포의 검증 결과가 아닙니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
 
 ### 모델·요청·수락 규칙
 
-- 베이스라인 API의 대상 모델은 아직 최종 선정되거나 확정되지 않았습니다. `ai/configs/baseline.json`은 메인 브랜치의 설정값을 유지하며 가드된 시스템 프롬프트도 이 파일에서 읽어옵니다. `model_id` 메타데이터는 `REPLICA_MODEL_ID`로, 선택적 `model_revision`은 `REPLICA_MODEL_REVISION` 환경 변수로 재정의할 수 있으나 실제 가중치는 항상 로컬 경로인 `--model-path` 또는 `REPLICA_MODEL_PATH`에서 로드됩니다. 선택적 리비전 값은 오프라인 로더에 전달되지만 로컬 스냅샷을 선택하거나 검증하지 않으므로 운영자가 정확한 리비전 디렉터리를 직접 제공해야 합니다.
+- 베이스라인 API의 서비스 모델은 2026-11-10 결정에 따라 Qwen/Qwen3-8B입니다. `ai/configs/baseline.json`의 기본 `model_id`도 Qwen/Qwen3-8B입니다. `REPLICA_MODEL_ID`로 모델 ID를, 선택 설정인 `model_revision`은 `REPLICA_MODEL_REVISION`으로 바꿀 수 있습니다. 가중치는 `--model-path` 또는 `REPLICA_MODEL_PATH`가 지정한 로컬 디렉터리에서 불러옵니다. `model_revision`은 로더에 전달되지만 로컬 스냅샷을 선택하거나 검증하지 않습니다. 기본 revision은 설정하지 않습니다.
+- Qwen3-8B 평가에 사용한 것으로 저장소에 기록된 snapshot revision은 `b968826d9c46dd6066d109eabc6255188de91218`입니다(`experiments/model77/profiles.json`). 이는 새 Hub 확인이나 배포 가중치 검증 결과가 아닙니다. 실제 로컬 스냅샷의 경로와 revision은 별도로 확인해야 합니다. 이전 CLI 실측은 2026-10-09 Qwen2.5-7B-Instruct 실행입니다. 당시 다운로드 revision은 `a09a35458c702b33eeacc393d103063234e8bc28`이며 다운로드 metadata와 대조한 값이지 모델 파일의 무결성 검사 결과는 아닙니다. GPU 로그에서 checkpoint 4/4 로딩과 응답 생성을 확인했지만 종료 코드는 별도로 전달받지 않았습니다. 이 기록은 현재 Qwen3 설정의 검증 결과가 아닙니다.
+- 다음 배포 확인 절차는 #93의 persona 모드와 실제 backend 연동이 포함된 경우에만 적용합니다. 기준 커밋 `45e4f518`은 baseline 전용이므로 이 브랜치에서는 `--mode persona`를 실행할 수 없고 성공 응답에도 `model_name`이 없습니다. 아래 명령과 응답 확인은 이 브랜치에서 실행할 수 있는 절차가 아닙니다.
+
+  배포 전 GPU의 `REPLICA_MODEL_ID`와 backend의 `LLM_MODEL_NAME`을 `Qwen/Qwen3-8B`로 맞추기로 담당자 간 확인해야 합니다. 평가 설정에서 확인한 revision은 기본값에 고정하지 않습니다. `REPLICA_MODEL_PATH`가 가리키는 실제 로컬 snapshot을 확인하고, 기존 다운로드 metadata를 대조해 revision을 별도로 기록합니다.
+
+  ```bash
+  export REPLICA_MODEL_ID='Qwen/Qwen3-8B'
+  export REPLICA_MODEL_REVISION='b968826d9c46dd6066d109eabc6255188de91218'
+  export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+  # 실제 backend 배포 설정에서 LLM_MODEL_NAME='Qwen/Qwen3-8B'로 맞춥니다.
+  python3 ai/src/server.py --mode persona --port 18043
+  ```
+
+  이 절차는 아직 수행하지 않았습니다. 통합 배포에서는 준비 상태가 된 뒤 `/readyz`를 확인하고 허용된 합성 persona 요청을 보냅니다. 응답의 `model_name`이 설정한 모델 ID와 정확히 일치하는지도 확인합니다. 응답에는 revision이 없으므로 로컬 스냅샷에서 따로 검증해야 합니다. backend의 모델 불일치 경고는 해당 배포에 실제 구현된 내용을 확인해 점검합니다. 이 기준 브랜치에서 경고의 이름이나 구현을 전제하지 않습니다. 담당자 합의와 실 GPU/backend 배포 검증은 완료되지 않았습니다. 자동 재시도나 fallback은 없습니다.
 - HTTP 템플릿은 `enable_thinking=False`, 생성은 greedy(`do_sample=False`, 새 `GenerationConfig`, `use_model_defaults=False`)입니다. CLI의 `enable_thinking`은 선택적 설정이며, 이 필드가 없는 기존 CLI 설정은 기존 템플릿 호출을 유지합니다.
 - 요청은 `Content-Type: application/json`인 비압축 UTF-8 JSON이며, `Content-Length`가 필요합니다. 압축·chunked 전송은 지원하지 않고 400으로 거부합니다. 모든 요청에 `request_id`, `message`, `history`, `max_new_tokens`가 필요하며 임의 필드는 거부합니다.
 - 판정 순서는 원시 바이트 413 → 서비스 인증 401/403 → 파싱·구조·타입·UUID·범위·공백·미정의 필드 400 → 파싱된 문자·이력 쌍 수 413 → 모델 준비 503 → 축소 후 문맥 422 → 원자적 수락 409/429입니다. 원시 본문은 262144바이트, 각 텍스트는 16000 Unicode code point, 이력은 20쌍, 출력 예산은 1~1024입니다. 오류 코드는 계약 예제의 고정 메시지를 사용하며 안전하게 검증한 요청 ID를 반환합니다. 인증 거부·파싱 전 원시 거부·깨진 JSON·잘못되거나 누락된 ID는 `null`입니다.
