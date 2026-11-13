@@ -1,65 +1,23 @@
-"""Loopback-only baseline HTTP API. Service authentication is deferred."""
+"""Loopback inference API with explicitly enabled profile-analysis nodes."""
 import json
 import logging
 import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import re
 import threading
 import time
+from typing import Final, assert_never
 
 import baseline
-from inference import ContextLimitExceeded, Inference, Request
+from inference import ContextLimitExceeded, Inference, Prepared, Request
+from http_contract import RAW_LIMIT as RAW_LIMIT, ERRORS as ERRORS
+from http_contract import FrameError, error_body, valid_id, parse_request, read_body
+import profile_contract
+from profile_adapter import ProfileConfig, ProfileInference
+from profile_types import AnalyzeRequest, MergeRequest, ProfileRequest, Task
 
-RAW_LIMIT = 262144
-ID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-ERRORS = {
-    400: ("INVALID_REQUEST", "요청 형식이 올바르지 않습니다."),
-    401: ("SERVICE_UNAUTHENTICATED", "서비스 인증이 필요합니다."),
-    403: ("SERVICE_FORBIDDEN", "서비스 호출 권한이 없습니다."),
-    413: ("PAYLOAD_TOO_LARGE", "요청 크기가 한도를 초과했습니다."),
-    422: ("CONTEXT_LIMIT_EXCEEDED", "질문이 모델 문맥 한도를 초과했습니다."),
-    503: ("MODEL_NOT_READY", "모델이 아직 준비되지 않았습니다."),
-    409: ("REQUEST_IN_PROGRESS", "동일 요청이 처리 중입니다."),
-    429: ("AI_BUSY", "AI가 다른 요청을 처리 중입니다."),
-    504: ("INFERENCE_DEADLINE_EXCEEDED", "추론 마감 시간을 초과했습니다."),
-    500: ("INFERENCE_FAILED", "답변 생성에 실패했습니다."),
-}
 LOGGER = logging.getLogger("baseline.http")
-
-
-def error_body(status: int, request_id: str | None = None):
-    code, message = ERRORS[status]
-    return {"request_id": request_id, "error": {"code": code, "message": message}}
-
-
-def valid_id(value) -> bool:
-    return isinstance(value, str) and ID_PATTERN.fullmatch(value) is not None
-
-
-def parse_request(data) -> Request:
-    """Check all structural rules before checking any parsed length limit."""
-    if not isinstance(data, dict) or set(data) != {
-            "request_id", "message", "history", "max_new_tokens"}:
-        raise ValueError
-    if not valid_id(data["request_id"]):
-        raise ValueError
-    if not isinstance(data["message"], str) or not data["message"].strip():
-        raise ValueError
-    if not isinstance(data["history"], list):
-        raise ValueError
-    budget = data["max_new_tokens"]
-    # JSON Schema integers include exactly integral JSON numbers, but not booleans.
-    if type(budget) not in (int, float) or not 1 <= budget <= 1024 or int(budget) != budget:
-        raise ValueError
-    pairs = []
-    for pair in data["history"]:
-        if not isinstance(pair, dict) or set(pair) != {"user", "assistant"}:
-            raise ValueError
-        if any(not isinstance(pair[key], str) or not pair[key].strip()
-               for key in ("user", "assistant")):
-            raise ValueError
-        pairs.append((pair["user"], pair["assistant"]))
-    return Request(data["request_id"], data["message"], tuple(pairs), int(budget))
+PROFILE_ROUTES: Final[dict[str, Task]] = {
+    "/v1/persona-profiles/analyze": "analyze", "/v1/persona-profiles/merge": "merge"}
 
 
 def allow_service(headers) -> int | None:
@@ -77,19 +35,40 @@ class Job:
 
 class Service:
     """One mutable slot, reserved and released under the same lock."""
-    def __init__(self, engine=None, deadline_seconds: float | None = None, auth=allow_service):
+    def __init__(self, engine: Inference | None = None, deadline_seconds: float | None = None, auth=allow_service,
+                 *, profile_config: ProfileConfig | None = None):
         if deadline_seconds is not None and (
                 not math.isfinite(deadline_seconds) or deadline_seconds <= 0):
             raise ValueError
         self.engine = engine
         self.ready = threading.Event()
-        if engine is not None:
-            self.ready.set()
+        self.profile_config = profile_config
+        self.profiles: ProfileInference | None = None
         self.lock = threading.Lock()
         self.active_id = None
         self.deadline_seconds = deadline_seconds
         self.auth = auth
         self.loader = None
+        if engine is not None:
+            self.initialize(engine)
+
+    def initialize(self, engine: Inference) -> None:
+        """Publish readiness only after the optional adapter is initialized."""
+        self.profiles = (ProfileInference(engine, self.profile_config)
+                         if self.profile_config is not None else None)
+        self.engine = engine
+        self.ready.set()
+
+    def prepare(self, request: Request | ProfileRequest) -> Prepared:
+        match request:
+            case Request():
+                assert self.engine is not None
+                return self.engine.prepare(request)
+            case AnalyzeRequest() | MergeRequest():
+                assert self.profiles is not None
+                return self.profiles.prepare(request)
+            case unreachable:
+                assert_never(unreachable)
 
     def start_loading(self, factory) -> None:
         """Publish readiness only after one successful background load."""
@@ -98,8 +77,7 @@ class Service:
 
         def load():
             try:
-                self.engine = factory()
-                self.ready.set()
+                self.initialize(factory())
             except Exception:
                 # Runtime boundary: never expose model paths or raw exceptions.
                 LOGGER.info("request_id=null status=503 duration_ms=0")
@@ -107,7 +85,7 @@ class Service:
         self.loader = threading.Thread(target=load, daemon=True)
         self.loader.start()
 
-    def accept(self, request: Request, prepared):
+    def accept(self, request: Request | ProfileRequest, prepared):
         with self.lock:
             if self.active_id == request.request_id:
                 return 409, None
@@ -123,20 +101,30 @@ class Service:
                 return 500, None
             return 200, job
 
-    def _generate(self, request: Request, prepared, job: Job) -> None:
+    def _generate(self, request: Request | ProfileRequest, prepared, job: Job) -> None:
         start = time.monotonic()
         output_tokens = 0
         try:
-            result = self.engine.generate(request, prepared)
-            output_tokens = result.output_tokens
-            if not result.message.strip():
-                raise ValueError
+            match request:
+                case Request():
+                    assert self.engine is not None
+                    result = self.engine.generate(request, prepared)
+                    output_tokens = result.output_tokens
+                    if not result.message.strip():
+                        raise ValueError
+                    job.body = {
+                        "request_id": request.request_id, "message": result.message,
+                        "finish_reason": result.finish_reason, "ai_generated": True,
+                        "context": {"used_history_turns": prepared.used_history_turns,
+                                    "dropped_history_turns": prepared.dropped_history_turns}}
+                case AnalyzeRequest() | MergeRequest():
+                    assert self.profiles is not None
+                    generated = self.profiles.generate(request, prepared)
+                    output_tokens = generated.output_tokens
+                    job.body = profile_contract.success_body(request, generated)
+                case unreachable:
+                    assert_never(unreachable)
             job.status = 200
-            job.body = {
-                "request_id": request.request_id, "message": result.message,
-                "finish_reason": result.finish_reason, "ai_generated": True,
-                "context": {"used_history_turns": prepared.used_history_turns,
-                            "dropped_history_turns": prepared.dropped_history_turns}}
         except Exception:
             # Compute boundary: all failures map to the safe fixed envelope.
             job.status, job.body = 500, error_body(500, request.request_id)
@@ -195,46 +183,35 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.started = time.monotonic()
-        if self.path != "/v1/baseline/generate":
+        service = self.server.service
+        profile_task = PROFILE_ROUTES.get(self.path)
+        if self.path != "/v1/baseline/generate" and (
+                profile_task is None or service.profile_config is None):
             self.send_error(404)
             return
-        service = self.server.service
-        lengths = self.headers.get_all("Content-Length", [])
-        length = None
-        if len(lengths) == 1 and re.fullmatch(r"[0-9]+", lengths[0]):
-            try:
-                length = int(lengths[0])
-            except ValueError:
-                self.respond(413, error_body(413))
-                return
-        if length is not None and length > RAW_LIMIT:
-            self.respond(413, error_body(413))
-            return
-        status = service.auth(self.headers)
-        if status is not None:
-            self.respond(status, error_body(status))
-            return
-        # Only uncompressed, Content-Length framed JSON is supported.
-        if (length is None or self.headers.get("Transfer-Encoding") is not None
-                or self.headers.get("Content-Encoding") not in (None, "identity")):
-            self.respond(400, error_body(400))
-            return
-        raw = self.rfile.read(length)
-        if len(raw) != length:
-            self.respond(400, error_body(400))
+        try:
+            raw = read_body(self, service.auth)
+        except FrameError as error:
+            self.respond(error.status, error_body(error.status))
             return
         request_id = None
         try:
-            data = json.loads(raw.decode("utf-8"), parse_constant=lambda value: None)
+            data = (profile_contract.decode_json(raw.decode("utf-8")) if profile_task is not None
+                    else json.loads(raw.decode("utf-8"), parse_constant=lambda value: None))
             if isinstance(data, dict) and valid_id(data.get("request_id")):
                 request_id = data["request_id"]
             if self.headers.get_content_type() != "application/json":
                 raise ValueError
-            request = parse_request(data)
+            request = (profile_contract.parse_request(data, profile_task) if profile_task is not None
+                       else parse_request(data))
+        except profile_contract.ProfileError as error:
+            self.respond(413 if error.code == "size" else 400, error_body(
+                413 if error.code == "size" else 400, request_id))
+            return
         except (ValueError, UnicodeError, RecursionError):
             self.respond(400, error_body(400, request_id))
             return
-        if (len(request.message) > 16000 or len(request.history) > 20
+        if isinstance(request, Request) and (len(request.message) > 16000 or len(request.history) > 20
                 or any(len(text) > 16000 for pair in request.history for text in pair)):
             self.respond(413, error_body(413, request_id))
             return
@@ -242,7 +219,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(503, error_body(503, request_id))
             return
         try:
-            prepared = service.engine.prepare(request)
+            prepared = service.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
@@ -266,15 +243,21 @@ def main(argv=None) -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--context-limit", type=int)
     parser.add_argument("--deadline-seconds", type=float)
+    parser.add_argument("--enable-profile-analysis", action="store_true")
+    parser.add_argument("--profile-output-tokens", type=int)
     try:
         args = parser.parse_args(argv)
         if not 0 < args.port <= 65535 or (
                 args.context_limit is not None and args.context_limit < 1):
             raise ValueError
+        if args.enable_profile_analysis != (args.profile_output_tokens is not None):
+            raise ValueError
         settings = baseline.read_settings(args.config, "startup", args.model_path)
         if settings["model_id"] is None:
             raise ValueError
-        service = Service(deadline_seconds=args.deadline_seconds)
+        config = (ProfileConfig(settings["model_id"], args.profile_output_tokens)
+                  if args.enable_profile_analysis else None)
+        service = Service(deadline_seconds=args.deadline_seconds, profile_config=config)
         baseline.os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
         baseline.os.environ["TQDM_DISABLE"] = "1"
         logging.basicConfig(level=logging.INFO, format="%(message)s")
