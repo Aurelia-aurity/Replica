@@ -29,3 +29,9 @@ class SessionOut(BaseModel):
     ai_notice_ack_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class SessionList(BaseModel):
+    items: list[SessionOut]
+    limit: int
+    offset: int

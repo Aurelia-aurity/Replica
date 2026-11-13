@@ -65,6 +65,9 @@ Swagger(`/docs`)에서 요청·응답 형식을 확인하고 직접 호출해 �
 | `POST /personas` | JSON `{name, persona_id?}` (로그인 필요) | 대화 상대 객체 (201) |
 | `GET /personas`, `GET /personas/{id}` | `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}` / 대화 상대 객체 |
 | `POST /sessions` | JSON `{persona_id, ai_notice_ack_at, title?, session_id?}` (로그인 필요) | 대화방 객체 (201) |
+| `GET /sessions`, `GET /sessions/{id}` | `persona_id?`, `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}`(최신순) / 대화방 객체 |
+| `GET /sessions/{id}/turns` | `after_turn_no`, `limit` (로그인 필요) | `{items, after_turn_no, limit}` (`turn_no` 오름차순, 턴 객체) |
+| `DELETE /sessions/{id}` | (로그인 필요) | 204. 대화방과 그 턴의 DB 행만 삭제 |
 | `POST /chat/text` | JSON `{session_id, turn_id, message}` (로그인 필요) | `{turn_id, answer, is_ai_generated, finish_reason, model_name, timings}` |
 | `POST /chat/voice` | multipart `file`(녹음), `session_id`, `turn_id` (로그인 필요) | `{turn_id, transcript, answer, is_ai_generated, finish_reason, model_name, tts_status, audio_base64, audio_format, tts_error, timings}` |
 | `POST /chat/turns/{turn_id}/tts` | (로그인 필요) 답변이 끝난 턴 | `{turn_id, tts_status, audio_base64, audio_format, timings}` / 합성 중·완료된 턴은 409 |

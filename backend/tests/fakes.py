@@ -71,6 +71,22 @@ class FakeUserDB:
         self.sessions[sid] = row
         return dict(row)
 
+    async def get_session(self, session_id):
+        row = self.sessions.get(str(session_id))
+        if row is None:
+            raise db.NotFoundError(code="P0002")
+        return dict(row)
+
+    async def list_sessions(self, *, persona_id=None, limit=50, offset=0):
+        rows = [r for r in self.sessions.values() if persona_id is None or r["persona_id"] == str(persona_id)]
+        rows.sort(key=lambda r: (r["created_at"], r["id"]), reverse=True)  # 생성 시각, 같으면 id 내림차순
+        return [dict(r) for r in rows[offset:offset + limit]]
+
+    async def delete_session_rows(self, session_id):
+        await self.get_session(session_id)
+        del self.sessions[str(session_id)]
+        self.turns = {k: v for k, v in self.turns.items() if v["session_id"] != str(session_id)}  # DB의 연쇄 삭제
+
     # --- 대화 턴 ---
     async def create_chat_turn(self, session_id, turn_id, *, input_mode, question=None, audio_sha256=None):
         sid, tid = str(session_id), str(turn_id)
@@ -91,7 +107,7 @@ class FakeUserDB:
                "stt_attempt": 0, "llm_attempt": 0, "tts_attempt": 0,
                "stt_started_at": None, "llm_started_at": None, "tts_started_at": None,
                "stt_ms": None, "llm_ms": None, "tts_ms": None, "total_ms": None,
-               "finish_reason": None, "llm_request_id": None}
+               "finish_reason": None, "llm_request_id": None, "created_at": _iso(_now())}
         self.turns[tid] = row
         return self._public(row)
 
@@ -236,7 +252,7 @@ class FakeUserDB:
             "stt_started_at": None, "llm_started_at": None, "tts_started_at": None,
             "stt_ms": None, "llm_ms": 10, "tts_ms": None, "total_ms": None,
             "finish_reason": "stop" if answer else None, "llm_request_id": None,
-            "error_message": None if answer else "llm_failed",
+            "error_message": None if answer else "llm_failed", "created_at": _iso(_now()),
         }
 
     def add_session(self) -> str:
