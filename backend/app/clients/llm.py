@@ -144,7 +144,7 @@ class RemoteLLMClient:
         timeout_seconds: float,
         *,
         token: str | None = None,
-        model_name: str = "Qwen2.5-7B-Instruct",
+        model_name: str = "Qwen/Qwen3-8B",  # core/config.py의 llm_model_name 기본값과 같아야 한다
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
@@ -238,7 +238,7 @@ class RemoteLLMClient:
             return _protocol_error(request_id, f"error body (http {res.status_code})")
         known = _AI_ERRORS.get(body.error.code)
         if known is None or known[0] != res.status_code:
-            return _protocol_error(request_id, f"unknown code/http {body.error.code} {res.status_code}")
+            return _protocol_error(request_id, f"unknown code/http (http {res.status_code})")  # 원시 code는 로그에 넣지 않는다
         if body.request_id != request_id and not (
             body.request_id is None and body.error.code in _NULL_ID_ALLOWED
         ):

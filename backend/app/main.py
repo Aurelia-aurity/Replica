@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.routers import chat, health, personas, sessions, speech
@@ -26,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# CORS 바깥에서 먼저 크기를 확인해, 한도를 넘는 본문은 파서가 읽기 전에 끊는다.
+app.add_middleware(BodyLimitMiddleware)
 
 register_error_handlers(app)
 

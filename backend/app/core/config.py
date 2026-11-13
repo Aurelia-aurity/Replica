@@ -28,9 +28,14 @@ class Settings(BaseSettings):
     llm_server_url: str | None = None
     llm_server_token: SecretStr | None = None  # 서비스 인증 방식은 #14 확인 후 확정. 지금은 Bearer로 보낸다.
     llm_timeout_seconds: float | None = Field(default=None, gt=0)
-    llm_model_name: str = "Qwen2.5-7B-Instruct"
+    # DB에 기록하는 답변 모델 라벨. 서비스 모델은 미확정이며 Qwen/Qwen3-8B는 #77 결과의 조건부 기준선이다.
+    # 배포 라벨이 다르면 LLM_MODEL_NAME으로 바꾼다. 코드·.env.example·README의 기본값은 같아야 한다(#65).
+    llm_model_name: str = "Qwen/Qwen3-8B"
     stt_provider: str = "mock"
     tts_provider: str = "mock"
+    # 개발용 /stt, /tts 점검 라우트. 기본은 꺼짐(404). 켜도 APP_ENV=prod에서는 열리지 않고,
+    # APP_ENV=dev에서는 로그인(Bearer)이 필요하다. 외부 음성 공급자 비용·키가 걸린 경로라서 기본을 닫아 둔다(#67 N1).
+    dev_speech_routes: bool = False
 
     # 음성 업로드 최대 크기(MB). Cloudflare 무료 플랜 요청 한도(약 100MB)보다 작게 둔다.
     max_upload_mb: int = 25
