@@ -11,6 +11,50 @@
 
 `PersonaIdentity`, `check_reply`, `GuardResult`를 제공하는 표준 라이브러리 기반 모듈과 추가형 프롬프트 규칙 템플릿 `PERSONA_RULES`입니다. 기본 프롬프트나 서비스 런타임/API 계약에는 적용되지 않았고 모델 품질 영향도 검증하지 않았습니다. 자세한 동작, 검증 결과와 한계는 [`experiments/persona_guard/README.md`](../experiments/persona_guard/README.md)를 참고하세요.
 
+### 프로필 분석 입력 계획 (`ai/src/profile_planning.py`)
+
+이 모듈은 서비스와 분리된 순수 로컬 커널입니다. 공개 함수 `plan_leaves`와 `validate_coverage`는 호출자가 제공하는 불변 `Corpus`와 `Binding`, 명시적 `Limits`를 사용합니다. `plan_leaves`에는 실제 런타임에서 고정된 전체 렌더링 프롬프트의 토큰 수를 세는 콜백을 전달해야 합니다. 커널은 tokenizer를 내장하지 않으며 프롬프트 일부만 세거나 토큰 수를 추정하지 않습니다.
+
+입력 문자열을 정규화하거나 일부를 버리지 않습니다. 원문을 Unicode 코드포인트 범위로 분할하며, `validate_coverage`는 원본과 각 요청의 식별자·순서·범위·텍스트가 정확히 일치하는지 독립적으로 확인합니다. 탐색 예산을 다 쓰면 `PlanningError("search_budget")`를, 주어진 제한으로 분할할 수 없으면 `PlanningError("infeasible")` 예외를 발생시킵니다.
+
+발화가 여러 개면 원래 발화 경계에서 너비 우선 탐색을 먼저 합니다. 이 경계에서 leaf 수·토큰 수·본문 크기·구조 제한을 모두 만족하는 분할을 찾지 못하면 모든 코드포인트 경계를 대상으로 다시 탐색합니다. 두 탐색은 하나의 `candidates` 예산을 공유합니다. 발화 경계를 보존하는 해를 우선하므로 모든 코드포인트 분할 중 최소 leaf 수는 보장하지 않습니다. 토큰 수의 단조성을 가정하지 않으며 각 후보의 전체 렌더링 프롬프트를 콜백으로 셉니다. 원문의 정확한 범위와 독립적인 `validate_coverage` 검사는 그대로 유지합니다. 발화 경계에서 해를 찾으면 코드포인트 탐색을 생략하지만 최악의 경우에는 전수 탐색 비용이 남습니다. 예산 소진은 `search_budget`이며 전체 탐색을 마쳐도 분할할 수 없을 때만 `infeasible`입니다.
+
+이 모듈에는 analyze/merge 경로, 운영 tokenizer, 모델 추론, 스냅샷 영속화 또는 서비스 연동이 없습니다. 집중 테스트는 저장소 루트에서 실행합니다.
+
+```bash
+python3 -m unittest discover -s ai/tests -p 'test_profile_planning*.py' -v
+```
+
+### 로컬 profile analyze/merge 노드 (`ai/src/server.py`)
+
+서버 기본 설정은 baseline 전용입니다. 로컬 profile 경로를 켜려면 시작할 때 `--enable-profile-analysis`와 `--profile-output-tokens N`을 함께 지정해야 하며 `N`은 양의 정수입니다. 운영 기본값이나 합의된 예산은 없습니다. 둘 중 하나만 주면 시작에 실패합니다. 서버는 계속 `127.0.0.1`에만 바인딩하고, 활성화하면 `POST /v1/persona-profiles/analyze`와 `POST /v1/persona-profiles/merge`를 제공합니다.
+
+두 경로는 고정 task와 `render_messages` 직렬화를 씁니다. 준비와 실행은 이미 적재한 runtime의 실제 chat template과 tokenizer로 전체 입력을 세고 출력 예약량을 더해 context 한도를 확인합니다. 입력이나 출력 profile을 자르지 않습니다. baseline과 같은 runtime 및 전역 동시 실행 1개 슬롯을 공유합니다.
+
+profile 응답은 엄격한 JSON 형식과 성공 종료 사유 `stop`이 모두 필요합니다. 파싱 가능한 내용이어도 `length` 종료는 거부됩니다. baseline 답변의 기존 `stop`·`length` 동작은 바뀌지 않습니다. 실패는 고정된 안전 오류로 반환하며 자동 재시도·출력 보정·fallback은 없습니다. DB 게시도 수행하지 않습니다.
+
+실제 GPU/model 실행, 운영 tokenizer의 배포 적합성, 추출 품질, DB 스냅샷·현재 시도·게시와 앱 서비스 연동을 검증한 결과는 없습니다. profile 집중 검사는 저장소 루트에서 실행할 수 있습니다.
+
+```bash
+python3 -m unittest discover -s ai/tests -p 'test_profile_*.py' -v
+```
+
+### 오프라인 인코딩·무손실 청킹 (`ai/src/record_encoding.py`)
+
+`SourceRecord`와 `SourceUnit`은 호출자가 제공하는 ID, 버전, 기록 종류, 원문 단위와 역할·화자·날짜·발화 순서를 받습니다. 이 모듈은 DB에서 자료를 읽거나 ID를 발급하지 않으므로 입력 정보가 DB의 현재 신원이나 권한을 증명하지 않습니다.
+
+`LocalEncoder.encode_records`는 `ChunkDraft`와 벡터를 반환하고 `LocalEncoder.encode_queries`는 질의 벡터를 만듭니다. 저장·검색·게시 기능은 없습니다. 원문 일부를 버리거나 정규화하지 않으며 Unicode 코드포인트 기준 `[start,end)` 구간으로 보존합니다. `rendered()`는 날짜·화자·역할 머리말과 각 원문 구간을 인코더 입력으로 직렬화하고 구간 사이에 줄바꿈을 넣습니다. 원문과 구간 정보는 그대로 유지됩니다.
+
+`ai/configs/encoding-candidate.json`은 CPU 전용 오프라인 후보입니다. `nlpai-lab/KURE-v1`과 의도한 `intended_revision` `8b418a58414668e75532ed045c22d9ca018ae2b2`, 1024차원, 완전한 입력 512개 토큰, 접두어 없음, L2 정규화 float32를 지정합니다. 이는 운영 임베딩 모델 채택이나 인덱스 준비를 뜻하지 않습니다. 명시적으로 전달된 로컬 모델 디렉터리만 읽으며 다운로드·네트워크 접근·자동 대체를 하지 않습니다. 선택 의존성과 버전은 `ai/requirements-encoding.txt`에 적혀 있고 자동 설치되지 않습니다.
+
+기존 Python 3.12.15 CPU 환경에서 실제 로컬 모델을 실행했습니다. 설치된 sentence-transformers 5.1.2, transformers 4.57.1, torch 2.7.1, numpy 2.2.6을 사용했습니다. 합성 문서·질의 입력에서 유한하고 정규화된 벡터, 반복 질의의 일치, 원문 구간 복원, 긴 입력의 한도 내 분할, 초과 질의 거부와 네트워크 연결 없음이 확인됐습니다. 실행한 로컬 디렉터리의 필수 런타임 파일 9개는 지정 공개 버전의 파일 해시와 대조해 일치했습니다. 여기에는 2.27 GB `model.safetensors` 가중치 파일도 포함됩니다. 그래도 반환 provenance는 `actual_revision=None`, `identity_status=unverified_local_directory`로 남으므로 일반적인 디렉터리 신원 검증이나 전체 저장소 검증으로 볼 수 없습니다. 검색 품질·임계값·용량·DB 연동도 확인하지 않았습니다.
+
+집중 단위 검사는 저장소 루트에서 실행합니다.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s ai/tests -p 'test_record_encoding.py' -v
+```
+
 ## 오프라인 baseline (#13)
 
 `src/baseline.py`는 학교 Slurm GPU 작업 셸에서 로컬 모델을 BF16으로 실행하는 CLI입니다. 기존 GPU 실행 기록은 Qwen2.5-7B-Instruct 기준이며, #43 HTTP 서버는 아래 별도 절에서 다룹니다. 개인화는 후속 과제입니다. 모델 가중치, 체크포인트, 개인 기록, 로컬 검색 색인은 커밋하지 않습니다. 비교·평가는 `experiments/`, 호출 계약은 `contracts/`에서 관리합니다.

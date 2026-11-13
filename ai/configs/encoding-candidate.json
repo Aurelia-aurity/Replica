@@ -1,0 +1,13 @@
+{
+  "purpose": "offline-local-candidate",
+  "model_id": "nlpai-lab/KURE-v1",
+  "intended_revision": "8b418a58414668e75532ed045c22d9ca018ae2b2",
+  "dimensions": 1024,
+  "max_tokens": 512,
+  "query_prefix": "",
+  "passage_prefix": "",
+  "device": "cpu",
+  "batch_size": 8,
+  "normalization": "l2-float32",
+  "chunker_version": "lossless-unit-spans-v1"
+}
