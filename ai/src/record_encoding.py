@@ -108,6 +108,25 @@ class LocalEncoder:
             if (module.get("type") not in allowed or not isinstance(module.get("path"), str)
                     or not (path / module["path"]).resolve().is_relative_to(path)):
                 raise EncodingError("unsupported_local_modules")
+            if module["type"] == "sentence_transformers.models.Transformer":
+                directory = path / module["path"]
+                if (directory / "adapter_config.json").exists():
+                    raise EncodingError("unsafe_local_weights")
+                index = directory / "model.safetensors.index.json"
+                if index.exists():
+                    try:
+                        layout = json.loads(index.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        raise EncodingError("unsafe_local_weights") from None
+                    shards = layout.get("weight_map") if isinstance(layout, dict) else None
+                    # Transformers trusts index filenames even for a safetensors index.
+                    if (not isinstance(shards, dict) or not shards
+                            or not all(isinstance(name, str) and name.endswith(".safetensors")
+                                       and not Path(name).is_absolute()
+                                       and (directory / name).resolve().is_relative_to(path)
+                                       and (directory / name).is_file()
+                                       for name in shards.values())):
+                        raise EncodingError("unsafe_local_weights")
         model_config = path / "config_sentence_transformers.json"
         if model_config.exists():
             try:
@@ -127,7 +146,7 @@ class LocalEncoder:
             str(path), device="cpu", local_files_only=True, trust_remote_code=False,
             token=False, backend="torch",
             model_kwargs={"local_files_only": True, "trust_remote_code": False,
-                          "use_safetensors": True},
+                          "use_safetensors": True, "weights_only": True},
             tokenizer_kwargs={"local_files_only": True, "trust_remote_code": False},
             config_kwargs={"local_files_only": True, "trust_remote_code": False},
         )

@@ -170,6 +170,7 @@ class EncoderTests(unittest.TestCase):
             expected.update({name: dict(local_files_only=True, trust_remote_code=False)
                              for name in ("model_kwargs", "tokenizer_kwargs", "config_kwargs")})
             expected["model_kwargs"]["use_safetensors"] = True
+            expected["model_kwargs"]["weights_only"] = True
             if Path(path) != self.path.resolve() or kwargs != expected:
                 raise EncodingError("unsafe_loader_policy")
             return self.model
