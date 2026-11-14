@@ -82,7 +82,8 @@ class SmokeTests(unittest.TestCase):
                 self.assertEqual(capture["parsed_citation_result"]["status"], "valid")
                 self.assertNotIn(capture["raw_output"], output.getvalue())
             self.assertEqual(engine.generate, original)
-            self.assertEqual(engine.calls, 8)
+            # Three startup warmups plus the unchanged eight smoke generations.
+            self.assertEqual(engine.calls, 11)
 
     def test_debug_capture_retains_invalid_raw_output_and_rejects_unselected_cases(self):
         # Given:
@@ -123,5 +124,6 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(records[-1], {"failures": 0, "suite": "persona-gpu-smoke"})
         self.assertEqual(len(records), 11)
         self.assertTrue(all(record["result"] == "PASS" for record in records[:-1]))
-        self.assertEqual(engine.calls, 8)
+        # Three startup warmups plus the unchanged eight smoke generations.
+        self.assertEqual(engine.calls, 11)
         capture.assert_not_called()
