@@ -1,14 +1,18 @@
-"""Shared HTTP wire limits/errors and the unchanged baseline request parser."""
+"""Inference HTTP framing, health checks, safe responses and baseline parsing."""
+import json
+import logging
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from http.client import HTTPMessage
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Final, TypeAlias, TypedDict, TypeGuard
 
 from inference import Request
 
 JSON: TypeAlias = None | bool | int | float | str | list["JSON"] | dict[str, "JSON"]
+LOGGER = logging.getLogger("baseline.http")
 RAW_LIMIT: Final = 262144
 ID_PATTERN: Final = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ERRORS: Final = {
@@ -75,6 +79,10 @@ def valid_id(value: JSON) -> TypeGuard[str]:
     return isinstance(value, str) and ID_PATTERN.fullmatch(value) is not None
 
 
+def reject_json_constant(_value: str) -> None:
+    raise ValueError
+
+
 def parse_request(data: JSON) -> Request:
     """Check all structural rules before checking any parsed length limit."""
     if not isinstance(data, dict) or set(data) != {
@@ -99,3 +107,45 @@ def parse_request(data: JSON) -> Request:
             raise ValueError
         pairs.append((pair["user"], pair["assistant"]))
     return Request(data["request_id"], data["message"], tuple(pairs), int(budget))
+
+
+class InferenceHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # Base implementation prints raw exceptions and possibly request text.
+        LOGGER.info("request_id=null status=500 duration_ms=0")
+
+
+class InferenceHandler(BaseHTTPRequestHandler):
+    """Common loopback health and response behavior; routes live in server."""
+    def log_message(self, format, *args):
+        # Base access logging includes untrusted URL/header text.
+        pass
+
+    def send_error(self, code, message=None, explain=None):
+        self.respond(code, {"status": code})
+
+    def respond(self, status: int, body) -> None:
+        raw = json.dumps(body, ensure_ascii=True).encode("ascii")
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(raw)
+        except OSError:
+            pass
+        self.close_connection = True
+        LOGGER.info("request_id=%s status=%d duration_ms=%.3f",
+                    body.get("request_id") or "null", status,
+                    (time.monotonic() - getattr(self, "started", time.monotonic())) * 1000)
+
+    def do_GET(self):
+        self.started = time.monotonic()
+        ready = self.server.service.ready.is_set()
+        if self.path not in ("/healthz", "/readyz"):
+            self.send_error(404)
+            return
+        self.respond(503 if self.path == "/readyz" and not ready else 200, {"ready": ready})

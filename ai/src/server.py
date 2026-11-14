@@ -2,7 +2,7 @@
 import json
 import logging
 import math
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http_contract import InferenceHTTPServer
 import threading
 import time
 from typing import Final, assert_never
@@ -11,8 +11,7 @@ import baseline
 from inference import ContextLimitExceeded, Inference, Prepared, Request
 import persona_contract
 from persona_adapter import PersonaGenerator, PersonaInference, log_failure
-from http_contract import RAW_LIMIT as RAW_LIMIT, ERRORS as ERRORS
-from http_contract import FrameError, error_body, valid_id, parse_request, read_body
+from http_contract import FrameError, InferenceHandler, error_body, valid_id, parse_request, read_body, reject_json_constant
 import profile_contract
 from profile_adapter import ProfileConfig, ProfileInference
 from profile_types import AnalyzeRequest, MergeRequest, ProfileRequest, Task
@@ -20,10 +19,6 @@ from profile_types import AnalyzeRequest, MergeRequest, ProfileRequest, Task
 LOGGER = logging.getLogger("baseline.http")
 PROFILE_ROUTES: Final[dict[str, Task]] = {
     "/v1/persona-profiles/analyze": "analyze", "/v1/persona-profiles/merge": "merge"}
-
-
-def reject_json_constant(_value: str) -> None:
-    raise ValueError
 
 
 def allow_service(headers) -> int | None:
@@ -166,50 +161,12 @@ class Service:
             job.done.set()
 
 
-class Server(ThreadingHTTPServer):
-    daemon_threads = True
-
+class Server(InferenceHTTPServer):
     def __init__(self, port: int, service: Service):
         self.service = service
         super().__init__(("127.0.0.1", port), Handler)
 
-    def handle_error(self, request, client_address):
-        # Base implementation prints raw exceptions and possibly request text.
-        LOGGER.info("request_id=null status=500 duration_ms=0")
-
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        # Base access logging includes untrusted URL/header text.
-        pass
-
-    def send_error(self, code, message=None, explain=None):
-        self.respond(code, {"status": code})
-
-    def respond(self, status: int, body) -> None:
-        raw = json.dumps(body, ensure_ascii=True).encode("ascii")
-        try:
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(raw)))
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.wfile.write(raw)
-        except OSError:
-            pass
-        self.close_connection = True
-        LOGGER.info("request_id=%s status=%d duration_ms=%.3f",
-                    body.get("request_id") or "null", status,
-                    (time.monotonic() - getattr(self, "started", time.monotonic())) * 1000)
-
-    def do_GET(self):
-        self.started = time.monotonic()
-        ready = self.server.service.ready.is_set()
-        if self.path not in ("/healthz", "/readyz"):
-            self.send_error(404)
-            return
-        self.respond(503 if self.path == "/readyz" and not ready else 200, {"ready": ready})
-
+class Handler(InferenceHandler):
     def do_POST(self):
         self.started = time.monotonic()
         service = self.server.service
