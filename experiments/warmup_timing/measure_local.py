@@ -12,31 +12,17 @@ import time
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ai" / "src"))
-from inference import Generated, Prepared
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from double_runtime import DoubleEngine, DoublePersona
 import server
 from startup_warmup import persona_fixture
 
 
-class DoubleEngine:
-    """No runtime, weights, network model client or GPU imports."""
-    def prepare(self, request):
-        return Prepared((1,), len(request.history), 0)
-
-    def generate(self, request, prepared):
-        return Generated("Synthetic answer.", "stop", 1)
-
-
-class DoublePersona(DoubleEngine):
-    def generate(self, request, prepared):
-        return server.persona_contract.PersonaGenerated(
-            "Synthetic answer.", "stop", 1, (), "local-double")
-
-
 @contextmanager
 def doubled_server():
-    service = server.Service(persona_generator=DoublePersona())
+    service = server.Service()
     with server.Server(0, service) as httpd:
-        service.start_loading(DoubleEngine)
+        service.start_loading(DoubleEngine, persona_model_name="local-double")
         service.loader.join(5)
         if service.loader.is_alive() or not service.ready.is_set():
             raise AssertionError
@@ -73,6 +59,7 @@ def attempt(port, count, concurrency, wave, participant, gate):
             "fixture_sha256": hashlib.sha256(body).hexdigest(),
             "send_ns": start, "complete_ns": time.monotonic_ns(),
             "status": response.status, "ttft_available": False,
+            "ttft_reason": "server_event_not_joined", "measurement_kind": "double",
         }
     finally:
         connection.close()
