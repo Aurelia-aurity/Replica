@@ -343,8 +343,12 @@ class UserDatabase:
         return self._owned_one(await self._rpc("record_turn_total_ms", p_turn_id=_id(turn_id), p_stage=stage,
             p_attempt=_integer(attempt, minimum=1), p_total_ms=_integer(total_ms)))
 
-    async def expire_chat_stages(self, *, started_before: datetime) -> int:
-        result = await self._rpc("expire_chat_stages", p_started_before=_time(started_before, not_future=True))
+    async def expire_chat_stages(self, *, started_before: datetime, tts_started_before: datetime | None = None) -> int:
+        cutoff = _time(started_before, not_future=True)
+        # TTS만 더 오래 걸릴 수 있어 별도 기준을 줄 수 있다. 주지 않으면 TTS에도 started_before를 쓴다.
+        # RPC는 두 기준을 항상 명시해 넘기는 expire_chat_stages_v2다(기존 2인자 RPC는 구버전 호환용으로 남아 있다).
+        tts_cutoff = cutoff if tts_started_before is None else _time(tts_started_before, not_future=True)
+        result = await self._rpc("expire_chat_stages_v2", p_started_before=cutoff, p_tts_started_before=tts_cutoff)
         if type(result) is not int or result < 0:
             raise DatabaseError(code="invalid_response")
         return result

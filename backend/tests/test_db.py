@@ -6,7 +6,7 @@ import inspect
 import re
 import threading
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -58,7 +58,7 @@ class FakeTransport:
             row["status"] = self.record_status
         if path.endswith("record_text_versions"):
             row["status"] = self.text_status
-        if path.endswith("expire_chat_stages"):
+        if "expire_chat_stages" in path:
             return Response(200, 1)
         if path.endswith("search_record_chunks"):
             return Response(200, [])
@@ -212,8 +212,11 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
         await self.user.publish_style_profile(P, source_revision=3, content={"tone": "test"}, model_name="test", source_ids=[V, V])
         await self.user.search_record_chunks(P, embedding_model="test", query_embedding=[1, 0])
         await self.user.request_record_deletion(R)
-        sql = (Path(__file__).resolve().parents[2] / "infra/supabase/redesign.sql").read_text(encoding="utf-8")
+        sql_dir = Path(__file__).resolve().parents[2] / "infra/supabase"
+        sql = (sql_dir / "redesign.sql").read_text(encoding="utf-8")
         declarations = dict(re.findall(r"create function public\.(\w+)\((.*?)\)\s*returns", sql, re.S))
+        patch_sql = (sql_dir / "expire_chat_stages_v2.sql").read_text(encoding="utf-8")  # 증분 패치로 추가된 함수
+        declarations.update(re.findall(r"create or replace function public\.(\w+)\((.*?)\)\s*returns", patch_sql, re.S))
         calls = [c for c in self.transport.calls if "/rpc/" in c["path"]]
         self.assertEqual(len(calls), 8)
         for call in calls:
@@ -224,6 +227,28 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[2]["body"]["p_attempt"], 2)
         self.assertEqual(calls[2]["body"]["p_ms"], 15)
         self.assertEqual(calls[5]["body"]["p_source_ids"], [V])
+
+    async def test_expire_calls_v2_with_both_cutoffs_and_matches_the_patch_sql(self):
+        later = TIME + timedelta(seconds=1)
+        await self.user.expire_chat_stages(started_before=TIME)
+        default_call = self.transport.calls[-1]
+        await self.user.expire_chat_stages(started_before=TIME, tts_started_before=later)
+        call = self.transport.calls[-1]
+        self.assertEqual(call["path"], "/rest/v1/rpc/expire_chat_stages_v2")  # 기존 2인자 RPC는 부르지 않는다
+        self.assertEqual(default_call["path"], call["path"])
+        self.assertEqual(call["body"]["p_tts_started_before"], later.isoformat())
+        # 주지 않으면 TTS에도 같은 기준을 명시해 보낸다(null을 보내지 않는다).
+        self.assertEqual(default_call["body"]["p_tts_started_before"], default_call["body"]["p_started_before"])
+        before = len(self.transport.calls)
+        for bad in (datetime(2026, 1, 1), datetime(2999, 1, 1, tzinfo=timezone.utc), "2026-01-01"):
+            with self.assertRaises(ValidationError):
+                await self.user.expire_chat_stages(started_before=TIME, tts_started_before=bad)
+        self.assertEqual(len(self.transport.calls), before)  # 잘못된 값은 네트워크로 나가지 않는다
+        sql = (Path(__file__).resolve().parents[2] / "infra/supabase/expire_chat_stages_v2.sql").read_text(encoding="utf-8")
+        declarations = dict(re.findall(r"create or replace function public\.(\w+)\((.*?)\)\s*returns", sql, re.S))
+        declaration = " ".join(declarations["expire_chat_stages_v2"].split())
+        self.assertEqual(set(call["body"]), set(re.findall(r"\b(p_\w+)\s", declaration)))
+        self.assertNotIn("default", declaration)  # 기본 인자가 없으므로 PostgREST에서 오버로드가 겹치지 않는다
 
     async def test_stage_inputs_validated_before_network(self):
         operations = [self.user.create_chat_turn(S, T, input_mode="text", question=""),
