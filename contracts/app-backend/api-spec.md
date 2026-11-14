@@ -39,6 +39,7 @@
 | POST | [`/chat/turns/{turn_id}/tts`](#a-turn-tts) | 완료된 답변을 음성으로 합성·재시도 | 구현 | baseline · #7, UC-02 ("원하면 음성 재생") |
 | POST | [`/personas`](#a-persona-create) | 대화 상대 생성 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
 | GET | [`/personas · /personas/{persona_id}`](#a-persona-get) | 대화 상대 목록·상세 | 구현 | baseline~고도화 1 · 전용 이슈 없음 (DB 문서의 대화 상대 함수) |
+| PATCH | [`/personas/{persona_id}`](#a-persona-patch) | 대화 상대 이름·호칭 수정 | 제안 | 고도화 1 · #74 |
 | POST | [`/sessions`](#a-session-create) | 대화방 생성 | 구현 | baseline · #5, #6 |
 | GET | [`/sessions · /sessions/{session_id}`](#a-session-get) | 대화 이력 목록·상세 | 제안 | 고도화 2 · #12 |
 | GET | [`/sessions/{session_id}/turns`](#a-turns) | 대화방의 턴 목록 | 제안 | 고도화 2 · #12 |
@@ -50,12 +51,13 @@
 | POST | [`/records/{record_id}/text-versions`](#a-textver-create) | 새 텍스트 초안 만들기 | 제안 | 고도화 1 · #10 |
 | PATCH | [`/text-versions/{text_version_id}`](#a-textver-edit) | 전사문 수정 | 제안 | 고도화 1 · #10 |
 | POST | [`/text-versions/{text_version_id}/confirm`](#a-textver-confirm) | 전사문 확정 | 제안 | 고도화 1·2 · #10 |
-| GET | [`/personas/{persona_id}/style-profile`](#a-profile) | 현재 말투 프로필 조회 | 제안 | 고도화 1 · #10 |
+| GET | [`/personas/{persona_id}/style-profile`](#a-profile) | 현재 말투 프로필·분석 상태 조회 | 제안 | 고도화 1 · #10, #113 |
+| POST | [`/personas/{persona_id}/style-profile/analysis`](#a-analysis) | 말투 프로필 분석 시작·재요청 | 제안 | 고도화 1 · #113 |
 | DELETE | [`/records/{record_id}`](#a-record-del) | 기록 삭제 요청 | 제안 | 고도화 2 · #11 |
 | GET | [`/deletion-jobs · /deletion-jobs/{job_id}`](#a-jobs) | 삭제 진행·부분 실패 확인 | 제안 | 고도화 2 · #11 |
 | DELETE | [`/account`](#a-account-del) | 계정 전체 삭제 | 미정 | 고도화 2 · #11 |
 
-기록 파일을 올리는 방법은 규격이 정해지지 않아 API 목록에서 제외했습니다. 아래 '정해지지 않은 항목'을 참고하세요.
+기록 파일은 `POST /records` 응답의 서명 업로드 정보로 Storage에 직접 올립니다(API 목록에는 넣지 않음). 아래 '기록 파일 업로드'를 참고하세요.
 
 ### 응답 객체
 
@@ -67,6 +69,8 @@
 |---|---|---|
 | id | uuid | 대화 상대 id |
 | name | string | 이름 |
+| display_name | string \| null | 앱에 표시하고 AI가 부르는 이름·호칭(예: "엄마"). 사용자가 편집하며 미설정이면 `null`이고 이때 앱은 `name`을 표시 |
+| provider_address | string \| null | 대화 상대가 사용자를 부르는 호칭. 사용자가 확인·수정한 값이며 미설정이면 `null`. 프로필의 자동 추출 후보와 별개 |
 | status | string | `active` 또는 `deleting` |
 | data_revision | integer | 자료 개정 번호. 확정 자료가 바뀔 때 증가, 말투 프로필의 최신 여부 판단에 사용 |
 | created_at | datetime | 생성 시각 |
@@ -117,6 +121,9 @@
 | consent_version | string \| null | 동의 문구 버전 (최대 100자) |
 | consent_scopes | string[] | 동의 범위. `personalization`, `training` 중 선택. 기본 `["personalization"]` |
 | error_code | string \| null | 실패 시 오류 코드 (영문·숫자·`.`·`-`·`_`, 1~64자) |
+| target_speaker | string \| null | (제안) 카카오톡 기록에서 말투를 반영하기로 고른 화자 |
+| provider_speaker | string \| null | (제안) 카카오톡 기록을 제공한 화자 (동의 근거) |
+| reflection_status | string | (제안) `none`(확정 전) · `pending`(확정됨, 색인·프로필 반영 중) · `reflected`(색인과 프로필에 반영 완료) · `failed`(반영 실패, 사용자 재요청으로 다시 시작) |
 | created_at, updated_at | datetime | 생성·수정 시각 |
 
 #### 텍스트 버전 객체
@@ -424,6 +431,44 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 |---|---|---|
 | (본문) | 대화 상대 객체 | 이 장의 '응답 객체' 절에 정의한 대화 상대 객체 |
 
+<a id="a-persona-patch"></a>
+
+#### `PATCH /personas/{persona_id}` (제안) — 대화 상대 이름·호칭 수정
+
+| 항목 | 내용 |
+|---|---|
+| 인증 | 필수 |
+| 단계·이슈 | 고도화 1 · #74 |
+| 내부 호출 | DB 대화 상대 호칭 수정 함수 (`display_name`·`provider_address` 컬럼과 함께 DB 담당이 확정. 현재 원격 스키마에는 없음) |
+
+SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`는 SC-07 또는 설정 화면에서 바꿉니다(화면 위치는 앱 명세에서 정함). 기존 `name`은 이 API로 바꾸지 않습니다.
+
+##### 요청 (JSON)
+
+| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
+|---|---|---|---|---|
+| Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
+| persona_id | path | uuid | 필수 | `active` 상태의 대화 상대 id |
+| display_name | body | string | 선택 | 앞뒤 공백을 제거한 뒤 1~50자. 공백만 있으면 422 |
+| provider_address | body | string \| null | 선택 | 앞뒤 공백을 제거한 뒤 1~50자. 빈 문자열이나 `null`이면 미설정(`null`)으로 저장 |
+
+두 필드 중 하나 이상을 보내야 하며, 정의하지 않은 필드는 422입니다.
+
+##### 규칙
+
+| 항목 | 내용 |
+|---|---|
+| 표시 | `display_name`이 `null`이면 앱은 `name`을 표시합니다 |
+| 개인화 호출 | 서버는 `display_name`을 쓰고, 없으면 `name`(1~50자일 때)을 씁니다. `name`이 범위를 벗어나면 개인화 호출 전에 422(`INVALID_INPUT`, `field: display_name`)로 이름을 입력하게 합니다 |
+| 자료 개정 | 호칭은 기록(자료)이 아니므로 `data_revision`을 올리지 않고 말투 프로필을 다시 분석하지 않습니다 |
+| 편집값 보호 | 분석 결과가 이 값을 덮어쓰지 않습니다. 자동 추출 후보는 말투 프로필의 `speech_style.address_terms`로만 제공합니다 |
+
+##### 응답 (200) · 대화 상대
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| (본문) | 대화 상대 객체 | 이 장의 '응답 객체' 절에 정의한 대화 상대 객체 |
+
 <a id="a-session-create"></a>
 
 #### `POST /sessions` (구현) — 대화방 생성
@@ -552,7 +597,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 단계·이슈 | 고도화 1 · #9 |
 | 내부 호출 | DB `reserve_record(...)` → 상태 `uploading` 행과 원본 저장 경로 생성. 파일 업로드는 별도 |
 
-파일을 올릴 위치·방법을 알려주는 응답 필드는 아직 정해지지 않았습니다 (아래 '정해지지 않은 항목'의 '기록 파일 업로드').
+파일은 이 응답의 `upload`(서명 업로드 정보)로 Storage에 직접 올립니다(아래 '기록 파일 업로드').
 
 ##### 요청 (JSON)
 
@@ -566,13 +611,30 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | size_bytes | body | integer | 필수 | 파일 크기(바이트). 0 이상 |
 | consent_at | body | datetime | 필수 | 자료 사용 동의 시각 (시간대 포함) |
 | consent_version | body | string | 필수 | 동의 문구 버전. 최대 100자 |
+| target_speaker | body | string | 조건부 | (제안) 카카오톡 내보내기에서 말투를 반영할 화자. 1~100자 |
+| provider_speaker | body | string | 조건부 | (제안) 카카오톡 내보내기에서 기록을 제공한 화자. 1~100자 |
 | record_id | body | uuid | 선택 | 앱이 미리 만든 id |
 
-##### 응답 (201) · 기록
+##### 검증 규칙
+
+| 항목 | 내용 |
+|---|---|
+| 용량 | `size_bytes`가 25 MiB(26,214,400바이트)를 넘으면 413 `FILE_TOO_LARGE`(`field: size_bytes`). 앱의 한도와 같음 |
+| 형식 | `mime_type`은 `text/plain`, `audio/wav`, `audio/x-wav`, `audio/mpeg`, `audio/mp4`, `audio/x-m4a` 중 하나이고 `kind`와 맞아야 함. 아니면 422 |
+| 화자 선택 | `target_speaker`·`provider_speaker`는 카카오톡 내보내기(`kind=text`)에서만 둘 다 보냅니다. 값은 파일에 나온 화자 표시 문자열 그대로이고 서버가 파싱한 화자 목록에 있어야 하며(없으면 422), 두 값이 같으면 422(`field: provider_speaker`)입니다. 앱의 비활성 처리는 우회될 수 있으므로 서버도 거부합니다 |
+| 화자 구분이 없는 기록 | 음성 기록은 대상 인물(persona)의 목소리만 담긴 파일이며 전사 전체를 `persona`의 발화로 봅니다. 카카오톡 형식이 아닌 텍스트(일기 등)도 전체를 `persona`의 기록으로 봅니다(제안). 이 경우 화자 필드를 보내면 422입니다 |
+| 재예약 | 같은 `record_id`로 같은 본문을 다시 보내고 기록이 `uploading`이면 기록은 그대로 두고 200과 새 `upload`를 돌려줍니다. 본문이 다르거나 이미 `uploading`이 아니면 409 `CONFLICT` |
+
+##### 응답 (201) · 기록과 업로드 정보
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | (본문) | 기록 객체 | 이 장의 '응답 객체' 절에 정의한 기록 객체 |
+| upload | object | 원본 파일을 올릴 서명 업로드 정보. 이 응답에만 있고 기록 객체에는 없음 |
+| upload.url | string | 일회용 서명 업로드 주소 (private Storage) |
+| upload.method | string | `PUT` |
+| upload.headers | object | 앱이 그대로 붙여 보낼 헤더 (예: `Content-Type`) |
+| upload.expires_at | datetime | 서명 만료 시각. 지나면 같은 `record_id`로 다시 예약해 새 정보를 받음 |
 
 <a id="a-record-uploaded"></a>
 
@@ -585,6 +647,10 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 내부 호출 | DB `update_record_status(record_id, expected_status='uploading', status='uploaded')` |
 
 이후 `processing`, `ready`, `failed`로의 상태 변경은 서버가 처리하고 앱은 기록 조회로 확인합니다.
+
+서버는 Storage에 원본이 있고 `size_bytes`와 같은지 확인한 뒤 `uploaded`로 바꿉니다. 없거나 크기가 다르면 409 `CONFLICT`입니다.
+
+처리 흐름은 다음과 같습니다. **텍스트 기록**은 서버가 본문을 처리해 `revision 1`을 만들고 **자동으로 확정**한 뒤 색인과 말투 프로필 분석을 이어서 수행합니다. **음성 기록**은 STT로 `revision 1` 초안을 만들고, 사용자가 앱에서 확인·수정해 확정(`confirm`)하면 같은 후속을 수행합니다. 반영 진행은 기록 객체의 `reflection_status`로 확인합니다.
 
 ##### 요청
 
@@ -727,6 +793,8 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 확정되면 이전 확정본은 `superseded`가 되고, 확정된 텍스트만 개인화에 사용됩니다. 프로필 생성 진행 상태는 말투 프로필 조회로 확인합니다.
 
+이 API는 **음성 기록**의 전사문을 사용자가 확정할 때 앱이 호출합니다. 텍스트 기록은 서버가 자동으로 확정하므로 앱이 호출하지 않습니다. 이미 확정된 버전에 다시 호출하면 409 `CONFLICT`입니다. 확정 뒤 색인과 프로필 분석은 서버가 이어서 수행하고, 진행은 기록의 `reflection_status`와 말투 프로필 조회의 분석 상태로 확인합니다.
+
 ##### 요청
 
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
@@ -742,13 +810,15 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 <a id="a-profile"></a>
 
-#### `GET /personas/{persona_id}/style-profile` (제안) — 현재 말투 프로필 조회
+#### `GET /personas/{persona_id}/style-profile` (제안) — 현재 말투 프로필·분석 상태 조회
 
 | 항목 | 내용 |
 |---|---|
 | 인증 | 필수 |
-| 단계·이슈 | 고도화 1 · #10 |
-| 내부 호출 | DB `get_current_style_profile(persona_id)` (`ready` 프로필만) |
+| 단계·이슈 | 고도화 1 · #10, #113 |
+| 내부 호출 | DB `get_current_style_profile(persona_id)` (`ready` 프로필만) + 분석 작업 상태(DB 담당과 확정) |
+
+기록을 확정하면 서버가 색인과 프로필 분석을 자동으로 이어서 수행합니다. 앱은 이 API로 결과와 진행 상태를 확인합니다.
 
 ##### 요청
 
@@ -761,13 +831,48 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
-| (본문) | object \| null | `ready` 프로필이 없으면(생성 중·없음·`stale`) `null` |
+| profile | 말투 프로필 객체 \| null | `ready` 프로필이 없으면(없음·생성 중·`stale`) `null` |
+| analysis | 분석 상태 객체 \| null | 진행 중이거나 마지막 분석 작업의 상태. 분석한 적이 없으면 `null` |
 
-##### 프로필 객체
+##### 분석 상태 객체
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
-| (본문) | 말투 프로필 객체 | 이 장의 '응답 객체' 절에 정의한 말투 프로필 객체 |
+| operation_id | uuid | 분석 작업 id |
+| status | string | `running` · `succeeded` · `failed` · `unknown` (게시 결과를 알 수 없음) |
+| error_code | string \| null | 실패 시 안전한 코드(예: `insufficient_input`, `source_changed`, `ai_failed`). 질문·기록·예외 원문은 넣지 않음 |
+| started_at, updated_at | datetime | 시작·갱신 시각 |
+
+실패나 `unknown` 뒤에 서버가 분석을 자동으로 다시 시작하지 않습니다. 사용자가 다시 요청할 때만 아래 API로 시작합니다.
+
+<a id="a-analysis"></a>
+
+#### `POST /personas/{persona_id}/style-profile/analysis` (제안) — 말투 프로필 분석 시작·재요청
+
+| 항목 | 내용 |
+|---|---|
+| 인증 | 필수 |
+| 단계·이슈 | 고도화 1 · #113 |
+| 내부 호출 | 분석 작업 생성(DB 담당과 확정) → AI 분석·통합 호출 → `publish_style_profile` |
+
+기록을 확정하면 서버가 분석을 자동으로 시작하므로 앱이 처음에 호출할 필요는 없습니다. 이 API는 실패·`unknown`·자료 개정 충돌 뒤에 사용자가 다시 요청할 때 씁니다.
+
+##### 요청 (JSON)
+
+| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
+|---|---|---|---|---|
+| Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
+| persona_id | path | uuid | 필수 | 대화 상대 id |
+| operation_id | body | uuid | 선택 | 앱이 미리 만든 작업 id. 같은 id로 다시 보내면 같은 작업을 돌려줌 |
+
+##### 응답
+
+| 상태 | 설명 |
+|---|---|
+| 202 | 새 분석 작업을 시작함. 본문은 분석 상태 객체 |
+| 200 | 이미 `running`인 작업이 있어 새로 만들지 않고 그 작업의 분석 상태 객체를 돌려줌. 직전 작업이 `unknown`이면 서버가 먼저 게시 결과를 확인해 게시됐다면 `succeeded`로 돌려주고 새 분석을 시작하지 않음 |
+| 404 | 없거나 남의 대화 상대 |
+| 422 | 확정된 기록이 하나도 없음 (`INVALID_INPUT`) |
 
 <a id="a-record-del"></a>
 
@@ -846,15 +951,15 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 필요한 작업 | Storage 원본 삭제 → 프로필·외부 색인·학습 산출물 정리 → 기록·파생 자료 삭제 → Auth 계정 제거를 처리하는 삭제 worker |
 | 요청·응답 규격 | 미정 |
 
-### 정해지지 않은 항목
+### 기록 파일 업로드
 
 <a id="a-record-upload"></a>
 
-#### 기록 파일 업로드 (미정) — 원본 파일을 private Storage에 올리는 방법
+#### 기록 파일 업로드 (제안) — 원본 파일을 private Storage에 올리는 방법
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 미정 |
+| 인증 | 서명 업로드 주소가 인증을 대신함. 앱은 Storage 요청에 `Authorization` 헤더를 보내지 않음 |
 | 단계·이슈 | 고도화 1 · #9 |
 
 ##### 정해진 것과 정해지지 않은 것
@@ -864,9 +969,10 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 저장 위치 | Supabase Storage private 버킷 `replica-records` (아직 생성되지 않음) |
 | 저장 경로 | `{user_id}/{record_id}/original`. 서버가 `records` 예약 행을 먼저 만든 뒤에만 업로드 가능, 원본 덮어쓰기 불가 |
 | 지원 형식 | `.txt`, `.wav`, `.mp3`, `.m4a` (이슈 #9). 지금 Mock 서버의 음성 허용 목록은 더 넓음 |
-| 용량 제한 | 미정 ("서버에서 합의한 용량 제한") |
-| 업로드 주체 | 미정: 앱이 Storage로 직접 올림 / 백엔드를 거쳐 올림 |
-| 요청·응답 규격 | 미정 |
+| 용량 제한 | 25 MiB(26,214,400바이트). 예약할 때 `size_bytes`로 검사 |
+| 업로드 주체 | 앱이 Storage로 직접 올림(백엔드를 거치지 않음). 서버는 `POST /records` 응답의 `upload`로 서명 정보를 줌 |
+| 요청·응답 규격 | `POST /records` 응답의 `upload`(`url`, `method`, `headers`, `expires_at`), 완료는 `POST /records/{record_id}/uploaded` |
+| 마스킹·원본 보관 범위 | 미정 (이슈 #74) |
 
 <a id="s2"></a>
 
