@@ -12,7 +12,7 @@ from inference_service import Service, allow_service
 from http_response import JsonHandler
 import persona_contract
 from persona_adapter import log_failure
-from request_timing import RequestTiming
+from request_timing import RequestTiming, bind_timing
 
 LOGGER = logging.getLogger("baseline.http")
 
@@ -97,7 +97,7 @@ class Handler(JsonHandler):
             self.respond(503, error_body(503, request_id))
             return
         try:
-            with self.timing.span("prepare_tokenize"):
+            with bind_timing(self.timing), self.timing.span("prepare_tokenize"):
                 prepared = engine.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))

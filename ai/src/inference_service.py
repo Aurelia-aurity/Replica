@@ -8,7 +8,7 @@ from baseline_contract import error_body
 from inference import Request
 import persona_contract
 from persona_adapter import PersonaGenerator, PersonaInference, log_failure
-from request_timing import startup_event
+from request_timing import bind_timing, startup_event, timed
 from startup_warmup import warmup
 
 LOGGER = logging.getLogger("baseline.http")
@@ -108,19 +108,21 @@ class Service:
             timing.emit("worker_handoff", job.admitted_ns)
         output_tokens = 0
         try:
-            result = self.engine_for(request).generate(request, prepared)
+            with bind_timing(timing):
+                result = self.engine_for(request).generate(request, prepared)
             output_tokens = result.output_tokens
             if not result.message.strip():
                 raise ValueError
             job.status = 200
-            if isinstance(request, persona_contract.PersonaRequest):
-                job.body = persona_contract.success_body(request, prepared, result)
-            else:
-                job.body = {
-                    "request_id": request.request_id, "message": result.message,
-                    "finish_reason": result.finish_reason, "ai_generated": True,
-                    "context": {"used_history_turns": prepared.used_history_turns,
-                                "dropped_history_turns": prepared.dropped_history_turns}}
+            with bind_timing(timing), timed("success_body"):
+                if isinstance(request, persona_contract.PersonaRequest):
+                    job.body = persona_contract.success_body(request, prepared, result)
+                else:
+                    job.body = {
+                        "request_id": request.request_id, "message": result.message,
+                        "finish_reason": result.finish_reason, "ai_generated": True,
+                        "context": {"used_history_turns": prepared.used_history_turns,
+                                    "dropped_history_turns": prepared.dropped_history_turns}}
         except Exception as error:
             # Compute boundary: all failures map to the safe fixed envelope.
             if isinstance(request, persona_contract.PersonaRequest):

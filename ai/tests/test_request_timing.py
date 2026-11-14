@@ -63,9 +63,13 @@ class RequestTimingTests(unittest.TestCase):
                 self.assertEqual(result[0], 500 if failure else 200)
                 self.assertNotIn(secret, "\n".join(logs.output))
                 rows = timing_records(logs)
-                self.assertEqual({r["stage"] for r in rows}, {
+                expected = {
                     "receipt", "body_read", "parse", "prepare_tokenize",
-                    "admission_lock", "worker_handoff", "generate", "response_write"})
+                    "prompt_assembly", "template_tokenize",
+                    "admission_lock", "worker_handoff", "generate", "response_write"}
+                if not failure:
+                    expected.add("success_body")
+                self.assertEqual({r["stage"] for r in rows}, expected)
                 self.assertEqual(len({r["attempt_id"] for r in rows}), 1)
                 by_stage = {r["stage"]: r for r in rows}
                 for row in rows:
