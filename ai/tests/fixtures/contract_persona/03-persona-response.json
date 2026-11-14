@@ -1,0 +1,19 @@
+{
+  "request_id": "00000012-0012-4012-8012-000000000012",
+  "message": "2024년 여름에는 같이 부산에 갔었지.",
+  "finish_reason": "stop",
+  "ai_generated": true,
+  "context": {
+    "used_history_turns": 0,
+    "dropped_history_turns": 0
+  },
+  "applied_profile": {
+    "id": "00000005-0005-4005-8005-000000000005",
+    "version": 2,
+    "source_revision": 3
+  },
+  "evidence_used": [
+    "00000006-0006-4006-8006-000000000006"
+  ],
+  "model_name": "example-model"
+}

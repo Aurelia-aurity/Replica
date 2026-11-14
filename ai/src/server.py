@@ -1,4 +1,4 @@
-"""Loopback-only baseline HTTP API. Service authentication is deferred."""
+"""Loopback-only inference API with explicitly enabled personalization."""
 import json
 import logging
 import math
@@ -9,6 +9,8 @@ import time
 
 import baseline
 from inference import ContextLimitExceeded, Inference, Request
+import persona_contract
+from persona_adapter import PersonaGenerator, PersonaInference, log_failure
 
 RAW_LIMIT = 262144
 ID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -34,6 +36,10 @@ def error_body(status: int, request_id: str | None = None):
 
 def valid_id(value) -> bool:
     return isinstance(value, str) and ID_PATTERN.fullmatch(value) is not None
+
+
+def reject_json_constant(_value: str) -> None:
+    raise ValueError
 
 
 def parse_request(data) -> Request:
@@ -77,7 +83,8 @@ class Job:
 
 class Service:
     """One mutable slot, reserved and released under the same lock."""
-    def __init__(self, engine=None, deadline_seconds: float | None = None, auth=allow_service):
+    def __init__(self, engine=None, deadline_seconds: float | None = None, auth=allow_service,
+                 persona_generator: PersonaGenerator | None = None):
         if deadline_seconds is not None and (
                 not math.isfinite(deadline_seconds) or deadline_seconds <= 0):
             raise ValueError
@@ -90,8 +97,14 @@ class Service:
         self.deadline_seconds = deadline_seconds
         self.auth = auth
         self.loader = None
+        self.persona_generator = persona_generator
 
-    def start_loading(self, factory) -> None:
+    def engine_for(self, request):
+        if isinstance(request, persona_contract.PersonaRequest):
+            return self.persona_generator
+        return self.engine
+
+    def start_loading(self, factory, *, persona_model_name: str | None = None) -> None:
         """Publish readiness only after one successful background load."""
         if self.loader is not None:
             raise RuntimeError
@@ -99,6 +112,8 @@ class Service:
         def load():
             try:
                 self.engine = factory()
+                if persona_model_name is not None:
+                    self.persona_generator = PersonaInference(self.engine, persona_model_name)
                 self.ready.set()
             except Exception:
                 # Runtime boundary: never expose model paths or raw exceptions.
@@ -107,7 +122,7 @@ class Service:
         self.loader = threading.Thread(target=load, daemon=True)
         self.loader.start()
 
-    def accept(self, request: Request, prepared):
+    def accept(self, request: Request | persona_contract.PersonaRequest, prepared):
         with self.lock:
             if self.active_id == request.request_id:
                 return 409, None
@@ -123,22 +138,27 @@ class Service:
                 return 500, None
             return 200, job
 
-    def _generate(self, request: Request, prepared, job: Job) -> None:
+    def _generate(self, request: Request | persona_contract.PersonaRequest, prepared, job: Job) -> None:
         start = time.monotonic()
         output_tokens = 0
         try:
-            result = self.engine.generate(request, prepared)
+            result = self.engine_for(request).generate(request, prepared)
             output_tokens = result.output_tokens
             if not result.message.strip():
                 raise ValueError
             job.status = 200
-            job.body = {
-                "request_id": request.request_id, "message": result.message,
-                "finish_reason": result.finish_reason, "ai_generated": True,
-                "context": {"used_history_turns": prepared.used_history_turns,
-                            "dropped_history_turns": prepared.dropped_history_turns}}
-        except Exception:
+            if isinstance(request, persona_contract.PersonaRequest):
+                job.body = persona_contract.success_body(request, prepared, result)
+            else:
+                job.body = {
+                    "request_id": request.request_id, "message": result.message,
+                    "finish_reason": result.finish_reason, "ai_generated": True,
+                    "context": {"used_history_turns": prepared.used_history_turns,
+                                "dropped_history_turns": prepared.dropped_history_turns}}
+        except Exception as error:
             # Compute boundary: all failures map to the safe fixed envelope.
+            if isinstance(request, persona_contract.PersonaRequest):
+                log_failure(request.request_id, error)
             job.status, job.body = 500, error_body(500, request.request_id)
         finally:
             with self.lock:
@@ -195,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.started = time.monotonic()
-        if self.path != "/v1/baseline/generate":
+        if self.path not in ("/v1/baseline/generate", "/v1/persona/generate"):
             self.send_error(404)
             return
         service = self.server.service
@@ -225,12 +245,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         request_id = None
         try:
-            data = json.loads(raw.decode("utf-8"), parse_constant=lambda value: None)
+            data = json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant)
             if isinstance(data, dict) and valid_id(data.get("request_id")):
                 request_id = data["request_id"]
             if self.headers.get_content_type() != "application/json":
                 raise ValueError
-            request = parse_request(data)
+            request = (persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
+                       else parse_request(data))
+        except persona_contract.PayloadTooLarge:
+            self.respond(413, error_body(413, request_id))
+            return
         except (ValueError, UnicodeError, RecursionError):
             self.respond(400, error_body(400, request_id))
             return
@@ -238,15 +262,18 @@ class Handler(BaseHTTPRequestHandler):
                 or any(len(text) > 16000 for pair in request.history for text in pair)):
             self.respond(413, error_body(413, request_id))
             return
-        if not service.ready.is_set():
+        engine = service.engine_for(request)
+        if not service.ready.is_set() or engine is None:
             self.respond(503, error_body(503, request_id))
             return
         try:
-            prepared = service.engine.prepare(request)
+            prepared = engine.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
-        except Exception:
+        except Exception as error:
+            if isinstance(request, persona_contract.PersonaRequest):
+                log_failure(request.request_id, error)
             self.respond(500, error_body(500, request_id))
             return
         status, job = service.accept(request, prepared)
@@ -266,6 +293,7 @@ def main(argv=None) -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--context-limit", type=int)
     parser.add_argument("--deadline-seconds", type=float)
+    parser.add_argument("--mode", choices=("baseline", "persona"), default="baseline")
     try:
         args = parser.parse_args(argv)
         if not 0 < args.port <= 65535 or (
@@ -281,7 +309,9 @@ def main(argv=None) -> int:
         for handler in logging.getLogger().handlers:
             handler.addFilter(lambda record: record.name == LOGGER.name)
         with Server(args.port, service) as server:
-            service.start_loading(lambda: Inference(settings, args.context_limit))
+            service.start_loading(
+                lambda: Inference(settings, args.context_limit),
+                persona_model_name=settings["model_id"] if args.mode == "persona" else None)
             try:
                 server.serve_forever()
             except KeyboardInterrupt:
