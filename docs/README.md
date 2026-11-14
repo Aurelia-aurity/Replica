@@ -18,7 +18,7 @@
 | [학교 GPU 접속 확인 결과](architecture/school-gpu-access.md) | #14 학교 회신, 접속·Slurm 관측과 미확인 운영 조건 |
 | [프로젝트 일정](project-schedule.md) | 최종 계획과 최신 공지, 발표·보고서 일정 |
 | [10월 2일 멘토 미팅](meetings/2026-10-02-mentor-meeting.md) | 멘토의 조언과 후속 작업 |
-| [10월 7일 팀 미팅](meetings/2026-10-07-team-meeting.md) | 설계·연동·역할·발표 준비 |
+| [10월 7일 팀 미팅](meetings/2026-10-07-weekly-team-meeting.md) | 설계·연동·역할·발표 준비 |
 
 회의록은 당시 기록을 보존합니다. 이후 확정된 협업 규칙은 협업 안내에서, 변경된 제출 일정은 프로젝트 일정과 Notion에서 확인합니다.
 
