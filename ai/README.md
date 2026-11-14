@@ -37,10 +37,15 @@ tokenizer cost. `admission_lock` measures mutex acquisition, not queueing;
 and CUDA drain, rather than an isolated model call. A 504 response does not
 release the active slot; its worker emits a separate terminal `generate` record.
 `write_ok` reports the server's socket write outcome, not client receipt.
-The current non-streaming inference API does not expose first-token time:
-`first_token_ms=null`, `ttft_available=false`,
-`ttft_reason="non_streaming_generate"`. Prompt, profile, evidence, response text,
-headers and token IDs are not included.
+### 첫 토큰과 세부 구간
+
+`generate`의 최종 로그는 Transformers 4.57.1 streamer가 CPU에서 관측한 첫 생성 토큰 시각을 `first_generated_token_ns`로 기록합니다. 값은 요청 시작 기준 monotonic 오프셋이며 `first_token_ms`는 같은 값을 ms로 나타냅니다. `model_first_token_ms`는 `model_generate_start_ns`부터 첫 관측까지의 시간입니다. `model_generate_end_ns`도 같은 요청 기준입니다. 토큰이 없으면 시각은 null이고 `ttft_available=false`입니다. 생성이 진행 중이면 `ttft_reason="awaiting_first_token"`, 토큰 없이 끝났으면 `no_generated_token`, 관측자가 시작하지 않았으면 `observer_not_started`로 구분합니다.
+
+첫 생성 토큰에는 강제 JSON 접두사도 포함됩니다. `forced_prefix_tokens`는 접두사 토큰 수이며 `first_unforced_token_ns`는 그 뒤 첫 토큰의 관측 시각입니다. 접두사 뒤 토큰이 없으면 null입니다. 이 위치가 따옴표나 공백일 수도 있으므로 첫 유용한 답변 토큰으로 해석하지 않습니다. HTTP 첫 바이트나 GPU kernel 완료 시각도 측정하지 않습니다.
+
+기존 `prepare_tokenize`와 `generate`를 유지하면서 `persona_prompt_assembly`, `prompt_assembly`, `template_tokenize`, `prefix_encode`, `input_setup`, `model_generate_call`, `output_decode`, `cuda_drain`, `adapter_parse_guard`, `success_body`를 해당 호출 경계에서 기록합니다. baseline에는 persona 전용 구간이 없습니다. 이력을 줄여 다시 준비하면 `prompt_assembly`와 `template_tokenize`가 시도마다 반복됩니다. `template_tokenize`에는 chat template과 토큰화가 함께 들어가며 `model_generate_call`은 framework의 host 경과 시간입니다. 구간 밖의 분기·기록 비용이 남으므로 세부 구간 합이 바깥 구간과 같다고 주장하지 않습니다. 중첩 구간도 더하지 않습니다.
+
+streamer는 첫 prompt callback을 제외하고 토큰 ID나 본문을 저장하지 않습니다. 첫 토큰과 접두사 뒤 첫 토큰에서만 시계를 읽고 이후 callback은 즉시 반환합니다. Transformers 자체는 prompt와 각 생성 토큰에 `.cpu()`를 수행하므로 전송과 Python callback 비용이 추가됩니다. 로그 기록 비용도 포함해 실제 GPU 지연·출력 동일성·계측 오버헤드는 새 GPU 실행에서 확인해야 합니다. 로컬 doubles 검증은 이 수치를 대신하지 않습니다. warmup은 기존 세 번의 생성·검증을 그대로 수행하며 새 TTFT 관측은 외부 요청에만 연결합니다. 프롬프트·프로필·근거·답변·헤더·토큰 ID는 로그에 남기지 않습니다.
 
 Local event-controlled tests use the existing command
 `python3 -B -m unittest discover -s ai/tests -v`. The doubled measurement
