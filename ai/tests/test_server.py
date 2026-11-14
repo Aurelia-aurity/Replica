@@ -33,6 +33,9 @@ class Tokenizer:
         self.calls.append((messages, kwargs))
         return [ord(c) for m in messages for c in ("!" + m["content"])] + [9]
 
+    def encode(self, text, **kwargs):
+        return [ord(c) for c in text]
+
 
 class Engine(inference.Inference):
     def __init__(self, context_limit=100000):

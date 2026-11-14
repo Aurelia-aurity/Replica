@@ -1,0 +1,17 @@
+{
+  "request_id": "00000013-0013-4013-8013-000000000013",
+  "message": "그건 남아 있는 기록으로는 알 수 없네. 어떤 장난감이었는지 이야기해 줄래?",
+  "finish_reason": "stop",
+  "ai_generated": true,
+  "context": {
+    "used_history_turns": 0,
+    "dropped_history_turns": 0
+  },
+  "applied_profile": {
+    "id": "00000005-0005-4005-8005-000000000005",
+    "version": 2,
+    "source_revision": 3
+  },
+  "evidence_used": [],
+  "model_name": "example-model"
+}
