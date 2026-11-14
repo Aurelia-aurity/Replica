@@ -1,12 +1,13 @@
 """Pre-persistence source values; identities are supplied, never issued here."""
 from dataclasses import dataclass
-from datetime import date
+from datetime import date as isodate
 from typing import Final, Literal, assert_never
 from uuid import UUID
 
 Role = Literal["persona", "provider", "other"]
 Kind = Literal["diary", "chat"]
 CHUNKER_VERSION: Final = "lossless-unit-spans-v1"
+ENCODING_MAX_TOKENS: Final = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +32,7 @@ class SourceUnit:
         if self.role not in ("persona", "provider", "other"):
             raise EncodingError("invalid_role")
         try:
-            date.fromisoformat(self.date)
+            isodate.fromisoformat(self.date)
         except ValueError:
             raise EncodingError("invalid_date") from None
         if self.turn is not None and (type(self.turn) is not int or self.turn < 0):
@@ -123,7 +124,7 @@ class EncodingProvenance:
     representation: str = "immutable-float32-rows-l2"
     purpose: str = "offline-local-candidate"
     dimensions: int = 1024
-    max_tokens: int = 512
+    max_tokens: int = ENCODING_MAX_TOKENS
 
 
 @dataclass(frozen=True, slots=True)

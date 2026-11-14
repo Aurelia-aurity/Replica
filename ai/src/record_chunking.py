@@ -5,7 +5,7 @@ import re
 from typing import assert_never
 
 from encoding_types import (
-    ChunkDraft, EncodingError, EncodingLimits, SourceRecord, SourceSpan,
+    ENCODING_MAX_TOKENS, ChunkDraft, EncodingError, EncodingLimits, SourceRecord, SourceSpan,
 )
 
 
@@ -34,7 +34,7 @@ def chunk_record(
         count = count_tokens(rendered)
         if type(count) is not int or count < 0:
             raise EncodingError("invalid_token_count")
-        return count <= 512
+        return count <= ENCODING_MAX_TOKENS
 
     groups: list[tuple[SourceSpan, ...]] = []
     index = 0

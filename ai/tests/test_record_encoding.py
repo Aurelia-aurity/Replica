@@ -1,6 +1,6 @@
 """Synthetic boundary doubles; none of these tests executes KURE weights."""
 from dataclasses import FrozenInstanceError, replace
-import importlib
+import importlib.util
 import itertools
 import json
 import math

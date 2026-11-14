@@ -8,7 +8,7 @@ import struct
 from typing import Protocol, TypedDict
 
 from encoding_types import (
-    EncodedRows, EncodingError, EncodingLimits, EncodingProvenance, SourceRecord,
+    ENCODING_MAX_TOKENS, EncodedRows, EncodingError, EncodingLimits, EncodingProvenance, SourceRecord,
 )
 from record_chunking import chunk_record
 
@@ -19,7 +19,7 @@ class EncodingCandidate:
     model_id: str = "nlpai-lab/KURE-v1"
     intended_revision: str = "8b418a58414668e75532ed045c22d9ca018ae2b2"
     dimensions: int = 1024
-    max_tokens: int = 512
+    max_tokens: int = ENCODING_MAX_TOKENS
     query_prefix: str = ""
     passage_prefix: str = ""
     device: str = "cpu"
