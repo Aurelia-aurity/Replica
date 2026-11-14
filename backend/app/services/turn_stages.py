@@ -4,7 +4,7 @@
 - `start_chat_stage`로 실행권을 얻은 요청만 외부(STT·AI·TTS)를 부른다. 자동 재시도는 TTS에만 있다(첫 시도 + 재시도 2번, 앱 대기 3분 안).
 - AI 요청 ID는 호출 전에 만들어 DB(`start_chat_stage`)에 먼저 기록하고, 같은 ID로 AI를 부르고, 결과를 저장할 때 확인한다.
 - 외부 호출이 실패하면 그 시도 번호로 실패를 기록한다. 질문·답변·예외 원문은 기록하지 않는다.
-- 실행 중(pending)인 단계는 제한 시간을 넘긴 것만 실패로 닫고, 아니면 409로 거절한다.
+- 실행 중(pending)인 단계는 제한 시간을 넘긴 것만 실패로 닫고, 아니면 409로 거절한다. TTS는 앱 대기 시간(180초)까지 닫지 않는다.
 """
 
 import asyncio
@@ -35,6 +35,7 @@ APP_WAIT_SECONDS = 180.0
 RESPONSE_MARGIN_SECONDS = 10.0
 TTS_MAX_RETRIES = 2
 FIRST_TRY_MIN_SECONDS = 10.0  # 앞 단계가 오래 걸려 남은 시간이 없어도 첫 시도가 기다리는 최소 시간
+TTS_STALE_SECONDS = APP_WAIT_SECONDS  # 진행 중인 TTS는 앱이 기다리는 시간 안에는 멈춘 것으로 보지 않는다
 
 STT_FAILED_MESSAGE = "음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요."
 EMPTY_TRANSCRIPT_MESSAGE = "음성을 인식하지 못했어요. 다시 말씀해 주세요."
@@ -67,11 +68,20 @@ def is_running(turn: dict) -> bool:
 
 
 async def refresh_if_stale(user_db: UserDatabase, turn: dict) -> dict:
-    """실행 중인 단계가 제한 시간을 넘겼으면 실패로 닫고 턴을 다시 읽는다. 제한 안이면 그대로 둔다."""
+    """실행 중인 단계가 제한 시간을 넘겼으면 실패로 닫고 턴을 다시 읽는다. 제한 안이면 그대로 둔다.
+
+    STT·LLM은 LLM_TIMEOUT_SECONDS(없으면 30초), TTS는 앱 대기 시간(TTS_STALE_SECONDS)을 기준으로 한다.
+    TTS는 자동 재시도로 더 오래 걸릴 수 있기 때문이다. 이 호출은 어느 단계의 요청에서든 사용자의 모든 턴을
+    대상으로 하므로 TTS 기준을 항상 함께 넘겨, 진행 중인 TTS가 다른 요청에 의해 닫히지 않게 한다.
+    """
     if not is_running(turn):
         return turn
     seconds = get_settings().llm_timeout_seconds or FALLBACK_STALE_SECONDS
-    await user_db.expire_chat_stages(started_before=datetime.now(timezone.utc) - timedelta(seconds=seconds))
+    now = datetime.now(timezone.utc)
+    await user_db.expire_chat_stages(
+        started_before=now - timedelta(seconds=seconds),
+        tts_started_before=now - timedelta(seconds=TTS_STALE_SECONDS),
+    )
     return await user_db.get_turn(turn["id"])
 
 
