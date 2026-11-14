@@ -7,6 +7,52 @@
 - `configs/`: 공유 가능한 모델·추론·개인화 설정
 - `.env.example`: 비밀 값이 없는 설정 예시
 
+### Startup warmup and timing (#96)
+
+Startup always runs three fixed synthetic generations before publishing readiness.
+There is no warmup CLI flag or opt-out: #96 requires warmup before `/readyz`
+returns 200. Baseline mode repeats `Reply with one short greeting.` three times;
+persona mode uses synthetic evidence counts 0, 3 and 10, in that order. Each call
+has an empty history and a 160-token output budget. All outputs must pass validation.
+Load, prepare, generation or validation failure keeps `/readyz` at 503 and logs
+only the failed stage, without retries. `/healthz` remains available. Warmup
+does not reserve the client slot or emit client-request timing. The constructor's
+injected engine remains an already-ready seam for local doubles.
+
+The existing `baseline.http` logger additionally emits JSON records:
+
+- `startup_timing`: `stage` (`load`, `warmup`, `ready`), `status`
+  (`begin`, `complete`, `failed`) and `elapsed_ns` from loader entry.
+- `request_timing`: `attempt_id` joins one HTTP attempt, including a response
+  timeout and later worker completion. Validated `request_id` is included once
+  parsed. `stage` is `receipt`, `body_read`, `parse`, `prepare_tokenize`,
+  `admission_lock`, `worker_handoff`, `generate` or `response_write`.
+  `start_ns` and `end_ns` are offsets from handler entry on one local monotonic
+  clock. `status`, `write_ok`, `input_tokens` and `output_tokens` are populated
+  where observed, otherwise null. Early rejections have partial spans.
+
+`prepare_tokenize` combines preparation and tokenization; it does not isolate
+tokenizer cost. `admission_lock` measures mutex acquisition, not queueing;
+`queue_present=false` and `queue_wait_ms=null`. `generate` includes adapter checks
+and CUDA drain, rather than an isolated model call. A 504 response does not
+release the active slot; its worker emits a separate terminal `generate` record.
+`write_ok` reports the server's socket write outcome, not client receipt.
+### 첫 토큰과 세부 구간
+
+`generate`의 최종 로그는 Transformers 4.57.1 streamer가 CPU에서 관측한 첫 생성 토큰 시각을 `first_generated_token_ns`로 기록합니다. 값은 요청 시작 기준 monotonic 오프셋이며 `first_token_ms`는 같은 값을 ms로 나타냅니다. `model_first_token_ms`는 `model_generate_start_ns`부터 첫 관측까지의 시간입니다. `model_generate_end_ns`도 같은 요청 기준입니다. 토큰이 없으면 시각은 null이고 `ttft_available=false`입니다. 생성이 진행 중이면 `ttft_reason="awaiting_first_token"`, 토큰 없이 끝났으면 `no_generated_token`, 관측자가 시작하지 않았으면 `observer_not_started`로 구분합니다.
+
+첫 생성 토큰에는 강제 JSON 접두사도 포함됩니다. `forced_prefix_tokens`는 접두사 토큰 수이며 `first_unforced_token_ns`는 그 뒤 첫 토큰의 관측 시각입니다. 접두사 뒤 토큰이 없으면 null입니다. 이 위치가 따옴표나 공백일 수도 있으므로 첫 유용한 답변 토큰으로 해석하지 않습니다. HTTP 첫 바이트나 GPU kernel 완료 시각도 측정하지 않습니다.
+
+기존 `prepare_tokenize`와 `generate`를 유지하면서 `persona_prompt_assembly`, `prompt_assembly`, `template_tokenize`, `prefix_encode`, `input_setup`, `model_generate_call`, `output_decode`, `cuda_drain`, `adapter_parse_guard`, `success_body`를 해당 호출 경계에서 기록합니다. baseline에는 persona 전용 구간이 없습니다. 이력을 줄여 다시 준비하면 `prompt_assembly`와 `template_tokenize`가 시도마다 반복됩니다. `template_tokenize`에는 chat template과 토큰화가 함께 들어가며 `model_generate_call`은 framework의 host 경과 시간입니다. 구간 밖의 분기·기록 비용이 남으므로 세부 구간 합이 바깥 구간과 같다고 주장하지 않습니다. 중첩 구간도 더하지 않습니다.
+
+streamer는 첫 prompt callback을 제외하고 토큰 ID나 본문을 저장하지 않습니다. 첫 토큰과 접두사 뒤 첫 토큰에서만 시계를 읽고 이후 callback은 즉시 반환합니다. Transformers 자체는 prompt와 각 생성 토큰에 `.cpu()`를 수행하므로 전송과 Python callback 비용이 추가됩니다. 로그 기록 비용도 포함해 실제 GPU 지연·출력 동일성·계측 오버헤드는 새 GPU 실행에서 확인해야 합니다. 로컬 doubles 검증은 이 수치를 대신하지 않습니다. warmup은 기존 세 번의 생성·검증을 그대로 수행하며 새 TTFT 관측은 외부 요청에만 연결합니다. 프롬프트·프로필·근거·답변·헤더·토큰 ID는 로그에 남기지 않습니다.
+
+Local event-controlled tests use the existing command
+`python3 -B -m unittest discover -s ai/tests -v`. The doubled measurement
+skeleton is documented in
+[`experiments/warmup_timing/README.md`](../experiments/warmup_timing/README.md).
+No new GPU measurements or voice end-to-end results are claimed.
+
 ### 페르소나 가드 (`ai/src/persona_guard.py`)
 
 `PersonaIdentity`, `check_reply`, `GuardResult`를 제공하는 표준 라이브러리 기반 모듈과 추가형 프롬프트 규칙 템플릿 `PERSONA_RULES`입니다. 개인화 경로에는 아래 축소 모드로 적용하며 baseline에는 적용하지 않습니다. 실제 모델 품질 영향은 아직 검증하지 않았습니다. 자세한 동작, 검증 결과와 한계는 [`experiments/persona_guard/README.md`](../experiments/persona_guard/README.md)를 참고하세요.
@@ -155,7 +201,7 @@ python ai/scripts/smoke_persona.py --help
 
 추론 마감 수치는 합의되지 않았습니다. `--deadline-seconds`는 선택적 양수 설정이며 기본값은 미설정입니다. 지정하면 수락한 생성 작업의 완료 대기에 적용하고, 504 후에도 계산은 계속됩니다. smoke의 `--timeout`은 클라이언트 대기 제한일 뿐 GPU 취소가 아닙니다. 전송 실패 결과는 UNKNOWN이며 자동 재시도하지 않습니다.
 
-모델은 백그라운드에서 한 번만 로드합니다. 로딩 중 생성 요청은 503입니다. `GET /healthz`는 프로세스가 응답하면 200과 `{"ready": false|true}`, `GET /readyz`는 같은 본문으로 미준비 시 503, 준비 시 200을 반환합니다. 준비는 로드 성공 여부이며 유휴 슬롯을 뜻하지 않습니다. 로드 실패 후에는 미준비 상태를 유지하고 자동 재로딩하지 않습니다. 잘못된 시작 설정·없는 로컬 모델 경로·포트 충돌은 프로세스 시작 실패로 처리합니다.
+모델은 백그라운드에서 한 번만 로드합니다. 로딩과 워밍업 중 생성 요청은 503입니다. `GET /healthz`는 프로세스가 응답하면 200과 `{"ready": false|true}`, `GET /readyz`는 같은 본문으로 미준비 시 503, 준비 시 200을 반환합니다. 선택한 모드에서 모델 로드와 시작 시 합성 워밍업 3회의 생성·출력 검증이 모두 성공해야 준비 완료가 됩니다. 준비 완료는 유휴 슬롯을 뜻하지 않습니다. 로드나 워밍업이 실패하면 미준비 상태를 유지하고 자동 재로딩이나 워밍업 재시도를 하지 않습니다. 잘못된 시작 설정·없는 로컬 모델 경로·포트 충돌은 프로세스 시작 실패로 처리합니다.
 
 ### 준비·실행·종료
 
