@@ -12,3 +12,16 @@ Future<Persona?> openPersonaCreate(
 ) => Navigator.of(context).push<Persona>(
   MaterialPageRoute(builder: (_) => PersonaNameScreen(controller: controller)),
 );
+
+/// Opens SC-13 in edit mode to change the display name of [persona]. Returns
+/// the saved partner, or null when the user cancelled. Entered from SC-07's
+/// "이름 수정" (not wired yet: SC-07 is restored next).
+Future<Persona?> openPersonaRename(
+  BuildContext context,
+  PersonaController controller,
+  Persona persona,
+) => Navigator.of(context).push<Persona>(
+  MaterialPageRoute(
+    builder: (_) => PersonaNameScreen(controller: controller, editing: persona),
+  ),
+);

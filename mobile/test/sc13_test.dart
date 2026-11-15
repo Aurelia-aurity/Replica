@@ -17,8 +17,9 @@ class Opened {
 /// Opens SC-13 from a plain page so cancel and back have somewhere to return.
 Future<Opened> openName(
   WidgetTester tester,
-  PersonaController controller,
-) async {
+  PersonaController controller, {
+  Persona? editing,
+}) async {
   final opened = Opened();
   await tester.pumpWidget(
     MaterialApp(
@@ -29,7 +30,10 @@ Future<Opened> openName(
               onPressed: () async {
                 opened.result = await Navigator.of(context).push<Persona>(
                   MaterialPageRoute(
-                    builder: (_) => PersonaNameScreen(controller: controller),
+                    builder: (_) => PersonaNameScreen(
+                      controller: controller,
+                      editing: editing,
+                    ),
                   ),
                 );
                 opened.returned = true;
@@ -63,7 +67,7 @@ void main() {
     await openName(tester, newController(FakePersonaService()));
     expect(find.text('프로필 만들기'), findsOneWidget);
     expect(find.text('누구와\n대화하고 싶으세요?'), findsOneWidget);
-    expect(find.textContaining('바꿀 수 없어요'), findsOneWidget);
+    expect(find.textContaining('바꿀 수 없어요'), findsNothing);
     expect(find.textContaining('말투'), findsNothing);
     expect(find.textContaining('학습'), findsNothing);
     expect(find.text('예: 엄마, 할머니, 민지'), findsOneWidget);
@@ -71,7 +75,7 @@ void main() {
     expect(saveEnabled(tester), false);
   });
 
-  testWidgets('there is no way to rename: the screen only creates', (
+  testWidgets('create mode starts empty, without the edit title', (
     tester,
   ) async {
     await openName(tester, newController(FakePersonaService()));
@@ -80,6 +84,170 @@ void main() {
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       isEmpty,
     );
+  });
+
+  group('edit mode', () {
+    const original = Persona(
+      id: 'p1',
+      name: '김영희',
+      displayName: '엄마',
+      providerAddress: '우리 딸',
+    );
+
+    Future<(FakePersonaService, PersonaController, Opened)> openEdit(
+      WidgetTester tester, {
+      Persona persona = original,
+    }) async {
+      final service = FakePersonaService(personas: [persona]);
+      final controller = newController(service);
+      await controller.load();
+      final opened = await openName(
+        tester,
+        controller,
+        editing: controller.current,
+      );
+      return (service, controller, opened);
+    }
+
+    String fieldText(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField)).controller!.text;
+
+    testWidgets('prefills the shown name with the edit title and guidance', (
+      tester,
+    ) async {
+      await openEdit(tester);
+      expect(find.text('대화 상대 이름 수정'), findsOneWidget);
+      expect(find.text('프로필 만들기'), findsNothing);
+      expect(find.text('이름이나 호칭을\n바꿔 볼까요?'), findsOneWidget);
+      expect(find.textContaining('올린 기록은 그대로예요'), findsOneWidget);
+      expect(fieldText(tester), '엄마');
+      expect(find.text('2 / 50'), findsOneWidget);
+      expect(saveEnabled(tester), true);
+    });
+
+    testWidgets('without a display name the creation name is prefilled', (
+      tester,
+    ) async {
+      await openEdit(
+        tester,
+        persona: const Persona(id: 'p1', name: '김영희'),
+      );
+      expect(fieldText(tester), '김영희');
+    });
+
+    testWidgets('saving sends only the display name and returns the partner', (
+      tester,
+    ) async {
+      final (service, controller, opened) = await openEdit(tester);
+      await tester.enterText(find.byType(TextField), ' 어머니 ');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(service.created, isEmpty);
+      expect(service.updates, hasLength(1));
+      expect(service.updates.single.id, 'p1');
+      expect(service.updates.single.update.toJson(), {'display_name': '어머니'});
+      expect(opened.result!.label, '어머니');
+      final current = controller.current!;
+      expect(current.label, '어머니');
+      expect(current.name, '김영희');
+      expect(current.providerAddress, '우리 딸');
+      expect(find.byType(PersonaNameScreen), findsNothing);
+    });
+
+    testWidgets('saving an unchanged name sends nothing', (tester) async {
+      final (service, _, opened) = await openEdit(tester);
+      await tester.enterText(find.byType(TextField), ' 엄마 ');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(service.updates, isEmpty);
+      expect(opened.result, original);
+    });
+
+    testWidgets('a blank name cannot be saved', (tester) async {
+      final (service, _, _) = await openEdit(tester);
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.pump();
+      expect(saveEnabled(tester), false);
+      expect(service.updates, isEmpty);
+    });
+
+    testWidgets('cancel and back keep the existing name', (tester) async {
+      final (service, controller, opened) = await openEdit(tester);
+      await tester.enterText(find.byType(TextField), '다른 이름');
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(opened.returned, true);
+      expect(opened.result, isNull);
+
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester), '엄마');
+      await tester.enterText(find.byType(TextField), '또 다른 이름');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(opened.result, isNull);
+      expect(service.updates, isEmpty);
+      expect(controller.current!.label, '엄마');
+    });
+
+    testWidgets('failure keeps the typed name and a retry sends it again', (
+      tester,
+    ) async {
+      final (service, controller, opened) = await openEdit(tester);
+      service.updateError = StateError('offline');
+      await tester.enterText(find.byType(TextField), '어머니');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('저장하지 못했어요'), findsOneWidget);
+      expect(fieldText(tester), '어머니');
+      expect(controller.current!.label, '엄마');
+      expect(opened.returned, false);
+
+      service.updateError = null;
+      await tester.tap(find.text('다시 시도'));
+      await tester.pumpAndSettle();
+      expect(service.updates, hasLength(2));
+      expect(opened.result!.label, '어머니');
+      expect(controller.current!.label, '어머니');
+    });
+
+    testWidgets('rejected input explains itself', (tester) async {
+      final (service, _, _) = await openEdit(tester);
+      service.updateError = const BackendFailure(
+        BackendFailureKind.generic,
+        code: 'INVALID_INPUT',
+      );
+      await tester.enterText(find.byType(TextField), '어머니');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(find.text('입력한 내용을 확인해 주세요.'), findsOneWidget);
+    });
+
+    testWidgets('saving blocks duplicate requests and leaving the screen', (
+      tester,
+    ) async {
+      final gate = Completer<void>();
+      final (service, _, opened) = await openEdit(tester);
+      service.updateGate = gate;
+      await tester.enterText(find.byType(TextField), '어머니');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pump();
+      await tester.tap(find.byType(FilledButton), warnIfMissed: false);
+      await tester.pump();
+      expect(find.bySemanticsLabel('저장 중'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pump();
+      expect(find.byType(PersonaNameScreen), findsOneWidget);
+      expect(service.updates, hasLength(1));
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(opened.result!.label, '어머니');
+    });
   });
 
   testWidgets('blank and whitespace-only input cannot be saved', (

@@ -7,14 +7,18 @@ import 'persona_controller.dart';
 import 'persona_models.dart';
 import 'persona_service.dart';
 
-/// SC-13 프로필 만들기: names the conversation partner.
+/// SC-13 프로필 만들기 · 대화 상대 이름 수정.
 ///
-/// A name cannot be changed once it is saved, so this screen only creates. It
-/// pops with the saved [Persona]; cancelling or going back pops with nothing
-/// and changes nothing.
+/// With [editing] null it creates a conversation partner (`POST /personas`).
+/// Otherwise it changes the display name of [editing]
+/// (`PATCH /personas/{id}` with `display_name`); the name given at creation,
+/// the provider address and the records stay as they are. The screen pops
+/// with the saved [Persona]; cancelling or going back pops with nothing and
+/// changes nothing.
 class PersonaNameScreen extends StatefulWidget {
-  const PersonaNameScreen({super.key, required this.controller});
+  const PersonaNameScreen({super.key, required this.controller, this.editing});
   final PersonaController controller;
+  final Persona? editing;
 
   @override
   State<PersonaNameScreen> createState() => _PersonaNameScreenState();
@@ -42,13 +46,14 @@ final _saveStyle = FilledButton.styleFrom(
 );
 
 class _PersonaNameScreenState extends State<PersonaNameScreen> {
-  final _text = TextEditingController();
+  late final _text = TextEditingController(text: widget.editing?.label ?? '');
   bool _saving = false;
   // One id per attempted name: a retry of the same save must not create a
   // second partner, a different name is a different request.
   String _requestId = newPersonaId();
   String? _requestName;
 
+  bool get _isEdit => widget.editing != null;
   String? get _name => normalizePersonaName(_text.text);
   bool get _canSave => !_saving && _name != null;
 
@@ -75,13 +80,29 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     if (!mounted) return;
     final name = _name;
     if (name == null || !_canSave) return;
+    final editing = widget.editing;
+    // Same name: nothing to send, just go back.
+    if (editing != null && name == editing.label) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Navigator.of(context).pop(editing);
+      return;
+    }
     setState(() => _saving = true);
     try {
-      if (_requestName != name) {
-        _requestId = newPersonaId();
-        _requestName = name;
+      final Persona saved;
+      if (editing != null) {
+        // Repeating the same update is harmless, so a retry needs no id.
+        saved = await widget.controller.update(
+          editing.id,
+          PersonaUpdate(displayName: name),
+        );
+      } else {
+        if (_requestName != name) {
+          _requestId = newPersonaId();
+          _requestName = name;
+        }
+        saved = await widget.controller.create(name, personaId: _requestId);
       }
-      final saved = await widget.controller.create(name, personaId: _requestId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       Navigator.of(context).pop(saved);
@@ -118,9 +139,9 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         appBar: AppBar(
           backgroundColor: replicaBackground,
           surfaceTintColor: Colors.transparent,
-          title: const Text(
-            '프로필 만들기',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            _isEdit ? '대화 상대 이름 수정' : '프로필 만들기',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
         body: SafeArea(
@@ -137,18 +158,20 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '누구와\n대화하고 싶으세요?',
-                            style: TextStyle(
+                          Text(
+                            _isEdit ? '이름이나 호칭을\n바꿔 볼까요?' : '누구와\n대화하고 싶으세요?',
+                            style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
                             ),
                           ),
                           const SizedBox(height: 10),
-                          const Text(
-                            '대화할 상대의 이름이나 호칭을 먼저 정해 주세요. 저장한 이름은 바꿀 수 없어요.',
-                            style: TextStyle(
+                          Text(
+                            _isEdit
+                                ? '앱에 보이는 이름과 대화에서 부를 이름이 바뀌어요. 올린 기록은 그대로예요.'
+                                : '대화할 상대의 이름이나 호칭을 먼저 정해 주세요.',
+                            style: const TextStyle(
                               color: Color(0xFF3D4743),
                               fontSize: 15,
                               height: 1.6,
