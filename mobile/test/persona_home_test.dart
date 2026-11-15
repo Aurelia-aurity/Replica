@@ -62,6 +62,23 @@ Finder titleIn(Type screen, String name) =>
 
 void main() {
   group('home card', () {
+    testWidgets('the card and the chat title use the display name', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(
+          personas: const [Persona(id: 'p1', name: '김영희', displayName: '엄마')],
+        ),
+      );
+      expect(find.text('엄마'), findsOneWidget);
+      expect(find.text('김영희'), findsNothing);
+      await tester.tap(find.text('텍스트로 대화'));
+      await tester.pumpAndSettle();
+      await acceptDisclosure(tester);
+      expect(titleIn(ChatScreen, '엄마'), findsOneWidget);
+    });
+
     testWidgets('the dummy account starts without a partner, like a real one', (
       tester,
     ) async {

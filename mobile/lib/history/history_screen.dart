@@ -117,7 +117,7 @@ const partnerMissingNotice = '대화 상대를 확인할 수 없어요. 홈에�
 String? conversationTitle(Conversation conversation, Persona? selected) =>
     conversation.personaName ??
     (selected != null && conversation.personaId == selected.id
-        ? selected.name
+        ? selected.label
         : null);
 
 /// Starts a conversation with [persona] (the partner picked on the home card)
@@ -149,7 +149,7 @@ Future<void> startConversation(
     service,
     conversation,
     voice: voice,
-    conversationName: persona.name,
+    conversationName: persona.label,
   );
 }
 

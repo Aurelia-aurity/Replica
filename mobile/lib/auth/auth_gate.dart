@@ -80,7 +80,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         // Dummy conversations belong to the partners named in SC-13.
         personaSource: () async => [
           for (final persona in await personas.service.list())
-            ConversationPersona(id: persona.id, name: persona.name),
+            ConversationPersona(id: persona.id, name: persona.label),
         ],
       );
     }

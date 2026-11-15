@@ -3,8 +3,8 @@ import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import 'persona_models.dart';
 
-/// Conversation partners (SC-02, SC-13). The app only sends the name; no
-/// speech profile is requested or stored in this version.
+/// Conversation partners (SC-02, SC-13): the name given at creation, and the
+/// display name and the form of address the user edits later.
 abstract class PersonaService {
   /// Active partners, newest first (`GET /personas`).
   Future<List<Persona>> list();
@@ -12,6 +12,11 @@ abstract class PersonaService {
   /// Creates a partner (`POST /personas`). [personaId] is chosen by the app and
   /// kept across retries so a lost response can never create a second partner.
   Future<Persona> create(String name, {required String personaId});
+
+  /// Changes the display name and/or the provider address
+  /// (`PATCH /personas/{id}`, PR #117 proposal). Repeating the same update is
+  /// harmless, so a retry after a lost answer needs no lookup.
+  Future<Persona> update(String personaId, PersonaUpdate update);
 }
 
 /// Data for the dummy account. Lives only for one login and is never sent
@@ -42,10 +47,25 @@ class MemoryPersonaService implements PersonaService {
         _personas.insert(0, persona);
         return persona;
       });
+
+  @override
+  Future<Persona> update(String personaId, PersonaUpdate update) =>
+      _run(() async {
+        if (update.isEmpty) throw ArgumentError('Nothing to update');
+        final index = _personas.indexWhere((p) => p.id == personaId);
+        if (index < 0) {
+          throw const BackendFailure(
+            BackendFailureKind.generic,
+            code: 'NOT_FOUND',
+          );
+        }
+        return _personas[index] = _personas[index].applying(update);
+      });
 }
 
 /// Adapter for the app-backend contract (`GET /personas`, `POST /personas`,
-/// `GET /personas/{id}`).
+/// `GET /personas/{id}`, and the proposed `PATCH /personas/{id}`, which the
+/// backend does not serve yet).
 class HttpPersonaService implements PersonaService {
   HttpPersonaService(this._api);
   final ApiClient _api;
@@ -89,6 +109,19 @@ class HttpPersonaService implements PersonaService {
       if (existing != null && existing.name == name) return existing;
       rethrow;
     }
+  }
+
+  @override
+  Future<Persona> update(String personaId, PersonaUpdate update) async {
+    if (update.isEmpty) throw ArgumentError('Nothing to update');
+    final json = await _api.request(
+      'PATCH',
+      '/personas/${Uri.encodeComponent(personaId)}',
+      body: update.toJson(),
+    );
+    final persona = Persona.fromJson(json as Map<String, dynamic>);
+    if (persona.id != personaId) throw const FormatException('Wrong persona');
+    return persona;
   }
 
   bool _isDefiniteRejection(Object error) =>

@@ -41,10 +41,11 @@ class FakePersonaService implements PersonaService {
   FakePersonaService({List<Persona>? personas}) : personas = [...?personas];
 
   final List<Persona> personas;
-  Object? listError, createError;
+  Object? listError, createError, updateError;
   Completer<void>? createGate;
 
   final created = <({String name, String id})>[];
+  final updates = <({String id, PersonaUpdate update})>[];
   int listCalls = 0;
 
   @override
@@ -62,6 +63,14 @@ class FakePersonaService implements PersonaService {
     final persona = Persona(id: personaId, name: name);
     personas.insert(0, persona);
     return persona;
+  }
+
+  @override
+  Future<Persona> update(String personaId, PersonaUpdate update) async {
+    updates.add((id: personaId, update: update));
+    if (updateError != null) throw updateError!;
+    final index = personas.indexWhere((p) => p.id == personaId);
+    return personas[index] = personas[index].applying(update);
   }
 }
 

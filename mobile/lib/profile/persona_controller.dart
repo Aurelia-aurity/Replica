@@ -64,6 +64,20 @@ class PersonaController extends ChangeNotifier {
     _notify();
   }
 
+  /// Changes a partner's display name or provider address. Throws on failure
+  /// and changes nothing; on success the stored partner is replaced by the
+  /// server's answer, keeping its place and the selection.
+  Future<Persona> update(String personaId, PersonaUpdate update) async {
+    final persona = await service.update(personaId, update);
+    if (!_disposed && _personas.any((p) => p.id == persona.id)) {
+      _personas = [for (final p in _personas) p.id == persona.id ? persona : p];
+      _status = LoadStatus.ready;
+      _request++; // an older list answer must not bring back the old values
+      _notify();
+    }
+    return persona;
+  }
+
   /// Creates a partner (SC-13). Throws on failure and changes nothing.
   Future<Persona> create(String name, {required String personaId}) async {
     final persona = await service.create(name, personaId: personaId);

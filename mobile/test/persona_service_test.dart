@@ -303,6 +303,168 @@ void main() {
     });
   });
 
+  group('display name and provider address (PR #117 proposal)', () {
+    test('the object reads both fields; unset or blank means null', () {
+      final full = Persona.fromJson({
+        ...personaJson('p', '김영희'),
+        'display_name': ' 엄마 ',
+        'provider_address': '우리 딸',
+      });
+      expect(full.displayName, '엄마');
+      expect(full.providerAddress, '우리 딸');
+      expect(full.dataRevision, 1);
+      expect(full.label, '엄마');
+
+      final bare = Persona.fromJson({
+        ...personaJson('p', '김영희'),
+        'display_name': null,
+        'provider_address': '  ',
+      });
+      expect(bare.displayName, isNull);
+      expect(bare.providerAddress, isNull);
+      expect(bare.label, '김영희');
+      expect(Persona.fromJson({'id': 'p', 'name': '김영희'}).dataRevision, isNull);
+
+      expect(
+        () => Persona.fromJson({...personaJson('p', 'a'), 'display_name': 3}),
+        throwsFormatException,
+      );
+      expect(
+        () =>
+            Persona.fromJson({...personaJson('p', 'a'), 'data_revision': '1'}),
+        throwsFormatException,
+      );
+    });
+
+    test('an update sends only what changes', () {
+      expect(PersonaUpdate(displayName: ' 엄마 ').toJson(), {
+        'display_name': '엄마',
+      });
+      expect(PersonaUpdate.providerAddress(' 우리 딸 ').toJson(), {
+        'provider_address': '우리 딸',
+      });
+      expect(PersonaUpdate.providerAddress('  ').toJson(), {
+        'provider_address': null,
+      });
+      expect(PersonaUpdate.providerAddress(null, displayName: '엄마').toJson(), {
+        'display_name': '엄마',
+        'provider_address': null,
+      });
+      expect(PersonaUpdate().isEmpty, isTrue);
+      expect(() => PersonaUpdate(displayName: '  '), throwsArgumentError);
+      expect(
+        () => PersonaUpdate(displayName: '가' * (personaNameMaxLength + 1)),
+        throwsArgumentError,
+      );
+      expect(
+        () => PersonaUpdate.providerAddress('가' * (personaNameMaxLength + 1)),
+        throwsArgumentError,
+      );
+    });
+
+    test('HTTP update is a PATCH with the update as its whole body', () async {
+      final (service, requests) = await httpService(
+        (request) async => jsonResponse({
+          ...personaJson('p1', '김영희'),
+          'display_name': '엄마',
+          'provider_address': null,
+        }),
+      );
+      final persona = await service.update(
+        'p1',
+        PersonaUpdate.providerAddress(null, displayName: '엄마'),
+      );
+      expect(persona.label, '엄마');
+      expect(persona.name, '김영희');
+      expect(requests, hasLength(1));
+      expect(requests.single.method, 'PATCH');
+      expect(requests.single.url.path, '/personas/p1');
+      expect(
+        requests.single.headers['Authorization'],
+        'Bearer synthetic-token',
+      );
+      expect(jsonDecode(requests.single.body), {
+        'display_name': '엄마',
+        'provider_address': null,
+      });
+    });
+
+    test('HTTP update rejects an empty update without a request', () async {
+      final (service, requests) = await httpService(
+        (request) async => jsonResponse(personaJson('p1', '엄마')),
+      );
+      await expectLater(
+        service.update('p1', PersonaUpdate()),
+        throwsArgumentError,
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('HTTP update rejects an answer about another partner', () async {
+      final (service, _) = await httpService(
+        (request) async => jsonResponse(personaJson('other', '엄마')),
+      );
+      await expectLater(
+        service.update('p1', PersonaUpdate(displayName: '엄마')),
+        throwsFormatException,
+      );
+    });
+
+    test('HTTP update passes a refusal on unchanged', () async {
+      final (service, requests) = await httpService(
+        (request) async => jsonResponse({
+          'error': {'code': 'INVALID_INPUT', 'retryable': false},
+        }, 422),
+      );
+      await expectLater(
+        service.update('p1', PersonaUpdate(displayName: '엄마')),
+        throwsA(
+          isA<BackendFailure>().having((f) => f.code, 'code', 'INVALID_INPUT'),
+        ),
+      );
+      expect(requests, hasLength(1));
+    });
+
+    test('the dummy account keeps updates and the creation name', () async {
+      final service = MemoryPersonaService(
+        personas: const [Persona(id: 'p1', name: '김영희')],
+      );
+      await service.update('p1', PersonaUpdate(displayName: '엄마'));
+      await service.update('p1', PersonaUpdate.providerAddress('우리 딸'));
+      var stored = (await service.list()).single;
+      expect(stored.name, '김영희');
+      expect(stored.label, '엄마');
+      expect(stored.providerAddress, '우리 딸');
+
+      // Changing the display name leaves the provider address alone.
+      await service.update('p1', PersonaUpdate(displayName: '어머니'));
+      stored = (await service.list()).single;
+      expect(stored.providerAddress, '우리 딸');
+      await service.update('p1', PersonaUpdate.providerAddress(null));
+      expect((await service.list()).single.providerAddress, isNull);
+
+      await expectLater(
+        service.update('missing', PersonaUpdate(displayName: '엄마')),
+        throwsA(isA<BackendFailure>()),
+      );
+    });
+
+    test('conversation screens show the display name', () {
+      final persona = ConversationPersona.fromJson({
+        ...personaJson('p1', '김영희'),
+        'display_name': '엄마',
+      });
+      expect(persona.name, '엄마');
+      expect(
+        ConversationPersona.fromJson({
+          ...personaJson('p1', '김영희'),
+          'display_name': ' ',
+        }).name,
+        '김영희',
+      );
+    });
+  });
+
   test('persona objects need an id and a non-blank name', () {
     expect(Persona.fromJson(personaJson('p', '엄마')).name, '엄마');
     expect(
@@ -318,6 +480,40 @@ void main() {
       addTearDown(controller.dispose);
       return controller;
     }
+
+    test(
+      'an update replaces the partner in place and keeps the selection',
+      () async {
+        final service = FakePersonaService(
+          personas: const [
+            Persona(id: 'p1', name: '김영희'),
+            Persona(id: 'p2', name: '박철수'),
+          ],
+        );
+        final controller = controllerFor(service);
+        await controller.load();
+        controller.select('p2');
+        var notified = 0;
+        controller.addListener(() => notified++);
+        await controller.update('p1', PersonaUpdate(displayName: '엄마'));
+        expect(controller.personas.map((p) => p.label), ['엄마', '박철수']);
+        expect(controller.current!.id, 'p2');
+        expect(notified, 1);
+      },
+    );
+
+    test('a failed update changes nothing', () async {
+      final service = FakePersonaService(
+        personas: const [Persona(id: 'p1', name: '김영희')],
+      )..updateError = StateError('synthetic failure');
+      final controller = controllerFor(service);
+      await controller.load();
+      await expectLater(
+        controller.update('p1', PersonaUpdate(displayName: '엄마')),
+        throwsStateError,
+      );
+      expect(controller.current!.label, '김영희');
+    });
 
     test('loading asks only for the partner list', () async {
       final service = FakePersonaService(

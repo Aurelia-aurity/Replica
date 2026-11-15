@@ -112,7 +112,7 @@ class PersonaCard extends StatelessWidget {
                       DropdownMenuItem(
                         value: item.id,
                         child: Text(
-                          item.name,
+                          item.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -127,7 +127,7 @@ class PersonaCard extends StatelessWidget {
               )
             else
               Text(
-                persona.name,
+                persona.label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: _name,
