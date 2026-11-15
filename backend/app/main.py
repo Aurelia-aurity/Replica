@@ -21,15 +21,15 @@ app = FastAPI(
     description="레플리카(인간 복제 보험 서비스) 백엔드 API. 모든 AI 응답은 AI 생성 콘텐츠입니다.",
 )
 
+# 본문 크기 확인은 파서가 읽기 전에 한도를 넘는 본문을 끊는다. add_middleware는 나중에 추가한 것이 바깥이므로
+# CORS를 나중에 추가해, 선언된 크기 초과로 즉시 돌려주는 413에도 CORS 헤더가 붙게 한다(브라우저가 오류 본문을 읽는다).
+app.add_middleware(BodyLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# CORS 바깥에서 먼저 크기를 확인해, 한도를 넘는 본문은 파서가 읽기 전에 끊는다.
-app.add_middleware(BodyLimitMiddleware)
 
 register_error_handlers(app)
 

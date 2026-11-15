@@ -28,10 +28,11 @@ def test_remote_model_label_default_is_the_same_everywhere():
     assert re.search(rf"\| `LLM_MODEL_NAME` \| `{re.escape(DEFAULT_LABEL)}` \|", read("README.md"))
 
 
-def test_model_label_is_not_described_as_confirmed():
+def test_model_label_is_described_as_the_confirmed_service_model():
     readme = read("README.md")
     row = next(line for line in readme.splitlines() if line.startswith("| `LLM_MODEL_NAME`"))
-    assert "미확정" in row and "확정 모델" not in row
+    assert DEFAULT_LABEL in row and "2026-11-10" in row and "REPLICA_MODEL_ID" in row
+    assert "미확정" not in row and "조건부" not in row
 
 
 def test_readme_lists_every_llm_and_supabase_setting():

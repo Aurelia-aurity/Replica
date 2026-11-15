@@ -26,7 +26,7 @@ class BodyTooLarge(HTTPException):
 
 
 def limit_for(path: str) -> tuple[int, bool]:
-    if path in UPLOAD_PATHS:
+    if path.rstrip("/") in UPLOAD_PATHS:  # 끝 슬래시(/stt/)도 같은 업로드 한도를 쓴다
         return get_settings().max_upload_mb * 1024 * 1024 + MULTIPART_OVERHEAD, True
     return JSON_LIMIT, False
 

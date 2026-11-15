@@ -124,7 +124,7 @@ AWS EC2 배포 시에는 외부 노출을 막기 위해 `-p 127.0.0.1:8000:8000`
 | `LLM_SERVER_URL` | (없음) | `LLM_MODE=remote`일 때 필수. AI 서버 주소 |
 | `LLM_SERVER_TOKEN` | (없음) | AI 서버로 보내는 Bearer 토큰. 서비스 인증 방식은 #14 확인 후 확정 |
 | `LLM_TIMEOUT_SECONDS` | (없음) | `LLM_MODE=remote`일 때 필수(0보다 큼). GPU 측정과 합의 전이라 기본값을 두지 않음 |
-| `LLM_MODEL_NAME` | `Qwen/Qwen3-8B` | DB에 기록하는 답변 모델 라벨. **서비스 모델은 미확정**이며 이 값은 #77 결과의 조건부 기준선입니다. 배포 라벨이 다르면 바꿉니다 |
+| `LLM_MODEL_NAME` | `Qwen/Qwen3-8B` | DB에 기록하는 답변 모델 라벨. 서비스 모델은 `Qwen/Qwen3-8B`입니다(2026-11-10 PM 결정, #107). 배포 때 GPU 서버의 `REPLICA_MODEL_ID`와 같은 값으로 맞춥니다 |
 | `STT_PROVIDER` | mock | mock 또는 STT 공급자 |
 | `TTS_PROVIDER` | mock | mock 또는 TTS 공급자 |
 | `MAX_UPLOAD_MB` | 25 | 음성 업로드 최대 크기(MB) |

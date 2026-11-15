@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     llm_server_url: str | None = None
     llm_server_token: SecretStr | None = None  # 서비스 인증 방식은 #14 확인 후 확정. 지금은 Bearer로 보낸다.
     llm_timeout_seconds: float | None = Field(default=None, gt=0)
-    # DB에 기록하는 답변 모델 라벨. 서비스 모델은 미확정이며 Qwen/Qwen3-8B는 #77 결과의 조건부 기준선이다.
-    # 배포 라벨이 다르면 LLM_MODEL_NAME으로 바꾼다. 코드·.env.example·README의 기본값은 같아야 한다(#65).
+    # DB에 기록하는 답변 모델 라벨. 서비스 모델은 Qwen/Qwen3-8B다(2026-11-10 PM 결정, #107).
+    # 배포 때 GPU 서버의 REPLICA_MODEL_ID와 같은 값으로 맞춘다. 코드·.env.example·README의 기본값은 같아야 한다(#65).
     llm_model_name: str = "Qwen/Qwen3-8B"
     stt_provider: str = "mock"
     tts_provider: str = "mock"

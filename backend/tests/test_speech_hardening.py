@@ -178,6 +178,47 @@ def test_get_requests_are_not_limited(client):
     assert client.get("/health").status_code == 200
 
 
+ORIGIN = "http://localhost:3000"
+
+
+def test_immediate_413_for_a_declared_size_keeps_the_cors_headers(monkeypatch, client):
+    use_settings(monkeypatch, MAX_UPLOAD_MB="1")
+    headers = {"Origin": ORIGIN}
+    json_res = client.post(
+        "/chat/text", content=b"x" * (2 * 1024 * 1024), headers={**headers, "Content-Type": "application/json"}
+    )
+    voice_res = client.post(
+        "/chat/voice", content=b"x" * (3 * 1024 * 1024),
+        headers={**headers, "Content-Type": "multipart/form-data; boundary=x"},
+    )
+    for res, code in ((json_res, "REQUEST_TOO_LARGE"), (voice_res, "FILE_TOO_LARGE")):
+        assert res.status_code == 413 and error_of(res)["code"] == code
+        assert res.headers.get("access-control-allow-origin") in ("*", ORIGIN)  # 브라우저가 오류 본문을 읽을 수 있다
+
+
+def test_streamed_413_keeps_the_cors_headers_too(monkeypatch, client):
+    use_settings(monkeypatch, MAX_UPLOAD_MB="1")
+    chunk = b"x" * 65536
+
+    def body():
+        for _ in range(48):
+            yield chunk
+
+    res = client.post(
+        "/stt", content=body(), headers={"Origin": ORIGIN, "Content-Type": "multipart/form-data; boundary=x"}
+    )
+    assert res.status_code == 413 and res.headers.get("access-control-allow-origin") in ("*", ORIGIN)
+
+
+def test_trailing_slash_upload_path_uses_the_upload_limit(monkeypatch, client):
+    use_settings(monkeypatch, MAX_UPLOAD_MB="25")
+    res = client.post(
+        "/stt/", content=b"x" * (1536 * 1024), follow_redirects=False,
+        headers={"Content-Type": "multipart/form-data; boundary=x"},
+    )
+    assert res.status_code != 413  # 일반 JSON 한도(1MiB)가 아니라 업로드 한도(25MiB)를 쓴다
+
+
 # --- N3: 오류 봉투 ---
 
 ENVELOPE_KEYS = {"code", "message", "stage", "turn_id", "retryable", "field"}
