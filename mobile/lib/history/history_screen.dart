@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../chat/ai_disclosure_sheet.dart';
 import '../chat/chat_screen.dart';
+import '../profile/persona_models.dart';
 import '../shared/conversation_widgets.dart';
 import 'conversation.dart';
 import 'conversation_service.dart';
 
-/// [conversationName] is the partner name set in SC-13. There is no stand-in
-/// title: a conversation is only opened once the partner has a name.
+/// [conversationName] is the partner name set in SC-13 ([conversationTitle]).
+/// There is no stand-in title: a conversation is only opened once its partner
+/// has a name. A name the server reports for the conversation later wins.
 Future<void> openConversation(
   BuildContext context,
   ConversationService service,
@@ -16,10 +20,80 @@ Future<void> openConversation(
   required String conversationName,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
-    builder: (_) => ChatScreen(
-      service: ConversationChatService(service, conversation.id),
+    builder: (_) => _ConversationRoute(
+      service: service,
+      conversation: conversation,
       conversationName: conversationName,
-      initialVoiceMode: voice ?? conversation.lastVoice,
+      voice: voice ?? conversation.lastVoice,
+    ),
+  ),
+);
+
+class _ConversationRoute extends StatefulWidget {
+  const _ConversationRoute({
+    required this.service,
+    required this.conversation,
+    required this.conversationName,
+    required this.voice,
+  });
+
+  final ConversationService service;
+  final Conversation conversation;
+  final String conversationName;
+  final bool voice;
+
+  @override
+  State<_ConversationRoute> createState() => _ConversationRouteState();
+}
+
+class _ConversationRouteState extends State<_ConversationRoute> {
+  late final ConversationChatService _chat;
+  late Conversation _conversation;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _conversation = widget.conversation;
+    _chat = ConversationChatService(widget.service, _conversation.id);
+    _scheduleRefresh();
+  }
+
+  void _scheduleRefresh() {
+    if (_conversation.pending) {
+      _refreshTimer = Timer(pendingTurnRefreshInterval, _refreshPendingTurns);
+    }
+  }
+
+  Future<void> _refreshPendingTurns() async {
+    try {
+      final latest = await widget.service.get(_conversation.id);
+      if (!mounted || latest.id != _conversation.id) return;
+      if (!latest.pending) {
+        setState(() => _conversation = latest);
+      }
+    } catch (_) {
+      // Keep the last confirmed status if history could not be refreshed.
+    } finally {
+      if (mounted) _scheduleRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversation = _conversation;
+    return ChatScreen(
+      // When the pending request finishes, display the newly fetched turns.
+      key: ObjectKey(conversation),
+      service: _chat,
+      conversationName: conversation.personaName ?? widget.conversationName,
+      initialVoiceMode: widget.voice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
       initialReplies: conversation.replyMetadata,
@@ -27,35 +101,55 @@ Future<void> openConversation(
           ? '이전에 처리하지 못한 메시지가 있어요. 새 메시지로 대화를 이어갈 수 있어요.'
           : null,
       blockedReason: conversation.pending
-          ? '아직 처리 중인 메시지가 있어요. 이력으로 돌아가 새로고침해 주세요.'
+          ? '아직 처리 중인 메시지가 있어요. 상태를 다시 확인할 때까지 기다리거나 이력에서 새로고침해 주세요.'
           : null,
-    ),
-  ),
-);
+    );
+  }
+}
 
 /// Shown when a conversation is attempted without a named partner. The home
 /// card says what to do (create the profile, or retry loading it).
 const partnerMissingNotice = '대화 상대를 확인할 수 없어요. 홈에서 대화 상대를 확인해 주세요.';
 
+/// Title for [conversation]: the partner name the service reported, or the
+/// name of [selected] when the conversation belongs to it. Null when neither
+/// is known; the conversation is then not opened.
+String? conversationTitle(Conversation conversation, Persona? selected) =>
+    conversation.personaName ??
+    (selected != null && conversation.personaId == selected.id
+        ? selected.name
+        : null);
+
+/// Starts a conversation with [persona] (the partner picked on the home card)
+/// after the AI notice, then opens it.
 Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
-  required String conversationName,
+  required Persona persona,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
     isDemo: service.isDemo,
   );
   if (acknowledgedAt == null || !context.mounted) return;
-  final conversation = await service.create(acknowledgedAt, voice: voice);
+  final personaService = service is PersonaConversationService
+      ? service as PersonaConversationService
+      : null;
+  final conversation = personaService != null
+      ? await personaService.createForPersona(
+          persona.id,
+          acknowledgedAt,
+          voice: voice,
+        )
+      : await service.create(acknowledgedAt, voice: voice);
   if (!context.mounted) return;
   await openConversation(
     context,
     service,
     conversation,
     voice: voice,
-    conversationName: conversationName,
+    conversationName: persona.name,
   );
 }
 
@@ -64,15 +158,15 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     required this.service,
     this.bottomNavigationBar,
-    this.conversationName,
+    this.selectedPersona,
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
 
-  /// Partner name shown at the top of the conversations opened from here.
+  /// Partner picked on the home card. New conversations are started with it.
   /// Null while there is no partner (or it is not loaded): nothing can be
-  /// opened or started then.
-  final String? conversationName;
+  /// started then.
+  final Persona? selectedPersona;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -126,8 +220,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _start() async {
     if (_starting || _opening != null) return;
-    final name = widget.conversationName;
-    if (name == null) {
+    final persona = widget.selectedPersona;
+    if (persona == null) {
       _notice(partnerMissingNotice);
       return;
     }
@@ -177,7 +271,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         context,
         widget.service,
         voice: voice,
-        conversationName: name,
+        persona: persona,
       );
       if (mounted) await _load();
     } catch (_) {
@@ -189,15 +283,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _open(Conversation item) async {
     if (_opening != null || _starting || _deleting.isNotEmpty) return;
-    final name = widget.conversationName;
-    if (name == null) {
-      _notice(partnerMissingNotice);
-      return;
-    }
     setState(() => _opening = item.id);
     try {
       final latest = await widget.service.get(item.id);
       if (!mounted) return;
+      final name = conversationTitle(latest, widget.selectedPersona);
+      if (name == null) {
+        _notice(partnerMissingNotice);
+        return;
+      }
       await openConversation(
         context,
         widget.service,

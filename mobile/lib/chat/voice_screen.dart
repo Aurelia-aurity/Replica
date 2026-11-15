@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../services/backend_service.dart';
+import '../services/request_timeouts.dart';
 import '../shared/conversation_widgets.dart';
 import 'chat_service.dart';
 import 'reply_audio_player.dart';
@@ -58,16 +59,19 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   ChatReply? _reply;
   SpeechAudio? _audio;
   bool _starting = false,
+      _finishing = false,
       _ttsBusy = false,
       _permission = false,
       _retryable = false;
-  bool _playing = false,
-      _paused = false,
-      _acknowledged = false,
-      _prompt = false,
-      _suspended = false;
+  bool _playing = false, _paused = false, _prompt = false, _suspended = false;
   bool _ttsFailed = false;
-  int _captureGeneration = 0, _playGeneration = 0;
+
+  /// The last speech request got a 409: the server may still be synthesizing.
+  bool _ttsConflict = false;
+  int _captureGeneration = 0, _sendGeneration = 0, _playGeneration = 0;
+  bool _ownsSend(int generation) => mounted && generation == _sendGeneration;
+  bool get _speechLocked =>
+      _audio == null && (_reply?.speechAlreadySynthesized ?? false);
   bool get _busy =>
       _starting || _ttsBusy || _phase == VoicePhase.processing || _prompt;
   bool get _recording => _phase == VoicePhase.recording;
@@ -112,8 +116,13 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       }),
     );
     _subscriptions.add(
-      _player.errors.listen((_) {
-        if (mounted) _playbackFailed();
+      _player.errors.listen((error) {
+        if (!mounted) return;
+        if (error is AudioPlaybackInterrupted) {
+          _playbackInterrupted();
+        } else {
+          _playbackFailed();
+        }
       }),
     );
     if (_player is InteractiveReplyAudioPlayer) {
@@ -135,6 +144,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     _captureGeneration++;
+    _sendGeneration++;
     _playGeneration++;
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
@@ -151,7 +161,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
     _suspended = state != AppLifecycleState.resumed;
     if (_suspended) {
       unawaited(_stopPlayback());
-      if (_recording) unawaited(_cancelRecording());
+      if (_recording || _starting || _finishing) unawaited(_cancelRecording());
     }
   }
 
@@ -170,13 +180,15 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _begin() async {
-    if (_busy ||
+    if (_suspended ||
+        _busy ||
         _recording ||
         widget.blockedReason != null ||
         widget.service is! VoiceChatService) {
       return;
     }
     final generation = ++_captureGeneration;
+    _sendGeneration++;
     setState(() {
       _starting = true;
       _error = null;
@@ -213,11 +225,12 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _captureFailed(Object error) async {
+    final generation = _captureGeneration;
     _timer?.cancel();
     try {
       await _recorder.cancel();
     } catch (_) {}
-    if (!mounted) return;
+    if (!mounted || generation != _captureGeneration) return;
     setState(() {
       _phase = VoicePhase.failed;
       _starting = false;
@@ -228,6 +241,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         CaptureFailure.permission => '음성 질문을 녹음하려면 마이크 권한이 필요해요. 설정에서 허용해 주세요.',
         CaptureFailure.empty => '잘 들리지 않았어요. 다시 말씀해 주세요.',
         CaptureFailure.tooLarge => '녹음이 너무 커요. 25MB 이내로 다시 녹음해 주세요.',
+        CaptureFailure.interrupted => '통화나 다른 오디오로 녹음이 중단됐어요. 다시 녹음해 주세요.',
+        BackendFailure() => error.userMessage,
         _ => '녹음을 시작하거나 읽지 못했어요. 마이크와 브라우저의 보안 연결을 확인해 주세요.',
       };
     });
@@ -235,6 +250,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
 
   Future<void> _cancelRecording() async {
     _captureGeneration++;
+    _sendGeneration++;
+    _finishing = false;
     _timer?.cancel();
     if (mounted) {
       setState(() {
@@ -250,31 +267,43 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
 
   Future<void> _finish() async {
     if (!_recording || _starting) return;
+    final generation = _captureGeneration;
+    _finishing = true;
     _timer?.cancel();
     setState(() => _phase = VoicePhase.processing);
+    late final VoiceRecording recording;
     try {
-      final recording = await _recorder.stop();
-      if (!mounted) return;
+      recording = await _recorder.stop();
+      if (!mounted || generation != _captureGeneration || _suspended) return;
       recording.validate();
-      _pending = recording;
-      await _send(recording);
     } catch (error) {
-      if (mounted) await _captureFailed(error);
+      if (mounted && generation == _captureGeneration) {
+        await _captureFailed(error);
+      }
+      return;
+    } finally {
+      if (generation == _captureGeneration) _finishing = false;
     }
+    // Backgrounding cancels capture, but an uploaded turn keeps the UI locked
+    // until its response or timeout. It must not be treated as recorder work.
+    _pending = recording;
+    await _send(recording);
   }
 
   Future<void> _send(VoiceRecording recording) async {
+    final generation = ++_sendGeneration;
     setState(() {
       _phase = VoicePhase.processing;
       _error = null;
       _failedStage = null;
       _ttsFailed = false;
+      _ttsConflict = false;
     });
     try {
       final result = await (widget.service as VoiceChatService)
           .replyVoice(recording)
-          .timeout(const Duration(seconds: 30));
-      if (!mounted) return;
+          .timeout(voiceRequestTimeout);
+      if (!_ownsSend(generation)) return;
       widget.onReply?.call(result);
       setState(() {
         _question = result.transcript;
@@ -288,7 +317,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         _duration = Duration.zero;
       });
     } on BackendFailure catch (failure) {
-      if (!mounted ||
+      if (!_ownsSend(generation) ||
           failure.kind == BackendFailureKind.unauthenticated ||
           failure.kind == BackendFailureKind.staleSession) {
         return;
@@ -296,19 +325,23 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       setState(() {
         _phase = VoicePhase.failed;
         _failedStage = failure.stage;
-        _retryable =
-            failure.retryable || failure.kind == BackendFailureKind.network;
-        _error = switch (failure.code) {
-          'EMPTY_TRANSCRIPT' || 'STT_FAILED' => '잘 들리지 않았어요. 다시 말씀해 주세요.',
-          'AI_BUSY' => '지금 다른 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'AI_NOT_READY' => 'AI를 준비하고 있어요. 잠시 후 다시 시도해 주세요.',
-          'FILE_TOO_LARGE' => '녹음이 너무 커요. 25MB 이내로 다시 녹음해 주세요.',
-          'CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력에서 새로고침해 주세요.',
-          _ => '응답을 받지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.',
-        };
+        _retryable = failure.canRetry;
+        _error = failure.userMessage;
       });
+    } on TimeoutException {
+      if (_ownsSend(generation)) {
+        setState(() {
+          _phase = VoicePhase.failed;
+          _retryable = true;
+          _error = const BackendFailure(
+            BackendFailureKind.network,
+            code: speechTimeoutCode,
+            retryable: true,
+          ).userMessage;
+        });
+      }
     } catch (_) {
-      if (mounted) {
+      if (_ownsSend(generation)) {
         setState(() {
           _phase = VoicePhase.failed;
           _retryable = true;
@@ -318,18 +351,27 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _playbackFailed() {
+  void _playbackFailed({bool conflict = false}) {
     if (!mounted) return;
     setState(() {
       _ttsFailed = true;
+      _ttsConflict = conflict;
       _failedStage = 'tts';
       _ttsBusy = false;
     });
     unawaited(_stopPlayback());
   }
 
+  void _playbackInterrupted() {
+    setState(() {
+      _error = '통화나 오디오 출력 변경으로 재생을 멈췄어요. 다시 재생해 주세요.';
+    });
+    unawaited(_stopPlayback());
+  }
+
   Future<void> _play() async {
-    if (_busy || _recording || _reply == null) return;
+    if (_suspended || _busy || _recording || _reply == null) return;
+    if (_speechLocked) return;
     if (_playing) {
       if (_player is InteractiveReplyAudioPlayer) {
         try {
@@ -351,7 +393,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
     _prompt = true;
     final generation = ++_playGeneration;
     try {
-      if (_preview || !_acknowledged) {
+      {
         final accepted = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -381,7 +423,6 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
             _suspended) {
           return;
         }
-        _acknowledged = true;
       }
       if (!mounted || generation != _playGeneration || _suspended) return;
       setState(() => _ttsBusy = true);
@@ -391,7 +432,7 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
         }
         final audio = await (widget.service as DetailedChatService)
             .synthesize(_reply!)
-            .timeout(const Duration(seconds: 30));
+            .timeout(speechRequestTimeout);
         if (!mounted || generation != _playGeneration || _suspended) return;
         _audio = audio;
         widget.onAudio?.call(_reply!, audio);
@@ -404,16 +445,24 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
       if (!mounted || generation != _playGeneration || _suspended) return;
       setState(() {
         _playing = true;
+        _error = null;
         _paused = false;
         _ttsFailed = false;
         _failedStage = null;
       });
+    } on AudioPlaybackInterrupted {
+      if (mounted && generation == _playGeneration) _playbackInterrupted();
     } on BackendFailure catch (failure) {
       if (mounted &&
           generation == _playGeneration &&
           failure.kind != BackendFailureKind.unauthenticated &&
           failure.kind != BackendFailureKind.staleSession) {
-        _playbackFailed();
+        // A 409 can also mean synthesis is still in progress. Keep manual retry.
+        _playbackFailed(
+          conflict:
+              failure.code == 'CONFLICT' ||
+              failure.code == speechInProgressCode,
+        );
       }
     } catch (_) {
       if (mounted && generation == _playGeneration) _playbackFailed();
@@ -656,7 +705,11 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                             children: [
                               IconButton(
                                 tooltip: _playing ? '음성 일시정지' : '답변 음성 재생',
-                                onPressed: _reply == null || _busy || _recording
+                                onPressed:
+                                    _reply == null ||
+                                        _busy ||
+                                        _recording ||
+                                        _speechLocked
                                     ? null
                                     : _play,
                                 icon: Icon(
@@ -672,6 +725,8 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                                       ? '합성 음성 재생 중'
                                       : _paused
                                       ? '일시정지'
+                                      : _speechLocked
+                                      ? '음성을 다시 받을 수 없어요'
                                       : '합성 음성 듣기',
                                   style: const TextStyle(color: _muted),
                                 ),
@@ -767,15 +822,25 @@ class _VoiceScreenState extends State<VoiceScreen> with WidgetsBindingObserver {
                                 ],
                               ),
                             ),
-                          if (_ttsFailed)
+                          if (_speechLocked)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 12),
+                              child: Text(
+                                '이 답변의 음성은 다시 받을 수 없어요. 답변 글은 그대로 볼 수 있어요.',
+                                style: TextStyle(color: _muted, height: 1.5),
+                              ),
+                            )
+                          else if (_ttsFailed)
                             Padding(
                               padding: const EdgeInsets.only(top: 12),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    '음성 합성·재생에 실패했어요. 답변 글은 그대로 볼 수 있어요.',
-                                    style: TextStyle(
+                                  Text(
+                                    _ttsConflict
+                                        ? '아직 음성을 만드는 중일 수 있어요. 잠시 후 다시 시도해 주세요. 답변 글은 그대로 볼 수 있어요.'
+                                        : '음성 합성·재생에 실패했어요. 답변 글은 그대로 볼 수 있어요.',
+                                    style: const TextStyle(
                                       color: Color(0xFFFFDAD6),
                                       height: 1.5,
                                     ),

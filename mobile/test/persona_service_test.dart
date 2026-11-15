@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/chat/chat_service.dart';
+import 'package:mobile/history/conversation.dart';
 import 'package:mobile/history/conversation_service.dart';
 import 'package:mobile/profile/persona_controller.dart';
 import 'package:mobile/profile/persona_models.dart';
@@ -188,9 +189,8 @@ void main() {
   });
 
   group('conversation target', () {
-    Future<(HttpConversationService, List<http.Request>)> conversations(
-      String? Function()? selected,
-    ) async {
+    Future<(HttpConversationService, List<http.Request>)>
+    conversations() async {
       final auth = SyntheticAuth();
       addTearDown(auth.dispose);
       await auth.signIn(
@@ -207,13 +207,14 @@ void main() {
             'offset': 0,
           });
         }
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
         return jsonResponse({
           'id': 's1',
-          'persona_id': jsonDecode(request.body)['persona_id'],
+          'persona_id': body['persona_id'],
           'title': null,
           'created_at': '2026-11-01T00:00:00Z',
           'updated_at': '2026-11-01T00:00:00Z',
-          'ai_notice_ack_at': '2026-11-01T00:00:00Z',
+          'ai_notice_ack_at': body['ai_notice_ack_at'],
         }, 201);
       });
       addTearDown(client.close);
@@ -222,27 +223,42 @@ void main() {
           backend: BackendService(auth),
           baseUrl: Uri.parse('http://localhost:8000'),
           client: client,
-          selectedPersonaId: selected,
         ),
         requests,
       );
     }
 
     test(
-      'a new conversation uses the partner shown on the home card',
+      'a new conversation uses the partner picked on the home card',
       () async {
-        final (service, requests) = await conversations(() => 'shown');
-        final conversation = await service.create(DateTime.now());
-        expect(conversation.personaId, 'shown');
-        expect(requests.map((r) => r.url.path), ['/sessions']);
+        final (service, requests) = await conversations();
+        final conversation = await service.createForPersona(
+          'newest',
+          DateTime.now(),
+        );
+        expect(conversation.personaId, 'newest');
+        expect(conversation.personaName, '새 상대');
+        expect(requests.map((r) => r.url.path), ['/personas', '/sessions']);
+        await expectLater(
+          service.createForPersona('gone', DateTime.now()),
+          throwsA(
+            isA<BackendFailure>().having((f) => f.code, 'code', 'NOT_FOUND'),
+          ),
+        );
       },
     );
 
     test('without a selection the first active partner is used', () async {
-      final (service, requests) = await conversations(() => null);
+      final (service, requests) = await conversations();
       final conversation = await service.create(DateTime.now());
       expect(conversation.personaId, 'newest');
-      expect(requests.map((r) => r.url.path), ['/personas', '/sessions']);
+      // create() picks the first partner, then createForPersona() checks that
+      // it is still active, so the list is read twice.
+      expect(requests.map((r) => r.url.path), [
+        '/personas',
+        '/personas',
+        '/sessions',
+      ]);
     });
   });
 
@@ -277,10 +293,13 @@ void main() {
       final conversations = MemoryConversationService(
         backend: BackendService(auth),
         chat: const DemoChatService(),
-        selectedPersonaId: () => 'named',
+        personaSource: () async => const [
+          ConversationPersona(id: 'named', name: '정한 이름'),
+        ],
       );
       final created = await conversations.create(DateTime.now());
       expect(created.personaId, 'named');
+      expect(created.personaName, '정한 이름');
     });
   });
 

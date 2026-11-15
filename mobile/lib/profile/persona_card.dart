@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../shared/conversation_widgets.dart';
 import 'persona_controller.dart';
 
-/// SC-02 대화 상대 카드. Shows the partner name and the conversation buttons.
-/// Without a partner it offers [onCreate] (SC-13) instead of the buttons.
+/// SC-02 대화 상대 카드. Shows the partner name and the conversation buttons;
+/// with several partners the name is a selector. Without a partner it offers
+/// [onCreate] (SC-13) instead of the buttons.
 class PersonaCard extends StatelessWidget {
   const PersonaCard({
     super.key,
@@ -21,6 +22,11 @@ class PersonaCard extends StatelessWidget {
   static const _label = Text(
     '대화 상대',
     style: TextStyle(color: Color(0xFFCAE0D6), fontSize: 12),
+  );
+  static const _name = TextStyle(
+    color: Colors.white,
+    fontSize: 30,
+    fontWeight: FontWeight.w700,
   );
   static const _muted = TextStyle(
     color: Color(0xFFDAEAE2),
@@ -92,16 +98,40 @@ class PersonaCard extends StatelessWidget {
               label: const Text('프로필 만들기'),
             ),
           ] else ...[
-            Text(
-              persona.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w700,
+            if (controller.personas.length > 1)
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const ValueKey('persona-selector'),
+                  value: persona.id,
+                  isExpanded: true,
+                  dropdownColor: replicaGreen,
+                  iconEnabledColor: Colors.white,
+                  style: _name,
+                  items: [
+                    for (final item in controller.personas)
+                      DropdownMenuItem(
+                        value: item.id,
+                        child: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (id) {
+                          if (id != null) controller.select(id);
+                        },
+                ),
+              )
+            else
+              Text(
+                persona.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: _name,
               ),
-            ),
             const SizedBox(height: 22),
             _buttons(enabled: !busy),
           ],

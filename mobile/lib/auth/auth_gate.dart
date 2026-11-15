@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../chat/chat_service.dart';
 import '../config/app_config.dart';
+import '../history/conversation.dart';
 import '../history/conversation_service.dart';
 import '../home/home_screen.dart';
 import '../profile/persona_controller.dart';
@@ -76,14 +77,17 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return _history = MemoryConversationService(
         backend: backend,
         chat: widget.chat,
-        selectedPersonaId: () => personas.current?.id,
+        // Dummy conversations belong to the partners named in SC-13.
+        personaSource: () async => [
+          for (final persona in await personas.service.list())
+            ConversationPersona(id: persona.id, name: persona.name),
+        ],
       );
     }
     return _history = HttpConversationService(
       backend: backend,
       baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
       client: _client,
-      selectedPersonaId: () => personas.current?.id,
     );
   }
 

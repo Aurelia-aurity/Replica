@@ -85,8 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _start({required bool voice}) async {
     if (_starting) return;
-    final name = widget.personas.current?.name;
-    if (name == null) {
+    final persona = widget.personas.current;
+    if (persona == null) {
       _notice(partnerMissingNotice);
       return;
     }
@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
         context,
         widget.history,
         voice: voice,
-        conversationName: name,
+        persona: persona,
       );
     } catch (_) {
       if (mounted) _notice('새 대화를 열지 못했어요. 대화 상대와 연결 상태를 확인해 주세요.');
@@ -112,14 +112,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openRecent(Conversation item) async {
     if (_starting) return;
-    final name = widget.personas.current?.name;
-    if (name == null) {
-      _notice(partnerMissingNotice);
-      return;
-    }
     setState(() => _starting = true);
     try {
       final latest = await widget.history.get(item.id);
+      final name = conversationTitle(latest, widget.personas.current);
+      if (name == null) {
+        if (mounted) _notice(partnerMissingNotice);
+        return;
+      }
       if (mounted) {
         await openConversation(
           context,
@@ -180,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_tab == 2) {
       return HistoryScreen(
         service: widget.history,
-        conversationName: widget.personas.current?.name,
+        selectedPersona: widget.personas.current,
         bottomNavigationBar: _navigation(),
       );
     }

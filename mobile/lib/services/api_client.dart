@@ -9,8 +9,11 @@ import 'backend_service.dart';
 ///
 /// Every request obtains fresh authorization headers, runs inside
 /// [BackendService] so a 401 or an account change is handled in one place,
-/// times out after 30 seconds, and never retries on its own. Raw error bodies
-/// are reduced to [BackendFailure]; messages from the server are not exposed.
+/// times out after [timeout] (30 seconds unless the caller says otherwise), and
+/// never retries on its own. Raw error bodies are reduced to [BackendFailure];
+/// messages from the server are not exposed. A timeout or a dropped connection
+/// becomes a retryable network failure carrying [timeoutCode] or
+/// [unavailableCode], so callers can tell an unanswered request from a refusal.
 class ApiClient {
   ApiClient({
     required this.backend,
@@ -31,21 +34,51 @@ class ApiClient {
     String path, {
     Map<String, String>? query,
     Map<String, Object?>? body,
+    Duration timeout = defaultTimeout,
+    String? timeoutCode,
+    String? unavailableCode,
   }) {
     final request = http.Request(method, uri(path, query))
       ..headers['Content-Type'] = 'application/json';
     if (body != null) request.body = jsonEncode(body);
-    return perform(request);
+    return perform(
+      request,
+      timeout: timeout,
+      timeoutCode: timeoutCode,
+      unavailableCode: unavailableCode,
+    );
   }
 
-  Future<Object?> perform(http.BaseRequest request) => backend.run(() async {
+  static const defaultTimeout = Duration(seconds: 30);
+
+  Future<Object?> perform(
+    http.BaseRequest request, {
+    Duration timeout = defaultTimeout,
+    String? timeoutCode,
+    String? unavailableCode,
+  }) => backend.run(() async {
     final headers = await backend.auth.authorizationHeaders();
     // Check generation again after asynchronous token acquisition.
     return backend.run(() async {
       request.headers.addAll(headers);
-      final response = await (() async => http.Response.fromStream(
-        await client.send(request),
-      ))().timeout(const Duration(seconds: 30));
+      late http.Response response;
+      try {
+        response = await (() async => http.Response.fromStream(
+          await client.send(request),
+        ))().timeout(timeout);
+      } on TimeoutException {
+        throw BackendFailure(
+          BackendFailureKind.network,
+          code: timeoutCode,
+          retryable: true,
+        );
+      } on http.ClientException {
+        throw BackendFailure(
+          BackendFailureKind.network,
+          code: unavailableCode,
+          retryable: true,
+        );
+      }
       Object? json;
       if (response.bodyBytes.isNotEmpty) {
         try {
