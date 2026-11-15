@@ -3,20 +3,22 @@ import 'package:flutter/material.dart';
 import '../shared/conversation_widgets.dart';
 import 'persona_controller.dart';
 
-/// SC-02 대화 상대 카드. Shows the partner name and the conversation buttons;
-/// with several partners the name is a selector. Without a partner it offers
-/// [onCreate] (SC-13) instead of the buttons.
+/// SC-02 대화 상대 카드. Shows the partner name, a way into SC-07
+/// ([onOpenProfile]) and the conversation buttons; with several partners the
+/// name is a selector. Without a partner it offers [onCreate] (SC-13) instead.
+
 class PersonaCard extends StatelessWidget {
   const PersonaCard({
     super.key,
     required this.controller,
     required this.onCreate,
+    required this.onOpenProfile,
     required this.onStartText,
     required this.onStartVoice,
     this.busy = false,
   });
   final PersonaController controller;
-  final VoidCallback onCreate, onStartText, onStartVoice;
+  final VoidCallback onCreate, onOpenProfile, onStartText, onStartVoice;
   final bool busy;
 
   static const _label = Text(
@@ -132,7 +134,19 @@ class PersonaCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: _name,
               ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: busy ? null : onOpenProfile,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+              iconAlignment: IconAlignment.end,
+              icon: const Icon(Icons.chevron_right, size: 18),
+              label: const Text('말투 프로필'),
+            ),
+            const SizedBox(height: 14),
             _buttons(enabled: !busy),
           ],
         ],

@@ -8,6 +8,7 @@ import 'package:mobile/main.dart';
 import 'package:mobile/profile/persona_models.dart';
 import 'package:mobile/profile/persona_name_screen.dart';
 import 'package:mobile/profile/persona_service.dart';
+import 'package:mobile/profile/speech_profile_screen.dart';
 
 import 'history_test.dart' as fixtures;
 import 'persona_test_support.dart';
@@ -103,19 +104,21 @@ void main() {
       expect(titleIn(ChatScreen, '할머니'), findsOneWidget);
     });
 
-    testWidgets('an existing partner has no way into a profile screen', (
+    testWidgets('an existing partner leads to SC-07, not to SC-13', (
       tester,
     ) async {
-      await pumpApp(
-        tester,
-        factory: () => FakePersonaService(personas: const [mother]),
-      );
+      final service = FakePersonaService(personas: const [mother]);
+      await pumpApp(tester, factory: () => service);
       expect(find.text('엄마'), findsOneWidget);
       expect(find.text('텍스트로 대화'), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsNothing);
-      await tester.tap(find.text('엄마'));
+      await tester.tap(find.text('말투 프로필'));
       await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
       expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.text('엄마의 말투'), findsOneWidget);
+      expect(service.profileCalls, 1);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('텍스트로 대화'), findsOneWidget);
     });
 
@@ -137,7 +140,12 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, '저장'));
       await tester.pumpAndSettle();
 
+      // Saving moves on to SC-07 for the new partner (issue #94).
       expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      expect(find.text('할머니의 말투'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('할머니'), findsOneWidget);
       expect(find.text('프로필을 만들어 주세요'), findsNothing);
       expect(find.text('텍스트로 대화'), findsOneWidget);

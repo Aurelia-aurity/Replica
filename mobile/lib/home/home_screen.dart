@@ -210,7 +210,14 @@ class _HomeScreenState extends State<HomeScreen> {
               PersonaCard(
                 controller: widget.personas,
                 busy: _starting,
-                onCreate: () => openPersonaCreate(context, widget.personas),
+                onCreate: () =>
+                    createPersonaThenProfile(context, widget.personas),
+                onOpenProfile: () {
+                  final persona = widget.personas.current;
+                  if (persona != null) {
+                    openSpeechProfile(context, widget.personas, persona);
+                  }
+                },
                 onStartText: () => _start(voice: false),
                 onStartVoice: () => _start(voice: true),
               ),

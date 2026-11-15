@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/profile/persona_models.dart';
 import 'package:mobile/profile/persona_service.dart';
+import 'package:mobile/profile/style_profile_models.dart';
+import 'package:mobile/profile/speech_profile_screen.dart';
 
 /// Preview account whose token header is a synthetic value.
 class SyntheticAuth extends PreviewAuthService {
@@ -41,8 +43,14 @@ class FakePersonaService implements PersonaService {
   FakePersonaService({List<Persona>? personas}) : personas = [...?personas];
 
   final List<Persona> personas;
-  Object? listError, createError, updateError;
-  Completer<void>? createGate, updateGate;
+  Object? listError, createError, updateError, profileError, analysisError;
+
+  /// Answer of the profile lookup; [analysisResult] of an analysis request.
+  StyleProfileState profileState = const StyleProfileState();
+  ProfileAnalysis? analysisResult;
+  final analysisRequests = <({String persona, String operation})>[];
+  int profileCalls = 0;
+  Completer<void>? createGate, updateGate, analysisGate;
 
   final created = <({String name, String id})>[];
   final updates = <({String id, PersonaUpdate update})>[];
@@ -73,7 +81,45 @@ class FakePersonaService implements PersonaService {
     final index = personas.indexWhere((p) => p.id == personaId);
     return personas[index] = personas[index].applying(update);
   }
+
+  @override
+  Future<StyleProfileState> styleProfile(String personaId) async {
+    profileCalls++;
+    if (profileError != null) throw profileError!;
+    return profileState;
+  }
+
+  @override
+  Future<ProfileAnalysis> requestAnalysis(
+    String personaId, {
+    required String operationId,
+  }) async {
+    analysisRequests.add((persona: personaId, operation: operationId));
+    await analysisGate?.future;
+    if (analysisError != null) throw analysisError!;
+    return analysisResult ?? analysisOf(AnalysisStatus.running, operationId);
+  }
 }
+
+ProfileAnalysis analysisOf(
+  AnalysisStatus status, [
+  String operationId = 'op-1',
+  String? errorCode,
+]) => ProfileAnalysis(
+  operationId: operationId,
+  status: status,
+  startedAt: DateTime.utc(2026, 11, 10),
+  updatedAt: DateTime.utc(2026, 11, 10),
+  errorCode: errorCode,
+);
+
+StyleProfile sampleProfile() => StyleProfile(
+  version: 2,
+  updatedAt: DateTime.utc(DateTime.now().year, 10, 6, 3),
+  expressions: const ['밥은 먹었니', '조심히 다녀'],
+  addressTerms: const ['우리 딸', '민지야'],
+  endings: const ['~했니?', '~하렴'],
+);
 
 /// Names the first partner from the home card, as every new account has to do
 /// before it can start a conversation.
@@ -87,4 +133,9 @@ Future<void> nameFirstPartner(
   await tester.pump();
   await tester.tap(find.widgetWithText(FilledButton, '저장'));
   await tester.pumpAndSettle();
+  // Saving a new partner moves on to SC-07; come back to the home card.
+  if (find.byType(SpeechProfileScreen).evaluate().isNotEmpty) {
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+  }
 }

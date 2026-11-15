@@ -2,6 +2,7 @@ import '../history/conversation.dart';
 import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import 'persona_models.dart';
+import 'style_profile_models.dart';
 
 /// Conversation partners (SC-02, SC-13): the name given at creation, and the
 /// display name and the form of address the user edits later.
@@ -17,6 +18,20 @@ abstract class PersonaService {
   /// (`PATCH /personas/{id}`, PR #117 proposal). Repeating the same update is
   /// harmless, so a retry after a lost answer needs no lookup.
   Future<Persona> update(String personaId, PersonaUpdate update);
+
+  /// Current speech profile and the latest analysis job
+  /// (`GET /personas/{id}/style-profile`, PR #117 proposal).
+  Future<StyleProfileState> styleProfile(String personaId);
+
+  /// Starts the analysis again after a failure, an unknown result or a stale
+  /// profile (`POST /personas/{id}/style-profile/analysis`, PR #117
+  /// proposal). The server starts the first analysis by itself when records
+  /// are confirmed. [operationId] is kept across retries of one request so a
+  /// lost answer never starts a second job.
+  Future<ProfileAnalysis> requestAnalysis(
+    String personaId, {
+    required String operationId,
+  });
 }
 
 /// Data for the dummy account. Lives only for one login and is never sent
@@ -61,6 +76,33 @@ class MemoryPersonaService implements PersonaService {
         }
         return _personas[index] = _personas[index].applying(update);
       });
+
+  /// The dummy account has no records, so it never has a profile and an
+  /// analysis is refused the way the server refuses it without confirmed
+  /// records. No preview profile is made up.
+  @override
+  Future<StyleProfileState> styleProfile(String personaId) => _run(() async {
+    _require(personaId);
+    return const StyleProfileState();
+  });
+
+  @override
+  Future<ProfileAnalysis> requestAnalysis(
+    String personaId, {
+    required String operationId,
+  }) => _run(() async {
+    _require(personaId);
+    throw const BackendFailure(
+      BackendFailureKind.generic,
+      code: 'INVALID_INPUT',
+    );
+  });
+
+  void _require(String personaId) {
+    if (!_personas.any((p) => p.id == personaId)) {
+      throw const BackendFailure(BackendFailureKind.generic, code: 'NOT_FOUND');
+    }
+  }
 }
 
 /// Adapter for the app-backend contract (`GET /personas`, `POST /personas`,
@@ -122,6 +164,34 @@ class HttpPersonaService implements PersonaService {
     final persona = Persona.fromJson(json as Map<String, dynamic>);
     if (persona.id != personaId) throw const FormatException('Wrong persona');
     return persona;
+  }
+
+  @override
+  Future<StyleProfileState> styleProfile(String personaId) async {
+    final json = await _api.request(
+      'GET',
+      '/personas/${Uri.encodeComponent(personaId)}/style-profile',
+    );
+    if (json is! Map<String, dynamic>) {
+      throw const FormatException('Invalid style profile answer');
+    }
+    return StyleProfileState.fromJson(json);
+  }
+
+  @override
+  Future<ProfileAnalysis> requestAnalysis(
+    String personaId, {
+    required String operationId,
+  }) async {
+    final json = await _api.request(
+      'POST',
+      '/personas/${Uri.encodeComponent(personaId)}/style-profile/analysis',
+      body: {'operation_id': operationId},
+    );
+    if (json is! Map<String, dynamic>) {
+      throw const FormatException('Invalid analysis answer');
+    }
+    return ProfileAnalysis.fromJson(json);
   }
 
   bool _isDefiniteRejection(Object error) =>
