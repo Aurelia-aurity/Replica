@@ -205,7 +205,7 @@ class PersonaInferenceTests(unittest.TestCase):
             # Then:
             self.assertEqual(persona_status, 503 if model_name is None else 200)
             self.assertEqual(baseline_status, 200)
-            self.assertEqual(engine.calls, 1 if model_name is None else 2)
+            self.assertEqual(engine.calls, 4 if model_name is None else 5)
             if model_name is not None:
                 self.assertIs(service.persona_generator.engine, engine)
 
@@ -213,6 +213,7 @@ class PersonaInferenceTests(unittest.TestCase):
         for mode in ("baseline", "persona"):
             # Given: the actual loader thread and a fake loaded engine.
             engine = Engine()
+            engine.answer = '{"message":"a","evidence_used":[]}'
             observed = []
 
             class InspectServer(server.Server):

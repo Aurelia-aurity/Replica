@@ -1,164 +1,24 @@
 """Loopback inference API with explicitly enabled persona and profile nodes."""
 import json
 import logging
-import math
-from http_contract import InferenceHTTPServer
-import threading
 import time
-from typing import Final, assert_never
+from typing import Final
 
 import baseline
-from inference import ContextLimitExceeded, Inference, Prepared, Request
+from inference import ContextLimitExceeded, Inference, Request
+from inference_service import Service, allow_service
+from http_contract import FrameError, InferenceHTTPServer, InferenceHandler, read_body
+from baseline_contract import RAW_LIMIT, error_body, valid_id, parse_request, reject_json_constant
 import persona_contract
-from persona_adapter import PersonaGenerator, PersonaInference, log_failure
-from http_contract import FrameError, InferenceHandler, error_body, valid_id, parse_request, read_body, reject_json_constant
+from persona_adapter import log_failure
 import profile_contract
-from profile_adapter import ProfileConfig, ProfileInference
-from profile_types import AnalyzeRequest, MergeRequest, ProfileRequest, Task
+from profile_adapter import ProfileConfig
+from profile_types import Task
+from request_timing import RequestTiming, bind_timing
 
 LOGGER = logging.getLogger("baseline.http")
 PROFILE_ROUTES: Final[dict[str, Task]] = {
     "/v1/persona-profiles/analyze": "analyze", "/v1/persona-profiles/merge": "merge"}
-
-
-def allow_service(headers) -> int | None:
-    """Undecided authentication hook: return None, 401, or 403. No body parsing."""
-    return None
-
-
-class Job:
-    """Mutable result shared only through the completion event."""
-    def __init__(self):
-        self.done = threading.Event()
-        self.status = 500
-        self.body = None
-
-
-class Service:
-    """One mutable slot, reserved and released under the same lock."""
-    def __init__(self, engine: Inference | None = None, deadline_seconds: float | None = None, auth=allow_service,
-                 persona_generator: PersonaGenerator | None = None,
-                 *, profile_config: ProfileConfig | None = None):
-        if deadline_seconds is not None and (
-                not math.isfinite(deadline_seconds) or deadline_seconds <= 0):
-            raise ValueError
-        self.engine = engine
-        self.ready = threading.Event()
-        self.profile_config = profile_config
-        self.profiles: ProfileInference | None = None
-        self.lock = threading.Lock()
-        self.active_id = None
-        self.deadline_seconds = deadline_seconds
-        self.auth = auth
-        self.loader = None
-        self.persona_generator = persona_generator
-        if engine is not None:
-            self.initialize(engine)
-
-    def initialize(self, engine: Inference, *, persona_model_name: str | None = None) -> None:
-        """Publish readiness only after the optional adapter is initialized."""
-        self.profiles = (ProfileInference(engine, self.profile_config)
-                         if self.profile_config is not None else None)
-        if persona_model_name is not None:
-            self.persona_generator = PersonaInference(engine, persona_model_name)
-        self.engine = engine
-        self.ready.set()
-
-    def prepare(self, request: Request | ProfileRequest | persona_contract.PersonaRequest) -> Prepared:
-        match request:
-            case Request():
-                assert self.engine is not None
-                return self.engine.prepare(request)
-            case AnalyzeRequest() | MergeRequest():
-                assert self.profiles is not None
-                return self.profiles.prepare(request)
-            case persona_contract.PersonaRequest():
-                assert self.persona_generator is not None
-                return self.persona_generator.prepare(request)
-            case unreachable:
-                assert_never(unreachable)
-
-    def engine_for(self, request):
-        if isinstance(request, persona_contract.PersonaRequest):
-            return self.persona_generator
-        if isinstance(request, (AnalyzeRequest, MergeRequest)):
-            return self.profiles
-        return self.engine
-
-    def start_loading(self, factory, *, persona_model_name: str | None = None) -> None:
-        """Publish readiness only after one successful background load."""
-        if self.loader is not None:
-            raise RuntimeError
-
-        def load():
-            try:
-                self.initialize(factory(), persona_model_name=persona_model_name)
-            except Exception:
-                # Runtime boundary: never expose model paths or raw exceptions.
-                LOGGER.info("request_id=null status=503 duration_ms=0")
-
-        self.loader = threading.Thread(target=load, daemon=True)
-        self.loader.start()
-
-    def accept(self, request: Request | ProfileRequest | persona_contract.PersonaRequest, prepared):
-        with self.lock:
-            if self.active_id == request.request_id:
-                return 409, None
-            if self.active_id is not None:
-                return 429, None
-            self.active_id = request.request_id
-            job = Job()
-            worker = threading.Thread(target=self._generate, args=(request, prepared, job), daemon=False)
-            try:
-                worker.start()
-            except RuntimeError:
-                self.active_id = None
-                return 500, None
-            return 200, job
-
-    def _generate(self, request: Request | ProfileRequest | persona_contract.PersonaRequest, prepared, job: Job) -> None:
-        start = time.monotonic()
-        output_tokens = 0
-        try:
-            match request:
-                case Request():
-                    assert self.engine is not None
-                    result = self.engine.generate(request, prepared)
-                    output_tokens = result.output_tokens
-                    if not result.message.strip():
-                        raise ValueError
-                    job.body = {
-                        "request_id": request.request_id, "message": result.message,
-                        "finish_reason": result.finish_reason, "ai_generated": True,
-                        "context": {"used_history_turns": prepared.used_history_turns,
-                                    "dropped_history_turns": prepared.dropped_history_turns}}
-                case AnalyzeRequest() | MergeRequest():
-                    assert self.profiles is not None
-                    generated = self.profiles.generate(request, prepared)
-                    output_tokens = generated.output_tokens
-                    job.body = profile_contract.success_body(request, generated)
-                case persona_contract.PersonaRequest():
-                    assert self.persona_generator is not None
-                    result = self.persona_generator.generate(request, prepared)
-                    output_tokens = result.output_tokens
-                    if not result.message.strip():
-                        raise ValueError
-                    job.body = persona_contract.success_body(request, prepared, result)
-                case unreachable:
-                    assert_never(unreachable)
-            job.status = 200
-        except Exception as error:
-            # Compute boundary: all failures map to the safe fixed envelope.
-            if isinstance(request, persona_contract.PersonaRequest):
-                log_failure(request.request_id, error)
-            job.status, job.body = 500, error_body(500, request.request_id)
-        finally:
-            with self.lock:
-                self.active_id = None
-            LOGGER.info("request_id=%s status=%d duration_ms=%.3f input_tokens=%d output_tokens=%d",
-                        request.request_id, job.status, (time.monotonic() - start) * 1000,
-                        len(prepared.token_ids), output_tokens)
-            job.done.set()
 
 
 class Server(InferenceHTTPServer):
@@ -166,9 +26,12 @@ class Server(InferenceHTTPServer):
         self.service = service
         super().__init__(("127.0.0.1", port), Handler)
 
+
 class Handler(InferenceHandler):
     def do_POST(self):
         self.started = time.monotonic()
+        self.timing = RequestTiming()
+        self.timing.emit("receipt", 0)
         service = self.server.service
         profile_task = PROFILE_ROUTES.get(self.path)
         if self.path not in ("/v1/baseline/generate", "/v1/persona/generate") and (
@@ -181,16 +44,20 @@ class Handler(InferenceHandler):
             self.respond(error.status, error_body(error.status))
             return
         request_id = None
+        parse_start = self.timing.now()
         try:
-            data = (profile_contract.decode_json(raw.decode("utf-8")) if profile_task is not None
-                    else json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant))
-            if isinstance(data, dict) and valid_id(data.get("request_id")):
-                request_id = data["request_id"]
-            if self.headers.get_content_type() != "application/json":
-                raise ValueError
-            request = (profile_contract.parse_request(data, profile_task) if profile_task is not None
-                       else persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
-                       else parse_request(data))
+            try:
+                data = (profile_contract.decode_json(raw.decode("utf-8")) if profile_task is not None
+                        else json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant))
+                if isinstance(data, dict) and valid_id(data.get("request_id")):
+                    request_id = self.timing.request_id = data["request_id"]
+                if self.headers.get_content_type() != "application/json":
+                    raise ValueError
+                request = (profile_contract.parse_request(data, profile_task) if profile_task is not None
+                           else persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
+                           else parse_request(data))
+            finally:
+                self.timing.emit("parse", parse_start)
         except persona_contract.PayloadTooLarge:
             self.respond(413, error_body(413, request_id))
             return
@@ -210,7 +77,8 @@ class Handler(InferenceHandler):
             self.respond(503, error_body(503, request_id))
             return
         try:
-            prepared = service.prepare(request)
+            with bind_timing(self.timing), self.timing.span("prepare_tokenize"):
+                prepared = service.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
@@ -219,6 +87,7 @@ class Handler(InferenceHandler):
                 log_failure(request.request_id, error)
             self.respond(500, error_body(500, request_id))
             return
+        service.request_timing.current = self.timing
         status, job = service.accept(request, prepared)
         if job is None:
             self.respond(status, error_body(status, request_id))

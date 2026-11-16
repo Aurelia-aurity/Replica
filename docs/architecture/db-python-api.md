@@ -84,7 +84,7 @@ user_db = await db.for_user(access_token)
 | create_chat_turn | session_id: UUID, turn_id: UUID, *, input_mode: text/voice, question: str 또는 None=None, audio_sha256: str 또는 None=None | Row, 동일 ID/입력 재사용 |
 | start_chat_stage | turn_id: UUID, stage: stt/llm/tts, *, model_name: str 또는 None=None, with_audio: bool=False | Row, 해당 *_attempt 반환 |
 | finish_chat_stage | turn_id: UUID, stage: stt/llm/tts, *, attempt: int, ok: bool, text: str 또는 None=None, elapsed_ms: int 또는 None=None, error_code: str 또는 None=None | Row, 해당 시도의 pending 결과만 저장 |
-| expire_chat_stages | *, started_before: datetime | int, 만료 처리한 단계 수 |
+| expire_chat_stages | *, started_before: datetime, tts_started_before: datetime \| None = None | int, 만료 처리한 단계 수 (TTS만 `tts_started_before` 기준, 없으면 `started_before`). RPC는 `expire_chat_stages_v2`를 부르며 기존 2인자 RPC는 구버전용으로 유지 |
 | confirm_record_text | text_version_id: UUID | Row |
 | publish_style_profile | persona_id: UUID, *, source_revision: int, content: dict, model_name: str, source_ids: Sequence[UUID] | Row, 생성 당시 자료 개정 번호와 확정 출처 검증 |
 | search_record_chunks | persona_id: UUID, *, embedding_model: str, query_embedding: Sequence[float], limit: int=10, min_similarity: float=0.5 | list[Row], chunk_id/record_id/text_version_id/content/similarity |

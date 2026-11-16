@@ -397,3 +397,32 @@ def test_failing_total_ms_record_does_not_break_the_response(client, fake_db, mo
 
     monkeypatch.setattr(fake_db, "record_turn_total_ms", stale)
     assert send(client, fake_db.add_session()).status_code == 200
+
+
+# --- 이력 조회 장애: 실행권을 잡기 전에 실패해야 바로 다시 보낼 수 있다 (#64 F2) ---
+
+
+def test_history_outage_claims_nothing_so_the_next_send_works_immediately(client, fake_db, monkeypatch):
+    llm = use_llm(FakeLLM())
+    session_id, turn_id = fake_db.add_session(), new_id()
+    working = fake_db.get_recent_history
+
+    async def down(*args, **kwargs):
+        raise db.DatabaseUnavailableError()
+
+    monkeypatch.setattr(fake_db, "get_recent_history", down)
+    res = send(client, session_id, turn_id)
+
+    assert res.status_code == 503
+    error = res.json()["error"]
+    assert (error["code"], error["retryable"], error["turn_id"]) == ("DB_UNAVAILABLE", True, turn_id)
+    assert llm.calls == []  # 장애 중에는 AI를 한 번도 부르지 않는다
+    assert ("start", "llm") not in fake_db.calls
+    assert (fake_db.turns[turn_id]["answer_status"], fake_db.turns[turn_id]["llm_attempt"]) == (None, 0)
+
+    monkeypatch.setattr(fake_db, "get_recent_history", working)
+    retry = send(client, session_id, turn_id)  # 같은 turn_id, 만료를 기다리지 않는다
+
+    assert retry.status_code == 200
+    assert len(llm.calls) == 1  # 복구 뒤 수동 재시도에서만 AI를 한 번 부른다
+    assert fake_db.turns[turn_id]["llm_attempt"] == 1
