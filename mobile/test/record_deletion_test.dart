@@ -18,6 +18,12 @@ import 'package:mobile/records/deletion_sheet.dart';
 import 'records_test.dart' show ApiTestAuth, Transfer;
 import 'record_review_test.dart' show ReviewFixture;
 
+/// Signed-in account that is not a preview login, without any network access.
+class _RealAccountAuth extends PreviewAuthService {
+  @override
+  bool get isPreview => false;
+}
+
 class DeletionFixture extends ReviewFixture {
   int requests = 0, checks = 0, retries = 0;
   bool fail = true, supported = true;
@@ -256,6 +262,29 @@ void main() {
       expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
     },
   );
+  testWidgets('preview records never end a real account session as deleted', (
+    tester,
+  ) async {
+    final auth = _RealAccountAuth();
+    addTearDown(auth.dispose);
+    await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+    final service = DeletionFixture()..fail = false;
+    await tester.pumpWidget(
+      ReplicaApp(authService: auth, recordServiceFactory: () => service),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('계정'));
+    await tester.pumpAndSettle();
+    final button = find.widgetWithText(TextButton, '계정 삭제');
+    expect(button, findsOneWidget);
+    expect(tester.widget<TextButton>(button).onPressed, isNull);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.text('계정과 모든 자료를 삭제할까요?'), findsNothing);
+    expect(service.requests, 0);
+    expect(auth.identity, isNotNull);
+    expect(auth.notice, isNot(contains('계정 삭제를 완료했어요')));
+  });
   testWidgets(
     'unsupported account deletion sheet fits small screen and cannot submit',
     (tester) async {

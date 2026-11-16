@@ -107,6 +107,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           .catchError((Object _) {}),
     );
   };
+
+  /// A preview record service only deletes its synthetic data, so it must
+  /// never end a real account's session or report that account as deleted.
+  /// Account deletion stays unavailable until a real record service is used.
+  VoidCallback? _accountDeletedFor(RecordService records, int generation) =>
+      records.isPreview && !widget.auth.isPreview
+      ? null
+      : _endDeletedAccountSession(generation);
+
   @override
   Widget build(BuildContext context) {
     if (widget.auth.identity == null) return AuthScreen(service: widget.auth);
@@ -117,24 +126,28 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         child: Navigator(
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
-            builder: (_) => HomeScreen(
-              onAccountDeleted: _endDeletedAccountSession(
-                widget.auth.generation,
-              ),
-              recordService: SessionRecordService(
+            builder: (_) {
+              final records = SessionRecordService(
                 backend: BackendService(widget.auth),
                 delegate:
                     widget.recordServiceFactory?.call() ??
                     PreviewRecordService(),
-              ),
-              history: _conversationService(),
-              accountEmail: widget.auth.identity!.email,
-              onSignOut: () =>
-                  unawaited(widget.auth.signOut().catchError((Object _) {})),
-              onExpireSession: widget.auth is PreviewAuthService
-                  ? (widget.auth as PreviewAuthService).expireSession
-                  : null,
-            ),
+              );
+              return HomeScreen(
+                onAccountDeleted: _accountDeletedFor(
+                  records,
+                  widget.auth.generation,
+                ),
+                recordService: records,
+                history: _conversationService(),
+                accountEmail: widget.auth.identity!.email,
+                onSignOut: () =>
+                    unawaited(widget.auth.signOut().catchError((Object _) {})),
+                onExpireSession: widget.auth is PreviewAuthService
+                    ? (widget.auth as PreviewAuthService).expireSession
+                    : null,
+              );
+            },
           ),
         ),
       ),
