@@ -53,6 +53,30 @@ class ArtifactTests(unittest.TestCase):
             LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
+    def test_mixed_case_bin_shard_indexes_never_enter_dependency(self):
+        (self.path / "payload.bin").touch()
+        for name in ("MODEL.SAFETENSORS.INDEX.JSON", "Model.Safetensors.Index.X.Json"):
+            with self.subTest(index=name):
+                index = self.path / name
+                index.write_text(json.dumps({
+                    "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+                try:
+                    with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+                        LocalEncoder(self.path)
+                finally:
+                    index.unlink()
+        self.runtime.SentenceTransformer.assert_not_called()
+
+    def test_config_weight_selector_never_enters_dependency(self):
+        (self.path / "config.json").write_text(json.dumps({
+            "transformers_weights": "other.safetensors.index.json"}))
+        (self.path / "other.safetensors.index.json").write_text(json.dumps({
+            "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+        (self.path / "payload.bin").touch()
+        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+            LocalEncoder(self.path)
+        self.runtime.SentenceTransformer.assert_not_called()
+
     def test_existing_shard_escapes_never_enter_dependency(self):
         root = self.path / "model"
         root.mkdir()
@@ -80,6 +104,7 @@ class ArtifactTests(unittest.TestCase):
         self.runtime.SentenceTransformer.assert_not_called()
 
     def test_valid_shards_load_with_weights_only_override(self):
+        (self.path / "config.json").write_text(json.dumps({"model_type": "bert"}))
         (self.path / "part.safetensors").touch()
         (self.path / "model.safetensors.index.json").write_text(json.dumps({
             "metadata": {}, "weight_map": {"weight": "part.safetensors"}}))

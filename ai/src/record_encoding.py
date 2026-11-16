@@ -112,7 +112,19 @@ class LocalEncoder:
                 directory = path / module["path"]
                 if (directory / "adapter_config.json").exists():
                     raise EncodingError("unsafe_local_weights")
-                for index in directory.glob("model.safetensors.index*.json"):
+                configuration = directory / "config.json"
+                if configuration.exists():
+                    try:
+                        configured = json.loads(configuration.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        raise EncodingError("unsafe_local_weights") from None
+                    if not isinstance(configured, dict) or "transformers_weights" in configured:
+                        raise EncodingError("unsafe_local_weights")
+                indexes = set(directory.glob("model.safetensors.index*.json", case_sensitive=False))
+                literal = directory / "model.safetensors.index.json"
+                if literal.exists():
+                    indexes.add(literal)
+                for index in indexes:
                     try:
                         layout = json.loads(index.read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
