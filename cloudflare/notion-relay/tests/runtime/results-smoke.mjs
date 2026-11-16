@@ -57,7 +57,7 @@ try {
   const outboundCheck=await mf.dispatchFetch('https://relay.invalid/__local_outbound');
   assert.equal(outboundCheck.status,200,await outboundCheck.text());
   apiReads=0;
-  for(const name of ['0001_journal','0002_bootstrap','0003_requests']){
+  for(const name of ['0001_journal','0002_bootstrap','0003_requests','0004_periodic']){
     const sql=await readFile(`${root}/migrations/${name}.sql`,'utf8');
     for(const statement of sql.replace(/^--.*$/gm,'').split(';').map(x=>x.trim()).filter(Boolean))
       await db.prepare(statement).run();

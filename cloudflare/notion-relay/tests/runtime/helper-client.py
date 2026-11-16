@@ -41,7 +41,7 @@ class LocalRelay:
             result = json.load(response)
         if self.loss == path:
             self.loss = None
-            raise helper.se.SyncError("synthetic local ACK loss after server accepted")
+            raise gp.SyncError("synthetic local ACK loss after server accepted")
         return result
 
 

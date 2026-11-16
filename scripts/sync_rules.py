@@ -1,4 +1,4 @@
-"""Pure, hold-free status rules for the issue #80 shadow engine."""
+"""Pure, hold-free status rules for the bidirectional writer."""
 from __future__ import annotations
 
 from typing import TypedDict
@@ -44,11 +44,25 @@ def decide(last_synced: str | None, notion_status: str | None,
         return {"target": target, "write_project": project_status != target,
                 "write_notion": notion_status != target, "note": ""}
 
+    if not facts["ready"] and any(
+            value == "검토 중" and value != last_synced
+            for value in (notion_status, project_status)):
+        # Reject the manual review move, not a fact-driven review transition.
+        target = last_synced
+        return {"target": target,
+                "write_project": target is not None and project_status == "검토 중"
+                                 and project_status != target,
+                "write_notion": target is not None and notion_status == "검토 중"
+                                and notion_status != target,
+                "note": "확인 필요"}
+
     invalid_notion = (notion_status not in STATUSES or
-                      (notion_status == "취소" and notion_status != last_synced))
+                      (notion_status == "취소" and notion_status != last_synced
+                       and project_status != notion_status))
     if invalid_notion:
-        target = last_synced if last_synced in STATUSES else project_status
-        return {"target": target, "write_project": project_status is None and target is not None,
+        target = (project_status if project_status in STATUSES and project_status != last_synced else
+                  last_synced if last_synced in STATUSES else project_status)
+        return {"target": target, "write_project": target is not None and project_status != target,
                 "write_notion": target is not None and notion_status != target, "note": "확인 필요"}
     if last_synced is None:
         target = notion_status

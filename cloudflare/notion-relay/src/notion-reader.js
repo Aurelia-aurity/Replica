@@ -29,7 +29,7 @@ export async function currentPage(page, pageID, env) {
     page.parent.data_source_id === SOURCE_ID, 'PAGE_SOURCE');
   requireValue(page.in_trash === false, 'PAGE_ARCHIVED');
   const names = {'종류':'NOTION_KIND_PROPERTY_ID','동기화 키':'NOTION_KEY_PROPERTY_ID',
-    '작업 상태':'NOTION_TASK_PROPERTY_ID','동기화 내부 상태':'NOTION_STATE_PROPERTY_ID'};
+    '작업 상태':'NOTION_TASK_PROPERTY_ID','동기화 기준':'NOTION_STATE_PROPERTY_ID'};
   requireValue(page.properties && typeof page.properties === 'object', 'PAGE_PROPERTIES');
   for (const [name, variable] of Object.entries(names)) {
     requireValue(normalizedID(page.properties[name]?.id) === normalizedID(env[variable]),
@@ -41,7 +41,7 @@ export async function currentPage(page, pageID, env) {
   requireValue(match && Number.isSafeInteger(Number(match[1])), 'PAGE_KEY');
   const status = selection(page.properties['작업 상태']);
   requireValue(status === null || DISPLAY_STATES.has(status), 'PAGE_STATUS');
-  const state = text(page.properties['동기화 내부 상태']);
+  const state = text(page.properties['동기화 기준']);
   // This is comparison-only. Only Python's existing exact decoder can produce
   // a handled checkpoint/reflection proof; an arbitrary latest page cannot.
   return {page_id:pageID, key, repository_id:REPOSITORY_ID, issue_id:Number(match[1]),

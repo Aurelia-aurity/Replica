@@ -60,7 +60,7 @@ export default {
   async scheduled(_event,env){
     try{
       if(!env.DB)throw new ProtocolError('DATABASE_UNCONFIGURED',503);
-      await new Drain(env).tick();
+      await new Drain(env).tick({scheduled:true});
     }catch(error){
       console.error(error instanceof ProtocolError?error.code:'DRAIN_UNAVAILABLE');
     }

@@ -1,7 +1,9 @@
 """Local, non-thinking greedy inference; no HTTP or request scheduling."""
 from dataclasses import dataclass
+from typing import Literal
 
 import baseline
+from request_timing import CURRENT, TokenObserver, timed
 
 
 class ContextLimitExceeded(Exception):
@@ -14,6 +16,7 @@ class Request:
     message: str
     history: tuple[tuple[str, str], ...]
     max_new_tokens: int
+    output_prefix_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -26,8 +29,22 @@ class Prepared:
 @dataclass(frozen=True)
 class Generated:
     message: str
-    finish_reason: str
+    finish_reason: Literal["stop", "length"]
     output_tokens: int
+
+
+@dataclass(frozen=True)
+class OutputPrefix:
+    """Force only initial decoder tokens; they consume the normal output budget."""
+    token_ids: tuple[int, ...]
+    input_length: int
+
+    def __call__(self, input_ids, scores):
+        position = input_ids.shape[1] - self.input_length
+        if position < len(self.token_ids):
+            scores.fill_(float("-inf"))
+            scores[:, self.token_ids[position]] = 0
+        return scores
 
 
 class Inference:
@@ -44,13 +61,15 @@ class Inference:
 
     def prepare(self, request: Request) -> Prepared:
         for dropped in range(len(request.history) + 1):
-            messages = [{"role": "system", "content": self.system_prompt}]
-            for user, assistant in request.history[dropped:]:
-                messages.extend([{"role": "user", "content": user},
-                                 {"role": "assistant", "content": assistant}])
-            messages.append({"role": "user", "content": request.message})
-            ids = self.tokenizer.apply_chat_template(
-                messages, tokenize=True, add_generation_prompt=True, enable_thinking=False)
+            with timed("prompt_assembly"):
+                messages = [{"role": "system", "content": self.system_prompt}]
+                for user, assistant in request.history[dropped:]:
+                    messages.extend([{"role": "user", "content": user},
+                                     {"role": "assistant", "content": assistant}])
+                messages.append({"role": "user", "content": request.message})
+            with timed("template_tokenize"):
+                ids = self.tokenizer.apply_chat_template(
+                    messages, tokenize=True, add_generation_prompt=True, enable_thinking=False)
             if len(ids) + request.max_new_tokens <= self.context_limit:
                 return Prepared(tuple(ids), len(request.history) - dropped, dropped)
         raise ContextLimitExceeded
@@ -58,22 +77,42 @@ class Inference:
     def generate(self, request: Request, prepared: Prepared) -> Generated:
         torch = self.torch
         try:
-            inputs = torch.tensor([prepared.token_ids], device="cuda:0")
-            generation = self.generation_config(
-                max_new_tokens=request.max_new_tokens, do_sample=False,
-                eos_token_id=self.model.generation_config.eos_token_id,
-                pad_token_id=self.tokenizer.eos_token_id)
+            with timed("input_setup"):
+                inputs = torch.tensor([prepared.token_ids], device="cuda:0")
+                generation = self.generation_config(
+                    max_new_tokens=request.max_new_tokens, do_sample=False,
+                    eos_token_id=self.model.generation_config.eos_token_id,
+                    pad_token_id=self.tokenizer.eos_token_id)
+                options = {}
+                if request.output_prefix_ids:
+                    options["logits_processor"] = [
+                        OutputPrefix(request.output_prefix_ids, len(prepared.token_ids))]
+                timing = CURRENT.get()
+                observer = TokenObserver(timing, len(request.output_prefix_ids)) if timing else None
+                if observer:
+                    timing.observer = observer
+                    options["streamer"] = observer
             with torch.inference_mode():
-                outputs = self.model.generate(
-                    input_ids=inputs, attention_mask=torch.ones_like(inputs),
-                    generation_config=generation, use_model_defaults=False)
-            tokens = outputs[0, len(prepared.token_ids):].tolist()
-            eos = generation.eos_token_id
-            eos_ids = eos if isinstance(eos, (list, tuple)) else [eos]
-            stopped = bool(tokens) and tokens[-1] in eos_ids
-            reason = "length" if len(tokens) >= request.max_new_tokens and not stopped else "stop"
-            return Generated(self.tokenizer.decode(tokens, skip_special_tokens=True), reason, len(tokens))
+                if observer:
+                    observer.start_ns = timing.now()
+                try:
+                    with timed("model_generate_call"):
+                        outputs = self.model.generate(
+                            input_ids=inputs, attention_mask=torch.ones_like(inputs),
+                            generation_config=generation, use_model_defaults=False, **options)
+                finally:
+                    if observer:
+                        observer.end_ns = timing.now()
+            with timed("output_decode"):
+                tokens = outputs[0, len(prepared.token_ids):].tolist()
+                eos = generation.eos_token_id
+                eos_ids = eos if isinstance(eos, (list, tuple)) else [eos]
+                stopped = bool(tokens) and tokens[-1] in eos_ids
+                reason = "length" if len(tokens) >= request.max_new_tokens and not stopped else "stop"
+                return Generated(
+                    self.tokenizer.decode(tokens, skip_special_tokens=True), reason, len(tokens))
         finally:
             # Also drain already-launched kernels when Python generation fails.
             # The service may return the slot only after this worker has finished.
-            torch.cuda.synchronize(0)
+            with timed("cuda_drain"):
+                torch.cuda.synchronize(0)

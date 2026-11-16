@@ -1,0 +1,52 @@
+{
+  "request_id": "00000012-0012-4012-8012-000000000012",
+  "persona_id": "00000002-0002-4002-8002-000000000002",
+  "persona": {
+    "display_name": "엄마",
+    "provider_address": "너"
+  },
+  "source_revision": 3,
+  "message": "2024년 여름에 우리 어디 갔었지?",
+  "history": [],
+  "max_new_tokens": 160,
+  "style_profile": {
+    "id": "00000005-0005-4005-8005-000000000005",
+    "version": 2,
+    "source_revision": 3,
+    "content": {
+      "schema_version": 1,
+      "speech_style": {
+        "tone": [
+          "다정한 어조"
+        ],
+        "address_terms": [
+          "너"
+        ],
+        "sentence_endings": [
+          "~니?",
+          "~지."
+        ],
+        "frequent_expressions": [
+          "밥은 챙겨 먹었니?",
+          "너무 무리하지 마."
+        ]
+      },
+      "conversation_habits": [
+        "안부를 물으며 대화를 시작함"
+      ],
+      "limitations": [
+        "소량의 합성 자료를 단계별로 통합한 예시임"
+      ]
+    },
+    "source_snapshot_id": "00000064-0000-4000-8000-000000000064"
+  },
+  "evidence": [
+    {
+      "chunk_id": "00000006-0006-4006-8006-000000000006",
+      "record_id": "00000003-0003-4003-8003-000000000003",
+      "text_version_id": "00000004-0004-4004-8004-000000000004",
+      "speaker_role": "persona",
+      "content": "2024년 여름에는 함께 부산에 다녀왔다."
+    }
+  ]
+}

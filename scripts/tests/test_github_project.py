@@ -68,7 +68,7 @@ def rest_issue_row(*, issue_id=REST_ISSUE_ID, node_id=PR_NODE):
 
 def rest_pull(*, database_id=PR_DATABASE_ID, node_id=PR_NODE):
     return {"id": database_id, "node_id": node_id, "number": 19, "state": "closed",
-            "draft": False, "merged": True,
+            "draft": False, "merged_at": "2026-09-02T00:00:00Z",
             "base": {"ref": "main", "repo": {"id": gp.REPOSITORY_ID,
                 "node_id": REPO_NODE}}}
 
@@ -85,8 +85,8 @@ class FactsREST:
             return {"id": gp.REPOSITORY_ID, "full_name": gp.REPOSITORY}
         if "/issues?" in path:
             return self.rows
-        if path.endswith("/pulls/19"):
-            return self.pull
+        if "/pulls?" in path:
+            return [self.pull]
         raise AssertionError("Unexpected REST path")
 
 

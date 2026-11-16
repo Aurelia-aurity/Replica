@@ -32,8 +32,10 @@ class RuleTests(unittest.TestCase):
         # Given: every baseline and pair, including the protected cancellation.
         for last, notion, project in itertools.product(STATUSES, repeat=3):
             with self.subTest(last=last, notion=notion, project=project):
-                if notion == "취소" and notion != last:
-                    target, wp, wn, note = last, False, True, "확인 필요"
+                if last != "검토 중" and "검토 중" in (notion, project):
+                    target, wp, wn, note = last, project == "검토 중", notion == "검토 중", "확인 필요"
+                elif notion == "취소" and notion != last and project != notion:
+                    target, wp, wn, note = project, False, True, "확인 필요"
                 else:
                     target = notion if notion != last else project
                     wp, wn, note = project != target, notion != target, ""
@@ -48,8 +50,10 @@ class RuleTests(unittest.TestCase):
         for notion, project in itertools.product(STATUSES, repeat=2):
             with self.subTest(notion=notion, project=project):
                 expected = (
+                    {"target": None, "write_project": False, "write_notion": False,
+                     "note": "확인 필요"} if "검토 중" in (notion, project) else
                     {"target": project, "write_project": False, "write_notion": notion != project,
-                     "note": "확인 필요"} if notion == "취소" else
+                     "note": "확인 필요"} if notion == "취소" and project != notion else
                     {"target": notion, "write_project": notion != project, "write_notion": False,
                      "note": "초기 정렬" if notion != project else ""})
                 # When:
@@ -102,10 +106,10 @@ class RuleTests(unittest.TestCase):
     def test_invalid_notion_values_revert_table(self):
         # Given:
         cases = [
-            ("백로그", "bad", "진행 중", "백로그", False, True),
-            ("준비 중", None, "진행 중", "준비 중", False, True),
+            ("백로그", "bad", "진행 중", "진행 중", False, True),
+            ("준비 중", None, "진행 중", "진행 중", False, True),
             ("진행 중", "", "진행 중", "진행 중", False, True),
-            ("검토 중", "취소", "완료", "검토 중", False, True),
+            ("검토 중", "취소", "완료", "완료", False, True),
             (None, None, "진행 중", "진행 중", False, True),
             (None, "bad", "준비 중", "준비 중", False, True),
             (None, None, None, None, False, False),

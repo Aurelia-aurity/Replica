@@ -1,4 +1,4 @@
-"""Minimal fixed-host Notion transport with read-only operations."""
+"""Fixed-host Notion transport; writes require explicit capability."""
 from __future__ import annotations
 
 import json
@@ -39,17 +39,21 @@ def bound_page(page, source_id):
 
 
 class NotionClient:
-    def __init__(self, token, *, opener=None, sleep=time.sleep):
+    def __init__(self, token, *, allow_apply=False, opener=None, sleep=time.sleep):
         require(isinstance(token, str) and token, "NOTION_TOKEN missing")
         self.opener = opener or urllib.request.build_opener(NoRedirect())
         self.sleep = sleep
+        self.allow_apply = allow_apply
         self.headers = {"Authorization": f"Bearer {token}",
                         "Content-Type": "application/json", "Notion-Version": "2026-03-11"}
 
     def request(self, method, path, payload=None):
         query = method == "POST" and re.fullmatch(r"/data_sources/[0-9a-f-]+/query", path)
         read = method == "GET" and re.fullmatch(r"/(?:pages|data_sources)/[0-9a-f-]+", path)
-        require(bool(query or read), "Notion operation not allowed")
+        write = self.allow_apply and (
+            method == "POST" and path == "/pages" or
+            method == "PATCH" and re.fullmatch(r"/pages/[0-9a-f-]+", path))
+        require(bool(query or read or write), "Notion operation not allowed")
         body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
         self.sleep(0.4)
         request = urllib.request.Request("https://api.notion.com/v1" + path,
@@ -100,8 +104,17 @@ def check_schema(notion, source_id, statuses):
     props = source.get("properties", {})
     for name, kind in (("동기화 키", "rich_text"), ("번호", "number"), ("종류", "select"),
                        ("작업 상태", "select"), ("확인 필요", "rich_text"),
-                       ("동기화 내부 상태", "rich_text")):
+                       ("동기화 내부 상태", "rich_text"), ("동기화 기준", "rich_text"),
+                       ("제목", "title"), ("GitHub URL", "url"), ("GitHub 상태", "select"),
+                       ("작성자", "rich_text"), ("담당자", "rich_text"), ("라벨", "rich_text"),
+                       ("GitHub 수정", "date"), ("동기화 시각", "date"),
+                       ("종료 사유", "select"), ("대표 이슈", "url")):
         require(props.get(name, {}).get("type") == kind, "Notion schema property mismatch")
     options = props["작업 상태"]["select"]["options"]
     require({option["name"] for option in options} == set(statuses),
             "Notion task status options mismatch")
+    for name, expected in (("종류", {"Issue", "PR", "Sync"}),
+                           ("GitHub 상태", {"Open", "Closed", "Draft", "Merged"}),
+                           ("종료 사유", {"완료", "미계획", "중복", "확인 필요"})):
+        require({option["name"] for option in props[name]["select"]["options"]} == expected,
+                "Notion metadata options mismatch")

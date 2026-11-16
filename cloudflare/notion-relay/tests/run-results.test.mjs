@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture} from './local-d1.mjs';
 import {RunResults,runName,WORKFLOW_PATH,GENESIS} from '../src/run-results.js';
+import {Drain} from '../src/drain.js';
 import {canonical,sha256,REPOSITORY_ID,PROJECT_ID} from '../src/protocol.js';
 
 const id='11111111-1111-4111-8111-111111111111';
@@ -39,6 +40,35 @@ test('claim is single-use, unknown UUID/HMAC metadata alone cannot authorize and
   await assert.rejects(results.claim({...binding,request_id:'22222222-2222-4222-8222-222222222222'}));
   env.RELAY_MODE='STOPPED';await assert.rejects(results.claim(binding),{message:'CLAIM_DISABLED'});
   assert.equal((await request(db)).phase,'CLAIMED');
+});
+
+test('receipt-free periodic requests retain one-time claim and terminal seal requirements',async()=>{
+  const {results,db,run}=await setup();
+  await db.prepare("UPDATE sync_requests SET receipt_ids='[]'").run();
+  const claims=await Promise.all([results.claim(binding),results.claim(binding)]);
+  assert.equal(claims.filter(value=>value.newly_authorized).length,1);
+  assert.deepEqual(claims[0].receipts,[]);
+  await results.result(seal(0,0,GENESIS));
+  assert.equal((await results.activate(await request(db))).pending,true);
+  run.status='completed';run.conclusion='success';
+  assert.equal((await results.activate(await request(db))).activated,true);
+});
+
+test('terminal periodic runner failure frees only its own slot and preserves evidence',async()=>{
+  for(const withSeal of [false,true]){
+    const {results,db,run,env}=await setup();
+    await db.prepare("UPDATE sync_requests SET receipt_ids='[]'").run();
+    await results.claim(binding);
+    if(withSeal)await results.result({...seal(0,0,GENESIS),failed:true,scan_complete:false});
+    const drain=new Drain(env,{github:{getRun:async()=>structuredClone(run)},now:()=>400});
+    await drain.tick({scheduled:true});
+    assert.equal((await db.prepare('SELECT request_id FROM request_slot').first()).request_id,id);
+    run.status='completed';run.conclusion='failure';
+    await drain.tick({scheduled:true});
+    assert.equal((await db.prepare('SELECT request_id FROM request_slot').first()).request_id,null);
+    assert.equal((await request(db)).phase,withSeal?'FAILED_FENCED':'FAILED_TERMINAL');
+    assert.notEqual((await request(db)).claimed_at,null);
+  }
 });
 test('independent run binding rejects SHA/ref/repo/actor/workflow/title/rerun mismatch before claim',async()=>{
   const changes=[r=>r.head_sha='d'.repeat(40),r=>r.head_branch='feature',r=>r.actor.id=9,

@@ -7,9 +7,55 @@
 - `configs/`: 공유 가능한 모델·추론·개인화 설정
 - `.env.example`: 비밀 값이 없는 설정 예시
 
+### Startup warmup and timing (#96)
+
+Startup always runs three fixed synthetic generations before publishing readiness.
+There is no warmup CLI flag or opt-out: #96 requires warmup before `/readyz`
+returns 200. Baseline mode repeats `Reply with one short greeting.` three times;
+persona mode uses synthetic evidence counts 0, 3 and 10, in that order. Each call
+has an empty history and a 160-token output budget. All outputs must pass validation.
+Load, prepare, generation or validation failure keeps `/readyz` at 503 and logs
+only the failed stage, without retries. `/healthz` remains available. Warmup
+does not reserve the client slot or emit client-request timing. The constructor's
+injected engine remains an already-ready seam for local doubles.
+
+The existing `baseline.http` logger additionally emits JSON records:
+
+- `startup_timing`: `stage` (`load`, `warmup`, `ready`), `status`
+  (`begin`, `complete`, `failed`) and `elapsed_ns` from loader entry.
+- `request_timing`: `attempt_id` joins one HTTP attempt, including a response
+  timeout and later worker completion. Validated `request_id` is included once
+  parsed. `stage` is `receipt`, `body_read`, `parse`, `prepare_tokenize`,
+  `admission_lock`, `worker_handoff`, `generate` or `response_write`.
+  `start_ns` and `end_ns` are offsets from handler entry on one local monotonic
+  clock. `status`, `write_ok`, `input_tokens` and `output_tokens` are populated
+  where observed, otherwise null. Early rejections have partial spans.
+
+`prepare_tokenize` combines preparation and tokenization; it does not isolate
+tokenizer cost. `admission_lock` measures mutex acquisition, not queueing;
+`queue_present=false` and `queue_wait_ms=null`. `generate` includes adapter checks
+and CUDA drain, rather than an isolated model call. A 504 response does not
+release the active slot; its worker emits a separate terminal `generate` record.
+`write_ok` reports the server's socket write outcome, not client receipt.
+### 첫 토큰과 세부 구간
+
+`generate`의 최종 로그는 Transformers 4.57.1 streamer가 CPU에서 관측한 첫 생성 토큰 시각을 `first_generated_token_ns`로 기록합니다. 값은 요청 시작 기준 monotonic 오프셋이며 `first_token_ms`는 같은 값을 ms로 나타냅니다. `model_first_token_ms`는 `model_generate_start_ns`부터 첫 관측까지의 시간입니다. `model_generate_end_ns`도 같은 요청 기준입니다. 토큰이 없으면 시각은 null이고 `ttft_available=false`입니다. 생성이 진행 중이면 `ttft_reason="awaiting_first_token"`, 토큰 없이 끝났으면 `no_generated_token`, 관측자가 시작하지 않았으면 `observer_not_started`로 구분합니다.
+
+첫 생성 토큰에는 강제 JSON 접두사도 포함됩니다. `forced_prefix_tokens`는 접두사 토큰 수이며 `first_unforced_token_ns`는 그 뒤 첫 토큰의 관측 시각입니다. 접두사 뒤 토큰이 없으면 null입니다. 이 위치가 따옴표나 공백일 수도 있으므로 첫 유용한 답변 토큰으로 해석하지 않습니다. HTTP 첫 바이트나 GPU kernel 완료 시각도 측정하지 않습니다.
+
+기존 `prepare_tokenize`와 `generate`를 유지하면서 `persona_prompt_assembly`, `prompt_assembly`, `template_tokenize`, `prefix_encode`, `input_setup`, `model_generate_call`, `output_decode`, `cuda_drain`, `adapter_parse_guard`, `success_body`를 해당 호출 경계에서 기록합니다. baseline에는 persona 전용 구간이 없습니다. 이력을 줄여 다시 준비하면 `prompt_assembly`와 `template_tokenize`가 시도마다 반복됩니다. `template_tokenize`에는 chat template과 토큰화가 함께 들어가며 `model_generate_call`은 framework의 host 경과 시간입니다. 구간 밖의 분기·기록 비용이 남으므로 세부 구간 합이 바깥 구간과 같다고 주장하지 않습니다. 중첩 구간도 더하지 않습니다.
+
+streamer는 첫 prompt callback을 제외하고 토큰 ID나 본문을 저장하지 않습니다. 첫 토큰과 접두사 뒤 첫 토큰에서만 시계를 읽고 이후 callback은 즉시 반환합니다. Transformers 자체는 prompt와 각 생성 토큰에 `.cpu()`를 수행하므로 전송과 Python callback 비용이 추가됩니다. 로그 기록 비용도 포함해 실제 GPU 지연·출력 동일성·계측 오버헤드는 새 GPU 실행에서 확인해야 합니다. 로컬 doubles 검증은 이 수치를 대신하지 않습니다. warmup은 기존 세 번의 생성·검증을 그대로 수행하며 새 TTFT 관측은 외부 요청에만 연결합니다. 프롬프트·프로필·근거·답변·헤더·토큰 ID는 로그에 남기지 않습니다.
+
+Local event-controlled tests use the existing command
+`python3 -B -m unittest discover -s ai/tests -v`. The doubled measurement
+skeleton is documented in
+[`experiments/warmup_timing/README.md`](../experiments/warmup_timing/README.md).
+No new GPU measurements or voice end-to-end results are claimed.
+
 ### 페르소나 가드 (`ai/src/persona_guard.py`)
 
-`PersonaIdentity`, `check_reply`, `GuardResult`를 제공하는 표준 라이브러리 기반 모듈과 추가형 프롬프트 규칙 템플릿 `PERSONA_RULES`입니다. 기본 프롬프트나 서비스 런타임/API 계약에는 적용되지 않았고 모델 품질 영향도 검증하지 않았습니다. 자세한 동작, 검증 결과와 한계는 [`experiments/persona_guard/README.md`](../experiments/persona_guard/README.md)를 참고하세요.
+`PersonaIdentity`, `check_reply`, `GuardResult`를 제공하는 표준 라이브러리 기반 모듈과 추가형 프롬프트 규칙 템플릿 `PERSONA_RULES`입니다. 개인화 경로에는 아래 축소 모드로 적용하며 baseline에는 적용하지 않습니다. 실제 모델 품질 영향은 아직 검증하지 않았습니다. 자세한 동작, 검증 결과와 한계는 [`experiments/persona_guard/README.md`](../experiments/persona_guard/README.md)를 참고하세요.
 
 ## 오프라인 baseline (#13)
 
@@ -66,7 +112,15 @@ nvidia-smi
 
 ### 실행
 
-아래 명령은 GPU 노드의 저장소 루트에서 실행합니다. 저장소 파일을 학교 shared home에 먼저 복사해야 합니다. 자동 SSH 접속·업로드는 이 코드에 없습니다.
+현재 기본 설정을 사용하는 실행 예시입니다. `REPLICA_MODEL_PATH`에는 운영자가 준비한 Qwen3-8B 로컬 스냅샷을 지정합니다. 실행 문법만 보여 주며 새 GPU 실행 결과는 아닙니다. 저장소 파일을 학교 shared home에 먼저 복사해야 합니다. 자동 SSH 접속·업로드는 이 코드에 없습니다.
+
+```bash
+export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+printf '%s\n' '발표 준비로 긴장하는 대학생에게 세 문장으로 조언해줘.' | \
+  ~/replica-llm-venv/bin/python ai/src/baseline.py
+```
+
+다음은 Qwen2.5-7B-Instruct를 사용한 2026-10-09 과거 실행 명령입니다. 현재 기본 설정을 검증한 명령은 아닙니다.
 
 ```bash
 printf '%s\n' '발표 준비로 긴장하는 대학생에게 세 문장으로 조언해줘.' | \
@@ -100,17 +154,76 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 공식 참고: [Transformers 오프라인 설치](https://huggingface.co/docs/transformers/v4.57.1/installation), [모델 카드](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct).
 
+## 개인화 API (#78)
+
+`ai/src/server.py`는 한 번 로드한 모델과 추론 슬롯을 공유하며 CLI `--mode persona` 지정 시 `POST /v1/baseline/generate`와 `POST /v1/persona/generate` 두 경로를 모두 활성화합니다. 기본값 `--mode baseline`은 개인화 요청에 `503 MODEL_NOT_READY`를 반환합니다. `ai/src/persona_adapter.py`의 `PersonaInference`는 호출자가 #59 검색 v2로 선택·복원한 근거를 받아 r1 핵심 프롬프트에 프로필·이력·#70 가드·JSON 출력 규칙을 더합니다. GPU 서버는 검색을 다시 수행하지 않으며 실험용 r1과 바이트 단위로 같지는 않습니다. 모델 ID와 리비전은 설정 및 `REPLICA_MODEL_ID`, `REPLICA_MODEL_REVISION`으로 바꿀 수 있습니다. 시험 기준인 Qwen3-8B는 최종 서비스 모델이 아닙니다.
+
+### 출력과 가드 정책 (PROPOSAL)
+
+아래 기본값은 모두 **PROPOSAL**이며 윤서준(backend)·임재성(DB)의 확인이 남아 있습니다. `contracts/`는 수정하지 않았습니다.
+
+- 모델은 한 번의 호출에서 `{"message":"...","evidence_used":[1]}` JSON을 출력합니다. 서버는 1부터 시작하는 인용 번호를 입력 근거의 `chunk_id` UUID로 변환합니다. 빈 목록도 허용합니다. 깨진 JSON, 필드 불일치, 범위 밖·중복·비정수 번호는 복구나 baseline 재호출 없이 `500 INFERENCE_FAILED`로 처리합니다. 반환된 ID는 모델이 선언한 출처이며 사실성을 증명하지 않습니다.
+- `max_new_tokens`는 기존과 같은 총 `1..1024` 예산이며 JSON 구문과 인용 번호도 포함합니다. 짧은 예산에서 JSON이 잘리면 500이 될 수 있습니다. 예산을 늘리거나 자동 재생성하지 않습니다.
+- 축소 가드는 `persona.display_name`만 이름·관계 두 별칭 범주에 넣습니다. `provider_address`는 자기 별칭으로 사용하지 않습니다. `style_profile.content.speech_style.tone`이 `반말`, `다정한 반말`, `해요체`, `하게체` 중 정확히 한 값일 때만 그 말높임을 가드 치환에 사용합니다. 빈 값·혼합·미지원 값은 추측 없이 `해요체`로 대체합니다. 이 대체값은 가드 치환문에만 적용하며 생성 프롬프트에는 받은 프로필을 그대로 전달합니다.
+- 가드가 답변을 치환하면 `evidence_used=[]`로 비우고 원래 생성의 `finish_reason`을 유지합니다. 개인화 실패나 결과 불명 뒤 baseline을 자동 호출하지 않습니다. baseline은 별도 모드·경로로 명시적으로 선택합니다.
+
+### 실행과 검증
+
+운영 안내: 개인화 요청을 처리하려면 서버를 `--mode persona` 옵션으로 기동해야 하며 기본 `baseline` 모드에서는 모델 준비 전 상태와 동일한 `503 MODEL_NOT_READY` 응답이 반환되므로 운영자는 반드시 서버 기동 모드를 확인해야 합니다.
+
+기존 Python 3.12 GPU 환경과 로컬 모델 스냅샷을 사용합니다. 기본 설정에는 과거 모델 라벨이 있으므로 Qwen3-8B 시험에서는 식별자를 명시합니다.
+
+```bash
+REPLICA_MODEL_ID=Qwen/Qwen3-8B python ai/src/server.py \
+  --port 18078 --mode persona --model-path "$REPLICA_MODEL_PATH"
+python ai/scripts/smoke_persona.py --help
+```
+
+가짜 엔진과 실제 로컬 HTTP로 생성·계약·인용·축소 가드를 검사합니다.
+
+2026-11-05 교내 `p02`/`DIS02` GPU 환경(Slurm 작업 `35892`)에서 합성 입력만으로 `ai/scripts/smoke_persona.py`를 실행해 10개 검증 항목을 모두 통과했습니다(`COMPLETED`, 종료 코드 `0:0`, 56초). 이번 실행으로 실모델 준비 상태, 근거 유무 및 대화 이력 조건별 페르소나 정상 응답, 인용 번호의 입력 청크 UUID 매핑, 명시적으로 선택된 baseline 경로와 1토큰 깨진 JSON 유도 시의 안전한 `500` 반환을 확인했습니다. 또한 제어된 첫 실제 CUDA forward 계측을 통해 클라이언트 연결 해제나 `504` 타임아웃 발생 시에도 실제 생성이 끝날 때까지 전역 `request_id`와 슬롯이 조기 해제되지 않고 유지됨을 검증했습니다(`409`/`429`). 다만 이는 제어된 계측 결과일 뿐 일반 요청 겹침 성능이나 즉시 GPU 연산 취소의 증명은 아닙니다. 아울러 실제 임베딩·인덱스·DB 연동 및 최신성, 실모델 응답에 대한 #70 가드 치환 발동과 의미적 근거 충실도·품질, 운영 인증, AWS·앱 E2E 검증은 이번 범위에 포함되지 않습니다.
+
+임베딩 실행 위치와 인덱스·메타데이터 및 백엔드 호출 전환은 담당자 합의가 남아 있고, 이 구현만으로 #78 전체 완료를 뜻하지 않습니다.
+
 ## 학교 GPU baseline HTTP API (#43)
+
+### Local synthetic persona transport checks (#44)
+
+```bash
+python3 -B ai/scripts/local_persona_transport.py
+```
+
+This stdlib-only harness starts and stops its own loopback HTTP server with
+tokenizer, model and CUDA doubles. It checks three synthetic persona calls
+(evidence, no evidence, history), response/profile IDs, evidence subsets and the
+model label. Each case sends once. It is not production backend integration or
+school-GPU verification. The auth hook remains undecided; `/readyz` currently
+does not invoke it. `test_persona_call_auth.py` and `test_persona_call_faults.py`
+cover auth ordering, private logs, shared slots and disconnect/504 recovery.
 
 `src/server.py`는 표준 라이브러리 `ThreadingHTTPServer`로 `POST /v1/baseline/generate`를 제공합니다. `src/inference.py`가 이력 축소와 생성을 맡으며 CLI의 환경 검사·로더를 재사용합니다. 새 런타임 의존성은 없습니다.
 
 계약의 기준 소스는 병합된 `contracts/baseline` 및 `contracts/backend-ai/api-spec.md`의 섹션 1입니다. HTTP 테스트는 병합된 정식 예제를 사용하며 기존에 복사해 두었던 픽스처는 과거 기록용으로만 유지됩니다.
 
-**2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`).** 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 아래 운영 명령은 실행 예시입니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
+**과거 실행 기록:** 2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`). 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 이 기록은 아래 설정이나 현재 배포의 검증 결과가 아닙니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
 
 ### 모델·요청·수락 규칙
 
-- 베이스라인 API의 대상 모델은 아직 최종 선정되거나 확정되지 않았습니다. `ai/configs/baseline.json`은 메인 브랜치의 설정값을 유지하며 가드된 시스템 프롬프트도 이 파일에서 읽어옵니다. `model_id` 메타데이터는 `REPLICA_MODEL_ID`로, 선택적 `model_revision`은 `REPLICA_MODEL_REVISION` 환경 변수로 재정의할 수 있으나 실제 가중치는 항상 로컬 경로인 `--model-path` 또는 `REPLICA_MODEL_PATH`에서 로드됩니다. 선택적 리비전 값은 오프라인 로더에 전달되지만 로컬 스냅샷을 선택하거나 검증하지 않으므로 운영자가 정확한 리비전 디렉터리를 직접 제공해야 합니다.
+- 베이스라인 API의 서비스 모델은 2026-11-10 결정에 따라 Qwen/Qwen3-8B입니다. `ai/configs/baseline.json`의 기본 `model_id`도 Qwen/Qwen3-8B입니다. `REPLICA_MODEL_ID`로 모델 ID를, 선택 설정인 `model_revision`은 `REPLICA_MODEL_REVISION`으로 바꿀 수 있습니다. 가중치는 `--model-path` 또는 `REPLICA_MODEL_PATH`가 지정한 로컬 디렉터리에서 불러옵니다. `model_revision`은 로더에 전달되지만 로컬 스냅샷을 선택하거나 검증하지 않습니다. 기본 revision은 설정하지 않습니다.
+- Qwen3-8B 평가에 사용한 것으로 저장소에 기록된 snapshot revision은 `b968826d9c46dd6066d109eabc6255188de91218`입니다(`experiments/model77/profiles.json`). 이는 새 Hub 확인이나 배포 가중치 검증 결과가 아닙니다. 실제 로컬 스냅샷의 경로와 revision은 별도로 확인해야 합니다. 이전 CLI 실측은 2026-10-09 Qwen2.5-7B-Instruct 실행입니다. 당시 다운로드 revision은 `a09a35458c702b33eeacc393d103063234e8bc28`이며 다운로드 metadata와 대조한 값이지 모델 파일의 무결성 검사 결과는 아닙니다. GPU 로그에서 checkpoint 4/4 로딩과 응답 생성을 확인했지만 종료 코드는 별도로 전달받지 않았습니다. 이 기록은 현재 Qwen3 설정의 검증 결과가 아닙니다.
+- 다음 배포 확인 절차는 #93의 persona 모드와 실제 backend 연동이 포함된 경우에만 적용합니다. 기준 커밋 `45e4f518`은 baseline 전용이므로 이 브랜치에서는 `--mode persona`를 실행할 수 없고 성공 응답에도 `model_name`이 없습니다. 아래 명령과 응답 확인은 이 브랜치에서 실행할 수 있는 절차가 아닙니다.
+
+  배포 전 GPU의 `REPLICA_MODEL_ID`와 backend의 `LLM_MODEL_NAME`을 `Qwen/Qwen3-8B`로 맞추기로 담당자 간 확인해야 합니다. 평가 설정에서 확인한 revision은 기본값에 고정하지 않습니다. `REPLICA_MODEL_PATH`가 가리키는 실제 로컬 snapshot을 확인하고, 기존 다운로드 metadata를 대조해 revision을 별도로 기록합니다.
+
+  ```bash
+  export REPLICA_MODEL_ID='Qwen/Qwen3-8B'
+  export REPLICA_MODEL_REVISION='b968826d9c46dd6066d109eabc6255188de91218'
+  export REPLICA_MODEL_PATH="$HOME/replica-models/Qwen3-8B"
+  # 실제 backend 배포 설정에서 LLM_MODEL_NAME='Qwen/Qwen3-8B'로 맞춥니다.
+  python3 ai/src/server.py --mode persona --port 18043
+  ```
+
+  이 절차는 아직 수행하지 않았습니다. 통합 배포에서는 준비 상태가 된 뒤 `/readyz`를 확인하고 허용된 합성 persona 요청을 보냅니다. 응답의 `model_name`이 설정한 모델 ID와 정확히 일치하는지도 확인합니다. 응답에는 revision이 없으므로 로컬 스냅샷에서 따로 검증해야 합니다. backend의 모델 불일치 경고는 해당 배포에 실제 구현된 내용을 확인해 점검합니다. 이 기준 브랜치에서 경고의 이름이나 구현을 전제하지 않습니다. 담당자 합의와 실 GPU/backend 배포 검증은 완료되지 않았습니다. 자동 재시도나 fallback은 없습니다.
 - HTTP 템플릿은 `enable_thinking=False`, 생성은 greedy(`do_sample=False`, 새 `GenerationConfig`, `use_model_defaults=False`)입니다. CLI의 `enable_thinking`은 선택적 설정이며, 이 필드가 없는 기존 CLI 설정은 기존 템플릿 호출을 유지합니다.
 - 요청은 `Content-Type: application/json`인 비압축 UTF-8 JSON이며, `Content-Length`가 필요합니다. 압축·chunked 전송은 지원하지 않고 400으로 거부합니다. 모든 요청에 `request_id`, `message`, `history`, `max_new_tokens`가 필요하며 임의 필드는 거부합니다.
 - 판정 순서는 원시 바이트 413 → 서비스 인증 401/403 → 파싱·구조·타입·UUID·범위·공백·미정의 필드 400 → 파싱된 문자·이력 쌍 수 413 → 모델 준비 503 → 축소 후 문맥 422 → 원자적 수락 409/429입니다. 원시 본문은 262144바이트, 각 텍스트는 16000 Unicode code point, 이력은 20쌍, 출력 예산은 1~1024입니다. 오류 코드는 계약 예제의 고정 메시지를 사용하며 안전하게 검증한 요청 ID를 반환합니다. 인증 거부·파싱 전 원시 거부·깨진 JSON·잘못되거나 누락된 ID는 `null`입니다.
@@ -124,7 +237,7 @@ mock 검사는 GPU·모델·네트워크 없이 실행합니다. 실제 검증�
 
 추론 마감 수치는 합의되지 않았습니다. `--deadline-seconds`는 선택적 양수 설정이며 기본값은 미설정입니다. 지정하면 수락한 생성 작업의 완료 대기에 적용하고, 504 후에도 계산은 계속됩니다. smoke의 `--timeout`은 클라이언트 대기 제한일 뿐 GPU 취소가 아닙니다. 전송 실패 결과는 UNKNOWN이며 자동 재시도하지 않습니다.
 
-모델은 백그라운드에서 한 번만 로드합니다. 로딩 중 생성 요청은 503입니다. `GET /healthz`는 프로세스가 응답하면 200과 `{"ready": false|true}`, `GET /readyz`는 같은 본문으로 미준비 시 503, 준비 시 200을 반환합니다. 준비는 로드 성공 여부이며 유휴 슬롯을 뜻하지 않습니다. 로드 실패 후에는 미준비 상태를 유지하고 자동 재로딩하지 않습니다. 잘못된 시작 설정·없는 로컬 모델 경로·포트 충돌은 프로세스 시작 실패로 처리합니다.
+모델은 백그라운드에서 한 번만 로드합니다. 로딩과 워밍업 중 생성 요청은 503입니다. `GET /healthz`는 프로세스가 응답하면 200과 `{"ready": false|true}`, `GET /readyz`는 같은 본문으로 미준비 시 503, 준비 시 200을 반환합니다. 선택한 모드에서 모델 로드와 시작 시 합성 워밍업 3회의 생성·출력 검증이 모두 성공해야 준비 완료가 됩니다. 준비 완료는 유휴 슬롯을 뜻하지 않습니다. 로드나 워밍업이 실패하면 미준비 상태를 유지하고 자동 재로딩이나 워밍업 재시도를 하지 않습니다. 잘못된 시작 설정·없는 로컬 모델 경로·포트 충돌은 프로세스 시작 실패로 처리합니다.
 
 ### 준비·실행·종료
 
