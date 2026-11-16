@@ -56,5 +56,5 @@ async def turn_tts(
     user_db: UserDatabase = Depends(get_user_db),
     tts: TTSClient = Depends(get_tts_client),
 ) -> TurnTtsResponse:
-    """답변이 끝난 턴을 음성으로 합성한다. 합성 중이거나 이미 완료된 턴, 답변이 없는 턴은 409."""
+    """답변이 끝난 턴을 음성으로 합성한다. 합성 중인 턴, 답변이 없는 턴은 409. 이미 완료된 턴은 DB를 바꾸지 않고 다시 합성한다."""
     return await chat_voice_service.handle_turn_tts(user_db, tts, turn_id)

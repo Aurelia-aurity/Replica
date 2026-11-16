@@ -67,14 +67,15 @@ Swagger(`/docs`)에서 요청·응답 형식을 확인하고 직접 호출해 �
 | `POST /sessions` | JSON `{persona_id, ai_notice_ack_at, title?, session_id?}` (로그인 필요) | 대화방 객체 (201) |
 | `POST /chat/text` | JSON `{session_id, turn_id, message}` (로그인 필요) | `{turn_id, answer, is_ai_generated, finish_reason, model_name, timings}` |
 | `POST /chat/voice` | multipart `file`(녹음), `session_id`, `turn_id` (로그인 필요) | `{turn_id, transcript, answer, is_ai_generated, finish_reason, model_name, tts_status, audio_base64, audio_format, tts_error, timings}` |
-| `POST /chat/turns/{turn_id}/tts` | (로그인 필요) 답변이 끝난 턴 | `{turn_id, tts_status, audio_base64, audio_format, timings}` / 합성 중·완료된 턴은 409 |
+| `POST /chat/turns/{turn_id}/tts` | (로그인 필요) 답변이 끝난 턴 | `{turn_id, tts_status, audio_base64, audio_format, timings}` / 합성 중인 턴은 409, 완료된 턴은 DB 변경 없이 다시 합성 |
 | `POST /stt` | multipart `file` | `{text, timings}` |
 | `POST /tts` | JSON `{text}` | 음성 파일 (audio/wav) |
 
 - 지원 음성 형식: wav, mp3, m4a, webm, ogg, mp4, aac. 그 외는 415 `UNSUPPORTED_AUDIO_FORMAT`, 25MB 초과는 413 `FILE_TOO_LARGE`, 빈 파일은 400 `EMPTY_FILE`.
 - 음성 대화: STT·LLM이 실패하면 `stage`(`stt`/`llm`)가 표시된 오류로, **TTS만 실패하면 전사문·답변을 유지한 채 200**으로 `tts_status: failed`를 돌려줍니다.
   이때 `POST /chat/turns/{turn_id}/tts`로 음성만 다시 만들 수 있습니다.
-- 응답 음성은 저장하지 않습니다. TTS까지 끝난 턴을 같은 `turn_id`로 다시 보내면 저장된 전사문·답변을 쓰고 음성만 다시 합성합니다.
+- 응답 음성은 저장하지 않습니다. TTS까지 끝난 턴을 같은 `turn_id`로 다시 보내면 저장된 전사문·답변을 쓰고 음성만 다시 합성합니다. 이 재합성이 실패해도 DB의 `ready` 상태와 답변은 그대로이고, 같은 요청이나 `/chat/turns/{turn_id}/tts`로 다시 받을 수 있습니다.
+- TTS 호출이 실패하면 한 요청 안에서 자동으로 다시 시도합니다(첫 시도 + 재시도 2번). 앱의 최대 대기 시간 3분(요청 시작 기준, 여유 10초 제외) 안에서만 다시 시도하고, 남은 시간이 직전 시도보다 짧으면 건너뜁니다. 첫 시도는 항상 하며, 남은 시간이 10초보다 적으면 첫 시도에 한해 최대 10초까지 기다립니다. 진행 중인 TTS 단계는 요청 시작 후 180초가 지나기 전에는 만료 처리하지 않습니다(STT·LLM은 `LLM_TIMEOUT_SECONDS`, 없으면 30초 기준). DB 시도 번호는 늘리지 않습니다.
 - `timings`는 구간별 시간(ms)이며 거치지 않은 구간은 `null`입니다.
 - `/chat/voice`의 응답 음성은 base64 문자열입니다. 브라우저에서는 `new Audio("data:audio/wav;base64," + audio_base64).play()`로 재생합니다.
 - `is_ai_generated`는 항상 `true`이며, 화면에 "AI 생성" 표시를 붙입니다(FR-08).

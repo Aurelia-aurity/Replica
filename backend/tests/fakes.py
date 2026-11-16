@@ -38,6 +38,7 @@ class FakeUserDB:
         self.list_turns_calls = 0
         self.rows_read = 0  # list_turns가 돌려준 행 수 합계 (얼마나 읽었는지 확인용)
         self.calls: list[tuple] = []  # (함수, 단계) 호출 기록
+        self.expire_calls: list[tuple] = []  # (started_before, tts_started_before) 기록
 
     # --- 대화 상대·대화방 ---
     async def create_persona(self, name, *, persona_id=None):
@@ -176,11 +177,13 @@ class FakeUserDB:
         row["total_ms"] = total_ms
         return self._public(row)
 
-    async def expire_chat_stages(self, *, started_before):
+    async def expire_chat_stages(self, *, started_before, tts_started_before=None):
+        self.expire_calls.append((started_before, tts_started_before))
         count = 0
         for row in self.turns.values():
             for stage, (status_key, _, started_key, _) in STAGE_FIELDS.items():
-                if row[status_key] == "pending" and row[started_key] is not None and row[started_key] < started_before:
+                cutoff = (tts_started_before or started_before) if stage == "tts" else started_before  # SQL과 같은 규칙
+                if row[status_key] == "pending" and row[started_key] is not None and row[started_key] < cutoff:
                     row[status_key] = "failed"
                     row["error_message"] = f"{stage}_timeout"
                     count += 1
