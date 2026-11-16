@@ -171,6 +171,7 @@ class EncoderTests(unittest.TestCase):
                              for name in ("model_kwargs", "tokenizer_kwargs", "config_kwargs")})
             expected["model_kwargs"]["use_safetensors"] = True
             expected["model_kwargs"]["weights_only"] = True
+            expected["model_kwargs"]["variant"] = None
             if Path(path) != self.path.resolve() or kwargs != expected:
                 raise EncodingError("unsafe_loader_policy")
             return self.model

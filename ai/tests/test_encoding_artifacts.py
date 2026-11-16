@@ -43,6 +43,32 @@ class ArtifactTests(unittest.TestCase):
             LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
+    def test_variant_bin_shard_never_enters_dependency(self):
+        (self.path / "sentence_bert_config.json").write_text(json.dumps({
+            "model_args": {"variant": "x"}}))
+        (self.path / "model.safetensors.index.x.json").write_text(json.dumps({
+            "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+        (self.path / "payload.bin").touch()
+        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+            LocalEncoder(self.path)
+        self.runtime.SentenceTransformer.assert_not_called()
+
+    def test_existing_shard_escapes_never_enter_dependency(self):
+        root = self.path / "model"
+        root.mkdir()
+        (root / "modules.json").write_text((self.path / "modules.json").read_text())
+        outside = self.path / "outside.safetensors"
+        outside.touch()
+        (root / "linked.safetensors").symlink_to(outside)
+        for shard in ("../outside.safetensors", "linked.safetensors"):
+            with self.subTest(shard=shard):
+                (root / "model.safetensors.index.json").write_text(json.dumps({
+                    "weight_map": {"weight": shard}}))
+                self.assertTrue((root / shard).is_file())
+                with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+                    LocalEncoder(root)
+        self.runtime.SentenceTransformer.assert_not_called()
+
     def test_shards_require_present_contained_safetensors_files(self):
         for shard in ("../outside.safetensors", "/outside.safetensors",
                       "missing.safetensors", 1):
@@ -58,8 +84,13 @@ class ArtifactTests(unittest.TestCase):
         (self.path / "model.safetensors.index.json").write_text(json.dumps({
             "metadata": {}, "weight_map": {"weight": "part.safetensors"}}))
         (self.path / "sentence_bert_config.json").write_text(json.dumps({
-            "model_args": {"weights_only": False}}))
+            "model_args": {"weights_only": False, "variant": "x"}}))
+        (self.path / "model.safetensors.index.x.json").write_text(json.dumps({
+            "weight_map": {"weight": "part.safetensors"}}))
         LocalEncoder(self.path)
+        kwargs = self.runtime.SentenceTransformer.call_args.kwargs["model_kwargs"]
+        self.assertIn("variant", kwargs)
+        self.assertIsNone(kwargs["variant"])
         self.assertIs(
             self.runtime.SentenceTransformer.call_args.kwargs["model_kwargs"].get("weights_only"),
             True)

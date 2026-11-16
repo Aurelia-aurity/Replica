@@ -112,8 +112,7 @@ class LocalEncoder:
                 directory = path / module["path"]
                 if (directory / "adapter_config.json").exists():
                     raise EncodingError("unsafe_local_weights")
-                index = directory / "model.safetensors.index.json"
-                if index.exists():
+                for index in directory.glob("model.safetensors.index*.json"):
                     try:
                         layout = json.loads(index.read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
@@ -146,7 +145,7 @@ class LocalEncoder:
             str(path), device="cpu", local_files_only=True, trust_remote_code=False,
             token=False, backend="torch",
             model_kwargs={"local_files_only": True, "trust_remote_code": False,
-                          "use_safetensors": True, "weights_only": True},
+                          "use_safetensors": True, "weights_only": True, "variant": None},
             tokenizer_kwargs={"local_files_only": True, "trust_remote_code": False},
             config_kwargs={"local_files_only": True, "trust_remote_code": False},
         )
