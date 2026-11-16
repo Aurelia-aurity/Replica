@@ -42,7 +42,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _records = RecordController(widget.recordService ?? PreviewRecordService());
+    _records = RecordController(
+      widget.recordService ?? PreviewRecordService(),
+      onAccountDeleted: widget.onAccountDeleted,
+    );
     _refreshRecent();
     _loadPersonas();
   }

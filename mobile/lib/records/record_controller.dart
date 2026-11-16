@@ -15,8 +15,15 @@ class RecordController extends ChangeNotifier {
     this.service, {
     this.pollInterval = const Duration(seconds: 5),
     this.analyze = analyzeTextRecord,
+    this.onAccountDeleted,
   });
   final RecordService service;
+
+  /// Ends the session of an account whose deletion completed while no
+  /// deletion sheet was open (for example a job that finished after the user
+  /// closed the sheet). Called at most once.
+  final VoidCallback? onAccountDeleted;
+  bool _accountDeletionReported = false;
 
   /// Base delay between status checks while a record is still being processed.
   final Duration pollInterval;
@@ -47,6 +54,11 @@ class RecordController extends ChangeNotifier {
       if (controller.job == null) continue;
       if (controller.account && controller.complete) {
         clearLocalData();
+        // An open sheet reports completion when the user closes it.
+        if (!controller.presented && !_accountDeletionReported) {
+          _accountDeletionReported = true;
+          onAccountDeleted?.call();
+        }
       }
       if (!controller.account) {
         entries.removeWhere((entry) => entry.id == controller.targetId);
@@ -84,7 +96,11 @@ class RecordController extends ChangeNotifier {
           job.targetId,
           account: job.targetType == 'account',
         );
-        if (!controller.busy) controller.job = job;
+        if (!controller.busy) {
+          controller.job = job;
+          // An open sheet must show the newer state it now holds.
+          if (controller.presented) controller.changed();
+        }
       }
       _deletionChanged();
     } catch (_) {

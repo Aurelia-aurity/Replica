@@ -317,6 +317,80 @@ void main() {
     expect(find.text('삭제가 진행 중이에요. 아직 완료되지 않았어요.'), findsNothing);
     expect(auth.identity, isNotNull);
   });
+  testWidgets(
+    'account deletion finished after the sheet closed ends the session',
+    (tester) async {
+      final auth = PreviewAuthService();
+      addTearDown(auth.dispose);
+      await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+      final service = DeletionFixture()..fail = false;
+      await tester.pumpWidget(
+        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('계정'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('계정 삭제'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+      expect(auth.identity, isNotNull);
+      // The server finishes the job while no sheet is open.
+      service.current = service.make('completed', []);
+      await tester.tap(find.text('기록'));
+      await tester.pumpAndSettle();
+      expect(auth.identity, isNull);
+      expect(auth.notice, contains('계정 삭제를 완료했어요'));
+      expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'account deletion completed inside the sheet waits for the user to close',
+    (tester) async {
+      final auth = PreviewAuthService();
+      addTearDown(auth.dispose);
+      await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+      final service = DeletionFixture()..fail = false;
+      await tester.pumpWidget(
+        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('계정'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('계정 삭제'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+      // Reopen the running job from its card on the records tab.
+      await tester.tap(find.text('기록'));
+      await tester.pumpAndSettle();
+      final controller = tester
+          .widget<RecordsPanel>(find.byType(RecordsPanel))
+          .controller;
+      await tester.tap(find.text('계정 삭제'));
+      await tester.pumpAndSettle();
+      expect(find.text('삭제가 진행 중이에요. 아직 완료되지 않았어요.'), findsOneWidget);
+      // A list refresh that sees the finished job while the sheet is open
+      // must not tear the sheet down before the user reads the result.
+      service.current = service.make('completed', []);
+      await controller.syncDeletionJobs();
+      await tester.pumpAndSettle();
+      expect(auth.identity, isNotNull);
+      // The open sheet shows the newer state right away.
+      expect(find.text('완료'), findsOneWidget);
+      await tester.tap(find.text('완료'));
+      await tester.pumpAndSettle();
+      expect(auth.identity, isNull);
+    },
+  );
   testWidgets('preview records never end a real account session as deleted', (
     tester,
   ) async {

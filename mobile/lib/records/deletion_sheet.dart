@@ -44,6 +44,7 @@ class _DeletionSheetState extends State<DeletionSheet> {
   @override
   void initState() {
     super.initState();
+    widget.controller.presented = true;
     widget.controller.addListener(_onChange);
     _onChange();
   }
@@ -64,6 +65,7 @@ class _DeletionSheetState extends State<DeletionSheet> {
   void dispose() {
     widget.controller.removeListener(_onChange);
     widget.controller.stopWatching();
+    widget.controller.presented = false;
     super.dispose();
   }
 

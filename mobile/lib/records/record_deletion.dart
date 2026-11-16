@@ -81,6 +81,10 @@ class RecordDeletionController extends ChangeNotifier {
   final bool account;
   DeletionJob? job;
   bool busy = false, disposed = false;
+
+  /// True while a deletion sheet shows this job. The sheet then reports the
+  /// outcome itself when the user closes it.
+  bool presented = false;
   String? error;
   String? label;
   Timer? _watch;
