@@ -80,8 +80,15 @@ class _DeletionSheetState extends State<DeletionSheet> {
         final supported =
             job != null || !c.account || c.service.canDeleteAccount;
         final needsConfirmation = c.account && job == null && supported;
-        return PopScope(
-          canPop: !c.busy,
+        // A system back closes the sheet exactly like the close button, so a
+        // completed deletion still reports completion (and ends the session
+        // of a deleted account) instead of returning null.
+        return PopScope<bool>(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop || c.busy) return;
+            Navigator.of(context).pop(c.complete);
+          },
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),

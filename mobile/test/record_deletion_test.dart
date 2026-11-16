@@ -262,6 +262,61 @@ void main() {
       expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
     },
   );
+  testWidgets(
+    'system back after completed account deletion still ends the session',
+    (tester) async {
+      final auth = PreviewAuthService();
+      addTearDown(auth.dispose);
+      await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+      final service = DeletionFixture()..fail = false;
+      await tester.pumpWidget(
+        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('계정'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('계정 삭제'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('상태 다시 확인'));
+      await tester.pumpAndSettle();
+      expect(find.text('완료'), findsOneWidget);
+      // Closing with the system back must count as completion, not dismissal.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(auth.identity, isNull);
+      expect(auth.notice, contains('계정 삭제를 완료했어요'));
+      expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
+    },
+  );
+  testWidgets('system back on a running account deletion keeps the session', (
+    tester,
+  ) async {
+    final auth = PreviewAuthService();
+    addTearDown(auth.dispose);
+    await auth.signIn('preview.a@example.com', PreviewAuthService.password);
+    final service = DeletionFixture()..fail = false;
+    await tester.pumpWidget(
+      ReplicaApp(authService: auth, recordServiceFactory: () => service),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('계정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('계정 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delete-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.text('삭제가 진행 중이에요. 아직 완료되지 않았어요.'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('삭제가 진행 중이에요. 아직 완료되지 않았어요.'), findsNothing);
+    expect(auth.identity, isNotNull);
+  });
   testWidgets('preview records never end a real account session as deleted', (
     tester,
   ) async {
