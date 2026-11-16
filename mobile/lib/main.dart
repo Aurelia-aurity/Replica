@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/auth_gate.dart';
 import 'auth/auth_config.dart';
 import 'auth/auth_service.dart';
 import 'auth/preview_auth_service.dart';
+import 'auth/supabase_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
 import 'shared/conversation_widgets.dart';
@@ -12,14 +14,25 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final app = AppConfig.fromEnvironment();
   final auth = AuthConfig.fromEnvironment(app.environment);
-  runApp(ReplicaApp(authService: selectAuthService(app, auth)));
+  runApp(ReplicaApp(authService: await selectAuthService(app, auth)));
 }
 
-/// No real authentication client is activated until integration is agreed.
-AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
-    app.environment == 'dev' && auth.mode == 'preview'
-    ? PreviewAuthService()
-    : UnconfiguredAuthService();
+Future<AuthService> selectAuthService(AppConfig app, AuthConfig auth) async {
+  if (app.environment == 'dev' && auth.mode == 'preview') {
+    return PreviewAuthService();
+  }
+  if (auth.mode != 'supabase' || !auth.isConfigured) {
+    return UnconfiguredAuthService();
+  }
+  final supabase = await Supabase.initialize(
+    url: auth.url.toString(),
+    publishableKey: auth.publishableKey!,
+  );
+  return SupabaseAuthService(
+    supabase.client,
+    emailRedirectTo: auth.emailRedirectTo,
+  );
+}
 
 class ReplicaApp extends StatelessWidget {
   const ReplicaApp({super.key, required this.authService, this.chatService});

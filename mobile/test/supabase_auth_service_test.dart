@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
@@ -80,15 +81,25 @@ void main() {
         autoRefreshToken: false,
         authFlowType: AuthFlowType.implicit,
       ),
-      httpClient: MockClient(
-        (_) async => http.Response(
+      httpClient: MockClient((request) async {
+        expect(jsonDecode(request.body)['data'], {
+          'personal_records_consent': true,
+        });
+        expect(
+          request.url.queryParameters['redirect_to'],
+          'com.replica://auth-callback',
+        );
+        return http.Response(
           jsonEncode(sessionResponse()['user']),
           200,
           headers: {'content-type': 'application/json'},
-        ),
-      ),
+        );
+      }),
     );
-    final auth = SupabaseAuthService(client);
+    final auth = SupabaseAuthService(
+      client,
+      emailRedirectTo: 'com.replica://auth-callback',
+    );
     addTearDown(() async {
       auth.dispose();
       await client.dispose();
@@ -194,37 +205,44 @@ void main() {
     });
   });
 
-  test(
-    'SDK refresh events cannot reopen a session invalidated by 401',
-    () async {
-      final client = SupabaseClient(
-        'https://synthetic.supabase.co',
-        'sb_publishable_synthetic',
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-        httpClient: MockClient(
-          (_) async => http.Response(
-            jsonEncode(sessionResponse()),
-            200,
-            headers: {'content-type': 'application/json'},
-          ),
-        ),
-      );
-      final auth = SupabaseAuthService(client);
-      addTearDown(() async {
-        auth.dispose();
-        await client.dispose();
-      });
-      await auth.signIn('synthetic@example.com', 'Example123!');
-      expect(auth.invalidateSession(requestGeneration: auth.generation), true);
-      await client.auth.refreshSession();
-      await Future<void>.delayed(Duration.zero);
-      expect(auth.identity, isNull);
-      await expectLater(
-        auth.authorizationHeaders(),
-        throwsA(isA<AuthFailure>()),
-      );
-      await auth.signIn('synthetic@example.com', 'Example123!');
-      expect(auth.identity!.id, userId);
-    },
-  );
+  test('401 clears the SDK session and permits a fresh login', () async {
+    final remoteLogout = Completer<http.Response>();
+    final remoteLogoutStarted = Completer<void>();
+    final client = SupabaseClient(
+      'https://synthetic.supabase.co',
+      'sb_publishable_synthetic',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+      httpClient: MockClient((request) async {
+        if (request.url.path.endsWith('/logout')) {
+          remoteLogoutStarted.complete();
+          return remoteLogout.future;
+        }
+        return http.Response(
+          jsonEncode(sessionResponse()),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final auth = SupabaseAuthService(client);
+    addTearDown(() async {
+      if (!remoteLogout.isCompleted) {
+        remoteLogout.complete(http.Response('', 204));
+      }
+      auth.dispose();
+      await client.dispose();
+    });
+    await auth.signIn('synthetic@example.com', 'Example123!');
+    expect(auth.invalidateSession(requestGeneration: auth.generation), true);
+    expect(client.auth.currentSession, isNull);
+    expect(auth.identity, isNull);
+    await expectLater(auth.authorizationHeaders(), throwsA(isA<AuthFailure>()));
+    await remoteLogoutStarted.future;
+    await auth
+        .signIn('synthetic@example.com', 'Example123!')
+        .timeout(const Duration(seconds: 2));
+    remoteLogout.complete(http.Response('', 204));
+    await Future<void>.delayed(Duration.zero);
+    expect(auth.identity!.id, userId);
+  });
 }

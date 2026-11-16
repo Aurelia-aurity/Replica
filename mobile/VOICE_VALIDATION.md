@@ -2,7 +2,7 @@
 
 ## 구현 경계
 
-- 실행 조건은 [README의 환경 설정](README.md#실행과-환경-설정)을 따른다. 제공된 개발 설정은 더미 인증·메모리 미리보기이며, 현재 `selectAuthService`는 개발 preview 외에는 `UnconfiguredAuthService`를 선택한다. 설정 파일만 바꿔서는 실제 로그인이 켜지지 않는다. 로그인 통합에서 실제 `AuthService`와 인증 세션을 제공하면 HTTP 서비스를 사용한다. Supabase 초기화·인증 설정은 로그인 통합 작업에서 담당한다.
+- 실행 조건은 [README의 환경 설정](README.md#실행과-환경-설정)을 따른다. 제공된 개발 설정은 더미 인증·메모리 미리보기이며, 실제 측정은 `config/auth.local.json`(`AUTH_MODE=supabase`, Supabase URL·publishable key·백엔드 주소)으로 실행한다. `selectAuthService`가 Supabase SDK를 초기화하고, 로그인하면 HTTP 서비스를 사용한다. URL과 키가 비어 있으면 `UnconfiguredAuthService`를 선택한다.
 - 앱의 음성 네트워크 요청은 인증된 백엔드 `POST /chat/voice`, `POST /chat/turns/{turn_id}/tts`만 사용한다. STT/LLM/TTS 제공 업체나 스토리지 URL에 직접 연결하지 않는다.
 - 녹음은 기본 16 kHz, 모노 PCM16을 WAV로 감싸 `question.wav`, `audio/wav`로 전송한다. 기기가 조정한 샘플레이트와 채널 수를 WAV 헤더에 반영한다. 최대 60초, 최대 25 MiB이며 전송 전 확장자·MIME·헤더·실제 PCM 길이도 검사한다.
 - TTS는 백엔드 명세의 `audio_base64`와 `audio_format`을 사용한다. WAV/MP3 바이트를 메모리에서 재생하며 iOS/macOS/Linux는 앱 임시 파일을 사용하고 정리한다. URL 재생은 사용하지 않는다.

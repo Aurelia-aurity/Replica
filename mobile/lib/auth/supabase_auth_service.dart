@@ -5,24 +5,33 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 
 class SupabaseAuthService extends AuthService {
-  SupabaseAuthService(this._client, {super.now}) {
+  SupabaseAuthService(this._client, {this.emailRedirectTo, super.now}) {
     _accept(_client.auth.currentSession);
     _subscription = _client.auth.onAuthStateChange.listen(
       (state) {
-        if (!_loggingOut) _accept(state.session);
+        if (state.event == AuthChangeEvent.signedOut &&
+            state.signOutReason == SignOutReason.userInitiated &&
+            !state.fromBroadcast) {
+          _finishLocalSignOut();
+        }
+        _accept(state.session);
       },
       onError: (Object error, StackTrace stack) {
-        // Offline refresh must not crash or expose raw server errors.
-        notice = '세션을 갱신하지 못했어요. 연결을 확인해 주세요.';
+        notice = switch (error) {
+          AuthException(code: 'otp_expired') => '이메일 인증 링크가 만료되었거나 이미 사용되었어요.',
+          AuthRetryableFetchException() => '인증 요청을 완료하지 못했어요. 연결을 확인해 주세요.',
+          _ => '인증을 완료하지 못했어요. 다시 로그인해 주세요.',
+        };
         _accept(_client.auth.currentSession);
       },
     );
   }
 
   final SupabaseClient _client;
+  final String? emailRedirectTo;
   late final StreamSubscription<AuthState> _subscription;
-  bool _loggingOut = false;
   bool _acceptSessions = true;
+  Completer<void>? _localSignOut;
   @override
   bool get isPreview => false;
 
@@ -82,6 +91,7 @@ class SupabaseAuthService extends AuthService {
   @override
   Future<void> signIn(String email, String password) async {
     try {
+      await _localSignOut?.future;
       _acceptSessions = true;
       notice = null;
       final response = await _client.auth.signInWithPassword(
@@ -97,11 +107,14 @@ class SupabaseAuthService extends AuthService {
   @override
   Future<SignUpResult> performRegistration(SignUpRequest request) async {
     try {
+      await _localSignOut?.future;
       _acceptSessions = true;
       notice = null;
       final response = await _client.auth.signUp(
         email: request.email,
         password: request.password,
+        emailRedirectTo: emailRedirectTo,
+        data: {'personal_records_consent': request.personalRecordsConsent},
       );
       _accept(response.session);
       return response.session != null
@@ -117,25 +130,46 @@ class SupabaseAuthService extends AuthService {
     final invalidated = super.invalidateSession(
       requestGeneration: requestGeneration,
     );
-    if (invalidated) _acceptSessions = false;
+    if (invalidated) {
+      _acceptSessions = false;
+      // Clear the SDK session too, so a restart cannot restore a rejected token.
+      _clearSdkSession().ignore();
+    }
     return invalidated;
   }
 
   @override
   Future<void> signOut() async {
-    _loggingOut = true;
     _acceptSessions = false;
     // Remove the entire account navigation tree before waiting on the network.
     updateIdentity(null);
     try {
-      await _client.auth.signOut(scope: SignOutScope.local);
+      await _clearSdkSession();
     } catch (error) {
-      notice = '화면 데이터는 지웠지만 로그아웃 요청을 완료하지 못했어요. 다시 시도해 주세요.';
-      notifyListeners();
+      if (!_acceptSessions) {
+        notice = '이 기기에서 로그아웃했어요. 서버 로그아웃 요청은 완료하지 못했어요.';
+        notifyListeners();
+      }
       throw _failure(error);
-    } finally {
-      _loggingOut = false;
     }
+  }
+
+  Future<void> _clearSdkSession() async {
+    final pending = _localSignOut;
+    if (pending != null) return pending.future;
+    final localSignOut = _localSignOut = Completer<void>();
+    try {
+      // The SDK emits signedOut after clearing its local session and before
+      // awaiting the remote logout request.
+      await _client.auth.signOut(scope: SignOutScope.local);
+    } finally {
+      if (identical(_localSignOut, localSignOut)) _finishLocalSignOut();
+    }
+  }
+
+  void _finishLocalSignOut() {
+    _localSignOut?.complete();
+    _localSignOut = null;
   }
 
   @override
