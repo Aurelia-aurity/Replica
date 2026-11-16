@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 import json
 import math
+import os
 from pathlib import Path
 import struct
 from typing import Protocol, TypedDict
@@ -81,6 +82,37 @@ def _float32(value: float) -> float:
     return result
 
 
+def _validate_weight_tree(root: Path) -> None:
+    """Reject pickle artifacts regardless of SDK configuration or module selection."""
+    pending = [root]
+    try:
+        while pending:
+            with os.scandir(pending.pop()) as entries:
+                for entry in entries:
+                    artifact = Path(entry.path)
+                    if entry.is_symlink() and not artifact.resolve().is_relative_to(root):
+                        raise EncodingError("unsafe_local_weights")
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(artifact)
+                        continue
+                    if artifact.suffix.lower() in {".bin", ".pt", ".pth", ".pkl", ".pickle", ".ckpt"}:
+                        raise EncodingError("unsafe_local_weights")
+                    if ".safetensors.index" not in entry.name.lower() or not entry.name.lower().endswith(".json"):
+                        continue
+                    layout = json.loads(artifact.read_text(encoding="utf-8"))
+                    shards = layout.get("weight_map") if isinstance(layout, dict) else None
+                    # Index contents, not their selectors, determine shard deserialization.
+                    if (not isinstance(shards, dict) or not shards
+                            or not all(isinstance(name, str) and name.endswith(".safetensors")
+                                       and not Path(name).is_absolute()
+                                       and (artifact.parent / name).resolve().is_relative_to(root)
+                                       and (artifact.parent / name).is_file()
+                                       for name in shards.values())):
+                        raise EncodingError("unsafe_local_weights")
+    except (OSError, json.JSONDecodeError):
+        raise EncodingError("unsafe_local_weights") from None
+
+
 class LocalEncoder:
     """Own one loaded optional model. Constructor always loads a real local path."""
 
@@ -90,6 +122,7 @@ class LocalEncoder:
         path = model_path.resolve()
         if not path.is_dir():
             raise EncodingError("local_model_directory_required")
+        _validate_weight_tree(path)
         # Standard ST modules only; never fall back to inferred mean pooling.
         try:
             modules = json.loads((path / "modules.json").read_text(encoding="utf-8"))
@@ -119,24 +152,6 @@ class LocalEncoder:
                     except (OSError, json.JSONDecodeError):
                         raise EncodingError("unsafe_local_weights") from None
                     if not isinstance(configured, dict) or "transformers_weights" in configured:
-                        raise EncodingError("unsafe_local_weights")
-                indexes = set(directory.glob("model.safetensors.index*.json", case_sensitive=False))
-                literal = directory / "model.safetensors.index.json"
-                if literal.exists():
-                    indexes.add(literal)
-                for index in indexes:
-                    try:
-                        layout = json.loads(index.read_text(encoding="utf-8"))
-                    except (OSError, json.JSONDecodeError):
-                        raise EncodingError("unsafe_local_weights") from None
-                    shards = layout.get("weight_map") if isinstance(layout, dict) else None
-                    # Transformers trusts index filenames even for a safetensors index.
-                    if (not isinstance(shards, dict) or not shards
-                            or not all(isinstance(name, str) and name.endswith(".safetensors")
-                                       and not Path(name).is_absolute()
-                                       and (directory / name).resolve().is_relative_to(path)
-                                       and (directory / name).is_file()
-                                       for name in shards.values())):
                         raise EncodingError("unsafe_local_weights")
         model_config = path / "config_sentence_transformers.json"
         if model_config.exists():

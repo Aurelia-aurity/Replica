@@ -77,6 +77,66 @@ class ArtifactTests(unittest.TestCase):
             LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
+    def test_module_config_redirect_never_enters_dependency(self):
+        (self.path / "sentence_bert_config.json").write_text(json.dumps({
+            "config_args": {"_configuration_file": "weights.json"}}))
+        (self.path / "weights.json").write_text(json.dumps({
+            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}))
+        (self.path / "other.safetensors.index.json").write_text(json.dumps({
+            "weight_map": {"weight": "payload.bin"}}))
+        (self.path / "payload.bin").touch()
+        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+            LocalEncoder(self.path)
+        self.runtime.SentenceTransformer.assert_not_called()
+
+    def test_versioned_config_redirect_never_enters_dependency(self):
+        (self.path / "config.json").write_text(json.dumps({
+            "model_type": "bert", "configuration_files": ["config.4.0.0.json"]}))
+        (self.path / "config.4.0.0.json").write_text(json.dumps({
+            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}))
+        (self.path / "other.safetensors.index.json").write_text(json.dumps({
+            "weight_map": {"weight": "payload.bin"}}))
+        (self.path / "payload.bin").touch()
+        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+            LocalEncoder(self.path)
+        self.runtime.SentenceTransformer.assert_not_called()
+
+    def test_unselected_nested_pickle_weights_never_enter_dependency(self):
+        nested = self.path / "unused"
+        nested.mkdir()
+        for extension in (".bin", ".PT", ".pth", ".PKL", ".pickle", ".CKPT"):
+            with self.subTest(extension=extension):
+                weight = nested / ("weights" + extension)
+                weight.touch()
+                try:
+                    with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+                        LocalEncoder(self.path)
+                finally:
+                    weight.unlink()
+        self.runtime.SentenceTransformer.assert_not_called()
+
+    def test_unselected_index_and_escaping_symlinks_never_enter_dependency(self):
+        nested = self.path / "unused"
+        nested.mkdir()
+        index = nested / "other.safetensors.index.json"
+        index.write_text(json.dumps({"weight_map": {"weight": "missing.bin"}}))
+        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+            LocalEncoder(self.path)
+        index.unlink()
+        with tempfile.TemporaryDirectory() as outside:
+            target = Path(outside) / "part.safetensors"
+            target.touch()
+            for destination in (target, Path(outside)):
+                with self.subTest(destination=destination.name):
+                    link = nested / "linked"
+                    link.symlink_to(destination)
+                    try:
+                        with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
+                            LocalEncoder(self.path)
+                    finally:
+                        link.unlink()
+        self.runtime.SentenceTransformer.assert_not_called()
+
     def test_existing_shard_escapes_never_enter_dependency(self):
         root = self.path / "model"
         root.mkdir()
