@@ -133,6 +133,20 @@ python ai/scripts/smoke_persona.py --help
 
 ## 학교 GPU baseline HTTP API (#43)
 
+### Local synthetic persona transport checks (#44)
+
+```bash
+python3 -B ai/scripts/local_persona_transport.py
+```
+
+This stdlib-only harness starts and stops its own loopback HTTP server with
+tokenizer, model and CUDA doubles. It checks three synthetic persona calls
+(evidence, no evidence, history), response/profile IDs, evidence subsets and the
+model label. Each case sends once. It is not production backend integration or
+school-GPU verification. The auth hook remains undecided; `/readyz` currently
+does not invoke it. `test_persona_call_auth.py` and `test_persona_call_faults.py`
+cover auth ordering, private logs, shared slots and disconnect/504 recovery.
+
 `src/server.py`는 표준 라이브러리 `ThreadingHTTPServer`로 `POST /v1/baseline/generate`를 제공합니다. `src/inference.py`가 이력 축소와 생성을 맡으며 CLI의 환경 검사·로더를 재사용합니다. 새 런타임 의존성은 없습니다.
 
 계약의 기준 소스는 병합된 `contracts/baseline` 및 `contracts/backend-ai/api-spec.md`의 섹션 1입니다. HTTP 테스트는 병합된 정식 예제를 사용하며 기존에 복사해 두었던 픽스처는 과거 기록용으로만 유지됩니다.
