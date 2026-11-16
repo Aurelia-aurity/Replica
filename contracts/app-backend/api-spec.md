@@ -69,8 +69,8 @@
 |---|---|---|
 | id | uuid | 대화 상대 id |
 | name | string | 이름 |
-| display_name | string \| null | 앱에 표시하고 AI가 부르는 이름·호칭(예: "엄마"). 사용자가 편집하며 미설정이면 `null`이고 이때 앱은 `name`을 표시 |
-| provider_address | string \| null | 대화 상대가 사용자를 부르는 호칭. 사용자가 확인·수정한 값이며 미설정이면 `null`. 프로필의 자동 추출 후보와 별개 |
+| display_name | string \| null | (제안) 앱에 표시하고 AI가 부르는 이름·호칭(예: "엄마"). 사용자가 편집하며 미설정이면 `null`이고 이때 앱은 `name`을 표시. 한 번 설정하면 `null`로 되돌릴 수 없음(수정 API 규칙 참고). 현재 `main`의 응답에는 아직 없음 |
+| provider_address | string \| null | (제안) 대화 상대가 사용자를 부르는 호칭. 사용자가 확인·수정한 값이며 미설정이면 `null`. 프로필의 자동 추출 후보와 별개. 현재 `main`의 응답에는 아직 없음 |
 | status | string | `active` 또는 `deleting` |
 | data_revision | integer | 자료 개정 번호. 확정 자료가 바뀔 때 증가, 말투 프로필의 최신 여부 판단에 사용 |
 | created_at | datetime | 생성 시각 |
@@ -121,9 +121,9 @@
 | consent_version | string \| null | 동의 문구 버전 (최대 100자) |
 | consent_scopes | string[] | 동의 범위. `personalization`, `training` 중 선택. 기본 `["personalization"]` |
 | error_code | string \| null | 실패 시 오류 코드 (영문·숫자·`.`·`-`·`_`, 1~64자) |
-| target_speaker | string \| null | (제안) 카카오톡 기록에서 말투를 반영하기로 고른 화자 |
+| target_speaker | string \| null | (제안) 카카오톡 기록에서 말투를 반영하기로 고른 화자. 파일에 표시된 문자열(앞뒤 공백 제거 후)이며 이 기록 안에서만 의미가 있음 |
 | provider_speaker | string \| null | (제안) 카카오톡 기록을 제공한 화자 (동의 근거) |
-| reflection_status | string | (제안) `none`(확정 전) · `pending`(확정됨, 색인·프로필 반영 중) · `reflected`(색인과 프로필에 반영 완료) · `failed`(반영 실패, 사용자 재요청으로 다시 시작) |
+| reflection_status | string | (제안) `none`(확정 전) · `pending`(확정됨, 색인·프로필 반영 중) · `reflected`(색인과 프로필에 반영 완료) · `failed`(반영 실패. 사용자가 말투 프로필 분석 API로 다시 요청하면 서버가 색인부터 다시 시작. 색인·프로필의 하위 상태와 재개 방식은 #112에서 정함) |
 | created_at, updated_at | datetime | 생성·수정 시각 |
 
 #### 텍스트 버전 객체
@@ -443,7 +443,7 @@ TTS 호출이 실패하면 백엔드가 한 요청 안에서 자동으로 다시
 | 단계·이슈 | 고도화 1 · #74 |
 | 내부 호출 | DB 대화 상대 호칭 수정 함수 (`display_name`·`provider_address` 컬럼과 함께 DB 담당이 확정. 현재 원격 스키마에는 없음) |
 
-SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`는 SC-07 또는 설정 화면에서 바꿉니다(화면 위치는 앱 명세에서 정함). 기존 `name`은 이 API로 바꾸지 않습니다.
+SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`는 SC-07에서 바꿉니다. 기존 `name`은 이 API로 바꾸지 않습니다.
 
 ##### 요청 (JSON)
 
@@ -451,7 +451,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 |---|---|---|---|---|
 | Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
 | persona_id | path | uuid | 필수 | `active` 상태의 대화 상대 id |
-| display_name | body | string | 선택 | 앞뒤 공백을 제거한 뒤 1~50자. 공백만 있으면 422 |
+| display_name | body | string | 선택 | 앞뒤 공백을 제거한 뒤 1~50자. 공백만 있으면 422. `null`이나 빈 값으로 되돌릴 수 없음(미설정이면 `name`을 표시) |
 | provider_address | body | string \| null | 선택 | 앞뒤 공백을 제거한 뒤 1~50자. 빈 문자열이나 `null`이면 미설정(`null`)으로 저장 |
 
 두 필드 중 하나 이상을 보내야 하며, 정의하지 않은 필드는 422입니다.
@@ -464,6 +464,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 개인화 호출 | 서버는 `display_name`을 쓰고, 없으면 `name`(1~50자일 때)을 씁니다. `name`이 범위를 벗어나면 개인화 호출 전에 422(`INVALID_INPUT`, `field: display_name`)로 이름을 입력하게 합니다 |
 | 자료 개정 | 호칭은 기록(자료)이 아니므로 `data_revision`을 올리지 않고 말투 프로필을 다시 분석하지 않습니다 |
 | 편집값 보호 | 분석 결과가 이 값을 덮어쓰지 않습니다. 자동 추출 후보는 말투 프로필의 `speech_style.address_terms`로만 제공합니다 |
+| 입력 한도 | 앱의 이름·호칭 입력 한도도 서버와 같은 50자에 맞춥니다(#94 초안의 20자는 50자로 바꾸도록 요청) |
 
 ##### 응답 (200) · 대화 상대
 
@@ -623,9 +624,10 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 |---|---|
 | 용량 | `size_bytes`가 25 MiB(26,214,400바이트)를 넘으면 413 `FILE_TOO_LARGE`(`field: size_bytes`). 앱의 한도와 같음 |
 | 형식 | `mime_type`은 `text/plain`, `audio/wav`, `audio/x-wav`, `audio/mpeg`, `audio/mp4`, `audio/x-m4a` 중 하나이고 `kind`와 맞아야 함. 아니면 422 |
-| 화자 선택 | `target_speaker`·`provider_speaker`는 카카오톡 내보내기(`kind=text`)에서만 둘 다 보냅니다. 값은 파일에 나온 화자 표시 문자열 그대로이고 서버가 파싱한 화자 목록에 있어야 하며(없으면 422), 두 값이 같으면 422(`field: provider_speaker`)입니다. 앱의 비활성 처리는 우회될 수 있으므로 서버도 거부합니다 |
-| 화자 구분이 없는 기록 | 음성 기록은 대상 인물(persona)의 목소리만 담긴 파일이며 전사 전체를 `persona`의 발화로 봅니다. 카카오톡 형식이 아닌 텍스트(일기 등)도 전체를 `persona`의 기록으로 봅니다(제안). 이 경우 화자 필드를 보내면 422입니다 |
+| 화자 선택 | `target_speaker`·`provider_speaker`는 카카오톡 내보내기에서 화자가 **2명 이상**일 때만 둘 다 보냅니다. 예약 단계에는 파일이 없으므로 **형식만** 검사합니다. 앞뒤 공백을 제거한 뒤 1~100자여야 하고, 하나만 오거나 두 값이 같으면 422(`field: provider_speaker`)입니다. 값이 파일의 화자 목록에 있는지와 카카오톡 판정은 파일을 올린 뒤 `/uploaded`에서 검사합니다(아래 '업로드 뒤 검증'). 앱의 비활성 처리는 우회될 수 있으므로 서버도 거부합니다 |
+| 화자 구분이 없는 기록 | 음성 기록은 대상 인물(persona)의 목소리만 담긴 파일이며 전사 전체를 `persona`의 발화로 봅니다. 카카오톡 형식이 아닌 텍스트(일기 등)도 전체를 `persona`의 기록으로 봅니다(제안). 이 경우 화자 필드를 보내면 업로드 뒤 검증에서 422입니다. 카카오톡 내보내기라도 화자가 1명뿐이면 앱은 선택 단계를 건너뛰고 화자 필드를 보내지 않으며, 서버도 전체를 `persona`의 발화로 봅니다(제안). 그 한 명이 제공자 본인이면 사용자의 글이 페르소나로 분석될 수 있어 앱의 안내와 후속 확인이 필요합니다 |
 | 재예약 | 같은 `record_id`로 같은 본문을 다시 보내고 기록이 `uploading`이면 기록은 그대로 두고 200과 새 `upload`를 돌려줍니다. 본문이 다르거나 이미 `uploading`이 아니면 409 `CONFLICT` |
+| 화자 식별 | 앱이 보내는 값은 파일에 표시된 화자 문자열이며 그 기록 안에서만 의미가 있습니다. 서버는 이를 기록별 화자 식별자로 바꿔 저장하고, 표시 문자열을 사람·계정을 가리키는 전역 ID처럼 쓰지 않습니다. 발화·청크의 `speaker_role` 저장 구조는 백엔드·DB가 정합니다(#74) |
 
 ##### 응답 (201) · 기록과 업로드 정보
 
@@ -635,8 +637,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | upload | object | 원본 파일을 올릴 서명 업로드 정보. 이 응답에만 있고 기록 객체에는 없음 |
 | upload.url | string | 일회용 서명 업로드 주소 (private Storage) |
 | upload.method | string | `PUT` |
-| upload.headers | object | 앱이 그대로 붙여 보낼 헤더 (예: `Content-Type`) |
-| upload.expires_at | datetime | 서명 만료 시각. 지나면 같은 `record_id`로 다시 예약해 새 정보를 받음 |
+| upload.headers | object | 앱이 그대로 붙여 보낼 헤더. `Content-Type`은 예약 요청의 `mime_type`과 같고 버킷이 허용하는 MIME 목록과 일치해야 함 |
+| upload.expires_at | datetime | 서명 만료 시각. 지나면 같은 `record_id`로 다시 예약해 새 정보를 받음. 서명이 만료·거절되어 Storage가 돌려주는 오류는 백엔드의 401이 아니므로 앱은 로그아웃하지 않고 재예약으로 처리함 |
 
 <a id="a-record-uploaded"></a>
 
@@ -650,22 +652,35 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 
 이후 `processing`, `ready`, `failed`로의 상태 변경은 서버가 처리하고 앱은 기록 조회로 확인합니다.
 
-서버는 Storage에 원본이 있고 `size_bytes`와 같은지 확인한 뒤 `uploaded`로 바꿉니다. 없거나 크기가 다르면 409 `CONFLICT`입니다.
+서버는 Storage에 원본이 있고 `size_bytes`와 같은지 확인한 뒤 `uploaded`로 바꿉니다. 없거나 크기가 다르면 409 `CONFLICT`입니다. 이미 `uploaded` 이후 상태인 기록에 다시 호출하면(응답을 받지 못해 재호출한 경우) 200으로 현재 기록을 그대로 돌려줍니다.
 
-처리 흐름은 다음과 같습니다. **텍스트 기록**은 서버가 본문을 처리해 `revision 1`을 만들고 **자동으로 확정**한 뒤 색인과 말투 프로필 분석을 이어서 수행합니다. **음성 기록**은 STT로 `revision 1` 초안을 만들고, 사용자가 앱에서 확인·수정해 확정(`confirm`)하면 같은 후속을 수행합니다. 반영 진행은 기록 객체의 `reflection_status`로 확인합니다.
+처리 흐름은 다음과 같습니다. **텍스트 기록**은 서버가 본문을 처리해 `revision 1`을 만들고 **자동으로 확정**한 뒤 색인과 말투 프로필 분석을 이어서 수행합니다. 자동 확정은 텍스트 기록의 최초 `revision 1`에만 적용합니다. 이후 텍스트 초안(`revision 2` 이상)은 앱이 확정 API로 명시 확정합니다. **음성 기록**은 STT로 `revision 1` 초안을 만들고, 사용자가 앱에서 확인·수정해 확정(`confirm`)하면 같은 후속을 수행합니다. 반영 진행은 기록 객체의 `reflection_status`로 확인합니다. 텍스트 자동 확정·색인·분석도 저장·임베딩 전에 마스킹(`contracts/backend-ai/api-spec.md`의 '기록 민감정보 마스킹')을 거쳐야 합니다. 마스킹 구현 담당과 진행 조건은 #74에서 정하며, 정해지기 전에는 합성 자료나 공유 권한이 확인된 자료로만 검증합니다.
 
 ##### 요청
 
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
 |---|---|---|---|---|
 | Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
-| record_id | path | uuid | 필수 | 기록 id. 현재 상태가 `uploading`이어야 함 |
+| record_id | path | uuid | 필수 | 기록 id. 현재 상태가 `uploading`이어야 함(이미 `uploaded` 이후이면 위 멱등 규칙) |
+| target_speaker | body | string | 선택 | (제안) 예약 때 화자를 보내지 않았거나 업로드 뒤 검증에서 거절됐을 때 선택값을 다시 보냄. 앞뒤 공백 제거 후 1~100자 |
+| provider_speaker | body | string | 선택 | (제안) 위와 같음. 두 값은 함께 보냄 |
 
 ##### 응답 (200) · 기록
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | (본문) | 기록 객체 | 이 장의 '응답 객체' 절에 정의한 기록 객체 |
+
+##### 업로드 뒤 검증
+
+| 항목 | 내용 |
+|---|---|
+| 내용 형식 | 실제 내용이 `kind`·`mime_type`과 맞는지 확인합니다(텍스트 디코딩, 음성 파일 시그니처). 맞지 않으면 422(`INVALID_INPUT`)이고 기록을 삭제한 뒤 새로 예약합니다 |
+| 카카오톡 판정 | 서버가 파일을 파싱해 카카오톡 내보내기 여부와 화자 목록을 판정합니다. 서버 판정이 최종이며 앱의 판정과 다를 수 있습니다 |
+| 화자가 필요한데 없음 | 서버가 카카오톡이고 화자가 2명 이상이라고 판정했는데 두 값이 없으면 422(`INVALID_INPUT`, `field: target_speaker`)입니다. 앱은 화자 선택 화면으로 돌아가 선택값을 `/uploaded`에 담아 다시 호출합니다 |
+| 화자가 파일에 없음 | 두 값(앞뒤 공백 제거 후)이 파일의 화자 목록에 없으면 422(`field: target_speaker` 또는 `provider_speaker`)입니다 |
+| 화자가 필요 없는데 있음 | 카카오톡이 아니거나 화자가 1명뿐인데 화자 값을 보내면 422(`field: target_speaker`)입니다 |
+| 실패 뒤 상태 | 422이면 기록은 `uploading`으로 남고 올린 파일도 그대로 둡니다. 앱은 화자만 고쳐 `/uploaded`를 다시 호출하며 파일을 다시 올리지 않습니다 |
 
 <a id="a-record-get"></a>
 
@@ -700,6 +715,10 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | (본문) | 기록 객체 | 이 장의 '응답 객체' 절에 정의한 기록 객체 |
+
+##### 상태 확인 주기
+
+처리 중인 기록(`uploading`·`uploaded`·`processing`, `reflection_status=pending`)이 있는 동안 앱은 목록 화면이 보이는 동안만 5초 간격으로 조회하고, 조회가 실패하면 간격을 2배씩(최대 8배, 40초) 늘립니다(`mobile`의 현재 구현). 앱에는 별도의 총 대기 상한을 두지 않습니다. 서버가 `pending`을 언제까지 유지하고 언제 실패로 바꿀지는 정해지지 않았으며 #10·#112에서 정합니다.
 
 <a id="a-textver-list"></a>
 
@@ -740,7 +759,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 단계·이슈 | 고도화 1 · #10 |
 | 내부 호출 | DB `create_text_draft(record_id, revision, content, text_version_id?)` |
 
-확정본은 직접 고치지 않고 새 `revision`의 초안을 만들어 수정합니다.
+확정본은 직접 고치지 않고 새 `revision`의 초안을 만들어 수정합니다. 텍스트 기록도 같은 방식으로 수정하며, 새 초안은 확정 API로 확정해야 개인화에 반영됩니다.
 
 ##### 요청 (JSON)
 
@@ -795,7 +814,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 
 확정되면 이전 확정본은 `superseded`가 되고, 확정된 텍스트만 개인화에 사용됩니다. 프로필 생성 진행 상태는 말투 프로필 조회로 확인합니다.
 
-이 API는 **음성 기록**의 전사문을 사용자가 확정할 때 앱이 호출합니다. 텍스트 기록은 서버가 자동으로 확정하므로 앱이 호출하지 않습니다. 이미 확정된 버전에 다시 호출하면 409 `CONFLICT`입니다. 확정 뒤 색인과 프로필 분석은 서버가 이어서 수행하고, 진행은 기록의 `reflection_status`와 말투 프로필 조회의 분석 상태로 확인합니다.
+이 API는 사용자가 전사문 초안을 확정할 때 앱이 호출합니다. **음성 기록**의 `revision 1`과 텍스트 기록의 `revision 2` 이상 초안이 대상입니다. 텍스트 기록의 최초 `revision 1`은 서버가 자동으로 확정하므로 앱이 호출하지 않습니다. 이미 확정된 버전에 다시 호출하면 409 `CONFLICT`입니다. 확정 뒤 색인과 프로필 분석은 서버가 이어서 수행하고, 진행은 기록의 `reflection_status`와 말투 프로필 조회의 분석 상태로 확인합니다.
 
 ##### 요청
 
@@ -834,6 +853,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | profile | 말투 프로필 객체 \| null | `ready` 프로필이 없으면(없음·생성 중·`stale`) `null` |
+| profile_state | string | (제안) `none`(프로필 없음) · `building`(분석 진행 중) · `ready` · `stale`(자료가 바뀌어 다시 분석해야 함. 이 프로필은 개인화에 쓰지 않으므로 `profile`은 `null`). 앱이 "재분석 필요"를 표시하는 근거 |
 | analysis | 분석 상태 객체 \| null | 진행 중이거나 마지막 분석 작업의 상태. 분석한 적이 없으면 `null` |
 
 ##### 분석 상태 객체
@@ -841,6 +861,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 필드 | 형식 | 설명 |
 |---|---|---|
 | operation_id | uuid | 분석 작업 id |
+| attempt | integer | (제안) 같은 자료에 대한 시도 번호(1부터). 서버가 올리며 앱은 보내지 않음 |
 | status | string | `running` · `succeeded` · `failed` · `unknown` (게시 결과를 알 수 없음) |
 | error_code | string \| null | 실패 시 안전한 코드(예: `insufficient_input`, `source_changed`, `ai_failed`). 질문·기록·예외 원문은 넣지 않음 |
 | started_at, updated_at | datetime | 시작·갱신 시각 |
@@ -857,7 +878,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 단계·이슈 | 고도화 1 · #113 |
 | 내부 호출 | 분석 작업 생성(DB 담당과 확정) → AI 분석·통합 호출 → `publish_style_profile` |
 
-기록을 확정하면 서버가 분석을 자동으로 시작하므로 앱이 처음에 호출할 필요는 없습니다. 이 API는 실패·`unknown`·자료 개정 충돌 뒤에 사용자가 다시 요청할 때 씁니다.
+기록을 확정하면 서버가 분석을 자동으로 시작하므로 앱이 처음에 호출할 필요는 없습니다. 이 API는 실패·`unknown`·자료 개정 충돌 뒤에 사용자가 다시 요청할 때 씁니다. 색인이 실패한 기록(`reflection_status=failed`)도 이 API로 다시 요청하면 서버가 색인부터 다시 시작합니다. 색인·프로필의 세부 하위 상태는 #112에서 정합니다.
 
 ##### 요청 (JSON)
 
@@ -872,9 +893,21 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 상태 | 설명 |
 |---|---|
 | 202 | 새 분석 작업을 시작함. 본문은 분석 상태 객체 |
-| 200 | 이미 `running`인 작업이 있어 새로 만들지 않고 그 작업의 분석 상태 객체를 돌려줌. 직전 작업이 `unknown`이면 서버가 먼저 게시 결과를 확인해 게시됐다면 `succeeded`로 돌려주고 새 분석을 시작하지 않음 |
+| 200 | 새 작업을 만들지 않고 기존 작업의 분석 상태 객체를 돌려줌(아래 '작업 식별과 재시도 규칙') |
 | 404 | 없거나 남의 대화 상대 |
 | 422 | 확정된 기록이 하나도 없음 (`INVALID_INPUT`) |
+
+##### 작업 식별과 재시도 규칙
+
+| 상황 | 처리 |
+|---|---|
+| 같은 `operation_id`로 다시 요청(응답 유실 등) | 새 작업·시도 없이 그 작업의 현재 분석 상태를 200으로 돌려줌. 이미 `succeeded`여도 같음 |
+| 다른 요청인데 `running` 작업이 있음 | 새로 만들지 않고 그 작업의 상태를 200으로 돌려줌 |
+| 마지막 작업이 `failed`이고 자료(`data_revision`)가 같음 | 사용자 수동 재시도. 서버가 같은 작업의 `attempt`를 1 올려 새 시도를 시작하고 202 |
+| 마지막 작업이 `unknown` | 서버가 먼저 저장된 게시 결과를 확인. 게시됐으면 `succeeded`로 200, 새 시도 없음. 확인되지 않으면 새 시도를 만들지 않고 `unknown` 그대로 200(확인 대기). 이전 시도의 미게시·실패가 확인된 뒤에만 새 `attempt`를 시작 |
+| 마지막 작업이 `succeeded`이거나 자료 `data_revision`이 바뀜 | 새 작업(`attempt` 1)을 시작하고 202. 이전 작업의 게시 권한은 폐기 |
+
+`attempt`는 백엔드가 올리고 앱은 보내지 않습니다. 서버가 분석을 자동으로 다시 시작하지 않습니다. 백엔드 내부 규칙은 `contracts/backend-ai/api-spec.md`의 분석 작업·시도 설명을 따릅니다.
 
 <a id="a-record-del"></a>
 
@@ -974,6 +1007,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 용량 제한 | 25 MiB(26,214,400바이트). 예약할 때 `size_bytes`로 검사 |
 | 업로드 주체 | 앱이 Storage로 직접 올림(백엔드를 거치지 않음). 서버는 `POST /records` 응답의 `upload`로 서명 정보를 줌 |
 | 요청·응답 규격 | `POST /records` 응답의 `upload`(`url`, `method`, `headers`, `expires_at`), 완료는 `POST /records/{record_id}/uploaded` |
+| 끊긴 전송·응답 유실 | 앱은 먼저 `POST /records/{record_id}/uploaded`를 호출합니다. 200이면 올라간 것이므로 끝, 409이면 파일이 없거나 크기가 다른 것이므로 같은 서명 주소로 `PUT`을 다시 보냅니다. 서명이 만료됐다면 같은 `record_id`로 재예약해 새 `upload`를 받습니다. 완료 호출의 응답을 잃어도 같은 호출을 반복하면 되며 이미 처리된 기록은 200입니다 |
+| Storage 오류 | Storage가 돌려주는 서명 만료·거절 오류는 백엔드 오류 봉투가 아니며, 앱은 백엔드 401(로그아웃)과 구분해 재예약으로 처리합니다. Storage의 상태 코드와 본문은 실제 호출로 확인한 뒤 적습니다(미확인) |
 | 마스킹·원본 보관 범위 | 미정 (이슈 #74) |
 
 <a id="s2"></a>
@@ -1039,11 +1074,11 @@ DB가 원인인 오류(`NOT_FOUND`, `CONFLICT`, `DB_UNAVAILABLE` 등)는 **DB �
 
 같은 `code`는 한 가지 문구만 씁니다. 2장·3장·DB 규격 문서의 `code`와 문구는 같고, 상황이 다르면 `code`를 나눕니다.
 
-AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 자체 30초 타임아웃으로 처리합니다.
+AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 요청 종류별 자체 타임아웃(텍스트·TTS 180초, 음성 200초)으로 처리합니다. 백엔드의 AI 호출 대기 `LLM_TIMEOUT_SECONDS`(잠정 60초, #96에서 검토 중)는 앱의 대기 시간과 별개의 값입니다.
 
 오류 본문에는 SQL, 예외 원문, 토큰, 질문·답변 내용, 서버 키를 넣지 않습니다.
 
-앱의 현재 동작: 입력은 2000자 이내, 공백만 있는 메시지는 전송 불가, 응답 대기 중 중복 전송 방지, **30초 타임아웃**, 실패·빈 응답은 오류 안내와 재시도·수정 버튼을 제공합니다.
+앱의 현재 동작: 입력은 2000자 이내, 공백만 있는 메시지는 전송 불가, 응답 대기 중 중복 전송 방지, **요청별 타임아웃(텍스트·TTS 180초, 음성 200초)**, 실패·빈 응답은 오류 안내와 재시도·수정 버튼을 제공합니다.
 
 <a id="s3"></a>
 
