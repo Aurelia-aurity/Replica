@@ -89,7 +89,7 @@ class _DeletionSheetState extends State<DeletionSheet> {
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
             if (didPop || c.busy) return;
-            Navigator.of(context).pop(c.complete);
+            _close(context, c.complete);
           },
           child: SafeArea(
             child: Padding(
@@ -318,7 +318,7 @@ class _DeletionSheetState extends State<DeletionSheet> {
                           child: OutlinedButton(
                             onPressed: c.busy
                                 ? null
-                                : () => Navigator.of(context).pop(c.complete),
+                                : () => _close(context, c.complete),
                             child: Text(job == null ? '취소' : '닫기'),
                           ),
                         ),
@@ -336,7 +336,7 @@ class _DeletionSheetState extends State<DeletionSheet> {
                                 ? null
                                 : () async {
                                     if (c.complete) {
-                                      Navigator.of(context).pop(true);
+                                      _close(context, true);
                                       return;
                                     }
                                     await c.execute(retry: failed);
@@ -364,6 +364,13 @@ class _DeletionSheetState extends State<DeletionSheet> {
         );
       },
     );
+  }
+
+  /// Closes the sheet with [complete] and hands any later completion back to
+  /// the controller's listeners before the closing animation starts.
+  void _close(BuildContext context, bool complete) {
+    widget.controller.release(complete: complete);
+    Navigator.of(context).pop(complete);
   }
 
   /// Per-step progress: what is already gone and what is still left.

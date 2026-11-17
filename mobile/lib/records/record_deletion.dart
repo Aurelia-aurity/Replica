@@ -82,9 +82,22 @@ class RecordDeletionController extends ChangeNotifier {
   DeletionJob? job;
   bool busy = false, disposed = false;
 
-  /// True while a deletion sheet shows this job. The sheet then reports the
-  /// outcome itself when the user closes it.
+  /// True while a deletion sheet shows this job and has not closed yet. The
+  /// sheet then reports the outcome itself when the user closes it.
   bool presented = false;
+
+  /// Set once a sheet closed reporting the deletion as complete; the screen
+  /// that opened it handles the outcome, so it is never reported again.
+  bool reported = false;
+
+  /// Called by a sheet as it starts closing with [complete]. From then on a
+  /// completion that arrives (even during the closing animation) is reported
+  /// by whoever listens to this controller, not by the closed sheet.
+  void release({required bool complete}) {
+    presented = false;
+    if (complete) reported = true;
+  }
+
   String? error;
   String? label;
   Timer? _watch;

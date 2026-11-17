@@ -55,7 +55,9 @@ class RecordController extends ChangeNotifier {
       if (controller.account && controller.complete) {
         clearLocalData();
         // An open sheet reports completion when the user closes it.
-        if (!controller.presented && !_accountDeletionReported) {
+        if (!controller.presented &&
+            !controller.reported &&
+            !_accountDeletionReported) {
           _accountDeletionReported = true;
           onAccountDeleted?.call();
         }
