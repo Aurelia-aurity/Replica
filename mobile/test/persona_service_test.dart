@@ -136,16 +136,21 @@ void main() {
     });
 
     test(
-      'a stored partner with another name is not mistaken for success',
+      'a partner an earlier attempt stored is returned under its name',
       () async {
+        // The app's id for this partner already holds an earlier attempt,
+        // saved before its answer was lost; the server refuses a second one.
         final (service, _) = await httpService((request) async {
-          if (request.method == 'POST') return jsonResponse({}, 500);
-          return jsonResponse(personaJson('p-new', '다른 이름'));
+          if (request.method == 'POST') {
+            return jsonResponse({
+              'error': {'code': 'CONFLICT'},
+            }, 409);
+          }
+          return jsonResponse(personaJson('p-new', '엄마'));
         });
-        await expectLater(
-          service.create('엄마', personaId: 'p-new'),
-          throwsA(isA<BackendFailure>()),
-        );
+        final persona = await service.create('엄마 2', personaId: 'p-new');
+        expect(persona.id, 'p-new');
+        expect(persona.name, '엄마');
       },
     );
 

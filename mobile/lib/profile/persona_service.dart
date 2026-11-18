@@ -12,6 +12,8 @@ abstract class PersonaService {
 
   /// Creates a partner (`POST /personas`). [personaId] is chosen by the app and
   /// kept across retries so a lost response can never create a second partner.
+  /// When an earlier attempt with [personaId] already stored the partner, that
+  /// partner is returned, even under the earlier attempt's name.
   Future<Persona> create(String name, {required String personaId});
 
   /// Changes the display name and/or the provider address
@@ -144,12 +146,14 @@ class HttpPersonaService implements PersonaService {
       );
       return Persona.fromJson(json as Map<String, dynamic>);
     } catch (error) {
-      if (_isDefiniteRejection(error)) rethrow;
+      if (isDefiniteRejection(error)) rethrow;
       // The write may have succeeded before the answer was lost (timeout,
       // dropped connection, 409 on a retry). Look the id up before reporting
-      // failure so retrying never leaves a second partner behind.
+      // failure so retrying never leaves a second partner behind. The id is
+      // the app's own for this one partner, so a stored partner under another
+      // name is an earlier attempt that was saved, not someone else's.
       final existing = await _find(personaId);
-      if (existing != null && existing.name == name) return existing;
+      if (existing != null) return existing;
       rethrow;
     }
   }
@@ -233,13 +237,6 @@ class HttpPersonaService implements PersonaService {
     code: apiNotProvided,
   );
 
-  bool _isDefiniteRejection(Object error) =>
-      error is BackendFailure &&
-      (error.kind == BackendFailureKind.unauthenticated ||
-          error.kind == BackendFailureKind.forbidden ||
-          error.kind == BackendFailureKind.staleSession ||
-          error.code == 'INVALID_INPUT');
-
   Future<Persona?> _find(String id) async {
     try {
       final json = await _api.request(
@@ -255,3 +252,12 @@ class HttpPersonaService implements PersonaService {
 
 /// Id for a new partner; retries of the same save reuse it.
 String newPersonaId() => newConversationId();
+
+/// The server certainly did not store the request: its input was refused or
+/// the session cannot write. Any other failure may hide a stored write.
+bool isDefiniteRejection(Object error) =>
+    error is BackendFailure &&
+    (error.kind == BackendFailureKind.unauthenticated ||
+        error.kind == BackendFailureKind.forbidden ||
+        error.kind == BackendFailureKind.staleSession ||
+        error.code == 'INVALID_INPUT');

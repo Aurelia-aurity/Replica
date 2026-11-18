@@ -48,10 +48,11 @@ final _saveStyle = FilledButton.styleFrom(
 class _PersonaNameScreenState extends State<PersonaNameScreen> {
   late final _text = TextEditingController(text: widget.editing?.label ?? '');
   bool _saving = false;
-  // One id per attempted name: a retry of the same save must not create a
-  // second partner, a different name is a different request.
+  // One id for this new partner until a request with it is definitely
+  // refused. An attempt whose answer was lost may have stored the partner,
+  // so even a changed name reuses its id: the server then refuses a second
+  // partner with it, and the stored one is found instead.
   String _requestId = newPersonaId();
-  String? _requestName;
 
   bool get _isEdit => widget.editing != null;
   String? get _name => normalizePersonaName(_text.text);
@@ -75,6 +76,23 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     _ => '저장하지 못했어요. 입력한 이름은 그대로 두었어요. 다시 시도해 주세요.',
   };
 
+  /// Creates the partner under [_requestId]. When an earlier attempt with
+  /// that id turns out to have stored it under another name, the typed
+  /// [name] is applied as its display name; if that fails the partner is
+  /// kept as stored rather than reported as a failure.
+  Future<Persona> _create(String name) async {
+    final saved = await widget.controller.create(name, personaId: _requestId);
+    if (saved.label == name) return saved;
+    try {
+      return await widget.controller.update(
+        saved.id,
+        PersonaUpdate(displayName: name),
+      );
+    } catch (_) {
+      return saved;
+    }
+  }
+
   Future<void> _save() async {
     // A notice action can fire after the screen is gone.
     if (!mounted) return;
@@ -97,17 +115,28 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
           PersonaUpdate(displayName: name),
         );
       } else {
-        if (_requestName != name) {
-          _requestId = newPersonaId();
-          _requestName = name;
-        }
-        saved = await widget.controller.create(name, personaId: _requestId);
+        saved = await _create(name);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+      if (saved.label != name) {
+        // Stored by an earlier attempt under its name, and the new name could
+        // not be applied: say so on the next screen.
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '앞서 저장한 "${saved.label}"(으)로 만들어졌어요. 이름은 말투 프로필에서 바꿀 수 있어요.',
+            ),
+          ),
+        );
+      }
       Navigator.of(context).pop(saved);
     } catch (error) {
       if (!mounted) return;
+      if (!_isEdit && isDefiniteRejection(error)) {
+        // Nothing was stored under this id: the next save may use a new one.
+        _requestId = newPersonaId();
+      }
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()

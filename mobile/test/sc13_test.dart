@@ -9,6 +9,21 @@ import 'package:mobile/services/backend_service.dart';
 
 import 'persona_test_support.dart';
 
+/// The first save is stored but its answer is lost. A later save with the
+/// same id finds the stored partner, as `HttpPersonaService` does after its
+/// lookup, whatever name it was sent with.
+class LostAnswerPersonas extends FakePersonaService {
+  @override
+  Future<Persona> create(String name, {required String personaId}) async {
+    created.add((name: name, id: personaId));
+    for (final persona in personas) {
+      if (persona.id == personaId) return persona;
+    }
+    personas.insert(0, Persona(id: personaId, name: name));
+    throw StateError('answer lost');
+  }
+}
+
 class Opened {
   Persona? result;
   bool returned = false;
@@ -389,9 +404,10 @@ void main() {
     expect(opened.result!.name, '엄마');
   });
 
-  testWidgets('a different name after a failure is a new request', (
+  testWidgets('a different name after an unanswered failure keeps the id', (
     tester,
   ) async {
+    // The first attempt may have been stored, so a new id could leave two.
     final service = FakePersonaService()..createError = StateError('offline');
     await openName(tester, newController(service));
     await tester.enterText(find.byType(TextField), '엄마');
@@ -403,7 +419,74 @@ void main() {
     await tester.pump();
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
+    expect(service.created.first.id, service.created.last.id);
+    expect(service.personas, hasLength(1));
+  });
+
+  testWidgets('a refused name lets the next save use a new id', (tester) async {
+    final service = FakePersonaService()
+      ..createError = const BackendFailure(
+        BackendFailureKind.generic,
+        code: 'INVALID_INPUT',
+      );
+    await openName(tester, newController(service));
+    await tester.enterText(find.byType(TextField), '엄마');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    service.createError = null;
+    await tester.enterText(find.byType(TextField), '엄마 2');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
     expect(service.created.first.id, isNot(service.created.last.id));
+  });
+
+  testWidgets('an earlier stored attempt gets the new name as display name', (
+    tester,
+  ) async {
+    final service = LostAnswerPersonas();
+    final controller = newController(service);
+    final opened = await openName(tester, controller);
+    await tester.enterText(find.byType(TextField), '엄마');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('저장하지 못했어요'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '어머니');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(service.personas, hasLength(1));
+    expect(opened.result!.name, '엄마');
+    expect(opened.result!.label, '어머니');
+    expect(controller.current!.label, '어머니');
+    expect(find.textContaining('앞서 저장한'), findsNothing);
+  });
+
+  testWidgets('an earlier stored attempt is kept when renaming cannot', (
+    tester,
+  ) async {
+    final service = LostAnswerPersonas()
+      ..updateError = const BackendFailure(
+        BackendFailureKind.generic,
+        code: apiNotProvided,
+      );
+    final controller = newController(service);
+    final opened = await openName(tester, controller);
+    await tester.enterText(find.byType(TextField), '엄마');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '어머니');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(service.personas, hasLength(1));
+    expect(opened.result!.label, '엄마');
+    expect(controller.current!.label, '엄마');
+    expect(find.textContaining('앞서 저장한 "엄마"'), findsOneWidget);
   });
 
   testWidgets('the example stays visible under the field while typing', (
