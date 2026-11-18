@@ -16,7 +16,7 @@ Future<Persona?> openPersonaCreate(
 
 /// Opens SC-13 in edit mode to change the display name of [persona]. Returns
 /// the saved partner, or null when the user cancelled. Entered from SC-07's
-/// "이름 수정" (not wired yet: SC-07 is restored next).
+/// "대화 상대 이름 수정".
 Future<Persona?> openPersonaRename(
   BuildContext context,
   PersonaController controller,

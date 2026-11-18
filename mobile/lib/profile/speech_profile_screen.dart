@@ -9,8 +9,9 @@ import 'persona_models.dart';
 import 'style_profile_controller.dart';
 import 'style_profile_models.dart';
 
-/// Opens SC-04 (record upload) for [persona]. Records are built in their own
-/// work item; until one is passed the screen shows a notice instead.
+/// Opens SC-04 (record upload) for [persona], with that partner's records.
+/// The home screen passes it; without one (a screen opened on its own, as in
+/// tests) "기록 올리기" only shows a notice.
 typedef RecordUploadLauncher = Future<void> Function(
   BuildContext context,
   Persona persona,

@@ -9,9 +9,10 @@ import 'style_profile_models.dart';
 
 /// How often SC-07 rechecks a running analysis while it is open.
 ///
-/// Interim app values: the contract does not set a polling interval or limit
-/// yet (asked in PR #117). After [analysisCheckLimit] the screen stops checking
-/// by itself and offers a manual check instead.
+/// Interim app values. PR #117 set a polling rule only for the records list
+/// (every 5 s while visible, backing off to 8x on failures); none for the
+/// style profile analysis yet. After [analysisCheckLimit] the screen stops
+/// checking by itself and offers a manual check instead.
 const analysisCheckInterval = Duration(seconds: 15);
 const analysisCheckLimit = Duration(minutes: 10);
 
