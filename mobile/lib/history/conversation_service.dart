@@ -219,6 +219,7 @@ class HttpConversationService
     required this.baseUrl,
     required this.client,
     DateTime Function()? now,
+    this.personaSource,
   }) : _now = now ?? DateTime.now,
        _api = ApiClient(backend: backend, baseUrl: baseUrl, client: client);
   final BackendService backend;
@@ -226,6 +227,12 @@ class HttpConversationService
   final http.Client client;
   final DateTime Function() _now;
   final ApiClient _api;
+
+  /// Partners the app already holds (the home card's list, kept by the
+  /// partner service). With it this service takes partners and their names
+  /// from there instead of requesting `GET /personas` itself, so there is one
+  /// list and one set of names. Without it, it asks the server.
+  final Future<List<ConversationPersona>> Function()? personaSource;
 
   /// Until when the backend may still be working on a turn's speech request.
   /// Kept per login, so it survives leaving the screen or backgrounding the app.
@@ -299,6 +306,15 @@ class HttpConversationService
 
   @override
   Future<List<ConversationPersona>> personas() async {
+    final source = personaSource;
+    final result = source == null ? await _fetchPersonas() : await source();
+    for (final persona in result) {
+      _personaNames[persona.id] = persona.name;
+    }
+    return result;
+  }
+
+  Future<List<ConversationPersona>> _fetchPersonas() async {
     final result = <ConversationPersona>[];
     var offset = 0;
     while (true) {
@@ -317,14 +333,14 @@ class HttpConversationService
       if (page.length < limit) break;
       offset += page.length;
     }
-    for (final persona in result) {
-      _personaNames[persona.id] = persona.name;
-    }
     return result;
   }
 
   Future<String?> _personaName(String id) async {
+    // The held list costs no request and may have changed since: read it.
+    if (personaSource != null) await personas();
     if (_personaNames.containsKey(id)) return _personaNames[id];
+    // Not a partner the app holds (one being deleted, say): ask for it alone.
     final json = await _request(
       'GET',
       '/personas/${Uri.encodeComponent(id)}',

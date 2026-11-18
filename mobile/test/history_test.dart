@@ -413,6 +413,83 @@ void main() {
     },
   );
 
+  test(
+    'HTTP adapter takes partners from the held list, not GET /personas',
+    () async {
+      final auth = TestAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      final requests = <String>[];
+      var held = const [ConversationPersona(id: 'persona-1', name: '엄마')];
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        requests.add('${request.method} $path');
+        if (path.endsWith('/turns')) {
+          return jsonResponse({'items': [], 'limit': 50, 'after_turn_no': 0});
+        }
+        if (path == '/personas/persona-9') {
+          return jsonResponse({
+            'id': 'persona-9',
+            'name': '삼촌',
+            'status': 'deleting',
+          });
+        }
+        if (request.method == 'POST' && path == '/sessions') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          return jsonResponse(
+            sessionJson(
+              'new',
+              acknowledgedAt: body['ai_notice_ack_at'] as String,
+            ),
+            status: 201,
+          );
+        }
+        if (path == '/sessions') {
+          return jsonResponse({
+            'items': [sessionJson('s1')],
+            'limit': 50,
+            'offset': 0,
+          });
+        }
+        if (path == '/sessions/s9') {
+          return jsonResponse(sessionJson('s9', personaId: 'persona-9'));
+        }
+        return jsonResponse(sessionJson('s1'));
+      });
+      addTearDown(client.close);
+      final service = HttpConversationService(
+        backend: BackendService(auth),
+        baseUrl: Uri.parse('http://localhost:8000'),
+        client: client,
+        personaSource: () async => held,
+      );
+
+      final created = await service.createForPersona(
+        'persona-1',
+        DateTime.parse('2026-11-04T01:23:45+09:00'),
+      );
+      expect(created.personaName, '엄마');
+      expect((await service.list()).single.personaName, '엄마');
+      await expectLater(
+        service.createForPersona('persona-2', DateTime.now()),
+        throwsA(isA<BackendFailure>()),
+      );
+
+      // Renamed in SC-13: the next lookup already uses the new name.
+      held = const [ConversationPersona(id: 'persona-1', name: '어머니')];
+      expect((await service.get('s1')).personaName, '어머니');
+
+      // A partner the app does not hold (being deleted) is asked for alone.
+      expect((await service.get('s9')).personaName, '삼촌');
+
+      expect(requests, isNot(contains('GET /personas')));
+      expect(requests, contains('GET /personas/persona-9'));
+    },
+  );
+
   test('date groups cover day, week, month and previous years', () {
     final now = DateTime(2026, 10, 28);
     expect(conversationDateGroup(now, now), '오늘');

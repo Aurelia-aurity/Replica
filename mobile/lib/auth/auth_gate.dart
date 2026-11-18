@@ -26,6 +26,7 @@ class AuthGate extends StatefulWidget {
     this.personaServiceFactory,
     this.recordServiceFactory,
   });
+
   /// Record service for one partner's records (`persona_id`), or for
   /// account-wide deletion when [personaId] is null. Preview data otherwise.
   final RecordService Function(String? personaId)? recordServiceFactory;
@@ -78,21 +79,25 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (_history != null) return _history!;
     final backend = BackendService(widget.auth);
     final personas = _personaController();
+    // One partner list per login: the one the home card loaded and SC-13
+    // updates. The conversation services read it instead of asking the
+    // server again, so a partner and its name are the same everywhere.
+    Future<List<ConversationPersona>> heldPartners() async => [
+      for (final persona in personas.personas)
+        ConversationPersona(id: persona.id, name: persona.label),
+    ];
     if (widget.auth.isPreview) {
       return _history = MemoryConversationService(
         backend: backend,
         chat: widget.chat,
-        // Dummy conversations belong to the partners named in SC-13.
-        personaSource: () async => [
-          for (final persona in await personas.service.list())
-            ConversationPersona(id: persona.id, name: persona.label),
-        ],
+        personaSource: heldPartners,
       );
     }
     return _history = HttpConversationService(
       backend: backend,
       baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
       client: _client,
+      personaSource: heldPartners,
     );
   }
 
