@@ -1,94 +1,74 @@
-"""Loopback-only inference API with explicitly enabled personalization."""
+"""Loopback inference API with explicitly enabled persona and profile nodes."""
 import json
 import logging
-from http.server import ThreadingHTTPServer
-import re
 import time
+from typing import Final
 
 import baseline
-from baseline_contract import RAW_LIMIT, error_body, valid_id, reject_json_constant, parse_request
-from inference import ContextLimitExceeded, Inference
+from inference import ContextLimitExceeded, Inference, Request
 from inference_service import Service, allow_service
-from http_response import JsonHandler
+from http_contract import FrameError, InferenceHTTPServer, InferenceHandler, read_body
+from baseline_contract import RAW_LIMIT, error_body, valid_id, parse_request, reject_json_constant
 import persona_contract
 from persona_adapter import log_failure
+import profile_contract
+from profile_adapter import ProfileConfig
+from profile_types import Task
 from request_timing import RequestTiming, bind_timing
 
 LOGGER = logging.getLogger("baseline.http")
+PROFILE_ROUTES: Final[dict[str, Task]] = {
+    "/v1/persona-profiles/analyze": "analyze", "/v1/persona-profiles/merge": "merge"}
 
 
-class Server(ThreadingHTTPServer):
-    daemon_threads = True
-
+class Server(InferenceHTTPServer):
     def __init__(self, port: int, service: Service):
         self.service = service
         super().__init__(("127.0.0.1", port), Handler)
 
-    def handle_error(self, request, client_address):
-        # Base implementation prints raw exceptions and possibly request text.
-        LOGGER.info("request_id=null status=500 duration_ms=0")
 
-
-class Handler(JsonHandler):
-    def do_GET(self):
-        self.started = time.monotonic()
-        ready = self.server.service.ready.is_set()
-        if self.path not in ("/healthz", "/readyz"):
-            self.send_error(404)
-            return
-        self.respond(503 if self.path == "/readyz" and not ready else 200, {"ready": ready})
-
+class Handler(InferenceHandler):
     def do_POST(self):
         self.started = time.monotonic()
         self.timing = RequestTiming()
         self.timing.emit("receipt", 0)
-        if self.path not in ("/v1/baseline/generate", "/v1/persona/generate"):
+        service = self.server.service
+        profile_task = PROFILE_ROUTES.get(self.path)
+        if self.path not in ("/v1/baseline/generate", "/v1/persona/generate") and (
+                profile_task is None or service.profile_config is None):
             self.send_error(404)
             return
-        service = self.server.service
-        lengths = self.headers.get_all("Content-Length", [])
-        length = None
-        if len(lengths) == 1 and re.fullmatch(r"[0-9]+", lengths[0]):
-            try:
-                length = int(lengths[0])
-            except ValueError:
-                self.respond(413, error_body(413))
-                return
-        if length is not None and length > RAW_LIMIT:
-            self.respond(413, error_body(413))
-            return
-        status = service.auth(self.headers)
-        if status is not None:
-            self.respond(status, error_body(status))
-            return
-        # Only uncompressed, Content-Length framed JSON is supported.
-        if (length is None or self.headers.get("Transfer-Encoding") is not None
-                or self.headers.get("Content-Encoding") not in (None, "identity")):
-            self.respond(400, error_body(400))
-            return
-        read_start = self.timing.now()
-        raw = self.rfile.read(length)
-        self.timing.emit("body_read", read_start)
-        if len(raw) != length:
-            self.respond(400, error_body(400))
+        try:
+            raw = read_body(self, service.auth)
+        except FrameError as error:
+            self.respond(error.status, error_body(error.status))
             return
         request_id = None
+        parse_start = self.timing.now()
         try:
-            with self.timing.span("parse"):
-                data = json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant)
+            try:
+                data = (profile_contract.decode_json(raw.decode("utf-8")) if profile_task is not None
+                        else json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant))
                 if isinstance(data, dict) and valid_id(data.get("request_id")):
                     request_id = self.timing.request_id = data["request_id"]
                 if self.headers.get_content_type() != "application/json":
                     raise ValueError
-                request = (persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
+                request = (profile_contract.parse_request(data, profile_task) if profile_task is not None
+                           else persona_contract.parse_request(data) if self.path == "/v1/persona/generate"
                            else parse_request(data))
+            finally:
+                self.timing.emit("parse", parse_start)
         except persona_contract.PayloadTooLarge:
             self.respond(413, error_body(413, request_id))
+            return
+        except profile_contract.ProfileError as error:
+            self.respond(413 if error.code == "size" else 400, error_body(
+                413 if error.code == "size" else 400, request_id))
             return
         except (ValueError, UnicodeError, RecursionError):
             self.respond(400, error_body(400, request_id))
             return
-        if (len(request.message) > 16000 or len(request.history) > 20
+        if isinstance(request, Request) and (len(request.message) > 16000 or len(request.history) > 20
                 or any(len(text) > 16000 for pair in request.history for text in pair)):
             self.respond(413, error_body(413, request_id))
             return
@@ -98,7 +78,7 @@ class Handler(JsonHandler):
             return
         try:
             with bind_timing(self.timing), self.timing.span("prepare_tokenize"):
-                prepared = engine.prepare(request)
+                prepared = service.prepare(request)
         except ContextLimitExceeded:
             self.respond(422, error_body(422, request_id))
             return
@@ -126,15 +106,21 @@ def main(argv=None) -> int:
     parser.add_argument("--context-limit", type=int)
     parser.add_argument("--deadline-seconds", type=float)
     parser.add_argument("--mode", choices=("baseline", "persona"), default="baseline")
+    parser.add_argument("--enable-profile-analysis", action="store_true")
+    parser.add_argument("--profile-output-tokens", type=int)
     try:
         args = parser.parse_args(argv)
         if not 0 < args.port <= 65535 or (
                 args.context_limit is not None and args.context_limit < 1):
             raise ValueError
+        if args.enable_profile_analysis != (args.profile_output_tokens is not None):
+            raise ValueError
         settings = baseline.read_settings(args.config, "startup", args.model_path)
         if settings["model_id"] is None:
             raise ValueError
-        service = Service(deadline_seconds=args.deadline_seconds)
+        config = (ProfileConfig(settings["model_id"], args.profile_output_tokens)
+                  if args.enable_profile_analysis else None)
+        service = Service(deadline_seconds=args.deadline_seconds, profile_config=config)
         baseline.os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
         baseline.os.environ["TQDM_DISABLE"] = "1"
         logging.basicConfig(level=logging.INFO, format="%(message)s")

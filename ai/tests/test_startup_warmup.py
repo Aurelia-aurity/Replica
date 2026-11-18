@@ -8,14 +8,16 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import server
+from profile_adapter import ProfileConfig
 from startup_warmup import persona_fixture
 from test_server import Engine, call, request, serving
 
 
 class StartupWarmupTests(unittest.TestCase):
     def test_each_mode_stays_unready_until_all_three_calls_complete(self):
-        for mode in (None, "synthetic"):
-            with self.subTest(mode=mode):
+        for mode, profiles in ((None, False), (None, True),
+                               ("synthetic", False), ("synthetic", True)):
+            with self.subTest(mode=mode, profiles=profiles):
                 engine = Engine()
                 engine.answer = '{"message":"synthetic answer","evidence_used":[]}'
                 entered = [threading.Event() for _ in range(3)]
@@ -31,7 +33,8 @@ class StartupWarmupTests(unittest.TestCase):
                         raise AssertionError
                     return generate(req, prepared)
 
-                service = server.Service()
+                service = server.Service(profile_config=(
+                    ProfileConfig("synthetic", 32) if profiles else None))
                 with patch.object(engine, "generate", gated), serving(service) as port:
                     try:
                         with self.assertLogs("baseline.http", level="INFO") as logs:
