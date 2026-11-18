@@ -1,0 +1,360 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
+
+/// Where the original audio of a record can be streamed from.
+///
+/// The draft API has no endpoint for this; a service supplies it only after the
+/// app and backend agree on one. [simulated] sources only run a silent clock so
+/// previews can show the player without any real file.
+class RecordAudioSource {
+  const RecordAudioSource({this.url, this.duration, this.simulated = false})
+    : assert(simulated || url != null);
+  final Uri? url;
+  final Duration? duration;
+  final bool simulated;
+}
+
+abstract class RecordPlaybackEngine {
+  Stream<Duration> get position;
+  Stream<Duration> get duration;
+  Stream<void> get completed;
+  Stream<Object> get errors;
+  Future<void> open(RecordAudioSource source);
+  Future<void> play();
+  Future<void> pause();
+  Future<void> seek(Duration value);
+  Future<void> dispose();
+}
+
+class DevicePlaybackEngine implements RecordPlaybackEngine {
+  DevicePlaybackEngine([AudioPlayer? player])
+    : _player = player ?? AudioPlayer() {
+    _subscriptions
+      ..add(_player.onPositionChanged.listen(_position.add))
+      ..add(_player.onDurationChanged.listen(_duration.add))
+      ..add(_player.onPlayerComplete.listen((_) => _completed.add(null)))
+      ..add(_player.eventStream.listen((_) {}, onError: _errors.add));
+  }
+  final AudioPlayer _player;
+  final _position = StreamController<Duration>.broadcast();
+  final _duration = StreamController<Duration>.broadcast();
+  final _completed = StreamController<void>.broadcast();
+  final _errors = StreamController<Object>.broadcast();
+  final _subscriptions = <StreamSubscription<dynamic>>[];
+  @override
+  Stream<Duration> get position => _position.stream;
+  @override
+  Stream<Duration> get duration => _duration.stream;
+  @override
+  Stream<void> get completed => _completed.stream;
+  @override
+  Stream<Object> get errors => _errors.stream;
+  @override
+  Future<void> open(RecordAudioSource source) =>
+      _player.setSourceUrl(source.url.toString());
+  @override
+  Future<void> play() => _player.resume();
+  @override
+  Future<void> pause() => _player.pause();
+  @override
+  Future<void> seek(Duration value) => _player.seek(value);
+  @override
+  Future<void> dispose() async {
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+    await _player.dispose();
+    await _position.close();
+    await _duration.close();
+    await _completed.close();
+    await _errors.close();
+  }
+}
+
+/// A silent clock for previews. It never touches audio or any file.
+class SimulatedPlaybackEngine implements RecordPlaybackEngine {
+  SimulatedPlaybackEngine({
+    this.tick = const Duration(milliseconds: 250),
+    this.fallbackDuration = const Duration(seconds: 192),
+  });
+  final Duration tick;
+  final Duration fallbackDuration;
+  final _position = StreamController<Duration>.broadcast();
+  final _duration = StreamController<Duration>.broadcast();
+  final _completed = StreamController<void>.broadcast();
+  final _errors = StreamController<Object>.broadcast();
+  Timer? _timer;
+  Duration _at = Duration.zero;
+  late Duration _total = fallbackDuration;
+  @override
+  Stream<Duration> get position => _position.stream;
+  @override
+  Stream<Duration> get duration => _duration.stream;
+  @override
+  Stream<void> get completed => _completed.stream;
+  @override
+  Stream<Object> get errors => _errors.stream;
+  @override
+  Future<void> open(RecordAudioSource source) async {
+    _total = source.duration ?? fallbackDuration;
+    _duration.add(_total);
+  }
+
+  @override
+  Future<void> play() async {
+    _timer?.cancel();
+    _timer = Timer.periodic(tick, (_) {
+      _at += tick;
+      if (_at >= _total) {
+        _at = _total;
+        _timer?.cancel();
+        _position.add(_at);
+        _completed.add(null);
+        return;
+      }
+      _position.add(_at);
+    });
+  }
+
+  @override
+  Future<void> pause() async => _timer?.cancel();
+  @override
+  Future<void> seek(Duration value) async {
+    _at = value > _total ? _total : value;
+    _position.add(_at);
+  }
+
+  @override
+  Future<void> dispose() async {
+    _timer?.cancel();
+    await _position.close();
+    await _duration.close();
+    await _completed.close();
+    await _errors.close();
+  }
+}
+
+enum PlayerPhase { idle, loading, ready, failed }
+
+/// Drives the SC-05 player bar. The audio source is resolved on first use so
+/// opening a record never requests a file the user does not play.
+class RecordPlayerController extends ChangeNotifier {
+  RecordPlayerController({
+    required this.resolve,
+    RecordPlaybackEngine Function(RecordAudioSource source)? engineFactory,
+  }) : _engineFactory = engineFactory ?? _defaultEngine;
+
+  static RecordPlaybackEngine _defaultEngine(RecordAudioSource source) =>
+      source.simulated ? SimulatedPlaybackEngine() : DevicePlaybackEngine();
+
+  final Future<RecordAudioSource> Function() resolve;
+  final RecordPlaybackEngine Function(RecordAudioSource) _engineFactory;
+  RecordPlaybackEngine? _engine;
+  final _subscriptions = <StreamSubscription<dynamic>>[];
+  Future<void>? _opening;
+  Future<void> _releasing = Future<void>.value();
+  bool _disposed = false;
+  // Playback intent: every start or pause request bumps [_intent], so an
+  // asynchronous start can tell whether it was superseded while it waited.
+  int _intent = 0;
+  bool _wantsPlay = false;
+  int _starting = 0;
+  PlayerPhase phase = PlayerPhase.idle;
+  bool playing = false;
+  bool simulated = false;
+  Duration position = Duration.zero;
+  Duration? duration;
+
+  void _changed() {
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> _ensureOpen() => _opening ??= _open();
+
+  bool _isCurrent(RecordPlaybackEngine engine) =>
+      !_disposed && identical(_engine, engine);
+
+  Future<void> _releaseEngine() {
+    final engine = _engine;
+    if (engine == null) return _releasing;
+    // Detach immediately so queued events and in-flight commands cannot change
+    // the state of a replacement engine while asynchronous cleanup runs.
+    _engine = null;
+    final subscriptions = List.of(_subscriptions);
+    _subscriptions.clear();
+    return _releasing =
+        (() async {
+          try {
+            await Future.wait(subscriptions.map((s) => s.cancel()));
+          } finally {
+            await engine.dispose();
+          }
+        })().catchError((Object _) {
+          // Cleanup errors must not escape an event callback or widget disposal.
+        });
+  }
+
+  Future<void> _open() async {
+    phase = PlayerPhase.loading;
+    _changed();
+    RecordPlaybackEngine? openingEngine;
+    try {
+      await _releasing;
+      if (_disposed) return;
+      final source = await resolve();
+      if (_disposed) return;
+      simulated = source.simulated;
+      duration = source.duration;
+      position = Duration.zero;
+      final engine = _engine = _engineFactory(source);
+      openingEngine = engine;
+      _subscriptions
+        ..add(
+          engine.position.listen((value) {
+            if (!_isCurrent(engine)) return;
+            position = value;
+            _changed();
+          }),
+        )
+        ..add(
+          engine.duration.listen((value) {
+            if (!_isCurrent(engine)) return;
+            duration = value;
+            _changed();
+          }),
+        )
+        ..add(
+          engine.completed.listen((_) {
+            if (!_isCurrent(engine)) return;
+            playing = false;
+            position = duration ?? position;
+            _changed();
+          }),
+        )
+        ..add(
+          engine.errors.listen((_) {
+            if (_isCurrent(engine)) _fail();
+          }),
+        );
+      await engine.open(source);
+      if (!_isCurrent(engine)) return;
+      phase = PlayerPhase.ready;
+    } catch (_) {
+      if (openingEngine == null || _isCurrent(openingEngine)) _fail();
+    }
+    _changed();
+  }
+
+  void _fail() {
+    if (_disposed) return;
+    phase = PlayerPhase.failed;
+    playing = false;
+    _wantsPlay = false;
+    _opening = null; // a later tap may try again
+    unawaited(_releaseEngine());
+    _changed();
+  }
+
+  /// Records a new request to start playback and returns its intent. Any later
+  /// [pause] or start request supersedes it.
+  int _requestPlay() {
+    _wantsPlay = true;
+    return ++_intent;
+  }
+
+  /// Calls [RecordPlaybackEngine.play] for [intent]. If [pause] arrived while
+  /// the engine was starting, the engine is stopped again instead of being
+  /// reported as playing.
+  Future<void> _start(RecordPlaybackEngine engine, int intent) async {
+    _starting++;
+    try {
+      await engine.play();
+    } finally {
+      _starting--;
+    }
+    if (!_isCurrent(engine)) return;
+    if (intent != _intent) {
+      if (!_wantsPlay) await engine.pause();
+      return;
+    }
+    playing = true;
+  }
+
+  Future<void> toggle() async {
+    if (phase == PlayerPhase.loading) return;
+    if (playing) return pause();
+    final intent = _requestPlay();
+    final opening = _ensureOpen();
+    await opening;
+    if (!identical(opening, _opening) || intent != _intent) return;
+    final engine = _engine;
+    if (_disposed || engine == null || phase != PlayerPhase.ready) return;
+    try {
+      if (duration != null && position >= duration!) {
+        await engine.seek(Duration.zero);
+        if (!_isCurrent(engine)) return;
+        position = Duration.zero;
+        if (intent != _intent) {
+          _changed();
+          return;
+        }
+      }
+      await _start(engine, intent);
+    } catch (_) {
+      if (_isCurrent(engine)) _fail();
+    }
+    _changed();
+  }
+
+  Future<void> seekTo(Duration value, {bool play = false}) async {
+    if (phase == PlayerPhase.loading) return;
+    // A plain seek is not a request to play, so a pause does not cancel it.
+    final intent = play && !playing ? _requestPlay() : null;
+    bool cancelled() => intent != null && intent != _intent;
+    final opening = _ensureOpen();
+    await opening;
+    if (!identical(opening, _opening) || cancelled()) return;
+    final engine = _engine;
+    if (_disposed || engine == null || phase != PlayerPhase.ready) return;
+    try {
+      final limit = duration;
+      final target = limit != null && value > limit ? limit : value;
+      await engine.seek(target);
+      if (!_isCurrent(engine)) return;
+      position = target;
+      if (intent != null && !playing && !cancelled()) {
+        await _start(engine, intent);
+      }
+    } catch (_) {
+      if (_isCurrent(engine)) _fail();
+    }
+    _changed();
+  }
+
+  /// Stops playback, including a start that is still opening the source or
+  /// waiting for the engine, so audio never begins after the caller paused.
+  Future<void> pause() async {
+    final intent = ++_intent;
+    _wantsPlay = false;
+    final engine = _engine;
+    if (engine == null || (!playing && _starting == 0)) return;
+    try {
+      await engine.pause();
+    } catch (_) {
+      /* The player is going away or already stopped. */
+    }
+    // A play requested after this pause owns the state now.
+    if (!_isCurrent(engine) || intent != _intent) return;
+    playing = false;
+    _changed();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    unawaited(_releaseEngine());
+    super.dispose();
+  }
+}

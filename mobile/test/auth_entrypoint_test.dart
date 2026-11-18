@@ -7,10 +7,31 @@ import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/config/app_config.dart';
 
 void main() {
+  test('email callback accepts an app deep link and requires HTTPS for web in prod', () {
+    AuthConfig config(String redirect) => AuthConfig.parse(
+      environment: 'prod',
+      mode: 'supabase',
+      url: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_test',
+      emailRedirectTo: redirect,
+    );
+
+    expect(
+      config('com.replica://auth-callback').emailRedirectTo,
+      'com.replica://auth-callback',
+    );
+    expect(config('https://app.example.com/auth').isConfigured, isTrue);
+    expect(() => config('http://app.example.com/auth'), throwsArgumentError);
+    expect(
+      () => config('https://user@app.example.com/auth'),
+      throwsArgumentError,
+    );
+  });
+
   for (final env in ['dev', 'staging', 'prod']) {
     for (final mode in ['preview', 'supabase']) {
-      test('service boundary $env/$mode', () {
-        final service = app.selectAuthService(
+      test('service boundary $env/$mode', () async {
+        final service = await app.selectAuthService(
           AppConfig.parse(
             environment: env,
             backendBaseUrl: 'https://api.example.com',

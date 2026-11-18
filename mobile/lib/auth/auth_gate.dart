@@ -12,6 +12,7 @@ import '../profile/persona_controller.dart';
 import '../profile/persona_service.dart';
 import '../services/api_client.dart';
 import '../services/backend_service.dart';
+import '../records/record_service.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
 import 'preview_auth_service.dart';
@@ -23,7 +24,9 @@ class AuthGate extends StatefulWidget {
     required this.auth,
     required this.chat,
     this.personaServiceFactory,
+    this.recordServiceFactory,
   });
+  final RecordService Function()? recordServiceFactory;
   final AuthService auth;
   final ChatService chat;
 
@@ -134,26 +137,55 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) widget.auth.checkSessionExpiry();
   }
 
+  VoidCallback _endDeletedAccountSession(int generation) => () {
+    unawaited(
+      widget.auth
+          .completeAccountDeletion(requestGeneration: generation)
+          .catchError((Object _) {}),
+    );
+  };
+
+  /// A preview record service only deletes its synthetic data, so it must
+  /// never end a real account's session or report that account as deleted.
+  /// Account deletion stays unavailable until a real record service is used.
+  VoidCallback? _accountDeletedFor(RecordService records, int generation) =>
+      records.isPreview && !widget.auth.isPreview
+      ? null
+      : _endDeletedAccountSession(generation);
+
   @override
   Widget build(BuildContext context) {
     if (widget.auth.identity == null) return AuthScreen(service: widget.auth);
     return ScaffoldMessenger(
       key: ValueKey(_generation),
       child: NavigatorPopHandler<Object?>(
-        onPopWithResult: (_) => _navigator.currentState!.pop(),
+        onPopWithResult: (_) => _navigator.currentState!.maybePop(),
         child: Navigator(
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
-            builder: (_) => HomeScreen(
-              history: _conversationService(),
-              personas: _personaController(),
-              accountEmail: widget.auth.identity!.email,
-              onSignOut: () =>
-                  unawaited(widget.auth.signOut().catchError((Object _) {})),
-              onExpireSession: widget.auth is PreviewAuthService
-                  ? (widget.auth as PreviewAuthService).expireSession
-                  : null,
-            ),
+            builder: (_) {
+              final records = SessionRecordService(
+                backend: BackendService(widget.auth),
+                delegate:
+                    widget.recordServiceFactory?.call() ??
+                    PreviewRecordService(),
+              );
+              return HomeScreen(
+                onAccountDeleted: _accountDeletedFor(
+                  records,
+                  widget.auth.generation,
+                ),
+                recordService: records,
+                history: _conversationService(),
+                personas: _personaController(),
+                accountEmail: widget.auth.identity!.email,
+                onSignOut: () =>
+                    unawaited(widget.auth.signOut().catchError((Object _) {})),
+                onExpireSession: widget.auth is PreviewAuthService
+                    ? (widget.auth as PreviewAuthService).expireSession
+                    : null,
+              );
+            },
           ),
         ),
       ),

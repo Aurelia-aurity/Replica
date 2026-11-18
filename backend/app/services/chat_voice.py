@@ -67,10 +67,10 @@ async def _run(user_db, stt, llm, tts, session_id, turn_id, audio, filename, con
 
     # 3) TTS: 실패해도 텍스트는 유지한다. 음성은 저장하지 않아 이미 끝난 턴은 다시 합성만 한다(DB는 그대로).
     if tts_status == "ready":
-        speech = await stages.synthesize(tts, answer)
+        speech = await stages.synthesize(tts, answer, request_started=started)
         tts_ms = speech.tts_ms
     else:
-        speech = await stages.run_tts_stage(user_db, tts, turn_id, answer)
+        speech = await stages.run_tts_stage(user_db, tts, turn_id, answer, request_started=started)
         tts_ms = speech.tts_ms
 
     total_ms = stages.elapsed_ms(started)
@@ -96,18 +96,23 @@ async def _run(user_db, stt, llm, tts, session_id, turn_id, audio, filename, con
 
 
 async def handle_turn_tts(user_db: UserDatabase, tts: TTSClient, turn_id: UUID) -> TurnTtsResponse:
-    """완료된 답변을 음성으로 합성한다(텍스트 턴의 '음성 재생', TTS 실패 뒤 재시도).
+    """완료된 답변을 음성으로 합성한다(텍스트 턴의 '음성 재생', TTS 실패 뒤 재시도, 이미 끝난 턴의 다시 듣기).
 
-    합성 중이거나 이미 완료된 턴, 답변이 아직 없는 턴은 409다. 합성이 실패하면 502 TTS_FAILED.
+    합성 중인 턴, 답변이 아직 없는 턴은 409다. 음성은 저장하지 않으므로 이미 끝난(ready) 턴은 DB를 바꾸지 않고
+    다시 합성만 하며, 그 합성이 실패해도 502 TTS_FAILED만 돌려주고 ready 상태와 답변은 그대로 둔다.
     """
     with stages.turn_errors(turn_id):
         started = time.perf_counter()
         turn = await user_db.get_turn(turn_id)
         turn = await stages.refresh_if_stale(user_db, turn)
-        # 상태 조건(답변 완료, tts_status 없음 또는 failed)은 start_chat_stage가 검사해 409로 돌려준다.
-        speech = await stages.run_tts_stage(user_db, tts, turn_id, turn["answer"] or "")
+        if turn["answer_status"] == "done" and turn.get("tts_status") == "ready":
+            speech = await stages.synthesize(tts, turn["answer"] or "", request_started=started)
+        else:
+            # 상태 조건(답변 완료, tts_status 없음 또는 failed)은 start_chat_stage가 검사해 409로 돌려준다.
+            speech = await stages.run_tts_stage(user_db, tts, turn_id, turn["answer"] or "", request_started=started)
         total_ms = stages.elapsed_ms(started)
-        await stages.record_total_ms(user_db, turn_id, "tts", speech.attempt, total_ms)
+        if speech.attempt:
+            await stages.record_total_ms(user_db, turn_id, "tts", speech.attempt, total_ms)
         if not speech.ok:
             raise stages.tts_failed_error()
         return TurnTtsResponse(

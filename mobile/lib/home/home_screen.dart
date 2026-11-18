@@ -6,6 +6,10 @@ import '../history/history_screen.dart';
 import '../profile/persona_card.dart';
 import '../profile/persona_controller.dart';
 import '../profile/persona_flow.dart';
+import '../records/record_controller.dart';
+import '../records/record_service.dart';
+import '../records/records_panel.dart';
+import '../records/deletion_sheet.dart';
 import '../shared/conversation_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,9 +20,13 @@ class HomeScreen extends StatefulWidget {
     this.accountEmail,
     this.onSignOut,
     this.onExpireSession,
+    this.recordService,
+    this.onAccountDeleted,
   });
   final ConversationService history;
   final PersonaController personas;
+  final RecordService? recordService;
+  final VoidCallback? onAccountDeleted;
   final String? accountEmail;
   final VoidCallback? onSignOut;
   final VoidCallback? onExpireSession;
@@ -31,13 +39,24 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _starting = false;
   int _tab = 0;
   late Future<List<Conversation>> _recent;
+  late final RecordController _records;
 
   @override
   void initState() {
     super.initState();
+    _records = RecordController(
+      widget.recordService ?? PreviewRecordService(),
+      onAccountDeleted: widget.onAccountDeleted,
+    );
     _refreshRecent();
     // Not synchronously: the listeners below must not rebuild during mount.
     Future.microtask(widget.personas.load);
+  }
+
+  @override
+  void dispose() {
+    _records.dispose();
+    super.dispose();
   }
 
   void _refreshRecent() {
@@ -67,6 +86,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   widget.onSignOut?.call();
                 },
                 child: const Text('로그아웃'),
+              ),
+              TextButton.icon(
+                onPressed: widget.onAccountDeleted == null
+                    ? null
+                    : () async {
+                        Navigator.of(sheetContext).pop();
+                        final deletion = _records.deletionFor(
+                          '#account',
+                          account: true,
+                        );
+                        final complete = await showDeletionSheet(
+                          context,
+                          deletion,
+                          preview: _records.service.isPreview,
+                        );
+                        if (mounted && complete == true) {
+                          widget.onAccountDeleted?.call();
+                        }
+                      },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('계정 삭제'),
               ),
               if (widget.onExpireSession != null)
                 TextButton(
@@ -145,13 +185,14 @@ class _HomeScreenState extends State<HomeScreen> {
     backgroundColor: Colors.white,
     indicatorColor: const Color(0xFFE3EFEB),
     onDestinationSelected: (index) {
-      if (index == 0 || index == 2) {
+      if (index < 3) {
         setState(() {
           _tab = index;
           if (index == 0) _refreshRecent();
+          if (index == 1) _records.refresh();
         });
       } else {
-        _notice('${index == 1 ? '기록 관리' : '설정'} 기능은 고도화 단계에서 제공할 예정입니다.');
+        _notice('설정 기능은 고도화 단계에서 제공할 예정입니다.');
       }
     },
     destinations: const [
@@ -177,6 +218,16 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _buildBody(BuildContext context) {
+    if (_tab == 1) {
+      return Scaffold(
+        backgroundColor: replicaBackground,
+        body: RecordsPanel(
+          controller: _records,
+          onAccountDeleted: widget.onAccountDeleted,
+        ),
+        bottomNavigationBar: _navigation(),
+      );
+    }
     if (_tab == 2) {
       return HistoryScreen(
         service: widget.history,

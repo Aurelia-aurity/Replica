@@ -1,26 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/auth_gate.dart';
 import 'auth/auth_config.dart';
 import 'auth/auth_service.dart';
 import 'auth/preview_auth_service.dart';
+import 'auth/supabase_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
 import 'profile/persona_service.dart';
 import 'shared/conversation_widgets.dart';
+import 'records/record_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final app = AppConfig.fromEnvironment();
   final auth = AuthConfig.fromEnvironment(app.environment);
-  runApp(ReplicaApp(authService: selectAuthService(app, auth)));
+  runApp(ReplicaApp(authService: await selectAuthService(app, auth)));
 }
 
-/// No real authentication client is activated until integration is agreed.
-AuthService selectAuthService(AppConfig app, AuthConfig auth) =>
-    app.environment == 'dev' && auth.mode == 'preview'
-    ? PreviewAuthService()
-    : UnconfiguredAuthService();
+Future<AuthService> selectAuthService(AppConfig app, AuthConfig auth) async {
+  if (app.environment == 'dev' && auth.mode == 'preview') {
+    return PreviewAuthService();
+  }
+  if (auth.mode != 'supabase' || !auth.isConfigured) {
+    return UnconfiguredAuthService();
+  }
+  final supabase = await Supabase.initialize(
+    url: auth.url.toString(),
+    publishableKey: auth.publishableKey!,
+  );
+  return SupabaseAuthService(
+    supabase.client,
+    emailRedirectTo: auth.emailRedirectTo,
+  );
+}
 
 class ReplicaApp extends StatelessWidget {
   const ReplicaApp({
@@ -28,7 +42,9 @@ class ReplicaApp extends StatelessWidget {
     required this.authService,
     this.chatService,
     this.personaServiceFactory,
+    this.recordServiceFactory,
   });
+  final RecordService Function()? recordServiceFactory;
   final AuthService authService;
   final ChatService? chatService;
 
@@ -62,6 +78,7 @@ class ReplicaApp extends StatelessWidget {
         ),
       ),
       home: AuthGate(
+        recordServiceFactory: recordServiceFactory,
         auth: authService,
         chat: chatService ?? const DemoChatService(),
         personaServiceFactory: personaServiceFactory,

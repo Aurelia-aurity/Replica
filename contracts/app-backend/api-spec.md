@@ -258,7 +258,7 @@
 
 STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, 오류 본문의 `stage`로 실패한 단계를 알립니다 (2장).
 
-같은 `turn_id`와 같은 음성으로 다시 보내면 끝난 단계는 건너뛰고, 실패했거나 시작 전인 단계부터 새 시도로 이어서 실행합니다. 같은 `turn_id`에 다른 음성을 보내면 409 `TURN_ID_CONFLICT`입니다. 응답 음성은 저장하지 않으므로, TTS까지 끝난 턴을 다시 보내면 저장된 답변 텍스트로 음성만 다시 합성해 돌려줍니다 (DB 상태는 바꾸지 않음).
+같은 `turn_id`와 같은 음성으로 다시 보내면 끝난 단계는 건너뛰고, 실패했거나 시작 전인 단계부터 새 시도로 이어서 실행합니다. 같은 `turn_id`에 다른 음성을 보내면 409 `TURN_ID_CONFLICT`입니다. 응답 음성은 저장하지 않으므로, TTS까지 끝난 턴을 다시 보내면 저장된 답변 텍스트로 음성만 다시 합성해 돌려줍니다 (DB 상태는 바꾸지 않음). 이때 재합성이 실패하면 응답은 `tts_status: "failed"`이지만 DB의 `tts_status`는 `ready`로, 답변과 함께 그대로 남습니다. 같은 요청을 다시 보내거나 `POST /chat/turns/{turn_id}/tts`로 다시 받을 수 있습니다. TTS 호출은 실패 시 백엔드가 자동으로 다시 시도합니다 (자세한 규칙은 `/chat/turns/{turn_id}/tts`). STT 전사문이 16,000자를 넘으면 AI·TTS를 호출하지 않고 422 `MESSAGE_TOO_LONG`(`stage: llm`, `retryable: false`)으로 응답하며, 전사문은 자르지 않고 보관합니다.
 
 ##### 요청 (multipart/form-data)
 
@@ -340,18 +340,20 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 |---|---|
 | 인증 | 필수 |
 | 단계·이슈 | baseline · #7, UC-02 ("원하면 음성 재생") |
-| 내부 호출 | DB `start_chat_stage(turn_id, 'tts')` → TTS → `finish_chat_stage('tts')` → `record_turn_total_ms` |
+| 내부 호출 | 새 단계 실행(`tts_status`가 없거나 `failed`): DB `start_chat_stage(turn_id, 'tts')` → TTS → `finish_chat_stage('tts')` → `record_turn_total_ms`. 재합성(`tts_status = ready`): DB 호출 없이 TTS만 호출하며 상태·시도 번호·시간 기록을 바꾸지 않음 |
 
-텍스트 대화의 "음성 재생"과, 음성 대화에서 TTS만 실패한 뒤의 재시도에 씁니다. 합성 중이거나 이미 완료(`tts_status = ready`)된 턴, 답변이 아직 없는 턴에 요청하면 409를 돌려줍니다. 합성이 실패하면 200이 아니라 502 `TTS_FAILED`를 돌려주고, 답변 텍스트는 그대로 남습니다.
+텍스트 대화의 "음성 재생"과, 음성 대화에서 TTS만 실패한 뒤의 재시도에 씁니다. 합성 중인 턴, 답변이 아직 없는 턴에 요청하면 409를 돌려줍니다. 합성이 실패하면 200이 아니라 502 `TTS_FAILED`를 돌려주고, 답변 텍스트는 그대로 남습니다.
 
-이미 완료된 턴의 음성을 DB 상태를 바꾸지 않고 다시 합성해 줄지는 정해지지 않았습니다. 현재는 409이며 팀 합의가 필요합니다 (#64 F5).
+응답 음성은 저장하지 않으므로, 이미 완료(`tts_status = ready`)된 턴에 요청하면 DB 상태를 바꾸지 않고 저장된 답변으로 음성만 다시 합성해 돌려줍니다. 이때 합성이 실패해도 502 `TTS_FAILED`만 돌려주고 `ready` 상태와 답변은 그대로 남으므로, 앱은 같은 요청을 다시 보낼 수 있습니다 (`retryable: true`).
+
+TTS 호출이 실패하면 백엔드가 한 요청 안에서 자동으로 다시 시도합니다 (첫 시도 + 재시도 2번, 팀 회의 결정). 앱이 응답을 기다리는 최대 시간 3분(요청 시작 기준, 응답 여유 10초 제외) 안에서만 다시 시도하고, 남은 시간이 직전 시도에 걸린 시간보다 짧으면 다음 시도를 건너뜁니다. 첫 시도는 남은 시간과 관계없이 항상 하며, 남은 시간이 10초보다 적으면 첫 시도에 한해 최대 10초까지 기다립니다(요청 시작 후 170초 이후에 시작한 TTS는 최대 10초 더 걸릴 수 있습니다). 진행 중인 TTS 단계는 요청 시작 후 180초(앱 대기 시간)가 지나기 전에는 다른 요청이 실패로 닫지 않습니다(STT·LLM 단계는 `LLM_TIMEOUT_SECONDS`, 없으면 30초 기준 그대로). 합성 중인 같은 턴을 다시 요청하면 409입니다. 모두 실패하면 위의 502 `TTS_FAILED`(`/chat/voice`는 200 + `tts_status: failed`)로 응답하므로, 앱은 이 응답을 받으면 사용자에게 다시 요청해 달라고 안내합니다. 자동 재시도는 DB 시도 번호(`tts_attempt`)를 늘리지 않습니다.
 
 ##### 요청
 
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
 |---|---|---|---|---|
 | Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
-| turn_id | path | uuid | 필수 | 대상 턴. 답변이 완료(`answer_status = done`)되어 있어야 하며 `tts_status`가 없거나 `failed`일 때만 시작 |
+| turn_id | path | uuid | 필수 | 대상 턴. 답변이 완료(`answer_status = done`)되어 있어야 함. `tts_status`가 없거나 `failed`이면 새 TTS 단계를 시작하고, `ready`이면 DB 변경 없이 다시 합성하며, `pending`(합성 중)이면 409 |
 
 ##### 응답 (200)
 
@@ -910,9 +912,10 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 | 요청 형식·값 오류 (필수 필드 누락, 형식 오류 등) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | 구현됨. `field`에 문제 필드 | 모든 API | false |
 | 메시지가 비었음 | 422 | `MESSAGE_EMPTY` | `메시지를 입력해 주세요.` | 구현됨. 공백만 있는 메시지도 이 오류 | `/chat/text` | false |
 | 메시지가 2000자 초과 | 422 | `MESSAGE_TOO_LONG` | `질문이 너무 길어요. 더 짧게 입력해 주세요.` | 구현됨 | `/chat/text` | false |
+| 음성 질문(STT 전사문)이 16,000자 초과 | 422 | `MESSAGE_TOO_LONG` (`stage: llm`) | `질문이 너무 길어요. 더 짧게 입력해 주세요.` | 구현됨. 전사문은 자르지 않고 보관하고 AI·TTS는 호출하지 않으며, 같은 음성으로 다시 보내도 같은 결과 | `/chat/voice` | false |
 | 음성 인식 결과가 비어 있음 (무음 녹음 등). AI를 호출하기 전에 차단 | 422 | `EMPTY_TRANSCRIPT` | `음성을 인식하지 못했어요. 다시 말씀해 주세요.` | 구현됨 | `/chat/voice` | true |
 | STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 구현됨 (`/chat/voice`) | `/chat/voice` | true |
-| TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
+| TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
 | 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health`, `/stt`, `/tts` 제외) | false |
 | 서버 내부 오류 (원인 상세는 서버 로그에만) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | 구현됨. 본문은 위 형식 | 모든 API | false |
 
@@ -922,7 +925,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 상황 | HTTP | 응답 본문 필드 | `tts_error.message` | 발생 API |
 |---|---|---|---|---|
-| 답변 생성은 성공했지만 TTS 단계만 실패 (시간 초과 포함) | 200 | `tts_status: "failed"`, `audio_base64: null`, `audio_format: null`, `tts_error: {code: "TTS_FAILED", message}` | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있어요.` | `/chat/voice` |
+| 답변 생성은 성공했지만 TTS 단계만 실패 (시간 초과 포함) | 200 | `tts_status: "failed"`, `audio_base64: null`, `audio_format: null`, `tts_error: {code: "TTS_FAILED", message}` | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.` | `/chat/voice` |
 
 AI 서버가 원인인 오류(`AI_BUSY`, `AI_NOT_READY`, `AI_TIMEOUT`, `AI_FAILED` 등)는 **3장**에 정리했습니다.
 
