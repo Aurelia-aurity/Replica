@@ -6,8 +6,11 @@ import '../history/history_screen.dart';
 import '../profile/persona_card.dart';
 import '../profile/persona_controller.dart';
 import '../profile/persona_flow.dart';
+import '../profile/persona_models.dart';
 import '../records/record_controller.dart';
+import '../records/record_picker.dart';
 import '../records/record_service.dart';
+import '../records/record_upload_screen.dart';
 import '../records/records_panel.dart';
 import '../records/deletion_sheet.dart';
 import '../shared/conversation_widgets.dart';
@@ -21,11 +24,15 @@ class HomeScreen extends StatefulWidget {
     this.onSignOut,
     this.onExpireSession,
     this.recordService,
+    this.recordPicker = pickRecordFile,
     this.onAccountDeleted,
   });
   final ConversationService history;
   final PersonaController personas;
   final RecordService? recordService;
+
+  /// File picker of SC-04, shared by the records tab and SC-07. For tests.
+  final RecordPicker recordPicker;
   final VoidCallback? onAccountDeleted;
   final String? accountEmail;
   final VoidCallback? onSignOut;
@@ -61,6 +68,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _refreshRecent() {
     _recent = widget.history.list();
+  }
+
+  /// SC-04 opened from SC-07 ("기록 올리기"), on the same records state as the
+  /// records tab. Records are not tied to a partner yet: the record service
+  /// is built without one, so [persona] is not passed on until that is
+  /// decided (see SC13.md).
+  Future<void> _openRecordUpload(BuildContext context, Persona persona) {
+    _records.beginSelection();
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => RecordUploadScreen(
+          controller: _records,
+          picker: widget.recordPicker,
+        ),
+      ),
+    );
   }
 
   void _notice(String text) {
@@ -223,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: replicaBackground,
         body: RecordsPanel(
           controller: _records,
+          picker: widget.recordPicker,
           onAccountDeleted: widget.onAccountDeleted,
         ),
         bottomNavigationBar: _navigation(),
@@ -261,12 +285,20 @@ class _HomeScreenState extends State<HomeScreen> {
               PersonaCard(
                 controller: widget.personas,
                 busy: _starting,
-                onCreate: () =>
-                    createPersonaThenProfile(context, widget.personas),
+                onCreate: () => createPersonaThenProfile(
+                  context,
+                  widget.personas,
+                  onOpenRecordUpload: _openRecordUpload,
+                ),
                 onOpenProfile: () {
                   final persona = widget.personas.current;
                   if (persona != null) {
-                    openSpeechProfile(context, widget.personas, persona);
+                    openSpeechProfile(
+                      context,
+                      widget.personas,
+                      persona,
+                      onOpenRecordUpload: _openRecordUpload,
+                    );
                   }
                 },
                 onStartText: () => _start(voice: false),

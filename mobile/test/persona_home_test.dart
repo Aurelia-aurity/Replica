@@ -9,6 +9,7 @@ import 'package:mobile/profile/persona_models.dart';
 import 'package:mobile/profile/persona_name_screen.dart';
 import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/profile/speech_profile_screen.dart';
+import 'package:mobile/records/record_upload_screen.dart';
 
 import 'history_test.dart' as fixtures;
 import 'persona_test_support.dart';
@@ -120,6 +121,27 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('텍스트로 대화'), findsOneWidget);
+    });
+
+    testWidgets('SC-07 record upload opens SC-04 and rechecks on return', (
+      tester,
+    ) async {
+      final service = FakePersonaService(personas: const [mother]);
+      await pumpApp(tester, factory: () => service);
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pumpAndSettle();
+      expect(find.text('아직 분석한 기록이 없어요'), findsOneWidget);
+      expect(service.profileCalls, 1);
+
+      await tester.tap(find.text('기록 올리기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RecordUploadScreen), findsOneWidget);
+      expect(find.text('기록 올리기는 아직 연결되지 않았어요.'), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      expect(service.profileCalls, 2);
     });
 
     testWidgets('no partner: the card offers SC-13 instead of conversations', (
