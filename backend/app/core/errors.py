@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db
 
@@ -96,6 +97,22 @@ def _request_validation_error(exc: RequestValidationError) -> AppError:
     return AppError(422, "INVALID_INPUT", INVALID_INPUT_MESSAGE, retryable=False, field=field)
 
 
+def http_exception_error(exc: StarletteHTTPException) -> AppError:
+    """프레임워크가 만든 HTTP 오류(없는 경로 404, 허용하지 않는 메서드 405, 본문 파싱 400 등)를 같은 봉투로 바꾼다."""
+    from app.core.body_limit import BodyTooLarge, too_large_error  # 순환 import 방지
+
+    if isinstance(exc, BodyTooLarge):
+        return too_large_error(exc.upload)
+    status = exc.status_code
+    if status == 404:
+        return AppError(404, "NOT_FOUND", "찾을 수 없는 경로예요.", retryable=False)
+    if status == 405:
+        return AppError(405, "METHOD_NOT_ALLOWED", "허용하지 않는 요청 방식이에요.", retryable=False)
+    if status >= 500:
+        return AppError(status, "INTERNAL_ERROR", INTERNAL_MESSAGE, retryable=False)
+    return AppError(status, "INVALID_INPUT", INVALID_INPUT_MESSAGE, retryable=False)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
@@ -107,6 +124,11 @@ def register_error_handlers(app: FastAPI) -> None:
         if error.http_status >= 500:
             logger.error("DB 오류 type=%s code=%s", type(exc).__name__, exc.code)
         return JSONResponse(status_code=error.http_status, content=error.body())
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        error = http_exception_error(exc)
+        return JSONResponse(status_code=error.http_status, content=error.body(), headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation(_: Request, exc: RequestValidationError) -> JSONResponse:

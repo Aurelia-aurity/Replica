@@ -20,7 +20,7 @@
 |---|---|
 | 기본 주소 | 앱 빌드 설정 `BACKEND_BASE_URL`. 개발: 에뮬레이터 `http://10.0.2.2:8000`, 로컬 `http://localhost:8000`. staging·prod는 HTTPS 필수 |
 | 요청 형식 | JSON은 `Content-Type: application/json`, 파일은 `multipart/form-data` |
-| 인증 | `Authorization: Bearer <Supabase JWT>`. `/health`와 개발 점검용 `/stt`·`/tts`를 제외한 모든 API에 필요. **로그인·회원가입은 앱이 Supabase Auth와 직접 하며 백엔드에는 로그인 API가 없음.** 백엔드는 받은 토큰을 Supabase Auth로 확인해 사용자 id를 얻고, 앱은 DB에 직접 접근하지 않음 |
+| 인증 | `Authorization: Bearer <Supabase JWT>`. `/health`를 제외한 모든 API에 필요(개발 점검용 `/stt`·`/tts`는 기본이 꺼져 있고, 켜는 환경의 규칙은 각 API 참고). **로그인·회원가입은 앱이 Supabase Auth와 직접 하며 백엔드에는 로그인 API가 없음.** 백엔드는 받은 토큰을 Supabase Auth로 확인해 사용자 id를 얻고, 앱은 DB에 직접 접근하지 않음 |
 | 식별자·시간 | id는 소문자 UUID 문자열. 시간은 ISO 8601 (시간대 포함) |
 | 목록 응답 | `{items, limit, offset}`. `limit` 기본 50 · 최대 100, `offset` 0 이상. (턴 목록은 `after_turn_no` 사용) |
 | AI 표시 | AI 답변이 담긴 응답에는 `is_ai_generated: true`를 항상 포함 (FR-08) |
@@ -295,7 +295,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 없음. Mock 개발 경로이며 `APP_ENV`와 관계없이 로그인 없이 열려 있음. 실제 음성 제공자 연동·운영 노출 전에 접근 제어를 적용할 예정 (#67). 앱 기능에서는 사용하지 않음 |
+| 인증 | 개발 점검 경로이며 **기본이 꺼져 있음**(`DEV_SPEECH_ROUTES=false` → 404 `NOT_FOUND`). 켜도 `APP_ENV=prod`에서는 열리지 않고, `APP_ENV=dev`에서는 로그인(Bearer)이 필요하며, `APP_ENV=local`에서만 로그인 없이 쓴다 (#67). 앱 기능에서는 사용하지 않음 |
 | 단계·이슈 | baseline · #7 |
 
 ##### 요청 (multipart/form-data)
@@ -317,7 +317,7 @@ STT 또는 LLM 단계가 실패하면 200이 아니라 오류로 응답하고, �
 
 | 항목 | 내용 |
 |---|---|
-| 인증 | 없음. `/stt`와 같은 개발 점검 경로 (#67). 앱 기능에서는 사용하지 않음 |
+| 인증 | `/stt`와 같음(기본 꺼짐, prod에서는 열리지 않음, dev는 로그인 필요, local만 무인증) (#67). 앱 기능에서는 사용하지 않음 |
 | 단계·이슈 | baseline · #7 |
 
 ##### 요청 (JSON)
@@ -900,15 +900,19 @@ TTS 호출이 실패하면 백엔드가 한 요청 안에서 자동으로 다시
 | error.retryable | boolean | 사용자가 같은 요청을 다시 시도해도 되는지 |
 | error.field | string \| null | 입력 오류일 때 문제가 된 필드 이름 |
 
-알려진 예외 두 가지입니다 (#67에서 정리 예정). 존재하지 않는 경로(404)와 허용되지 않는 메서드(405)는 프레임워크 기본 형식 `{"detail": …}`로 응답하므로, 앱은 `error` 키가 없으면 HTTP 상태만으로 처리해야 합니다. 요청 본문이 JSON이 아닐 때의 `INVALID_INPUT`은 `field`에 `"0"` 같은 값이 올 수 있습니다.
+프레임워크가 만드는 오류도 같은 형식입니다 (#67). 존재하지 않는 경로(404 `NOT_FOUND`), 허용되지 않는 메서드(405 `METHOD_NOT_ALLOWED`, `Allow` 헤더 유지), 요청 본문 크기 초과(413), 깨진 multipart 등 본문을 해석하지 못한 경우(400 `INVALID_INPUT`)는 `detail` 대신 `error` 본문으로 응답합니다. 오류 본문에는 입력 내용이나 서버 내부 정보를 넣지 않습니다. 요청 본문이 JSON이 아닐 때의 `INVALID_INPUT`은 `field`에 `"0"` 같은 값이 올 수 있습니다.
 
 ### 오류 목록
 
 | 상황 | HTTP | `code` | `message` (앱에 보내는 문구) | 현재 구현 | 발생 API | `retryable` |
 |---|---|---|---|---|---|---|
-| 지원하지 않는 음성 형식 | 415 | `UNSUPPORTED_AUDIO_FORMAT` | `지원하지 않는 음성 형식입니다(.확장자). 지원 형식: .aac, .m4a, .mp3, .mp4, .ogg, .wav, .webm`<br>확장자가 없으면 `(확장자 없음)` | 구현됨. 본문은 위 형식이며 `field`는 `file` | `/chat/voice` `/stt` | false |
-| 음성 파일이 25MB 초과 | 413 | `FILE_TOO_LARGE` | `파일이 너무 큽니다. 최대 25MB` | 구현됨 (위와 같음) | `/chat/voice` `/stt` | false |
+| 지원하지 않는 음성 형식 | 415 | `UNSUPPORTED_AUDIO_FORMAT` | `지원하지 않는 음성 형식입니다(.확장자). 지원 형식: .aac, .m4a, .mp3, .mp4, .ogg, .wav, .webm`<br>확장자가 없으면 `(확장자 없음)`<br>content-type이 음성이 아니면 `음성 파일이 아닙니다. 녹음 파일을 다시 선택해 주세요.`<br>파일 머리 시그니처가 확장자와 다르면 `파일 내용이 .wav 음성 형식과 맞지 않습니다. 녹음 파일을 다시 선택해 주세요.` | 구현됨. 본문은 위 형식이며 `field`는 `file`. 허용 content-type: `audio/*`, `video/mp4`, `video/webm`, `application/octet-stream` (디코딩 검증은 하지 않음) | `/chat/voice` `/stt` | false |
+| 음성 파일이 25MB 초과 | 413 | `FILE_TOO_LARGE` | `파일이 너무 큽니다. 최대 25MB` | 구현됨 (위와 같음). 요청 크기는 본문을 다 읽기 전에 확인하며(Content-Length 또는 읽은 바이트, 한도 25MB + multipart 여유 1MiB), 한도를 넘으면 본문 해석 없이 끊음 | `/chat/voice` `/stt` | false |
 | 빈 음성 파일 | 400 | `EMPTY_FILE` | `빈 파일입니다.` | 구현됨 (위와 같음) | `/chat/voice` `/stt` | false |
+| JSON 요청 본문이 1MiB 초과 | 413 | `REQUEST_TOO_LARGE` | `요청이 너무 커요. 내용을 줄여 다시 시도해 주세요.` | 구현됨 (#67) | 음성 업로드 외 모든 쓰기 API | false |
+| 존재하지 않는 경로 | 404 | `NOT_FOUND` | `찾을 수 없는 경로예요.` (DB의 `NOT_FOUND`와 코드가 같고 문구만 다름) | 구현됨 (#67). 꺼진 개발용 `/stt`·`/tts`도 같은 응답 | 모든 경로 | false |
+| 허용하지 않는 메서드 | 405 | `METHOD_NOT_ALLOWED` | `허용하지 않는 요청 방식이에요.` | 구현됨 (#67). `Allow` 헤더 포함 | 모든 경로 | false |
+| 본문을 해석하지 못함 (깨진 multipart 등) | 400 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` | 구현됨 (#67). `field`는 `null` | 본문이 있는 API | false |
 | 요청 형식·값 오류 (필수 필드 누락, 형식 오류 등) | 422 | `INVALID_INPUT` | `입력한 내용을 확인해 주세요.` (`field`에 문제 필드) | 구현됨. `field`에 문제 필드 | 모든 API | false |
 | 메시지가 비었음 | 422 | `MESSAGE_EMPTY` | `메시지를 입력해 주세요.` | 구현됨. 공백만 있는 메시지도 이 오류 | `/chat/text` | false |
 | 메시지가 2000자 초과 | 422 | `MESSAGE_TOO_LONG` | `질문이 너무 길어요. 더 짧게 입력해 주세요.` | 구현됨 | `/chat/text` | false |
@@ -916,7 +920,7 @@ TTS 호출이 실패하면 백엔드가 한 요청 안에서 자동으로 다시
 | 음성 인식 결과가 비어 있음 (무음 녹음 등). AI를 호출하기 전에 차단 | 422 | `EMPTY_TRANSCRIPT` | `음성을 인식하지 못했어요. 다시 말씀해 주세요.` | 구현됨 | `/chat/voice` | true |
 | STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 구현됨 (`/chat/voice`) | `/chat/voice` | true |
 | TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
-| 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health`, `/stt`, `/tts` 제외) | false |
+| 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health` 제외. 꺼져 있는 개발용 `/stt`·`/tts`는 켠 `dev` 환경에서 로그인이 필요하고 `local`에서만 필요 없음) | false |
 | 서버 내부 오류 (원인 상세는 서버 로그에만) | 500 | `INTERNAL_ERROR` | `서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.` | 구현됨. 본문은 위 형식 | 모든 API | false |
 
 ### 오류가 아닌 부분 실패
