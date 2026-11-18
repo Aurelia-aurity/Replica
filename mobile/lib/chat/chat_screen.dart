@@ -100,11 +100,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return null;
   }
 
-  /// The server has confirmed synthesis completed and there is no local audio.
-  bool _speechLocked(int index) =>
-      _speechCache[index] == null &&
-      _replyDetails[index]?.speechAlreadySynthesized == true;
-
   SpeechAudio? _lastReplyAudio() {
     for (var index = _messages.length - 1; index >= 0; index--) {
       if (!_messages[index].isUser) return _speechCache[index];
@@ -240,7 +235,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       await _stopAudio();
       return;
     }
-    if (_speechLocked(index)) return;
     final reply = _replyDetails[index];
     if (widget.service.isDemo ||
         widget.service is! DetailedChatService ||
@@ -423,9 +417,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 12, color: Color(0xFF68766F)),
               ),
             OutlinedButton.icon(
-              onPressed: _speechBusy != null || _speechLocked(index)
-                  ? null
-                  : () => _listen(index),
+              onPressed: _speechBusy != null ? null : () => _listen(index),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF57645D),
                 backgroundColor: Colors.white,
@@ -448,8 +440,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ? '음성 준비 중'
                     : _playing == index
                     ? '재생 중지'
-                    : _speechLocked(index)
-                    ? '듣기 불가'
                     : _speechFailed.contains(index)
                     ? '듣기 다시 시도'
                     : '듣기',
@@ -462,14 +452,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             padding: EdgeInsets.only(top: 6),
             child: Text(
               '답변이 길이 제한으로 일부 생략되었어요.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF68766F)),
-            ),
-          ),
-        if (_speechLocked(index))
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Text(
-              '이 답변의 음성은 다시 받을 수 없어요. 답변 글은 그대로 볼 수 있어요.',
               style: TextStyle(fontSize: 12, color: Color(0xFF68766F)),
             ),
           ),
