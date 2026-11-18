@@ -11,7 +11,7 @@ import 'conversation_service.dart';
 
 /// [conversationName] is the partner name set in SC-13 ([conversationTitle]).
 /// There is no stand-in title: a conversation is only opened once its partner
-/// has a name. A name the server reports for the conversation later wins.
+/// has a name.
 Future<void> openConversation(
   BuildContext context,
   ConversationService service,
@@ -92,7 +92,9 @@ class _ConversationRouteState extends State<_ConversationRoute> {
       // When the pending request finishes, display the newly fetched turns.
       key: ObjectKey(conversation),
       service: _chat,
-      conversationName: conversation.personaName ?? widget.conversationName,
+      // Chosen when the conversation was opened from the partners the app
+      // holds, so a renamed partner keeps its new name after a refresh.
+      conversationName: widget.conversationName,
       initialVoiceMode: widget.voice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
@@ -111,14 +113,20 @@ class _ConversationRouteState extends State<_ConversationRoute> {
 /// card says what to do (create the profile, or retry loading it).
 const partnerMissingNotice = '대화 상대를 확인할 수 없어요. 홈에서 대화 상대를 확인해 주세요.';
 
-/// Title for [conversation]: the partner name the service reported, or the
-/// name of [selected] when the conversation belongs to it. Null when neither
-/// is known; the conversation is then not opened.
-String? conversationTitle(Conversation conversation, Persona? selected) =>
-    conversation.personaName ??
-    (selected != null && conversation.personaId == selected.id
-        ? selected.label
-        : null);
+/// Title for [conversation]: the current name of its partner among
+/// [partners] (the ones the app holds, updated by SC-13 at once), else the
+/// name the conversation service reported. The service's name can be older
+/// than a rename, so it is only used for a partner the app does not hold.
+/// Null when neither is known; the conversation is then not opened.
+String? conversationTitle(
+  Conversation conversation,
+  Iterable<Persona> partners,
+) {
+  for (final partner in partners) {
+    if (partner.id == conversation.personaId) return partner.label;
+  }
+  return conversation.personaName;
+}
 
 /// Starts a conversation with [persona] (the partner picked on the home card)
 /// after the AI notice, then opens it.
@@ -159,6 +167,7 @@ class HistoryScreen extends StatefulWidget {
     required this.service,
     this.bottomNavigationBar,
     this.selectedPersona,
+    this.partners = const [],
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
@@ -167,6 +176,10 @@ class HistoryScreen extends StatefulWidget {
   /// Null while there is no partner (or it is not loaded): nothing can be
   /// started then.
   final Persona? selectedPersona;
+
+  /// Every partner the app holds, for conversation titles. Without them only
+  /// [selectedPersona] is known.
+  final List<Persona> partners;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -287,7 +300,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final latest = await widget.service.get(item.id);
       if (!mounted) return;
-      final name = conversationTitle(latest, widget.selectedPersona);
+      final selected = widget.selectedPersona;
+      final name = conversationTitle(
+        latest,
+        widget.partners.isNotEmpty
+            ? widget.partners
+            : [?selected],
+      );
       if (name == null) {
         _notice(partnerMissingNotice);
         return;

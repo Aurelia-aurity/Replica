@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _starting = true);
     try {
       final latest = await widget.history.get(item.id);
-      final name = conversationTitle(latest, widget.personas.current);
+      final name = conversationTitle(latest, widget.personas.personas);
       if (name == null) {
         if (mounted) _notice(partnerMissingNotice);
         return;
@@ -394,6 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return HistoryScreen(
         service: widget.history,
         selectedPersona: widget.personas.current,
+        partners: widget.personas.personas,
         bottomNavigationBar: _navigation(),
       );
     }

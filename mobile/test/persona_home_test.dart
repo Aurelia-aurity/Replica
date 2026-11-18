@@ -274,6 +274,58 @@ void main() {
       expect(titleIn(ChatScreen, '할머니'), findsOneWidget);
     });
 
+    /// Starts a text chat and comes back to the home tab.
+    Future<void> chatOnce(WidgetTester tester) async {
+      await tester.tap(find.text('텍스트로 대화'));
+      await tester.pumpAndSettle();
+      await acceptDisclosure(tester);
+      await tester.tap(find.byTooltip('뒤로'));
+      await tester.pumpAndSettle();
+    }
+
+    /// The first conversation row of a list (home recent or conversations).
+    Finder conversationRow() => find.byType(ListTile).first;
+
+    /// Renames the current partner through SC-07 and SC-13, then returns home.
+    Future<void> rename(WidgetTester tester, String name) async {
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('대화 상대 이름 수정'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), name);
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, '저장'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a recent chat reopens under the new name after a rename', (
+      tester,
+    ) async {
+      await pumpApp(tester, factory: () => FakePersonaService());
+      await nameFirstPartner(tester, '할머니');
+      await chatOnce(tester);
+      await rename(tester, '외할머니');
+      expect(find.text('외할머니'), findsOneWidget);
+      await tester.tap(conversationRow());
+      await tester.pumpAndSettle();
+      expect(titleIn(ChatScreen, '외할머니'), findsOneWidget);
+      expect(titleIn(ChatScreen, '할머니'), findsNothing);
+    });
+
+    testWidgets('the conversations tab also uses the new name', (tester) async {
+      await pumpApp(tester, factory: () => FakePersonaService());
+      await nameFirstPartner(tester, '할머니');
+      await chatOnce(tester);
+      await rename(tester, '외할머니');
+      await tester.tap(find.text('전체 보기'));
+      await tester.pumpAndSettle();
+      await tester.tap(conversationRow());
+      await tester.pumpAndSettle();
+      expect(titleIn(ChatScreen, '외할머니'), findsOneWidget);
+    });
+
     testWidgets('a 50 character name keeps the text title on one line', (
       tester,
     ) async {
