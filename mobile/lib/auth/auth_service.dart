@@ -83,6 +83,22 @@ abstract class AuthService extends ChangeNotifier {
     return true;
   }
 
+  /// Ends the session of an account whose deletion the server has completed.
+  ///
+  /// Like [invalidateSession], a request from an earlier session is ignored.
+  /// Unlike an expired session, the user is told the account is gone, and the
+  /// locally stored credentials are removed so a restart cannot restore them.
+  Future<void> completeAccountDeletion({required int requestGeneration}) async {
+    if (_identity == null || requestGeneration != _generation) return;
+    notice = '계정 삭제를 완료했어요. 이용해 주셔서 감사합니다.';
+    updateIdentity(null);
+    await clearStoredCredentials();
+  }
+
+  /// Removes locally stored session data. Failures must not block sign-out.
+  @protected
+  Future<void> clearStoredCredentials() async {}
+
   void checkSessionExpiry() {
     if (_identity != null &&
         _expiresAt != null &&
