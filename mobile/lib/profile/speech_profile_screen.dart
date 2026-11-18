@@ -49,9 +49,9 @@ ButtonStyle _footerButton({required Color color, required Color line}) =>
       ),
     );
 
-/// What SC-07 shows for a loaded answer. The contract does not separate "no
-/// records", "being built" and "stale" (asked in PR #117), so the app reads
-/// them from the profile together with the latest analysis job.
+/// What SC-07 shows for a loaded answer: from `profile_state` (PR #117)
+/// together with the latest analysis job, or from the job alone when the
+/// server does not send `profile_state` yet.
 enum ProfileView {
   /// A `ready` profile is shown (with a banner when an analysis is running,
   /// failed or ended unknown).
@@ -75,33 +75,49 @@ enum ProfileView {
   /// The server could not tell whether the result was published.
   unknown,
 
-  /// The last analysis succeeded but no `ready` profile is served: the
-  /// records changed afterwards and the profile is outdated.
+  /// The records changed and the profile must be rebuilt (`profile_state`
+  /// `stale`; without it, a succeeded analysis with no `ready` profile).
   outdated,
 }
 
 ProfileView profileViewOf(StyleProfileState state) {
   if (state.profile != null) return ProfileView.profile;
+  if (state.inProgress) return ProfileView.analyzing;
   final analysis = state.analysis;
-  if (analysis == null) return ProfileView.noAnalysis;
-  return switch (analysis.status) {
-    AnalysisStatus.running => ProfileView.analyzing,
-    AnalysisStatus.succeeded => ProfileView.outdated,
-    AnalysisStatus.unknown => ProfileView.unknown,
-    AnalysisStatus.failed => switch (analysis.errorCode) {
-      'insufficient_input' => ProfileView.needsRecords,
-      'source_changed' => ProfileView.sourceChanged,
-      _ => ProfileView.failed,
-    },
+  // A failed or unknown last job says more than the profile state alone.
+  switch (analysis?.status) {
+    case AnalysisStatus.unknown:
+      return ProfileView.unknown;
+    case AnalysisStatus.failed:
+      return switch (analysis!.errorCode) {
+        'insufficient_input' => ProfileView.needsRecords,
+        'source_changed' => ProfileView.sourceChanged,
+        _ => ProfileView.failed,
+      };
+    case AnalysisStatus.running || AnalysisStatus.succeeded || null:
+      break;
+  }
+  return switch (state.profileState) {
+    ProfileState.stale => ProfileView.outdated,
+    // `none` after a succeeded job: the records behind it are gone.
+    ProfileState.none => ProfileView.noAnalysis,
+    // Not sent (or `ready`, which always comes with a profile): a succeeded
+    // job without a ready profile means the profile went out of date.
+    _ => analysis == null ? ProfileView.noAnalysis : ProfileView.outdated,
   };
 }
 
-/// The user may start the analysis again (PR #117: only after a failure, an
-/// unknown result or a conflict; the server starts the first one itself).
+/// The user may start the analysis again (PR #117: after a failure, an
+/// unknown result, or a `stale` profile; the server starts the first one
+/// itself, and never while one is under way).
 bool canRequestAnalysis(StyleProfileState state) {
+  if (state.inProgress) return false;
+  if (state.profileState == ProfileState.stale) return true;
   final analysis = state.analysis;
-  if (analysis == null || analysis.running) return false;
-  return analysis.retryable || state.profile == null;
+  if (analysis == null) return false;
+  if (analysis.retryable) return true;
+  // Without `profile_state`: a succeeded job but no ready profile is stale.
+  return state.profileState == null && state.profile == null;
 }
 
 /// SC-07 말투 프로필.

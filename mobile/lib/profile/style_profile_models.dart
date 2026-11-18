@@ -127,16 +127,37 @@ class ProfileAnalysis {
   }
 }
 
+/// `profile_state` of the style profile answer (PR #117 proposal).
+enum ProfileState {
+  /// No profile yet.
+  none,
+
+  /// An analysis is building the profile.
+  building,
+
+  /// A profile is served.
+  ready,
+
+  /// The records changed; the old profile is not used and must be rebuilt.
+  stale,
+}
+
 /// Answer of `GET /personas/{id}/style-profile` (PR #117 proposal).
 ///
-/// [profile] is null when there is no `ready` profile: none yet, being built,
-/// or `stale`. The contract does not separate these yet (asked in PR #117), so
-/// the app reads them together with [analysis].
+/// [profile] is null when there is no `ready` profile. [profileState] says
+/// why (none yet, being built, or `stale`); it is null when the server does
+/// not send it yet, and the app then reads the situation from [analysis].
 @immutable
 class StyleProfileState {
-  const StyleProfileState({this.profile, this.analysis});
+  const StyleProfileState({this.profile, this.analysis, this.profileState});
   final StyleProfile? profile;
   final ProfileAnalysis? analysis;
+  final ProfileState? profileState;
+
+  /// An analysis is under way: the server says the profile is being built,
+  /// or the latest analysis job is still running.
+  bool get inProgress =>
+      profileState == ProfileState.building || analysis?.running == true;
 
   factory StyleProfileState.fromJson(Map<String, dynamic> json) {
     final profile = json['profile'], analysis = json['analysis'];
@@ -144,12 +165,32 @@ class StyleProfileState {
         (analysis != null && analysis is! Map<String, dynamic>)) {
       throw const FormatException('Invalid style profile answer');
     }
+    final state = switch (json['profile_state']) {
+      null => null,
+      'none' => ProfileState.none,
+      'building' => ProfileState.building,
+      'ready' => ProfileState.ready,
+      'stale' => ProfileState.stale,
+      _ => throw const FormatException('Invalid profile state'),
+    };
+    if (state == ProfileState.ready && profile == null) {
+      throw const FormatException('Ready profile missing');
+    }
+    // Only a ready profile is used. With [state] given, a profile sent for any
+    // other state (a `stale` one, say) is ignored rather than shown.
+    final usable = state == null || state == ProfileState.ready;
     return StyleProfileState(
-      profile: profile == null ? null : StyleProfile.fromJson(profile),
+      profile: profile == null || !usable
+          ? null
+          : StyleProfile.fromJson(profile),
       analysis: analysis == null ? null : ProfileAnalysis.fromJson(analysis),
+      profileState: state,
     );
   }
 
-  StyleProfileState withAnalysis(ProfileAnalysis value) =>
-      StyleProfileState(profile: profile, analysis: value);
+  StyleProfileState withAnalysis(ProfileAnalysis value) => StyleProfileState(
+    profile: profile,
+    analysis: value,
+    profileState: profileState,
+  );
 }

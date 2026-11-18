@@ -120,11 +120,12 @@ class StyleProfileController extends ChangeNotifier {
     }
   }
 
-  /// Rechecks while the analysis runs, up to [analysisCheckLimit].
+  /// Rechecks while the analysis runs (or the profile is being built), up to
+  /// [analysisCheckLimit].
   void _watch() {
     _timer?.cancel();
     _timer = null;
-    if (_disposed || _state?.analysis?.running != true) {
+    if (_disposed || _state?.inProgress != true) {
       _checks = 0;
       return;
     }

@@ -153,6 +153,113 @@ void main() {
       );
     });
 
+    test('profile_state is read and checked against the profile', () {
+      final ready = StyleProfileState.fromJson({
+        'profile': profileJson(),
+        'profile_state': 'ready',
+        'analysis': null,
+      });
+      expect(ready.profileState, ProfileState.ready);
+      expect(ready.profile, isNotNull);
+
+      // A stale profile sent with `stale` is ignored, not an error.
+      final stale = StyleProfileState.fromJson({
+        'profile': profileJson(status: 'stale'),
+        'profile_state': 'stale',
+        'analysis': analysisJson('succeeded'),
+      });
+      expect(stale.profileState, ProfileState.stale);
+      expect(stale.profile, isNull);
+
+      final building = StyleProfileState.fromJson({
+        'profile': null,
+        'profile_state': 'building',
+        'analysis': null,
+      });
+      expect(building.profileState, ProfileState.building);
+      expect(building.inProgress, isTrue);
+
+      // Not sent yet by the server: the app falls back to the analysis job.
+      expect(
+        StyleProfileState.fromJson({'profile': null}).profileState,
+        isNull,
+      );
+      expect(
+        () => StyleProfileState.fromJson({
+          'profile': null,
+          'profile_state': 'ready',
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => StyleProfileState.fromJson({'profile_state': 'done'}),
+        throwsFormatException,
+      );
+    });
+
+    test('views follow profile_state when the server sends it', () {
+      StyleProfileState of(ProfileState state, [ProfileAnalysis? analysis]) =>
+          StyleProfileState(profileState: state, analysis: analysis);
+      expect(profileViewOf(of(ProfileState.building)), ProfileView.analyzing);
+      expect(profileViewOf(of(ProfileState.stale)), ProfileView.outdated);
+      expect(
+        profileViewOf(
+          of(ProfileState.stale, analysisOf(AnalysisStatus.succeeded)),
+        ),
+        ProfileView.outdated,
+      );
+      expect(
+        profileViewOf(
+          of(ProfileState.stale, analysisOf(AnalysisStatus.running)),
+        ),
+        ProfileView.analyzing,
+      );
+      expect(
+        profileViewOf(
+          of(
+            ProfileState.stale,
+            analysisOf(AnalysisStatus.failed, 'op', 'source_changed'),
+          ),
+        ),
+        ProfileView.sourceChanged,
+      );
+      expect(profileViewOf(of(ProfileState.none)), ProfileView.noAnalysis);
+      // The records behind the last profile are gone: not "outdated".
+      expect(
+        profileViewOf(
+          of(ProfileState.none, analysisOf(AnalysisStatus.succeeded)),
+        ),
+        ProfileView.noAnalysis,
+      );
+      expect(
+        profileViewOf(
+          of(
+            ProfileState.none,
+            analysisOf(AnalysisStatus.failed, 'op', 'insufficient_input'),
+          ),
+        ),
+        ProfileView.needsRecords,
+      );
+    });
+
+    test('profile_state decides when a new analysis may be requested', () {
+      bool can(ProfileState state, [AnalysisStatus? status]) =>
+          canRequestAnalysis(
+            StyleProfileState(
+              profileState: state,
+              analysis: status == null ? null : analysisOf(status),
+            ),
+          );
+      expect(can(ProfileState.stale), isTrue);
+      expect(can(ProfileState.stale, AnalysisStatus.succeeded), isTrue);
+      expect(can(ProfileState.stale, AnalysisStatus.running), isFalse);
+      expect(can(ProfileState.building), isFalse);
+      expect(can(ProfileState.building, AnalysisStatus.failed), isFalse);
+      expect(can(ProfileState.none), isFalse);
+      expect(can(ProfileState.none, AnalysisStatus.succeeded), isFalse);
+      expect(can(ProfileState.none, AnalysisStatus.failed), isTrue);
+    });
+
     test('a new analysis may be requested only after it ended badly', () {
       bool can(StyleProfile? profile, AnalysisStatus? status) =>
           canRequestAnalysis(
@@ -462,6 +569,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('분석이 이미 끝나 있었어요.'), findsOneWidget);
       expect(reanalyze, findsNothing);
+    });
+
+    testWidgets('a stale profile asks for a new analysis', (tester) async {
+      await openProfile(
+        tester,
+        state: const StyleProfileState(profileState: ProfileState.stale),
+      );
+      expect(find.text('프로필을 새로 만들어야 해요'), findsOneWidget);
+      expect(reanalyze, findsOneWidget);
+    });
+
+    testWidgets('a profile being built is rechecked without a job yet', (
+      tester,
+    ) async {
+      final h = await openProfile(
+        tester,
+        state: const StyleProfileState(profileState: ProfileState.building),
+      );
+      expect(find.text('말투를 분석하고 있어요'), findsOneWidget);
+      expect(reanalyze, findsNothing);
+      expect(h.service.profileCalls, 1);
+      h.service.profileState = StyleProfileState(
+        profile: sampleProfile(),
+        profileState: ProfileState.ready,
+      );
+      await tester.pump(analysisCheckInterval);
+      await tester.pump();
+      expect(h.service.profileCalls, 2);
+      expect(find.text('말투를 분석하고 있어요'), findsNothing);
+      expect(find.text('자주 쓰는 표현'), findsOneWidget);
     });
 
     testWidgets('an outdated profile asks for a new analysis', (tester) async {
