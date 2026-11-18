@@ -26,7 +26,9 @@ class AuthGate extends StatefulWidget {
     this.personaServiceFactory,
     this.recordServiceFactory,
   });
-  final RecordService Function()? recordServiceFactory;
+  /// Record service for one partner's records (`persona_id`), or for
+  /// account-wide deletion when [personaId] is null. Preview data otherwise.
+  final RecordService Function(String? personaId)? recordServiceFactory;
   final AuthService auth;
   final ChatService chat;
 
@@ -164,18 +166,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) {
-              final records = SessionRecordService(
-                backend: BackendService(widget.auth),
-                delegate:
-                    widget.recordServiceFactory?.call() ??
-                    PreviewRecordService(),
-              );
+              final generation = widget.auth.generation;
               return HomeScreen(
-                onAccountDeleted: _accountDeletedFor(
-                  records,
-                  widget.auth.generation,
+                recordServiceFor: (personaId) => SessionRecordService(
+                  backend: BackendService(widget.auth),
+                  delegate:
+                      widget.recordServiceFactory?.call(personaId) ??
+                      PreviewRecordService(),
                 ),
-                recordService: records,
+                accountDeletedFor: (records) =>
+                    _accountDeletedFor(records, generation),
                 history: _conversationService(),
                 personas: _personaController(),
                 accountEmail: widget.auth.identity!.email,

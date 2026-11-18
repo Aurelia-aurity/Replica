@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
+import 'package:mobile/profile/persona_models.dart';
+import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_models.dart';
@@ -363,7 +365,15 @@ void main() {
     final auth = PreviewAuthService();
     addTearDown(auth.dispose);
     await auth.signIn('preview.a@example.com', PreviewAuthService.password);
-    await tester.pumpWidget(ReplicaApp(authService: auth));
+    await tester.pumpWidget(
+      ReplicaApp(
+        authService: auth,
+        // Records belong to a partner, so the records tab needs one.
+        personaServiceFactory: () => MemoryPersonaService(
+          personas: const [Persona(id: 'p1', name: '엄마')],
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('기록'));
     await tester.pumpAndSettle();

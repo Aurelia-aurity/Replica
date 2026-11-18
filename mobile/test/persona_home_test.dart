@@ -9,7 +9,10 @@ import 'package:mobile/profile/persona_models.dart';
 import 'package:mobile/profile/persona_name_screen.dart';
 import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/profile/speech_profile_screen.dart';
+import 'package:mobile/records/record_models.dart';
+import 'package:mobile/records/record_service.dart';
 import 'package:mobile/records/record_upload_screen.dart';
+import 'package:mobile/records/records_panel.dart';
 
 import 'history_test.dart' as fixtures;
 import 'persona_test_support.dart';
@@ -32,9 +35,27 @@ class QuietChat implements ChatService {
   Future<String> reply(String message) async => '합성 답변';
 }
 
+/// Preview records whose list is one record named [fileName].
+class NamedRecords extends PreviewRecordService {
+  NamedRecords(this.fileName);
+  final String fileName;
+  @override
+  Future<List<RecordEntry>> list() async => [
+    RecordEntry(
+      id: fileName,
+      name: fileName,
+      kind: RecordKind.text,
+      status: RecordStatus.ready,
+      createdAt: DateTime.utc(2026, 11, 1),
+      sizeBytes: 10,
+    ),
+  ];
+}
+
 Future<void> pumpApp(
   WidgetTester tester, {
   PersonaService Function()? factory,
+  RecordService Function(String? personaId)? records,
 }) async {
   final auth = PreviewAuthService();
   addTearDown(auth.dispose);
@@ -47,6 +68,7 @@ Future<void> pumpApp(
       authService: auth,
       chatService: QuietChat(),
       personaServiceFactory: factory,
+      recordServiceFactory: records,
     ),
   );
   await tester.pumpAndSettle();
@@ -333,6 +355,92 @@ void main() {
       expect(find.text('합성 상대'), findsOneWidget);
       expect(find.text('엄마'), findsNothing);
       expect(find.text('대화'), findsNothing);
+    });
+  });
+
+  group('records belong to a partner', () {
+    const father = Persona(id: 'p2', name: '아빠');
+
+    Future<void> openRecords(WidgetTester tester) async {
+      await tester.tap(find.text('기록'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openHomeAndPick(WidgetTester tester, String name) async {
+      await tester.tap(find.text('홈'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('persona-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('without a partner the records tab asks for a profile', (
+      tester,
+    ) async {
+      final asked = <String?>[];
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(),
+        records: (id) {
+          asked.add(id);
+          return PreviewRecordService();
+        },
+      );
+      await openRecords(tester);
+      expect(find.text('기록은 대화 상대별로 모여요'), findsOneWidget);
+      expect(find.byType(RecordsPanel), findsNothing);
+      expect(asked, isEmpty);
+      await tester.tap(find.text('프로필 만들기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PersonaNameScreen), findsOneWidget);
+    });
+
+    testWidgets('each partner lists only its own records', (tester) async {
+      final asked = <String?>[];
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(personas: const [mother, father]),
+        records: (id) {
+          asked.add(id);
+          return NamedRecords('$id-record.txt');
+        },
+      );
+      await openRecords(tester);
+      expect(find.text('엄마의 기록'), findsOneWidget);
+      expect(find.text('p1-record.txt'), findsOneWidget);
+
+      await openHomeAndPick(tester, '아빠');
+      await openRecords(tester);
+      expect(find.text('아빠의 기록'), findsOneWidget);
+      expect(find.text('p2-record.txt'), findsOneWidget);
+      expect(find.text('p1-record.txt'), findsNothing);
+
+      // Going back reuses the first partner's service.
+      await openHomeAndPick(tester, '엄마');
+      await openRecords(tester);
+      expect(find.text('p1-record.txt'), findsOneWidget);
+      expect(asked, ['p1', 'p2']);
+    });
+
+    testWidgets('SC-07 uploads go to that partner\'s records', (tester) async {
+      final services = <String?, RecordService>{};
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(personas: const [mother, father]),
+        records: (id) => services[id] = PreviewRecordService(),
+      );
+      await openHomeAndPick(tester, '아빠');
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('기록 올리기'));
+      await tester.pumpAndSettle();
+      final upload = tester.widget<RecordUploadScreen>(
+        find.byType(RecordUploadScreen),
+      );
+      final service = upload.controller.service as SessionRecordService;
+      expect(service.delegate, same(services['p2']));
+      expect(services.keys, ['p2']);
     });
   });
 }

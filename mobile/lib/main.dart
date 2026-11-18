@@ -44,7 +44,10 @@ class ReplicaApp extends StatelessWidget {
     this.personaServiceFactory,
     this.recordServiceFactory,
   });
-  final RecordService Function()? recordServiceFactory;
+  /// Replaces the default record service. Called once per partner id for
+  /// that partner's records, and with null for account-wide deletion when
+  /// there is no partner yet. For tests and previews.
+  final RecordService Function(String? personaId)? recordServiceFactory;
   final AuthService authService;
   final ChatService? chatService;
 
