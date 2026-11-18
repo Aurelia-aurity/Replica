@@ -448,6 +448,40 @@ void main() {
       expect(find.text('밥은 먹었니'), findsOneWidget);
     });
 
+    testWidgets('a server without the style profile says it is not ready', (
+      tester,
+    ) async {
+      final service = FakePersonaService(personas: const [partner])
+        ..profileError = const BackendFailure(
+          BackendFailureKind.generic,
+          code: apiNotProvided,
+        );
+      final personas = PersonaController(service);
+      addTearDown(personas.dispose);
+      await personas.load();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SpeechProfileScreen(personas: personas, personaId: 'p1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('말투 프로필은 아직 준비 중이에요'), findsOneWidget);
+      expect(find.text('말투 프로필을 불러오지 못했어요.'), findsNothing);
+      expect(find.text('다시 시도'), findsNothing);
+      expect(reanalyze, findsNothing);
+      // Renaming stays reachable; the partner itself is fine.
+      expect(find.text('대화 상대 이름 수정'), findsOneWidget);
+
+      // Once the server serves it, pulling down shows the profile.
+      service
+        ..profileError = null
+        ..profileState = StyleProfileState(profile: sampleProfile());
+      await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
+      await tester.pumpAndSettle();
+      expect(find.text('말투 프로필은 아직 준비 중이에요'), findsNothing);
+      expect(find.text('밥은 먹었니'), findsOneWidget);
+    });
+
     for (final (code, title) in [
       ('insufficient_input', '말투를 파악하려면 기록이 더 필요해요'),
       ('source_changed', '분석하는 동안 기록이 바뀌었어요'),
@@ -808,6 +842,32 @@ void main() {
       expect(h.personas.current!.providerAddress, '우리 딸');
     });
 
+    testWidgets('a server without the address API says so in the sheet', (
+      tester,
+    ) async {
+      final h = await openProfile(
+        tester,
+        persona: const Persona(id: 'p1', name: '김영희'),
+      );
+      h.service.updateError = const BackendFailure(
+        BackendFailureKind.generic,
+        code: apiNotProvided,
+      );
+      await openSheet(tester);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(ProviderAddressSheet),
+          matching: find.byType(TextField),
+        ),
+        '우리 딸',
+      );
+      await tester.pump();
+      await tester.tap(sheetSave);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProviderAddressSheet), findsOneWidget);
+      expect(find.textContaining('호칭 저장은 아직 준비 중이에요'), findsOneWidget);
+      expect(h.personas.current!.providerAddress, isNull);
+    });
     testWidgets('cancel changes nothing', (tester) async {
       final h = await openProfile(tester);
       await openSheet(tester);

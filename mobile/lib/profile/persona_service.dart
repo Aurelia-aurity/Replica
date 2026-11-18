@@ -106,8 +106,9 @@ class MemoryPersonaService implements PersonaService {
 }
 
 /// Adapter for the app-backend contract (`GET /personas`, `POST /personas`,
-/// `GET /personas/{id}`, and the proposed `PATCH /personas/{id}`, which the
-/// backend does not serve yet).
+/// `GET /personas/{id}`, and the PR #117 proposals `PATCH /personas/{id}` and
+/// the style profile routes). A proposal the backend does not serve yet fails
+/// with [apiNotProvided] instead of an ordinary failure.
 class HttpPersonaService implements PersonaService {
   HttpPersonaService(this._api);
   final ApiClient _api;
@@ -156,10 +157,13 @@ class HttpPersonaService implements PersonaService {
   @override
   Future<Persona> update(String personaId, PersonaUpdate update) async {
     if (update.isEmpty) throw ArgumentError('Nothing to update');
-    final json = await _api.request(
-      'PATCH',
-      '/personas/${Uri.encodeComponent(personaId)}',
-      body: update.toJson(),
+    final json = await _proposed(
+      personaId,
+      () => _api.request(
+        'PATCH',
+        '/personas/${Uri.encodeComponent(personaId)}',
+        body: update.toJson(),
+      ),
     );
     final persona = Persona.fromJson(json as Map<String, dynamic>);
     if (persona.id != personaId) throw const FormatException('Wrong persona');
@@ -168,9 +172,12 @@ class HttpPersonaService implements PersonaService {
 
   @override
   Future<StyleProfileState> styleProfile(String personaId) async {
-    final json = await _api.request(
-      'GET',
-      '/personas/${Uri.encodeComponent(personaId)}/style-profile',
+    final json = await _proposed(
+      personaId,
+      () => _api.request(
+        'GET',
+        '/personas/${Uri.encodeComponent(personaId)}/style-profile',
+      ),
     );
     if (json is! Map<String, dynamic>) {
       throw const FormatException('Invalid style profile answer');
@@ -183,16 +190,48 @@ class HttpPersonaService implements PersonaService {
     String personaId, {
     required String operationId,
   }) async {
-    final json = await _api.request(
-      'POST',
-      '/personas/${Uri.encodeComponent(personaId)}/style-profile/analysis',
-      body: {'operation_id': operationId},
+    final json = await _proposed(
+      personaId,
+      () => _api.request(
+        'POST',
+        '/personas/${Uri.encodeComponent(personaId)}/style-profile/analysis',
+        body: {'operation_id': operationId},
+      ),
     );
     if (json is! Map<String, dynamic>) {
       throw const FormatException('Invalid analysis answer');
     }
     return ProfileAnalysis.fromJson(json);
   }
+
+  /// Runs a request to an API that PR #117 only proposes, and reports
+  /// [apiNotProvided] when the backend does not serve it yet:
+  /// - 405: the path exists for other methods (`GET /personas/{id}`), so
+  ///   `PATCH` is simply not there.
+  /// - 404 while the partner itself is found: the contract answers 404 only
+  ///   for a missing partner, so the route is missing. Both the plain
+  ///   framework answer and the `NOT_FOUND` envelope look alike otherwise.
+  Future<Object?> _proposed(
+    String personaId,
+    Future<Object?> Function() request,
+  ) async {
+    try {
+      return await request();
+    } on BackendFailure catch (error) {
+      if (error.statusCode == 405 || error.statusCode == 501) {
+        throw _notProvided;
+      }
+      if (error.statusCode == 404 && await _find(personaId) != null) {
+        throw _notProvided;
+      }
+      rethrow;
+    }
+  }
+
+  static const _notProvided = BackendFailure(
+    BackendFailureKind.generic,
+    code: apiNotProvided,
+  );
 
   bool _isDefiniteRejection(Object error) =>
       error is BackendFailure &&

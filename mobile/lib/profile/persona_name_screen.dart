@@ -68,12 +68,12 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     Navigator.of(context).pop();
   }
 
-  String _failureText(Object error) {
-    if (error is BackendFailure && error.code == 'INVALID_INPUT') {
-      return '입력한 내용을 확인해 주세요.';
-    }
-    return '저장하지 못했어요. 입력한 이름은 그대로 두었어요. 다시 시도해 주세요.';
-  }
+  String _failureText(Object error) => switch (error) {
+    BackendFailure(code: apiNotProvided) =>
+      '이름 수정은 아직 준비 중이에요. 지금은 처음 정한 이름으로 대화할 수 있어요.',
+    BackendFailure(code: 'INVALID_INPUT') => '입력한 내용을 확인해 주세요.',
+    _ => '저장하지 못했어요. 입력한 이름은 그대로 두었어요. 다시 시도해 주세요.',
+  };
 
   Future<void> _save() async {
     // A notice action can fire after the screen is gone.
@@ -124,7 +124,10 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
               _noticeLift + MediaQuery.paddingOf(context).bottom,
             ),
             content: Text(_failureText(error)),
-            action: SnackBarAction(label: '다시 시도', onPressed: _save),
+            // A retry cannot help while the server lacks the API.
+            action: error is BackendFailure && error.code == apiNotProvided
+                ? null
+                : SnackBarAction(label: '다시 시도', onPressed: _save),
           ),
         );
     }

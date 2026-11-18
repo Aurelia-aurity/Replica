@@ -214,6 +214,25 @@ void main() {
       expect(controller.current!.label, '어머니');
     });
 
+    testWidgets('a server without the rename API says it is not ready', (
+      tester,
+    ) async {
+      final (service, controller, opened) = await openEdit(tester);
+      service.updateError = const BackendFailure(
+        BackendFailureKind.generic,
+        code: apiNotProvided,
+      );
+      await tester.enterText(find.byType(TextField), '어머니');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('이름 수정은 아직 준비 중이에요'), findsOneWidget);
+      expect(find.text('다시 시도'), findsNothing);
+      expect(fieldText(tester), '어머니');
+      expect(controller.current!.label, '엄마');
+      expect(opened.returned, false);
+    });
+
     testWidgets('rejected input explains itself', (tester) async {
       final (service, _, _) = await openEdit(tester);
       service.updateError = const BackendFailure(

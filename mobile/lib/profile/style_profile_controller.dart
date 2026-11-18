@@ -43,6 +43,12 @@ class StyleProfileController extends ChangeNotifier {
   StyleProfileState? get state => _state;
   bool get requesting => _requesting;
 
+  /// The last lookup failed because the backend does not serve the style
+  /// profile yet ([apiNotProvided]); SC-07 then says so instead of offering a
+  /// retry that cannot help.
+  bool get notProvided => _notProvided;
+  bool _notProvided = false;
+
   /// The automatic checks of a running analysis stopped at the limit.
   bool get watchExpired => _watchExpired;
 
@@ -72,9 +78,13 @@ class StyleProfileController extends ChangeNotifier {
       if (_disposed || request != _request) return;
       _state = result;
       _status = LoadStatus.ready;
-    } catch (_) {
+      _notProvided = false;
+    } catch (error) {
       if (_disposed || request != _request) return;
-      if (!keep) _status = LoadStatus.failed;
+      if (!keep) {
+        _status = LoadStatus.failed;
+        _notProvided = error is BackendFailure && error.code == apiNotProvided;
+      }
     }
     _watch();
     _notify();

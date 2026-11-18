@@ -188,6 +188,65 @@ void main() {
     });
   });
 
+  group('APIs the backend does not serve yet (PR #117 proposals)', () {
+    final notProvided = throwsA(
+      isA<BackendFailure>().having((e) => e.code, 'code', apiNotProvided),
+    );
+    final notFound = throwsA(
+      isA<BackendFailure>().having((e) => e.code, 'code', 'NOT_FOUND'),
+    );
+    http.Response plain(int status) => http.Response(
+      jsonEncode({
+        'detail': status == 405 ? 'Method Not Allowed' : 'Not Found',
+      }),
+      status,
+      headers: {'content-type': 'application/json'},
+    );
+    http.Response envelope(int status, String code) => jsonResponse({
+      'error': {'code': code, 'message': 'x', 'retryable': false},
+    }, status);
+
+    test('PATCH answered 405 (plain or enveloped) is not provided', () async {
+      for (final answer in [plain(405), envelope(405, 'METHOD_NOT_ALLOWED')]) {
+        final (service, _) = await httpService((_) async => answer);
+        await expectLater(
+          service.update('p1', PersonaUpdate(displayName: '엄마')),
+          notProvided,
+        );
+      }
+    });
+
+    test(
+      'a style profile 404 for a partner that exists is not provided',
+      () async {
+        for (final answer in [plain(404), envelope(404, 'NOT_FOUND')]) {
+          final (service, requests) = await httpService((request) async {
+            if (request.url.path == '/personas/p1') {
+              return jsonResponse(personaJson('p1', '엄마'));
+            }
+            return answer;
+          });
+          await expectLater(service.styleProfile('p1'), notProvided);
+          await expectLater(
+            service.requestAnalysis('p1', operationId: 'op-1'),
+            notProvided,
+          );
+          expect(
+            requests.map((r) => '${r.method} ${r.url.path}'),
+            contains('GET /personas/p1'),
+          );
+        }
+      },
+    );
+
+    test('a 404 for a missing partner stays a not-found failure', () async {
+      final (service, _) = await httpService(
+        (_) async => envelope(404, 'NOT_FOUND'),
+      );
+      await expectLater(service.styleProfile('gone'), notFound);
+    });
+  });
+
   group('conversation target', () {
     Future<(HttpConversationService, List<http.Request>)>
     conversations() async {

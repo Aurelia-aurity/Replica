@@ -219,6 +219,7 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
     } catch (error) {
       if (!mounted) return;
       _notice(switch (error) {
+        BackendFailure(code: apiNotProvided) => '말투 분석 요청은 아직 준비 중이에요.',
         BackendFailure(code: 'INVALID_INPUT') =>
           '확정된 기록이 없어요. 기록을 올려 확정한 뒤 다시 시도해 주세요.',
         BackendFailure(code: 'NOT_FOUND') => '대화 상대를 찾을 수 없어요.',
@@ -301,8 +302,17 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 if (!ready)
-                  status == LoadStatus.failed
-                      ? _StateCard(
+                  status != LoadStatus.failed
+                      ? const _LoadingState()
+                      : _profile.notProvided
+                      // The server has no style profile yet: retrying cannot
+                      // help, so no retry button (pulling down still checks).
+                      ? const _StateCard(
+                          icon: Icons.schedule,
+                          title: '말투 프로필은 아직 준비 중이에요',
+                          body: '서버에서 말투 분석을 제공하면 여기에 보여 드릴게요. 이름을 정한 대화 상대와는 지금도 대화할 수 있어요.',
+                        )
+                      : _StateCard(
                           icon: Icons.cloud_off_outlined,
                           title: '말투 프로필을 불러오지 못했어요.',
                           action: TextButton.icon(
@@ -311,7 +321,6 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
                             label: const Text('다시 시도'),
                           ),
                         )
-                      : const _LoadingState()
                 else if (view == ProfileView.profile) ...[
                   ..._analysisBanner(state),
                   ..._sections(state.profile!),
@@ -593,9 +602,12 @@ class _ProviderAddressSheetState extends State<ProviderAddressSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = error is BackendFailure && error.code == 'INVALID_INPUT'
-            ? '입력한 내용을 확인해 주세요.'
-            : '저장하지 못했어요. 입력한 호칭은 그대로 두었어요. 다시 시도해 주세요.';
+        _error = switch (error) {
+          BackendFailure(code: apiNotProvided) =>
+            '호칭 저장은 아직 준비 중이에요. 서버에서 지원하면 저장할 수 있어요.',
+          BackendFailure(code: 'INVALID_INPUT') => '입력한 내용을 확인해 주세요.',
+          _ => '저장하지 못했어요. 입력한 호칭은 그대로 두었어요. 다시 시도해 주세요.',
+        };
       });
     }
   }
