@@ -120,7 +120,7 @@
 | consent_at | datetime \| null | 자료 사용 동의 시각 |
 | consent_version | string \| null | 동의 문구 버전 (최대 100자) |
 | consent_scopes | string[] | 동의 범위. `personalization`, `training` 중 선택. 기본 `["personalization"]` |
-| error_code | string \| null | 실패 시 오류 코드 (영문·숫자·`.`·`-`·`_`, 1~64자) |
+| error_code | string \| null | 실패 시 오류 코드 (영문·숫자·`.`·`-`·`_`, 1~64자). `status`가 `uploading`일 때는 `/uploaded`가 화자 오류로 거절한 사유 `speaker_required` · `speaker_not_found` · `speaker_not_allowed`가 들어 있을 수 있으며, 앱은 이 값이 있으면 '확인 필요'로 표시하고 화자 선택을 이어감('업로드 뒤 검증'의 '화자 선택 이어가기'). 화자 검증을 통과해 `uploaded`가 되면 `null` |
 | target_speaker | string \| null | (제안) 카카오톡 기록에서 말투를 반영하기로 고른 화자. 화자가 1명뿐인 기록에서는 사용자가 "이 화자가 대화 상대입니다"라고 확인한 그 화자. 파일에 표시된 문자열(앞뒤 공백 제거 후)이며 이 기록 안에서만 의미가 있음. 이 값은 이 기록의 최초 업로드와 `revision 1`, 기록 안 화자에 연결된 확인이며 이후 `revision`에는 '화자 확인의 적용 범위' 조건으로 승계됨 |
 | provider_speaker | string \| null | (제안) 화자가 2명 이상인 카카오톡 기록에서 제공자로 고른 화자(동의 근거). 화자가 1명뿐인 기록은 `null`이며 파일에 없는 제공자는 추정하지 않음 |
 | reflection_status | string | (제안) `none`(확정 전, 카카오톡 기록의 화자 확인 전 포함) · `pending`(확정됨, 색인·프로필 반영 중) · `reflected`(같은 확정본·자료 개정이 색인과 프로필 모두에 반영됨) · `failed`(반영 실패. 사용자가 말투 프로필 분석 API로 다시 요청하면 서버가 색인부터 다시 시작). 색인과 프로필의 개별 상태로 계산하며 둘 중 하나만 반영됐으면 `reflected`가 아님. 하위 상태와 재개 방식은 #112·#113·#121에서 정함 |
@@ -693,7 +693,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 화자가 파일에 없음 | 두 값(앞뒤 공백 제거 후)이 파일의 화자 목록에 없으면 422 `SPEAKER_NOT_FOUND`(`field: target_speaker` 또는 `provider_speaker`)입니다. 응답의 `speakers`로 다시 선택하게 합니다 |
 | 화자 값이 필요 없는데 있음 | 카카오톡이 아니면 화자 값을 보내면 422 `SPEAKER_NOT_ALLOWED`(`field: target_speaker`)입니다(`speakers`는 빈 배열). 화자가 1명뿐인 카카오톡에서 `provider_speaker`를 보내면 422 `SPEAKER_NOT_ALLOWED`(`field: provider_speaker`)입니다(파일에 없는 제공자를 추정하지 않음). 앱은 보낸 값을 `null`로 지워 `/uploaded`를 다시 호출하며 파일을 다시 올리지 않습니다 |
 | 화자가 대화 상대가 아님 | 앱은 예약 전에 확인을 받으므로 사용자가 "대화 상대가 아니다"라고 하면 예약하지 않습니다(기록 삭제 불필요). `/uploaded`의 확인 요구(422)는 앱과 서버의 판정이 다를 때만 쓰는 경로입니다(예: 앱은 1명, 서버는 2명 이상으로 판정). 그 경로에서 사용자가 거절하면 앱이 기록을 삭제하고 안내합니다(삭제 API는 #123이며 그 전까지 `uploading` 기록이 남음) |
-| 화자 검증 실패 뒤 상태 | 위 최종 선택값·화자 검증(`INVALID_INPUT`의 화자 형식 오류, `SPEAKER_REQUIRED`·`SPEAKER_NOT_FOUND`·`SPEAKER_NOT_ALLOWED`)에서 422이면 기록은 `uploading`으로 남고 올린 파일도 그대로 둡니다. 모든 경우 화자 값만 고쳐(또는 `null`로 지워) `/uploaded`를 다시 호출하며 파일을 다시 올리지 않습니다. '내용 형식'의 422는 이 복구에 해당하지 않고 기록을 삭제한 뒤 새로 예약합니다. 화자 확인 때문에 `uploading`에 멈춘 기록을 나타내는 별도 값은 두지 않습니다. 앱이 `/uploaded` 응답에서 바로 확인 화면으로 연결하며, 앱을 닫았다가 다시 열면 업로드 중으로 보일 수 있습니다 |
+| 화자 검증 실패 뒤 상태 | 위 최종 선택값·화자 검증(`INVALID_INPUT`의 화자 형식 오류, `SPEAKER_REQUIRED`·`SPEAKER_NOT_FOUND`·`SPEAKER_NOT_ALLOWED`)에서 422이면 기록은 `uploading`으로 남고 올린 파일도 그대로 둡니다. 모든 경우 화자 값만 고쳐(또는 `null`로 지워) `/uploaded`를 다시 호출하며 파일을 다시 올리지 않습니다. '내용 형식'의 422는 이 복구에 해당하지 않고 기록을 삭제한 뒤 새로 예약합니다 |
+| 화자 선택 이어가기 | `/uploaded`가 서버 판정에 따른 화자 오류(`SPEAKER_*`)로 422를 내리면 서버는 기록의 `error_code`에 그 사유를 소문자로 저장합니다(`speaker_required`·`speaker_not_found`·`speaker_not_allowed`). 앱을 닫았다가 다시 열어도 기록 목록·상세의 `status: uploading`과 `error_code: speaker_*`로 "화자 확인이 필요한 기록"을 알 수 있고, 앱은 이를 일반 업로드 중과 구분해 '확인 필요'로 표시합니다. 항목을 누르면 앱은 **본문 없이 `/uploaded`를 다시 호출**해 같은 `SPEAKER_*` 422와 서버가 판정한 `speakers`를 받고(서버가 파일을 다시 읽어 판정), 그 목록으로 선택 화면을 띄운 뒤 선택값을 담아 다시 호출합니다. 파일은 다시 올리지 않으며 통과하면 `uploaded`가 되고 `error_code`는 `null`로 지워집니다. 화자 목록을 기록 조회 응답에 넣지는 않습니다. 이 호출은 서버가 원본 파일(최대 25 MiB)을 다시 읽어 판정하므로 사용자가 항목을 탭할 때만 부르고, 응답을 받은 화면에서는 반복 호출하지 않으며 목록 갱신이나 폴링에 쓰지 않습니다. 호출이 드물다는 전제의 임시 선택이므로 실제 응답 시간을 측정한 뒤 화자 목록을 저장해 조회로 주는 방식 등으로 바꿀 수 있습니다. `INVALID_INPUT`의 형식 오류(예: 동일인 중복)는 `error_code`에 저장하지 않으며, 텍스트 버전 `confirm`의 `SPEAKER_*`도 기록의 `error_code`를 바꾸지 않습니다(초안이 `draft`로 남아 있고 다시 `confirm`하면 같은 오류와 `speakers`를 받음) |
 
 ##### 오류 응답 (`/uploaded`)
 
@@ -705,7 +706,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 409 | `UPLOAD_MISSING`(`retryable: true`) | 원본이 없음 | 같은 주소로 다시 `PUT`, 만료·거절이면 재예약 |
 | 409 | `UPLOAD_SIZE_MISMATCH`(`retryable: false`) | 원본은 있으나 크기가 `size_bytes`와 다름 | 기록을 삭제하고 새 `record_id`로 다시 예약 |
 | 422 | `INVALID_INPUT` | 내용 형식 오류, 최종 선택값의 형식 오류(길이·쌍·동일인) | 내용 형식은 기록 삭제 후 새 예약, 최종 선택값은 값을 고쳐 재호출 |
-| 422 | `SPEAKER_REQUIRED`·`SPEAKER_NOT_FOUND`·`SPEAKER_NOT_ALLOWED`(`retryable: true`) | 서버 판정에 따른 화자 오류. 응답에 `speakers` | 값을 고치거나 `null`로 지워 재호출 |
+| 422 | `SPEAKER_REQUIRED`·`SPEAKER_NOT_FOUND`·`SPEAKER_NOT_ALLOWED`(`retryable: true`) | 서버 판정에 따른 화자 오류. 응답에 `speakers`이며 기록의 `error_code`에 `speaker_*`를 저장 | 값을 고치거나 `null`로 지워 재호출. 앱을 닫았다 열었다면 목록의 `error_code`로 알아보고 본문 없이 `/uploaded`를 다시 호출해 `speakers`를 받음 |
 | 503 | `DB_UNAVAILABLE`(`retryable: true`) | Storage에서 원본을 확인하지 못함 | 같은 호출을 다시 |
 
 ##### 화자 확인의 적용 범위
@@ -759,7 +760,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 
 ##### 상태 확인 주기
 
-처리 중인 기록(`uploading`·`uploaded`·`processing`, `reflection_status=pending`)이 있는 동안 앱은 목록 화면이 보이는 동안만 5초 간격으로 조회하고, 조회가 실패하면 간격을 2배씩(최대 8배, 40초) 늘립니다(`mobile`의 현재 구현). 앱에는 별도의 총 대기 상한을 두지 않습니다. 서버가 `pending`을 언제까지 유지하고 언제 실패로 바꿀지는 정해지지 않았으며 #10·#112에서 정합니다.
+처리 중인 기록(`uploading`·`uploaded`·`processing`, `reflection_status=pending`)이 있는 동안 앱은 목록 화면이 보이는 동안만 5초 간격으로 조회하고, 조회가 실패하면 간격을 2배씩(최대 8배, 40초) 늘립니다(`mobile`의 현재 구현). 앱에는 별도의 총 대기 상한을 두지 않습니다. 서버가 `pending`을 언제까지 유지하고 언제 실패로 바꿀지는 정해지지 않았으며 #10·#112에서 정합니다. `status: uploading`이면서 `error_code`가 `speaker_*`인 기록은 사용자의 화자 선택을 기다리는 것이므로 처리 중 확인(폴링)의 대상으로 보지 않아도 됩니다.
 
 <a id="a-textver-list"></a>
 
