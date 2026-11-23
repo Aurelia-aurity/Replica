@@ -49,16 +49,17 @@ jobs:
             python -m pip freeze
           } > "$REPRO_OUT/environment.txt"
           python -m pytest ai/tests -q -p no:cacheprovider --collect-only 2>&1 | tee "$REPRO_OUT/collection.log"
-      - name: Run fixed pre-fix samples
+      - name: Run fixed suite samples
         run: |
           run_batch() {
-            local mode=$1 runs=$2 selection=$3
+            local mode=$1 runs=$2
+            shift 2
             local i run_id rc failures=0
             for ((i=1; i<=runs; i++)); do
               printf -v run_id '%s-%02d' "$mode" "$i"
-              if python -m pytest "$selection" -q -p no:cacheprovider > "$REPRO_OUT/$run_id.log" 2>&1; then
+              if "$@" > "$REPRO_OUT/$run_id.log" 2>&1; then
                 rc=0
-                rm "$REPRO_OUT/$run_id.log"
+                if [[ "$mode" != targeted-drain ]]; then rm "$REPRO_OUT/$run_id.log"; fi
               else
                 rc=$?
                 failures=$((failures + 1))
@@ -68,14 +69,65 @@ jobs:
             BATCH_FAILURES=$failures
           }
 
+          pytest=(python -m pytest -q -p no:cacheprovider)
           printf 'run\texit_code\n' > "$REPRO_OUT/exit-codes.tsv"
-          run_batch full 20 ai/tests
+          run_batch full 20 "${pytest[@]}" ai/tests
           full_fail=$BATCH_FAILURES
-          run_batch isolated 10 ai/tests/test_smoke_persona.py
+          run_batch isolated 10 "${pytest[@]}" ai/tests/test_smoke_persona.py
           isolated_fail=$BATCH_FAILURES
-          run_batch auth-isolated 10 ai/tests/test_persona_call_auth.py
+          run_batch auth-isolated 10 "${pytest[@]}" ai/tests/test_persona_call_auth.py
           printf 'SUMMARY os=%s full_fail=%s/20 isolated_fail=%s/10 auth_isolated_fail=%s/10\n' \
             "$REPRO_OS" "$full_fail" "$isolated_fail" "$BATCH_FAILURES" | tee "$REPRO_OUT/summary.txt"
+          if [[ "$REPRO_OS" == windows-latest ]]; then
+            targets=(
+              ai/tests/test_server.py::ServerTests::test_background_loading_and_readiness
+              ai/tests/test_startup_warmup.py::StartupWarmupTests::test_warmup_failure_keeps_not_ready_and_never_retries
+              ai/tests/test_persona.py::PersonaTests::test_raw_then_auth_then_structure_then_sizes_then_readiness
+              ai/tests/test_persona_call_auth.py::PersonaCallAuthTests::test_denial_precedes_json_decode_even_for_valid_id_or_broken_body
+            )
+            # Experimental control: keep the normal half-close but drain the receive side
+            # up to EOF, one second or RAW_LIMIT + 1 bytes, whichever comes first.
+            cat > "$REPRO_OUT/drain-probe.py" <<'PY'
+          import socket
+          import sys
+          from pathlib import Path
+          from time import monotonic
+
+          import pytest
+
+          sys.path.insert(0, str(Path("ai/src").resolve()))
+          from http_contract import InferenceHTTPServer, RAW_LIMIT
+
+          observed = []
+
+          def half_close_and_drain(server: InferenceHTTPServer, request: socket.socket) -> None:
+              size = 0
+              try:
+                  request.shutdown(socket.SHUT_WR)
+                  deadline = monotonic() + 1
+                  while size <= RAW_LIMIT and (remaining := deadline - monotonic()) > 0:
+                      request.settimeout(remaining)
+                      data = request.recv(min(8192, RAW_LIMIT + 1 - size))
+                      if not data:
+                          break
+                      size += len(data)
+              except OSError as error:
+                  observed.append(f"{type(error).__name__}:{error.errno}")
+              finally:
+                  observed.append(size)
+                  server.close_request(request)
+
+          InferenceHTTPServer.shutdown_request = half_close_and_drain
+          result = pytest.main(sys.argv[1:])
+          print(f"DRAIN_OBSERVED {observed}", flush=True)
+          raise SystemExit(result)
+          PY
+            run_batch targeted 50 "${pytest[@]}" "${targets[@]}"
+            printf 'TARGETED original_fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
+            run_batch targeted-drain 50 python "$REPRO_OUT/drain-probe.py" -q -p no:cacheprovider "${targets[@]}"
+            printf 'TARGETED drain_fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
+            rm "$REPRO_OUT/drain-probe.py"
+          fi
       - name: Upload reproduction evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
