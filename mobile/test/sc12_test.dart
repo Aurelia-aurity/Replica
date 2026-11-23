@@ -95,6 +95,23 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('account deletion row starts the provided deletion flow', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsScreen(
+          isDemo: true,
+          onDeleteAccount: () async => calls++,
+        ),
+      ),
+    );
+    await openMenu(tester, '계정 삭제');
+    expect(calls, 1);
+    expect(find.text('계정 삭제는 아직 지원하지 않아요'), findsNothing);
+  });
+
   testWidgets(
     'logout cancellation, duplicate prevention and failure keep account',
     (tester) async {
