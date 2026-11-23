@@ -1,0 +1,5 @@
+# Optional CPU offline encoding candidate, not an installed environment claim.
+# Keep separate from GPU generation requirements. No automatic installation.
+sentence-transformers==5.1.2
+transformers==4.57.1
+torch==2.7.1

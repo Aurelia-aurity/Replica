@@ -10,6 +10,9 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import request_timing
 import server
+from profile_adapter import ProfileConfig
+from test_profile_contract import analyze, merge, profile
+from test_profile_server import ANALYZE, MERGE
 from test_persona import FakePersona, PATH, assign, request as persona_request
 from test_server import Engine, RecordingService, call, request, serving
 
@@ -20,6 +23,36 @@ def timing_records(logs):
 
 
 class RequestTimingTests(unittest.TestCase):
+    def test_profile_routes_keep_timing_and_profile_success_envelope(self):
+        for path, data in ((ANALYZE, analyze()), (MERGE, merge())):
+            engine = Engine()
+            engine.answer = json.dumps(profile())
+            service = server.Service(engine, profile_config=ProfileConfig("synthetic", 32))
+            responded = threading.Event()
+            original = server.Handler.respond
+
+            def respond(handler, status, body):
+                original(handler, status, body)
+                responded.set()
+
+            with self.subTest(path=path), serving(service) as port, patch.object(
+                    server.Handler, "respond", respond):
+                with self.assertLogs("baseline.http", level="INFO") as logs:
+                    status, body = call(port, data, path=path)
+                    self.assertTrue(responded.wait(5))
+            self.assertEqual(status, 200)
+            self.assertEqual(body["profile_content"], profile())
+            rows = timing_records(logs)
+            stages = {row["stage"]: row for row in rows}
+            self.assertTrue({"receipt", "body_read", "parse", "prepare_tokenize",
+                             "admission_lock", "worker_handoff", "generate",
+                             "success_body", "response_write"} <= stages.keys())
+            self.assertEqual(len({row["attempt_id"] for row in rows}), 1)
+            self.assertEqual(stages["generate"]["request_id"], data["request_id"])
+            self.assertEqual(stages["generate"]["output_tokens"], 1)
+            self.assertTrue(stages["response_write"]["write_ok"])
+            self.assertIsNone(service.active_id)
+
     def test_monotonic_offsets_use_one_local_clock(self):
         with patch.object(request_timing.time, "monotonic_ns", side_effect=[100, 120, 150]):
             timing = request_timing.RequestTiming()

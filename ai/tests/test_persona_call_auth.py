@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from persona_adapter import PersonaInference
 import server
+from request_timing import RequestTiming
 from test_persona import PATH, request
 from test_server import Engine, call, serving
 
@@ -37,6 +38,43 @@ def private_engine():
     return engine
 
 
+def assert_private_timing(case, line):
+    """The #116 JSON schema permits only fixed labels, IDs and numeric metadata."""
+    row = json.loads(line)
+    labels = {"schema_version", "event", "attempt_id", "request_id", "stage",
+              "queue_present", "queue_wait_ms", "ttft_available", "ttft_reason",
+              "first_unforced_token_reason", "write_ok"}
+    numbers = {"start_ns", "end_ns", "status", "input_tokens", "output_tokens",
+               "first_token_ms", "first_generated_token_ns", "first_unforced_token_ns",
+               "model_generate_start_ns", "model_generate_end_ns", "model_first_token_ms",
+               "forced_prefix_tokens"}
+    case.assertEqual(set(row), labels | numbers)
+    case.assertEqual(row["schema_version"], 1)
+    case.assertEqual(row["event"], "request_timing")
+    case.assertRegex(row["attempt_id"], r"^[0-9a-f-]{36}$")
+    if row["request_id"] is not None:
+        case.assertRegex(row["request_id"], r"^[0-9a-f-]{36}$")
+    case.assertIn(row["stage"], {
+        "receipt", "body_read", "parse", "prepare_tokenize", "prompt_assembly",
+        "persona_prompt_assembly",
+        "template_tokenize", "prefix_encode", "input_setup", "model_generate_call",
+        "output_decode", "cuda_drain", "adapter_parse_guard", "admission_lock",
+        "worker_handoff", "success_body", "generate", "response_write"})
+    case.assertIn(row["ttft_reason"], {
+        "observed_cpu_token", "awaiting_first_token", "no_generated_token",
+        "observer_not_started"})
+    case.assertIn(row["first_unforced_token_reason"], {
+        "observed_cpu_token", "no_unforced_token", "observer_not_started"})
+    case.assertIs(row["queue_present"], False)
+    case.assertIsNone(row["queue_wait_ms"])
+    case.assertIs(type(row["ttft_available"]), bool)
+    case.assertIn(type(row["write_ok"]), (bool, type(None)))
+    for key in numbers:
+        if row[key] is not None:
+            case.assertIn(type(row[key]), (int, float))
+            case.assertGreaterEqual(row[key], 0)
+
+
 def assert_private_logs(case, logs, status):
     """Allow counts, never token values, and static exception location metadata."""
     messages = [record.getMessage() for record in logs.records]
@@ -49,6 +87,9 @@ def assert_private_logs(case, logs, status):
     failure = prefix + r"exception_type=\w+ stack=(.+)"
     for record, line in zip(logs.records, messages):
         case.assertIsNone(record.exc_info)
+        if line.startswith("{"):
+            assert_private_timing(case, line)
+            continue
         if re.fullmatch(normal, line):
             continue
         match = re.fullmatch(failure, line)
@@ -62,6 +103,17 @@ def assert_private_logs(case, logs, status):
 
 
 class PersonaCallAuthTests(unittest.TestCase):
+    def test_timing_privacy_rejects_payload_fields_and_string_metadata(self):
+        timing = RequestTiming()
+        with self.assertLogs(server.LOGGER, level="INFO") as logs:
+            timing.emit("receipt", 0)
+        row = json.loads(logs.records[0].getMessage())
+        assert_private_timing(self, json.dumps(row))
+        for field, value in (("message", MARKERS[0]), ("stage", MARKERS[1]),
+                             ("input_tokens", MARKERS[2]), ("request_id", MARKERS[3])):
+            with self.subTest(field=field), self.assertRaises(AssertionError):
+                assert_private_timing(self, json.dumps({**row, field: value}))
+
     def test_fake_auth_decisions_use_fixed_envelopes_and_private_logs(self):
         for decision in (None, 401, 403):
             engine = private_engine()
