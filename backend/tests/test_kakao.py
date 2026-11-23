@@ -1,6 +1,8 @@
 """카카오톡 내보내기 분석: 앱(`text_analysis.dart`)과 같은 판정 규칙."""
 
-from app.services.kakao import PLAIN, analyze_text
+import pytest
+
+from app.services.kakao import MAX_SPEAKER_NAME, MAX_SPEAKERS, PLAIN, TooManySpeakers, analyze_text
 
 ANDROID = "[엄마] [오후 3:12] 밥 먹었니\n[나] [오후 3:13] 응\n[엄마] [오후 3:14] 다행이다\n".encode()
 DATED = (
@@ -20,9 +22,33 @@ def test_dated_export_variants_are_recognized():
     assert result.kakao and result.speakers == ["엄마", "나"] and result.messages == 3
 
 
-def test_bom_and_malformed_bytes_do_not_break_analysis():
-    data = b"\xef\xbb\xbf" + ANDROID + b"\xff\xfe broken line\n"
-    assert analyze_text(data).speakers == ["엄마", "나"]
+def test_a_leading_bom_is_ignored():
+    assert analyze_text(b"\xef\xbb\xbf" + ANDROID).speakers == ["엄마", "나"]
+
+
+def test_bytes_that_are_not_utf8_raise_instead_of_garbling_speaker_names():
+    with pytest.raises(UnicodeDecodeError):
+        analyze_text(ANDROID + b"\xff\xfe broken line\n")
+
+
+def _lines(names):
+    return "".join(f"[{name}] [오후 3:12] 안녕\n" for name in names).encode()
+
+
+def test_a_speaker_name_over_the_limit_is_not_counted_as_a_speaker():
+    long_name, ok_name = "가" * (MAX_SPEAKER_NAME + 1), "나" * MAX_SPEAKER_NAME
+    result = analyze_text(_lines([ok_name, ok_name, long_name, long_name, long_name]))
+    assert result.kakao and result.speakers == [ok_name] and result.messages == 2  # 긴 이름의 줄은 메시지로 세지 않음
+    assert analyze_text(_lines([long_name, long_name])) == PLAIN
+
+
+def test_the_number_of_distinct_speakers_is_capped():
+    at_limit = analyze_text(_lines(f"u{n}" for n in range(MAX_SPEAKERS)))
+    assert at_limit.kakao and len(at_limit.speakers) == MAX_SPEAKERS
+    repeated = analyze_text(_lines([f"u{n}" for n in range(MAX_SPEAKERS)] + ["u0", "u1"]))  # 이미 센 이름은 한도와 무관
+    assert len(repeated.speakers) == MAX_SPEAKERS
+    with pytest.raises(TooManySpeakers):
+        analyze_text(_lines(f"u{n}" for n in range(MAX_SPEAKERS + 1)))
 
 
 def test_a_single_stray_timestamp_is_not_a_chat_export():

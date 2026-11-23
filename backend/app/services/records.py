@@ -4,6 +4,7 @@
 `/uploaded`에서 검사한다. 카카오톡 기록은 화자가 1명이어도 그 화자를 대화 상대로 확인한 `target_speaker`가 있어야 완료된다. 질문·본문·화자 이름은 로그에 남기지 않는다.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -13,11 +14,11 @@ from app.core.config import get_settings
 from app.core.errors import CONFLICT_MESSAGE, INVALID_INPUT_MESSAGE, AppError
 from app.db.repository import RECORD_MIME_TYPES
 from app.schemas.record import RecordCreate, UploadedBody
-from app.services.kakao import analyze_text
+from app.services.kakao import MAX_SPEAKER_NAME, TooManySpeakers, analyze_text
 
 logger = logging.getLogger(__name__)
 
-SPEAKER_MAX = 100
+SPEAKER_MAX = MAX_SPEAKER_NAME  # 분석이 화자로 세는 이름의 길이 한도와 같다
 # 서버 판정에 따른 화자 오류는 기록의 error_code에 저장해, 앱을 다시 열어도 '확인 필요' 기록임을 알 수 있게 한다.
 _SPEAKER_STATES = {"SPEAKER_REQUIRED": "speaker_required", "SPEAKER_NOT_FOUND": "speaker_not_found",
                    "SPEAKER_NOT_ALLOWED": "speaker_not_allowed"}
@@ -205,13 +206,15 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
             data = await storage.read_object(path, max_bytes=size)
         except StorageUnavailable:
             raise _storage_down() from None
-        try:
-            data.decode("utf-8-sig")  # 텍스트로 디코딩되지 않는 파일은 거절한다(UTF-8이 아니면 화자 이름이 깨짐)
-        except UnicodeDecodeError:
-            raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.") from None
         if b"\x00" in data or data.isspace():
             raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.")
-        analysis = analyze_text(data)
+        try:
+            # 최대 25MiB를 줄 단위로 훑으므로 이벤트 루프를 막지 않게 스레드에서 돌린다. UTF-8로 읽히지 않으면
+            # 디코딩 오류가 나며, 파일 복사본을 따로 만들지 않고 같은 순회에서 검사한다.
+            analysis = await asyncio.to_thread(analyze_text, data)
+        except (UnicodeDecodeError, TooManySpeakers):
+            # UTF-8이 아니거나, 서로 다른 화자가 너무 많아(대화 내보내기가 아님) 읽을 수 없는 파일이다.
+            raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.") from None
         try:
             if analysis.kakao:
                 _check_kakao_speakers(analysis.speakers, target, provider)

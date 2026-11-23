@@ -310,6 +310,18 @@ def test_unreadable_text_is_422_without_a_field(client, fake_db, storage, person
     assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", None)
 
 
+def test_a_file_with_too_many_distinct_speakers_is_unreadable_and_saves_no_speaker_state(client, fake_db, storage, persona):
+    from app.services.kakao import MAX_SPEAKERS
+
+    data = "".join(f"[u{n}] [오후 3:12] 안녕\n" for n in range(MAX_SPEAKERS + 1)).encode()
+    record_id = reserved(client, persona, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", None)
+    assert "speakers" not in error(res)  # 수천 명의 목록을 응답에 싣지 않는다
+    assert (fake_db.records[record_id]["status"], fake_db.records[record_id]["error_code"]) == ("uploading", None)
+
+
 def test_audio_upload_is_checked_by_size_only_and_rejects_speakers(client, fake_db, storage, persona):
     record_id = reserved(client, persona, kind="audio", mime_type="audio/wav", size_bytes=44)
     put_file(storage, fake_db, record_id, b"RIFF" + b"\x00" * 40)
