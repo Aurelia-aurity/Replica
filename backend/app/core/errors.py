@@ -33,6 +33,7 @@ class AppError(Exception):
         field: str | None = None,
         turn_id: UUID | str | None = None,
         db_error_code: str | None = None,
+        speakers: list[str] | None = None,
     ):
         self.http_status = http_status
         self.code = code
@@ -43,10 +44,12 @@ class AppError(Exception):
         self.turn_id = turn_id
         # DB chat_turns.error_message에 기록할 실패 코드 (예: llm_busy). 앱에는 보내지 않는다.
         self.db_error_code = db_error_code
+        # 화자 오류(SPEAKER_*)에서만 쓴다. 서버가 파일에서 판정한 화자 목록이며 다른 오류에는 키 자체가 없다.
+        self.speakers = speakers
         super().__init__(code)
 
     def body(self) -> dict:
-        return {
+        body = {
             "error": {
                 "code": self.code,
                 "message": self.message,
@@ -56,6 +59,9 @@ class AppError(Exception):
                 "field": self.field,
             }
         }
+        if self.speakers is not None:
+            body["error"]["speakers"] = list(self.speakers)
+        return body
 
 
 def from_database_error(

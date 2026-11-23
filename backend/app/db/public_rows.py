@@ -9,7 +9,7 @@ _FIELDS = {
     "turn": "turn_no input_mode question question_status answer answer_status tts_status model_name "
             "stt_ms llm_ms tts_ms total_ms error_message created_at finish_reason",
     "record": "id persona_id kind original_name mime_type size_bytes status consent_at consent_version "
-              "consent_scopes error_code created_at updated_at",
+              "consent_scopes error_code target_speaker provider_speaker created_at updated_at",
     "text_version": "id record_id revision content status confirmed_at created_at updated_at",
     "style_profile": "id persona_id version source_revision content model_name status created_at updated_at",
     "deletion_job": "id target_type target_id status remaining_steps attempt_count last_error_code "

@@ -94,6 +94,10 @@ def _one(data: Any, *, empty_error: type[DatabaseError] = NotFoundError) -> Row:
     return rows[0]
 
 
+RECORD_MIME_TYPES = {"text": ("text/plain",),
+                     "audio": ("audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/x-m4a")}
+
+
 @dataclass(frozen=True)
 class ChunkInput:
     chunk_no: int
@@ -356,10 +360,10 @@ class UserDatabase:
     async def reserve_record(self, persona_id: Identifier, *, kind: Literal["text", "audio"],
                              original_name: str, mime_type: str, size_bytes: int,
                              consent_at: datetime, consent_version: str,
-                             record_id: Identifier | None = None) -> Row:
+                             record_id: Identifier | None = None,
+                             target_speaker: str | None = None, provider_speaker: str | None = None) -> Row:
         pid, rid = _id(persona_id), _id(uuid4() if record_id is None else record_id)
-        allowed = {"text": ("text/plain",), "audio": ("audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/x-m4a")}
-        if not isinstance(kind, str) or kind not in allowed or mime_type not in allowed[kind]:
+        if not isinstance(kind, str) or kind not in RECORD_MIME_TYPES or mime_type not in RECORD_MIME_TYPES[kind]:
             raise ValidationError()
         payload = {"id": rid, "persona_id": pid, "kind": kind,
             "original_name": _text(original_name, max_length=255), "mime_type": mime_type,
@@ -367,6 +371,11 @@ class UserDatabase:
             "object_path": self._user_id + "/" + rid + "/original",
             "consent_at": _time(consent_at, not_future=True), "consent_version": _text(consent_version, max_length=100),
             "consent_scopes": ["personalization"], "status": "uploading"}
+        # 카카오톡 화자 선택값. 원격 records에는 provider_speaker 컬럼이 아직 없어(DB 담당 확정 전) 값이 있을 때만 보낸다.
+        if target_speaker is not None:
+            payload["target_speaker"] = _text(target_speaker, max_length=100)
+        if provider_speaker is not None:
+            payload["provider_speaker"] = _text(provider_speaker, max_length=100)
         await self.get_persona(pid)
         return await self._insert("records", payload)
 
@@ -375,7 +384,9 @@ class UserDatabase:
 
     async def list_records(self, *, persona_id: Identifier | None = None,
                            limit: int = 50, offset: int = 0) -> list[Row]:
-        filters = {} if persona_id is None else {"persona_id": "eq." + _id(persona_id)}
+        filters = {"status": "neq.deleting"}  # 삭제 중인 기록은 목록에서 제외한다.
+        if persona_id is not None:
+            filters["persona_id"] = "eq." + _id(persona_id)
         return await self._select("records", **filters, **_page(limit, offset), order="created_at.desc,id.desc")
 
     async def update_record_status(self, record_id: Identifier, *, expected_status: str,
@@ -391,6 +402,29 @@ class UserDatabase:
             raise ConflictError()
         return await self._update("records", record_id,
             {"status": status, "error_code": error_code if status == "failed" else None}, status="eq." + expected_status)
+
+    async def update_record_upload(self, record_id: Identifier, *, expected_updated_at: datetime,
+                                   status: Literal["uploading", "uploaded"], speakers: Mapping[str, str | None],
+                                   error_code: str | None = None) -> Row:
+        """업로드 확인 단계의 화자·상태·오류를 한 번에 저장한다(SQL RPC `update_record_upload`).
+
+        `expected_updated_at`은 파일을 검사하기 전에 읽은 기록의 `updated_at`이다. 그사이 기록이 바뀌었으면
+        `ConflictError`(오래 걸린 요청이 최신 선택을 덮지 않는다). `speakers`는 `target_speaker`·`provider_speaker`의
+        부분 매핑이며 생략한 키는 유지, `None`은 지운다. `error_code`는 `uploading`을 유지할 때만 쓰고 `uploaded`로
+        바꿀 때는 `None`이어야 한다.
+        """
+        if status not in ("uploading", "uploaded") or not isinstance(speakers, Mapping):
+            raise ValidationError()
+        if error_code not in (None, "speaker_required", "speaker_not_found", "speaker_not_allowed")                 or status == "uploaded" and error_code is not None:
+            raise ValidationError()
+        patch = {}
+        for name, value in speakers.items():
+            if name not in ("target_speaker", "provider_speaker"):
+                raise ValidationError()
+            patch[name] = None if value is None else _text(value, max_length=100)
+        return self._owned_one(await self._rpc("update_record_upload", p_record_id=_id(record_id),
+            p_expected_updated_at=_time(expected_updated_at), p_status=status, p_speakers=patch,
+            p_error_code=error_code))
 
     async def create_text_draft(self, record_id: Identifier, *, revision: int, content: str,
                                 text_version_id: Identifier | None = None) -> Row:

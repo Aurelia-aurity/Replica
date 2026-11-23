@@ -3,11 +3,12 @@
 턴 규칙은 infra의 SQL 함수(create_chat_turn, start_chat_stage, finish_chat_stage, expire_chat_stages)를 따른다.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from app import db
 from app.clients.llm import LLMResult
+from app.clients.storage import SignedUpload, StorageUnavailable
 from app.core.errors import AppError
 
 STAGE_FIELDS = {
@@ -39,6 +40,8 @@ class FakeUserDB:
         self.rows_read = 0  # list_turns가 돌려준 행 수 합계 (얼마나 읽었는지 확인용)
         self.calls: list[tuple] = []  # (함수, 단계) 호출 기록
         self.expire_calls: list[tuple] = []  # (started_before, tts_started_before) 기록
+        self.records: dict[str, dict] = {}
+        self.upload_updates: list[dict] = []  # update_record_upload 호출 기록
 
     # --- 대화 상대·대화방 ---
     async def create_persona(self, name, *, persona_id=None):
@@ -231,6 +234,70 @@ class FakeUserDB:
         self.rows_read += len(rows)
         return [{"user": r["question"], "assistant": r["answer"]} for r in reversed(rows)]
 
+    # --- 기록 (infra redesign.sql의 records 규칙을 흉내) ---
+    async def reserve_record(self, persona_id, *, kind, original_name, mime_type, size_bytes, consent_at,
+                             consent_version, record_id=None, target_speaker=None, provider_speaker=None):
+        await self.get_persona(persona_id)
+        rid = str(record_id or uuid4())
+        if rid in self.records:
+            raise db.ConflictError(code="23505")
+        now = _iso(_now())
+        row = {"id": rid, "user_id": "u-secret", "persona_id": str(persona_id), "kind": kind,
+               "original_name": original_name, "mime_type": mime_type, "size_bytes": size_bytes,
+               "object_path": f"u-secret/{rid}/original", "consent_at": consent_at.isoformat(),
+               "consent_version": consent_version, "consent_scopes": ["personalization"], "status": "uploading",
+               "error_code": None, "target_speaker": target_speaker, "provider_speaker": provider_speaker,
+               "created_at": now, "updated_at": now}
+        self.records[rid] = row
+        return dict(row)
+
+    async def get_record(self, record_id):
+        row = self.records.get(str(record_id))
+        if row is None:
+            raise db.NotFoundError(code="P0002")
+        return dict(row)
+
+    async def list_records(self, *, persona_id=None, limit=50, offset=0):
+        rows = [r for r in self.records.values()
+                if r["status"] != "deleting" and (persona_id is None or r["persona_id"] == str(persona_id))]
+        rows.sort(key=lambda r: (r["created_at"], r["id"]), reverse=True)
+        return [dict(r) for r in rows[offset:offset + limit]]
+
+    def _touch(self, row: dict) -> None:
+        """수정 시각 트리거를 흉내 낸다. 값은 항상 이전보다 커진다."""
+        now = _now()
+        previous = datetime.fromisoformat(row["updated_at"])
+        row["updated_at"] = _iso(max(now, previous + timedelta(microseconds=1)))
+
+    async def update_record_status(self, record_id, *, expected_status, status, error_code=None):
+        row = self.records.get(str(record_id))
+        if row is None:
+            raise db.NotFoundError(code="P0002")
+        if row["status"] != expected_status:
+            raise db.ConflictError()
+        row.update(status=status, error_code=error_code if status == "failed" else None)
+        self._touch(row)
+        return dict(row)
+
+    async def update_record_upload(self, record_id, *, expected_updated_at, status, speakers, error_code=None):
+        """infra record_metadata.sql의 `update_record_upload`(#124) 규칙을 흉내 낸다."""
+        self.upload_updates.append({"status": status, "speakers": dict(speakers), "error_code": error_code})
+        row = self.records.get(str(record_id))
+        if row is None or row["status"] == "deleting":
+            raise db.NotFoundError(code="P0002")
+        if row["status"] != "uploading" or datetime.fromisoformat(row["updated_at"]) != expected_updated_at:
+            raise db.ConflictError(code="55000")
+        target, provider = row["target_speaker"], row["provider_speaker"]
+        if "target_speaker" in speakers:
+            target = speakers["target_speaker"]
+        if "provider_speaker" in speakers:
+            provider = speakers["provider_speaker"]
+        if (provider is not None and (target is None or target == provider))                 or (row["kind"] == "audio" and (target is not None or provider is not None)):
+            raise db.ValidationError(code="22023")
+        row.update(target_speaker=target, provider_speaker=provider, status=status, error_code=error_code)
+        self._touch(row)
+        return dict(row)
+
     def _turn(self, turn_id) -> dict:
         row = self.turns.get(str(turn_id))
         if row is None:
@@ -317,3 +384,35 @@ class FakeTTS:
 def busy_error() -> AppError:
     return AppError(429, "AI_BUSY", "지금 다른 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.",
                     retryable=True, stage="llm", db_error_code="llm_busy")
+
+
+class FakeStorage:
+    """메모리 Storage. `files`에 올린 것처럼 바이트를 넣어 두고 존재·크기·읽기를 흉내 낸다."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.upload_calls: list[tuple[str, str]] = []  # (object_path, mime_type)
+        self.down = False  # True이면 모든 호출이 연결 실패
+
+    def _check(self) -> None:
+        if self.down:
+            raise StorageUnavailable()
+
+    async def create_upload(self, object_path, *, mime_type):
+        self._check()
+        self.upload_calls.append((object_path, mime_type))
+        return SignedUpload(url=f"https://storage.test/sign/{object_path}?token=t{len(self.upload_calls)}",
+                            headers={"Content-Type": mime_type},
+                            expires_at=_now() + timedelta(hours=2))
+
+    async def object_size(self, object_path):
+        self._check()
+        data = self.files.get(object_path)
+        return None if data is None else len(data)
+
+    async def read_object(self, object_path, *, max_bytes):
+        self._check()
+        data = self.files[object_path]
+        if len(data) > max_bytes:
+            raise StorageUnavailable()
+        return data
