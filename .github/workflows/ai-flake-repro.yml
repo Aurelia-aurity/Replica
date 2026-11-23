@@ -85,8 +85,8 @@ jobs:
               ai/tests/test_persona.py::PersonaTests::test_raw_then_auth_then_structure_then_sizes_then_readiness
               ai/tests/test_persona_call_auth.py::PersonaCallAuthTests::test_denial_precedes_json_decode_even_for_valid_id_or_broken_body
             )
-            run_batch targeted 50 "${pytest[@]}" "${targets[@]}"
-            printf 'TARGETED fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
+            run_batch targeted 200 "${pytest[@]}" "${targets[@]}"
+            printf 'TARGETED fail=%s/200\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
           fi
       - name: Upload reproduction evidence
         if: ${{ !cancelled() }}
