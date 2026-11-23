@@ -101,43 +101,6 @@ class SettingsScreen extends StatelessWidget {
     ),
   );
 
-  void _recordUsage(BuildContext context) => _showDetails(
-    context,
-    title: '내 기록이 쓰이는 방식',
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '사용 범위 안내 초안',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: replicaGreen,
-          ),
-        ),
-        SizedBox(height: 16),
-        _UsageItem(
-          icon: Icons.person_outline,
-          title: '말투 프로필',
-          description: '확정한 기록을 바탕으로 표현·호칭·끝맺음 등 말투 특징을 정리해요.',
-        ),
-        _UsageItem(
-          icon: Icons.search,
-          title: '기록 검색',
-          description: '질문과 관련된 내용을 확정한 기록에서 찾아요.',
-        ),
-        _UsageItem(
-          icon: Icons.chat_bubble_outline,
-          title: '응답 생성',
-          description: '찾은 기록과 말투 프로필을 참고해 AI가 응답을 만들어요. 실제 그분이 한 말은 아니에요.',
-        ),
-        Text(
-          '이 안내는 화면 기획을 바탕으로 한 초안이에요. 최종 안내·동의 문구와 버전은 관련 담당자 확인 후 반영해요. 모델 학습 사용 여부는 별도 결정 사항이에요.',
-        ),
-      ],
-    ),
-  );
-
   void _deleteAccount(BuildContext context) => _showDetails(
     context,
     title: '계정 삭제',
@@ -265,10 +228,6 @@ class SettingsScreen extends StatelessWidget {
                     title: '기록 사용 동의 내역',
                     onTap: () => _consents(context),
                   ),
-                  _SettingsRow(
-                    title: '내 기록이 쓰이는 방식',
-                    onTap: () => _recordUsage(context),
-                  ),
                 ],
               ),
               const SizedBox(height: 22),
@@ -393,45 +352,6 @@ class _SettingsRow extends StatelessWidget {
           ],
         ),
       ),
-    ),
-  );
-}
-
-class _UsageItem extends StatelessWidget {
-  const _UsageItem({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-  final IconData icon;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: replicaGreen, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: _settingsText,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(description),
-            ],
-          ),
-        ),
-      ],
     ),
   );
 }

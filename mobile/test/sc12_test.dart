@@ -87,11 +87,6 @@ void main() {
     expect(find.text('0건'), findsNothing);
     await tester.tap(find.text('닫기'));
     await tester.pumpAndSettle();
-    await openMenu(tester, '내 기록이 쓰이는 방식');
-    expect(find.text('사용 범위 안내 초안'), findsOneWidget);
-    expect(find.textContaining('모델 학습 사용 여부는 별도 결정'), findsOneWidget);
-    await tester.tap(find.text('닫기'));
-    await tester.pumpAndSettle();
     await openMenu(tester, '계정 삭제');
     expect(find.text('계정 삭제는 아직 지원하지 않아요'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
@@ -162,7 +157,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await openMenu(tester, '내 기록이 쓰이는 방식');
+    await openMenu(tester, '기록 사용 동의 내역');
     await tester.ensureVisible(find.text('닫기'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
