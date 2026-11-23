@@ -605,6 +605,55 @@ void main() {
       expect(reanalyze, findsNothing);
     });
 
+    testWidgets('an unknown result still being checked is not called a start', (
+      tester,
+    ) async {
+      final h = await openProfile(
+        tester,
+        state: StyleProfileState(analysis: analysisOf(AnalysisStatus.unknown)),
+      );
+      // The server could not confirm the earlier result yet (200, unknown).
+      h.service.analysisResult = analysisOf(AnalysisStatus.unknown);
+      await tester.tap(reanalyze);
+      await tester.pumpAndSettle();
+      expect(find.text('말투 분석을 다시 시작했어요.'), findsNothing);
+      expect(
+        find.text('이전 분석 결과를 아직 확인하고 있어요. 잠시 후 다시 시도해 주세요.'),
+        findsOneWidget,
+      );
+      expect(find.text('분석 결과를 확인하지 못했어요'), findsOneWidget);
+      expect(reanalyze, findsOneWidget);
+    });
+
+    testWidgets('a failed job answered for a reused id asks to try again', (
+      tester,
+    ) async {
+      final h = await openProfile(
+        tester,
+        state: StyleProfileState(
+          analysis: analysisOf(AnalysisStatus.failed, 'op', 'ai_failed'),
+        ),
+      );
+      // The retry of a lost answer reused the id of a job that had failed
+      // (id reuse itself: 'an unanswered request is retried with the same
+      // id'). The server answers that job's state, not a new start.
+      h.service.analysisResult = analysisOf(
+        AnalysisStatus.failed,
+        'op',
+        'ai_failed',
+      );
+      await tester.tap(reanalyze);
+      await tester.pumpAndSettle();
+      expect(h.service.analysisRequests, hasLength(1));
+      expect(find.text('말투 분석을 다시 시작했어요.'), findsNothing);
+      expect(
+        find.text('이전 분석 요청이 실패로 끝났어요. "다시 분석"을 한 번 더 눌러 주세요.'),
+        findsOneWidget,
+      );
+      expect(find.text('말투를 분석하지 못했어요'), findsOneWidget);
+      expect(reanalyze, findsOneWidget);
+    });
+
     testWidgets('a stale profile asks for a new analysis', (tester) async {
       await openProfile(
         tester,

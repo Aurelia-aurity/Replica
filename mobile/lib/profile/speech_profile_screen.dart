@@ -209,13 +209,20 @@ class _SpeechProfileScreenState extends State<SpeechProfileScreen> {
     try {
       await _profile.requestAnalysis();
       if (!mounted) return;
-      final analysis = _profile.state?.analysis;
-      if (analysis?.status == AnalysisStatus.succeeded) {
-        // An unknown result turned out to be published: fetch the profile.
-        _notice('분석이 이미 끝나 있었어요.');
-        await _profile.load(quiet: true);
-      } else {
-        _notice('말투 분석을 다시 시작했어요.');
+      // A 200 answer may carry an existing job rather than a new one (PR
+      // #117): an unknown result still being checked, or the failed job a
+      // reused operation id points at. Only a running job means it started.
+      switch (_profile.state?.analysis?.status) {
+        case AnalysisStatus.succeeded:
+          // An unknown result turned out to be published: fetch the profile.
+          _notice('분석이 이미 끝나 있었어요.');
+          await _profile.load(quiet: true);
+        case AnalysisStatus.unknown:
+          _notice('이전 분석 결과를 아직 확인하고 있어요. 잠시 후 다시 시도해 주세요.');
+        case AnalysisStatus.failed:
+          _notice('이전 분석 요청이 실패로 끝났어요. "다시 분석"을 한 번 더 눌러 주세요.');
+        case AnalysisStatus.running || null:
+          _notice('말투 분석을 다시 시작했어요.');
       }
     } catch (error) {
       if (!mounted) return;
