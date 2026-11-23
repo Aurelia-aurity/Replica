@@ -87,16 +87,13 @@ class ChatReply {
   final String? turnId, modelName, finishReason;
 
   /// Backend `tts_status` (`pending`, `ready`, `failed`) when the payload
-  /// carried one; null when unknown or not requested yet.
+  /// carried one; null when unknown or not requested yet. The backend does not
+  /// store audio, so a `ready` turn is synthesized again on request (200, or
+  /// 502 `TTS_FAILED` without changing the turn); only `pending` answers 409.
   final String? ttsStatus;
   final Map<String, int?> timings;
   final EvidenceState evidence;
   final List<EvidenceRecord> sources;
-
-  /// The backend already holds a finished synthesis for this turn. The TTS
-  /// endpoint answers 409 for such turns and the API has no download for the
-  /// stored audio, so only audio this app cached itself can be played again.
-  bool get speechAlreadySynthesized => ttsStatus == 'ready';
 
   factory ChatReply.fromJson(
     Map<String, dynamic> json, {

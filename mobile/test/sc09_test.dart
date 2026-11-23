@@ -250,16 +250,23 @@ void main() {
     },
   );
 
-  testWidgets('reopened reply with stored speech is not requested again', (
+  testWidgets('reopened reply with finished speech is synthesized again', (
     tester,
   ) async {
-    final service = Sc09Service();
+    final service = Sc09Service()
+      ..speechFailure = BackendFailure.fromResponse(
+        statusCode: 502,
+        body: {
+          'error': {'code': 'TTS_FAILED', 'retryable': true, 'stage': 'tts'},
+        },
+      );
+    final player = Sc09Player();
     await tester.pumpWidget(
       MaterialApp(
         home: ChatScreen(
           service: service,
           conversationName: '합성 상대',
-          audioPlayer: Sc09Player(),
+          audioPlayer: player,
           initialMessages: const [
             (text: '지난 질문', isUser: true),
             (text: '저장된 답변', isUser: false),
@@ -275,18 +282,23 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('듣기 불가'), findsOneWidget);
-    expect(find.text('듣기'), findsNothing);
-    expect(find.text('듣기 다시 시도'), findsNothing);
-    expect(find.textContaining('다시 받을 수 없어요'), findsOneWidget);
-    final button = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text('듣기 불가'),
-        matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
-      ),
-    );
-    expect(button.onPressed, isNull);
+    expect(find.text('듣기'), findsOneWidget);
     expect(service.syntheses, 0);
+    // A failed re-synthesis (502) leaves the answer and offers a retry.
+    await acceptSpeech(tester);
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 1);
+    expect(player.plays, 0);
+    expect(find.text('듣기 다시 시도'), findsOneWidget);
+    expect(find.textContaining('음성을 재생하지 못했어요'), findsOneWidget);
+    expect(find.text('저장된 답변'), findsOneWidget);
+    service.speechFailure = null;
+    await tester.tap(find.text('듣기 다시 시도'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '재생'));
+    await tester.pumpAndSettle();
+    expect(service.syntheses, 2);
+    expect(player.plays, 1);
   });
 
   testWidgets('TTS can recover after a 409 without reopening the text screen', (
@@ -304,7 +316,6 @@ void main() {
     await acceptSpeech(tester);
     await tester.pumpAndSettle();
     expect(service.syntheses, 1);
-    expect(find.text('듣기 불가'), findsNothing);
     expect(find.text('듣기 다시 시도'), findsOneWidget);
     expect(find.textContaining('아직 음성을 만드는 중일 수 있어요'), findsOneWidget);
     expect(player.plays, 0);
