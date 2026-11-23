@@ -3,8 +3,9 @@
 비공개 버킷 `replica-records`만 쓴다. 서버 키(secret)로만 호출하며, 앱에는 서명 업로드 주소만 준다.
 토큰·서명 주소·파일 내용은 로그와 예외 문자열에 넣지 않는다.
 
-주의: 버킷은 만들어져 있지만 실제 서명 업로드는 아직 해 보지 않았다. 서명 주소 발급(`/object/upload/sign`)과
-정보 조회(`/object/info`)의 응답 형식은 Supabase 문서 기준 가정이며, 실제 호출로 확인해야 한다(#120).
+확인 범위: 서버 키로 하는 서명 발급(`/object/upload/sign`)의 응답(`url`, `token`)·`PUT`·정보 조회(`/object/info`)의 `size`·
+읽기와 없는 객체의 응답(바깥 HTTP 400, 본문 `NoSuchKey`)은 #120에서 실제 Storage로 직접 호출해 확인했다. 이 클라이언트가
+발급한 주소로 올려 `/uploaded`까지 가는 통합과, 음성 시그니처용 `Range` 요청(`read_head`)은 아직 확인하지 않았다.
 """
 
 import asyncio
@@ -44,6 +45,9 @@ class StorageClient(Protocol):
 
     async def read_object(self, object_path: str, *, max_bytes: int) -> bytes: ...
 
+    async def read_head(self, object_path: str, *, size: int) -> bytes:
+        """파일 앞쪽 `size`바이트(파일이 더 짧으면 전부)."""
+
 
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -79,7 +83,8 @@ class SupabaseStorage:
         return "/".join(quote(part, safe="") for part in object_path.split("/"))
 
     def _call(self, method: str, path: str, *, max_bytes: int, body: bytes | None = None,
-              extra: Mapping[str, str] | None = None) -> tuple[int, bytes]:
+              extra: Mapping[str, str] | None = None, truncate: bool = False) -> tuple[int, bytes]:
+        """`truncate`이면 응답이 `max_bytes`보다 길어도 앞부분만 읽고 닫는다(머리만 필요할 때)."""
         request = Request(self._base() + path, data=body, method=method,
                           headers={**self._headers, **(extra or {})})
         try:
@@ -88,6 +93,8 @@ class SupabaseStorage:
             except HTTPError as error:
                 response = error
             with response:
+                if truncate:
+                    return response.code, response.read(max_bytes)
                 raw = response.read(max_bytes + 1)
                 if len(raw) > max_bytes:
                     raise StorageUnavailable()
@@ -131,5 +138,14 @@ class SupabaseStorage:
         path = f"/storage/v1/object/{BUCKET}/{self._path(object_path)}"
         status, raw = await asyncio.to_thread(self._call, "GET", path, max_bytes=max_bytes)
         if status != 200:
+            raise StorageUnavailable()
+        return raw
+
+    async def read_head(self, object_path: str, *, size: int) -> bytes:
+        """파일 앞쪽 `size`바이트만 읽는다(파일 시그니처 확인용). Range를 무시하는 서버라도 앞부분만 읽고 닫는다."""
+        path = f"/storage/v1/object/{BUCKET}/{self._path(object_path)}"
+        status, raw = await asyncio.to_thread(
+            self._call, "GET", path, max_bytes=size, extra={"Range": f"bytes=0-{size - 1}"}, truncate=True)
+        if status not in (200, 206):
             raise StorageUnavailable()
         return raw

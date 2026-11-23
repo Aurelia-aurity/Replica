@@ -322,13 +322,110 @@ def test_a_file_with_too_many_distinct_speakers_is_unreadable_and_saves_no_speak
     assert (fake_db.records[record_id]["status"], fake_db.records[record_id]["error_code"]) == ("uploading", None)
 
 
-def test_audio_upload_is_checked_by_size_only_and_rejects_speakers(client, fake_db, storage, persona):
-    record_id = reserved(client, persona, kind="audio", mime_type="audio/wav", size_bytes=44)
-    put_file(storage, fake_db, record_id, b"RIFF" + b"\x00" * 40)
+WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 24
+M4A = b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 24
+MP3_ID3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\x00" * 24
+MP3_FRAME = b"\xff\xfb\x90\x00" + b"\x00" * 28
+
+
+def test_audio_upload_rejects_speakers(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, kind="audio", mime_type="audio/wav", size_bytes=len(WAV))
+    put_file(storage, fake_db, record_id, WAV)
     bad = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마", "provider_speaker": "나"})
     assert bad.status_code == 422 and error(bad)["field"] == "target_speaker"
     ok = client.post(f"/records/{record_id}/uploaded")
     assert ok.status_code == 200 and ok.json()["status"] == "uploaded"
+
+
+@pytest.mark.parametrize("mime, data", [("audio/wav", WAV), ("audio/x-wav", WAV), ("audio/mp4", M4A), ("audio/x-m4a", M4A),
+                                        ("audio/mpeg", MP3_ID3), ("audio/mpeg", MP3_FRAME)])
+def test_audio_with_a_matching_signature_is_uploaded(client, fake_db, storage, persona, mime, data):
+    record_id = reserved(client, persona, kind="audio", mime_type=mime, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 200 and res.json()["status"] == "uploaded"
+
+
+@pytest.mark.parametrize("mime, data", [("audio/wav", M4A), ("audio/wav", b"RIFF\x00\x00\x00\x00AVI " + b"\x00" * 24),
+                                        ("audio/mp4", WAV), ("audio/mpeg", WAV), ("audio/wav", PLAIN * 3)])
+def test_audio_whose_content_does_not_match_the_declared_type_is_422(client, fake_db, storage, persona, mime, data):
+    record_id = reserved(client, persona, kind="audio", mime_type=mime, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", None)
+    assert (fake_db.records[record_id]["status"], fake_db.records[record_id]["error_code"]) == ("uploading", None)
+
+
+def test_audio_signature_check_needs_storage(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, kind="audio", mime_type="audio/wav", size_bytes=len(WAV))
+    put_file(storage, fake_db, record_id, WAV)
+    original = storage.read_head
+
+    async def down(*args, **kwargs):
+        from app.clients.storage import StorageUnavailable
+        raise StorageUnavailable()
+
+    storage.read_head = down
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 503 and fake_db.records[record_id]["status"] == "uploading"
+    storage.read_head = original
+    assert client.post(f"/records/{record_id}/uploaded").status_code == 200  # 다시 부르면 복구된다
+
+
+def test_a_chat_with_a_speaker_name_over_the_limit_is_rejected_not_treated_as_plain_text(client, fake_db, storage, persona):
+    long_name = "가" * 101
+    cases = {
+        "only_long": f"[{long_name}] [오후 3:12] 안녕\n[{long_name}] [오후 3:13] 응\n",
+        "long_third_party": f"[엄마] [오후 3:12] a\n[나] [오후 3:13] b\n[{long_name}] [오후 3:14] c\n",
+        "single_long": f"[{long_name}] [오후 3:12] 안녕\n그냥 일기\n",
+        "dated": f"2025. 9. 20. 오후 3:12, {long_name} : 안녕\n2025. 9. 20. 오후 3:13, 나 : 응\n",
+    }
+    for title, text in cases.items():
+        data = text.encode()
+        record_id = reserved(client, persona, size_bytes=len(data), original_name=f"{title}.txt")
+        put_file(storage, fake_db, record_id, data)
+        res = client.post(f"/records/{record_id}/uploaded")
+        assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", None), title
+        assert "speakers" not in error(res), title
+        stored = fake_db.records[record_id]  # 일반 텍스트로 통과(200)하지 않고 uploading에 남으며 화자 상태도 저장하지 않는다
+        assert (stored["status"], stored["error_code"], stored["target_speaker"]) == ("uploading", None, None), title
+
+
+SINGLE_MESSAGE_EXPORT = ("엄마 님과 카카오톡 대화\n저장한 날짜 : 2026년 11월 23일 오후 6:19\n\n"
+                         "2023년 2월 28일 오후 7:51\n2023년 2월 28일 오후 7:51, 엄마 : 안녕\n").encode()
+
+
+def test_a_single_message_export_needs_the_speaker_confirmation_like_any_other_chat(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, size_bytes=len(SINGLE_MESSAGE_EXPORT))
+    put_file(storage, fake_db, record_id, SINGLE_MESSAGE_EXPORT)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("SPEAKER_REQUIRED", "target_speaker")
+    assert error(res)["speakers"] == ["엄마"]  # 화자 하나가 있는 카카오톡: 확인 없이 200으로 통과하지 않는다
+    assert fake_db.records[record_id]["error_code"] == "speaker_required"
+    wrong = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "나"})
+    assert wrong.status_code == 422 and error(wrong)["code"] == "SPEAKER_NOT_FOUND"
+    ok = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마"})
+    assert ok.status_code == 200 and (ok.json()["status"], ok.json()["target_speaker"]) == ("uploaded", "엄마")
+    assert ok.json()["provider_speaker"] is None
+
+
+def test_an_export_header_without_messages_is_rejected(client, fake_db, storage, persona):
+    data = "엄마 님과 카카오톡 대화\n저장한 날짜 : 2026년 11월 23일 오후 6:19\n\n".encode()
+    record_id = reserved(client, persona, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", None)
+    assert (fake_db.records[record_id]["status"], fake_db.records[record_id]["error_code"]) == ("uploading", None)
+
+
+def test_a_speaker_whose_name_contains_closing_brackets_can_be_selected(client, fake_db, storage, persona):
+    data = "[엄마 [회사]] [오후 3:12] 안녕\n[나] [오후 3:13] 응\n[엄마 [회사]] [오후 3:14] 밥\n".encode()
+    record_id = reserved(client, persona, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    required = client.post(f"/records/{record_id}/uploaded")
+    assert required.status_code == 422 and error(required)["speakers"] == ["엄마 [회사]", "나"]
+    ok = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마 [회사]", "provider_speaker": "나"})
+    assert ok.status_code == 200 and (ok.json()["target_speaker"], ok.json()["provider_speaker"]) == ("엄마 [회사]", "나")
 
 
 def test_storage_failure_at_uploaded_is_503_and_the_record_stays_uploading(client, fake_db, storage, persona):

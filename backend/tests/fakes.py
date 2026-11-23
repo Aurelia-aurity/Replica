@@ -416,3 +416,7 @@ class FakeStorage:
         if len(data) > max_bytes:
             raise StorageUnavailable()
         return data
+
+    async def read_head(self, object_path, *, size):
+        self._check()
+        return self.files[object_path][:size]

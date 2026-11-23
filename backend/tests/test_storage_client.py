@@ -23,9 +23,11 @@ class Recorder(SupabaseStorage):
         super().__init__(SETTINGS)
         self.status, self.payload, self.calls = status, payload, []
 
-    def _call(self, method, path, *, max_bytes, body=None, extra=None):
+    def _call(self, method, path, *, max_bytes, body=None, extra=None, truncate=False):
         self.calls.append((method, path, body, dict(extra or {})))
         raw = self.payload if isinstance(self.payload, bytes) else json.dumps(self.payload).encode()
+        if truncate:
+            return self.status, raw[:max_bytes]
         if len(raw) > max_bytes:
             raise StorageUnavailable()
         return self.status, raw
@@ -70,6 +72,52 @@ class StorageClientTests(unittest.TestCase):
             run(Recorder(200, b"abcd").read_object(PATH, max_bytes=3))
         with self.assertRaises(StorageUnavailable):
             run(Recorder(404, b"").read_object(PATH, max_bytes=3))
+
+    def test_read_head_asks_for_a_range_and_accepts_200_or_206(self):
+        storage = Recorder(206, b"RIFF1234WAVE")
+        self.assertEqual(run(storage.read_head(PATH, size=16)), b"RIFF1234WAVE")
+        method, path, _, extra = storage.calls[-1]
+        self.assertEqual((method, path), ("GET", f"/storage/v1/object/{BUCKET}/{PATH}"))
+        self.assertEqual(extra, {"Range": "bytes=0-15"})
+        self.assertEqual(run(Recorder(200, b"x" * 100).read_head(PATH, size=4)), b"xxxx")  # Range를 무시해도 앞부분만
+        for status in (404, 416, 500):
+            with self.subTest(status=status):
+                with self.assertRaises(StorageUnavailable):
+                    run(Recorder(status, b"").read_head(PATH, size=16))
+
+    def test_read_head_over_http_reads_only_the_head_even_if_the_server_ignores_range(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        seen = []
+        body = b"RIFF" + b"\x00" * 4 + b"WAVE" + b"\x01" * (2 * 1024 * 1024)
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                seen.append(self.headers.get("Range"))
+                self.send_response(200)  # Range를 무시하고 전체를 보낸다
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except OSError:
+                    pass  # 클라이언트가 앞부분만 읽고 닫으면 끊긴다
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            local = Settings(f"http://127.0.0.1:{server.server_port}", "sb_publishable_fake", "sb_secret_fake",
+                             allow_local_http=True)
+            head = run(SupabaseStorage(local).read_head(PATH, size=16))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+        self.assertEqual((head, seen), (body[:16], ["bytes=0-15"]))
 
     def test_object_path_segments_are_quoted_and_the_secret_key_is_a_header_only(self):
         storage = Recorder(200, {"size": 1})

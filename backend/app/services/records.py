@@ -14,7 +14,8 @@ from app.core.config import get_settings
 from app.core.errors import CONFLICT_MESSAGE, INVALID_INPUT_MESSAGE, AppError
 from app.db.repository import RECORD_MIME_TYPES
 from app.schemas.record import RecordCreate, UploadedBody
-from app.services.kakao import MAX_SPEAKER_NAME, TooManySpeakers, analyze_text
+from app.services.audio_signature import HEAD_BYTES, signature_matches
+from app.services.kakao import MAX_SPEAKER_NAME, NoChatMessages, SpeakerNameTooLong, TooManySpeakers, analyze_text
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,11 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
         except (UnicodeDecodeError, TooManySpeakers):
             # UTF-8이 아니거나, 서로 다른 화자가 너무 많아(대화 내보내기가 아님) 읽을 수 없는 파일이다.
             raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.") from None
+        except NoChatMessages:
+            raise _invalid(None, "대화 내용을 찾을 수 없어요. 파일을 확인해 주세요.") from None
+        except SpeakerNameTooLong:
+            # 화자 줄이 인식됐는데 이름이 한도를 넘는다. 이름을 자르거나 일반 텍스트로 바꾸지 않고 거절한다.
+            raise _invalid(None, f"대화에 {SPEAKER_MAX}자가 넘는 화자 이름이 있어요. 파일을 확인해 주세요.") from None
         try:
             if analysis.kakao:
                 _check_kakao_speakers(analysis.speakers, target, provider)
@@ -223,6 +229,14 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
         except AppError as exc:
             await _remember_speaker_state(user_db, record, exc.code)
             raise
+    else:
+        # 음성 파일은 앞 몇 바이트만 읽어 예약한 형식과 맞는지 본다. 맞지 않으면 기록을 지우고 새로 예약해야 한다.
+        try:
+            head = await storage.read_head(path, size=HEAD_BYTES)
+        except StorageUnavailable:
+            raise _storage_down() from None
+        if not signature_matches(record["mime_type"], head):
+            raise _invalid(None, "음성 파일 내용이 선택한 형식과 맞지 않아요. 다른 파일을 올려 주세요.")
 
     # 검증을 통과한 최종 화자 값·`uploaded`·오류 해제를 한 번에 저장한다(중간에 끊겨도 반쪽만 저장되지 않는다).
     # 두 키를 모두 보내므로 저장되는 값은 방금 검증한 값과 같다.

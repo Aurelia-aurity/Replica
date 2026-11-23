@@ -68,7 +68,7 @@ Swagger(`/docs`)에서 요청·응답 형식을 확인하고 직접 호출해 �
 | `GET /sessions`, `GET /sessions/{id}` | `persona_id?`, `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}`(최신순) / 대화방 객체 |
 | `GET /sessions/{id}/turns` | `after_turn_no`, `limit` (로그인 필요) | `{items, after_turn_no, limit}` (`turn_no` 오름차순, 턴 객체) |
 | `DELETE /sessions/{id}` | (로그인 필요) | 204. 대화방과 그 턴의 DB 행만 삭제 |
-| `POST /records` | JSON `{persona_id, kind, original_name, mime_type, size_bytes, consent_at, consent_version, target_speaker?, provider_speaker?, record_id?}` (로그인 필요) | 기록 객체 + 서명 업로드 정보 `upload` (201, 같은 `record_id`·같은 본문의 재예약은 200). **Storage 버킷 `replica-records`가 있어야 서명 주소를 발급함(아직 없음, 실제 호출 미확인)** |
+| `POST /records` | JSON `{persona_id, kind, original_name, mime_type, size_bytes, consent_at, consent_version, target_speaker?, provider_speaker?, record_id?}` (로그인 필요) | 기록 객체 + 서명 업로드 정보 `upload` (201, 같은 `record_id`·같은 본문의 재예약은 200). 서명 주소는 비공개 Storage 버킷 `replica-records`로 발급함(버킷은 있음. 서버 키로 서명 발급·`PUT`·정보 조회·읽기는 #120에서 직접 호출로 확인했고, 백엔드가 발급한 주소로 올려 `/uploaded`까지 가는 통합과 음성 시그니처용 `Range` 읽기는 아직 확인 전) |
 | `POST /records/{id}/uploaded` | 선택 JSON `{target_speaker?, provider_speaker?}` (로그인 필요) | 기록 객체. Storage의 원본 존재·크기와 카카오톡 화자 선택을 확인한 뒤 `uploaded`로 바꿈. 이미 처리된 기록은 200 |
 | `GET /records`, `GET /records/{id}` | `persona_id`, `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}` / 기록 객체 (삭제 중인 기록은 제외) |
 | `POST /chat/text` | JSON `{session_id, turn_id, message}` (로그인 필요) | `{turn_id, answer, is_ai_generated, finish_reason, model_name, timings}` |
