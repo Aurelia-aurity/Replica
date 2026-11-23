@@ -73,7 +73,7 @@ class SmokeTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in directory.iterdir()),
                              ["history.json", "no-evidence-daily.json"])
             for path in directory.iterdir():
-                capture = json.loads(path.read_text())
+                capture = json.loads(path.read_text(encoding="utf-8"))
                 self.assertTrue(capture["synthetic_only"])
                 self.assertEqual(capture["finish_reason"], "stop")
                 self.assertEqual(capture["max_new_tokens"], 160)
@@ -100,7 +100,7 @@ class SmokeTests(unittest.TestCase):
             # When:
             debug.record(req, Prepared((1, 2), 0, 0), decoded)
             # Then:
-            capture = json.loads((debug.directory / "no-evidence-daily.json").read_text())
+            capture = json.loads((debug.directory / "no-evidence-daily.json").read_text(encoding="utf-8"))
             self.assertEqual(capture["raw_output"], decoded.message)
             self.assertEqual(capture["request"], data)
             self.assertEqual(capture["finish_reason"], "length")

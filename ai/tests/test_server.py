@@ -109,7 +109,7 @@ class ServerTests(unittest.TestCase):
 
     def test_contract_examples_over_real_http(self):
         for file in sorted(FIXTURES.glob("*.json")):
-            fixture = json.loads(file.read_text())
+            fixture = json.loads(file.read_text(encoding="utf-8"))
             if fixture["transport_outcome"] == "unknown":
                 continue  # Exercised by the disconnect test, not a fabricated 504.
             with self.subTest(example=file.name):
@@ -238,7 +238,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(call(port, request(history=[{"user": "a", "assistant": "b"}] * 20))[0], 200)
 
     def test_disconnect_keeps_compute_slot_and_id_until_completion(self):
-        fixture = json.loads((FIXTURES / "16-transport-timeout.json").read_text())
+        fixture = json.loads((FIXTURES / "16-transport-timeout.json").read_text(encoding="utf-8"))
         engine = Engine()
         engine.block = True
         service = RecordingService(engine)

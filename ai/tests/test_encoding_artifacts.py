@@ -19,7 +19,7 @@ class ArtifactTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.path = Path(temporary.name)
         (self.path / "modules.json").write_text(json.dumps([
-            {"type": "sentence_transformers.models.Transformer", "path": ""}]))
+            {"type": "sentence_transformers.models.Transformer", "path": ""}]), encoding="utf-8")
         self.runtime = ModuleType("sentence_transformers")
         self.runtime.__version__ = "5.1.2"
         self.runtime.SentenceTransformer = Mock(return_value=ModelBoundary())
@@ -29,25 +29,25 @@ class ArtifactTests(unittest.TestCase):
 
     def test_bin_shard_in_safetensors_index_never_enters_dependency(self):
         (self.path / "model.safetensors.index.json").write_text(json.dumps({
-            "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+            "metadata": {}, "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
         (self.path / "payload.bin").touch()
         (self.path / "sentence_bert_config.json").write_text(json.dumps({
-            "model_args": {"weights_only": False}}))
+            "model_args": {"weights_only": False}}), encoding="utf-8")
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
     def test_adapter_directory_never_enters_dependency(self):
-        (self.path / "adapter_config.json").write_text("{}")
+        (self.path / "adapter_config.json").write_text("{}", encoding="utf-8")
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
     def test_variant_bin_shard_never_enters_dependency(self):
         (self.path / "sentence_bert_config.json").write_text(json.dumps({
-            "model_args": {"variant": "x"}}))
+            "model_args": {"variant": "x"}}), encoding="utf-8")
         (self.path / "model.safetensors.index.x.json").write_text(json.dumps({
-            "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+            "metadata": {}, "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
         (self.path / "payload.bin").touch()
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
@@ -59,7 +59,7 @@ class ArtifactTests(unittest.TestCase):
             with self.subTest(index=name):
                 index = self.path / name
                 index.write_text(json.dumps({
-                    "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+                    "metadata": {}, "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
                 try:
                     with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
                         LocalEncoder(self.path)
@@ -69,9 +69,9 @@ class ArtifactTests(unittest.TestCase):
 
     def test_config_weight_selector_never_enters_dependency(self):
         (self.path / "config.json").write_text(json.dumps({
-            "transformers_weights": "other.safetensors.index.json"}))
+            "transformers_weights": "other.safetensors.index.json"}), encoding="utf-8")
         (self.path / "other.safetensors.index.json").write_text(json.dumps({
-            "metadata": {}, "weight_map": {"weight": "payload.bin"}}))
+            "metadata": {}, "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
         (self.path / "payload.bin").touch()
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
@@ -79,11 +79,11 @@ class ArtifactTests(unittest.TestCase):
 
     def test_module_config_redirect_never_enters_dependency(self):
         (self.path / "sentence_bert_config.json").write_text(json.dumps({
-            "config_args": {"_configuration_file": "weights.json"}}))
+            "config_args": {"_configuration_file": "weights.json"}}), encoding="utf-8")
         (self.path / "weights.json").write_text(json.dumps({
-            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}))
+            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}), encoding="utf-8")
         (self.path / "other.safetensors.index.json").write_text(json.dumps({
-            "weight_map": {"weight": "payload.bin"}}))
+            "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
         (self.path / "payload.bin").touch()
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
@@ -91,11 +91,11 @@ class ArtifactTests(unittest.TestCase):
 
     def test_versioned_config_redirect_never_enters_dependency(self):
         (self.path / "config.json").write_text(json.dumps({
-            "model_type": "bert", "configuration_files": ["config.4.0.0.json"]}))
+            "model_type": "bert", "configuration_files": ["config.4.0.0.json"]}), encoding="utf-8")
         (self.path / "config.4.0.0.json").write_text(json.dumps({
-            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}))
+            "model_type": "bert", "transformers_weights": "other.safetensors.index.json"}), encoding="utf-8")
         (self.path / "other.safetensors.index.json").write_text(json.dumps({
-            "weight_map": {"weight": "payload.bin"}}))
+            "weight_map": {"weight": "payload.bin"}}), encoding="utf-8")
         (self.path / "payload.bin").touch()
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
@@ -119,7 +119,7 @@ class ArtifactTests(unittest.TestCase):
         nested = self.path / "unused"
         nested.mkdir()
         index = nested / "other.safetensors.index.json"
-        index.write_text(json.dumps({"weight_map": {"weight": "missing.bin"}}))
+        index.write_text(json.dumps({"weight_map": {"weight": "missing.bin"}}), encoding="utf-8")
         with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
             LocalEncoder(self.path)
         index.unlink()
@@ -140,14 +140,15 @@ class ArtifactTests(unittest.TestCase):
     def test_existing_shard_escapes_never_enter_dependency(self):
         root = self.path / "model"
         root.mkdir()
-        (root / "modules.json").write_text((self.path / "modules.json").read_text())
+        (root / "modules.json").write_text(
+            (self.path / "modules.json").read_text(encoding="utf-8"), encoding="utf-8")
         outside = self.path / "outside.safetensors"
         outside.touch()
         (root / "linked.safetensors").symlink_to(outside)
         for shard in ("../outside.safetensors", "linked.safetensors"):
             with self.subTest(shard=shard):
                 (root / "model.safetensors.index.json").write_text(json.dumps({
-                    "weight_map": {"weight": shard}}))
+                    "weight_map": {"weight": shard}}), encoding="utf-8")
                 self.assertTrue((root / shard).is_file())
                 with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
                     LocalEncoder(root)
@@ -158,20 +159,20 @@ class ArtifactTests(unittest.TestCase):
                       "missing.safetensors", 1):
             with self.subTest(shard=shard):
                 (self.path / "model.safetensors.index.json").write_text(json.dumps({
-                    "weight_map": {"weight": shard}}))
+                    "weight_map": {"weight": shard}}), encoding="utf-8")
                 with self.assertRaisesRegex(EncodingError, "unsafe_local_weights"):
                     LocalEncoder(self.path)
         self.runtime.SentenceTransformer.assert_not_called()
 
     def test_valid_shards_load_with_weights_only_override(self):
-        (self.path / "config.json").write_text(json.dumps({"model_type": "bert"}))
+        (self.path / "config.json").write_text(json.dumps({"model_type": "bert"}), encoding="utf-8")
         (self.path / "part.safetensors").touch()
         (self.path / "model.safetensors.index.json").write_text(json.dumps({
-            "metadata": {}, "weight_map": {"weight": "part.safetensors"}}))
+            "metadata": {}, "weight_map": {"weight": "part.safetensors"}}), encoding="utf-8")
         (self.path / "sentence_bert_config.json").write_text(json.dumps({
-            "model_args": {"weights_only": False, "variant": "x"}}))
+            "model_args": {"weights_only": False, "variant": "x"}}), encoding="utf-8")
         (self.path / "model.safetensors.index.x.json").write_text(json.dumps({
-            "weight_map": {"weight": "part.safetensors"}}))
+            "weight_map": {"weight": "part.safetensors"}}), encoding="utf-8")
         LocalEncoder(self.path)
         kwargs = self.runtime.SentenceTransformer.call_args.kwargs["model_kwargs"]
         self.assertIn("variant", kwargs)

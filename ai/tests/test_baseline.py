@@ -22,9 +22,9 @@ class BaselineTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.model_path = self.root / "model"
         self.model_path.mkdir()
-        (self.model_path / "config.json").write_text("{}")
+        (self.model_path / "config.json").write_text("{}", encoding="utf-8")
         self.config = self.root / "baseline.json"
-        self.config.write_text(json.dumps({"system_prompt": "system", "max_new_tokens": 160}))
+        self.config.write_text(json.dumps({"system_prompt": "system", "max_new_tokens": 160}), encoding="utf-8")
         self.settings = baseline.read_settings(self.config, "synthetic question", str(self.model_path))
 
     def fake_runtime(self):
@@ -162,7 +162,7 @@ class BaselineTests(unittest.TestCase):
         for prompt in ("", " ", "q" * 16001):
             with self.assertRaises(baseline.BaselineError):
                 baseline.read_settings(self.config, prompt, str(self.model_path))
-        self.config.write_text("not json")
+        self.config.write_text("not json", encoding="utf-8")
         with self.assertRaises(baseline.BaselineError):
             baseline.read_settings(self.config, "q", str(self.model_path))
 
@@ -175,14 +175,14 @@ class BaselineTests(unittest.TestCase):
     def test_optional_thinking_setting_preserves_existing_cli_configuration(self):
         self.config.write_text(json.dumps({
             "system_prompt": "system", "max_new_tokens": 160,
-            "model_id": "configurable/model", "enable_thinking": False}))
+            "model_id": "configurable/model", "enable_thinking": False}), encoding="utf-8")
         self.settings = baseline.read_settings(self.config, "q", str(self.model_path))
         runtime = self.fake_runtime()
         self.run_fake(runtime)
         self.assertFalse(runtime[2].apply_chat_template.call_args.kwargs["enable_thinking"])
         self.assertFalse(runtime[3].generate.call_args.kwargs["use_model_defaults"])
         self.config.write_text(json.dumps({
-            "system_prompt": "system", "max_new_tokens": 160, "enable_thinking": "false"}))
+            "system_prompt": "system", "max_new_tokens": 160, "enable_thinking": "false"}), encoding="utf-8")
         with self.assertRaises(baseline.BaselineError) as ctx:
             baseline.read_settings(self.config, "q", str(self.model_path))
         self.assertEqual(ctx.exception.code, "CONFIG")
@@ -190,7 +190,7 @@ class BaselineTests(unittest.TestCase):
     def test_model_metadata_and_revision_are_configurable(self):
         self.config.write_text(json.dumps({
             "system_prompt": "system", "max_new_tokens": 160,
-            "model_id": "example/test-model", "model_revision": "config-revision"}))
+            "model_id": "example/test-model", "model_revision": "config-revision"}), encoding="utf-8")
         with patch.dict(baseline.os.environ, {}, clear=True):
             configured = baseline.read_settings(self.config, "q", str(self.model_path))
         self.assertEqual(configured["model_id"], "example/test-model")
@@ -211,7 +211,7 @@ class BaselineTests(unittest.TestCase):
         for field in ("model_id", "model_revision"):
             for value in ("", " ", 7, False):
                 self.config.write_text(json.dumps({
-                    "system_prompt": "system", "max_new_tokens": 160, field: value}))
+                    "system_prompt": "system", "max_new_tokens": 160, field: value}), encoding="utf-8")
                 with self.subTest(field=field, value=value), patch.dict(
                         baseline.os.environ, {}, clear=True), self.assertRaises(baseline.BaselineError) as ctx:
                     baseline.read_settings(self.config, "q", str(self.model_path))

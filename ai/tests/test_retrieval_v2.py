@@ -17,7 +17,7 @@ FIXTURE = Path(__file__).parent / "fixtures/retrieval_v2/source.json"
 
 def fixture():
     """#59's UUID5 rule is used only to reconstruct its frozen test fixture."""
-    data = json.loads(FIXTURE.read_text())
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     records, chunks = [], []
     for row in data["records"]:
         records.append(Record(row["record_id"], row["text_version_id"], data["persona_id"],

@@ -16,7 +16,7 @@ PATH = "/v1/persona/generate"
 
 
 def request():
-    return json.loads((FIXTURES / "03-persona-request.json").read_text())
+    return json.loads((FIXTURES / "03-persona-request.json").read_text(encoding="utf-8"))
 
 
 def assign(data, path, value):
@@ -46,8 +46,8 @@ class FakePersona(Engine):
 class PersonaTests(unittest.TestCase):
     def test_pr75_examples_roundtrip_success(self):
         for prefix in ("03-persona", "04-no-evidence"):
-            data = json.loads((FIXTURES / f"{prefix}-request.json").read_text())
-            expected = json.loads((FIXTURES / f"{prefix}-response.json").read_text())
+            data = json.loads((FIXTURES / f"{prefix}-request.json").read_text(encoding="utf-8"))
+            expected = json.loads((FIXTURES / f"{prefix}-response.json").read_text(encoding="utf-8"))
             fake = FakePersona()
             fake.answer, fake.reason = expected["message"], expected["finish_reason"]
             fake.evidence_used, fake.model_name = tuple(expected["evidence_used"]), expected["model_name"]
