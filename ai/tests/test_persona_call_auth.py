@@ -12,7 +12,7 @@ from persona_adapter import PersonaInference
 import server
 from request_timing import RequestTiming
 from test_persona import PATH, request
-from test_server import Engine, call, serving
+from server_test_support import Engine, call, serving
 
 MARKERS = (
     "PRIVATE_PROMPT_44", "PRIVATE_PROFILE_44", "PRIVATE_EVIDENCE_44",

@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from test_server import server, serving
+from server_test_support import serving
+import server
 
 
 @pytest.mark.parametrize(

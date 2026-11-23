@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import persona_contract as contract
 import server
-from test_server import Engine, OTHER_ID, call, request as baseline_request, serving
+from server_test_support import Engine, OTHER_ID, call, request as baseline_request, serving
 
 FIXTURES = Path(__file__).parent / "fixtures/contract_persona"
 PATH = "/v1/persona/generate"

@@ -19,7 +19,7 @@ from request_timing import RequestTiming, TokenObserver, bind_timing
 import server
 from test_persona import PATH, request as persona_request
 from test_request_timing import timing_records
-from test_server import RecordingService, Tokenizer, call, request, serving
+from server_test_support import RecordingService, Tokenizer, call, request, serving
 
 
 def decoder(tokens, *, failure_at=None, gate=None):

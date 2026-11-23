@@ -12,7 +12,7 @@ import inference
 from persona_adapter import PersonaInference
 import server
 from test_persona import PATH
-from test_server import Engine, call, serving
+from server_test_support import Engine, call, serving
 
 FIXTURES = Path(__file__).parent / "fixtures/smoke35891"
 

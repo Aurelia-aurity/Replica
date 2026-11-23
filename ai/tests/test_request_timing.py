@@ -14,7 +14,7 @@ from profile_adapter import ProfileConfig
 from test_profile_contract import analyze, merge, profile
 from test_profile_server import ANALYZE, MERGE
 from test_persona import FakePersona, PATH, assign, request as persona_request
-from test_server import Engine, RecordingService, call, request, serving
+from server_test_support import Engine, RecordingService, call, request, serving
 
 
 def timing_records(logs):
