@@ -97,6 +97,22 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 | `get_deletion_job` | `job_id: UUID` | `Row` |  |
 | `list_deletion_jobs` | `*`, `limit: int = 50`, `offset: int = 0` | `list[Row]` |  |
 
+### 삭제 추가안 (#123)
+
+대화 상대·계정 삭제와 삭제 worker 처리를 위한 SQL 함수 제안입니다. 모두 `service_role`만 실행하고, 사용자 id는 백엔드가 검증한 값을 `p_user_id`로 넘깁니다. Python 함수 서명은 SQL 서명이 정해진 뒤 위 표에 추가합니다. 이 표는 Python 함수 목록이 아니므로 함수 일치 시험의 대상이 아닙니다.
+
+| SQL 함수 | 인자 | 반환·동작 |
+|---|---|---|
+| `request_persona_deletion` | `p_user_id: uuid`, `p_persona_id: uuid` | 삭제 작업 행. 같은 대상의 열린 작업이 있으면 재사용합니다. 대화 상대를 `deleting`으로 바꿔 그 기록·대화방·프로필의 읽기를 즉시 막고(부모 상태를 따르는 기존 RLS), 자료 개정 번호(`data_revision`)를 올립니다. `manifest`에 이 대화 상대의 원본 경로 목록을 담습니다. 없거나 남의 대화 상대는 `P0002` |
+| `request_account_deletion` | `p_user_id: uuid` | 삭제 작업 행(`target_type = account`, `target_id = p_user_id`). 모든 대화 상대를 `deleting`으로 바꾸고 `manifest`에 전체 원본 경로를 담습니다. 열린 작업이 있으면 재사용합니다 |
+| `claim_deletion_job` | `p_job_id: uuid \| null` | (worker 전용) 처리할 작업을 하나 집어 `running`으로 바꾸고 `attempt_count`를 올립니다. 대상은 `pending`, 자동 재시도 시각이 지난 `failed`, 갱신이 5분(임시 값) 멈춘 `running`입니다. 이미 다른 worker가 집은 작업은 건너뜁니다(행 잠금) |
+| `finish_deletion_step` | `p_job_id: uuid`, `p_step: text`, `p_ok: boolean`, `p_error_code: text \| null` | (worker 전용) 성공이면 그 단계를 `remaining_steps`에서 빼고, 순서(`storage` → `external_index` → `adapter` → `database` → `auth`)에 맞지 않는 단계는 `22023`으로 거부합니다. 마지막 단계가 끝나면 `completed`, `finished_at` 설정, `manifest` 비우기. 실패면 `failed`와 안전한 코드(`storage_unavailable` 등, 앱↔백엔드 문서의 '삭제 작업의 상태와 처리 규칙')를 저장합니다 |
+| `retry_deletion_job` | `p_user_id: uuid`, `p_job_id: uuid` | `failed`를 `pending`으로 바꿉니다(`remaining_steps` 유지). `pending`·`running`이면 그대로 돌려주고, `completed`면 `55000`, 없거나 남의 작업은 `P0002` |
+
+`database` 단계의 행 삭제는 기존 `guard_record_delete`가 `storage` 단계가 끝난 작업에 대해서만 허용합니다. 계정 삭제의 `auth` 단계(Supabase Auth 사용자 삭제)는 SQL이 아니라 백엔드 worker가 서버 키로 Auth Admin API를 호출해 처리합니다.
+
+삭제 worker는 백엔드 프로세스의 백그라운드 작업으로 둡니다(2026-11-23 결정 대기 항목 중 실행 위치). 서버가 시작될 때와 주기적으로 `claim_deletion_job`으로 작업을 집고, 단계가 끝날 때마다 `finish_deletion_step`으로 `remaining_steps`를 줄입니다. 서버가 중간에 멈춰도 `remaining_steps`부터 이어가며, 이미 끝난 단계를 다시 처리하지 않습니다.
+
 SQL 함수(`create_chat_turn`, `start_chat_stage`, `finish_chat_stage`, `record_turn_total_ms`, `expire_chat_stages`, `confirm_record_text`, `publish_style_profile`, `search_record_chunks`, `request_record_deletion`)는 위 표의 같은 이름의 Python 함수가 호출하고, 나머지 함수는 테이블을 직접 읽고 씁니다.
 
 ### 호출 규칙

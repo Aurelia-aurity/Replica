@@ -53,9 +53,11 @@
 | POST | [`/text-versions/{text_version_id}/confirm`](#a-textver-confirm) | 전사문 확정 | 제안 | 고도화 1·2 · #10 |
 | GET | [`/personas/{persona_id}/style-profile`](#a-profile) | 현재 말투 프로필·분석 상태 조회 | 제안 | 고도화 1 · #10, #113 |
 | POST | [`/personas/{persona_id}/style-profile/analysis`](#a-analysis) | 말투 프로필 분석 시작·재요청 | 제안 | 고도화 1 · #113 |
-| DELETE | [`/records/{record_id}`](#a-record-del) | 기록 삭제 요청 | 제안 | 고도화 2 · #11 |
-| GET | [`/deletion-jobs · /deletion-jobs/{job_id}`](#a-jobs) | 삭제 진행·부분 실패 확인 | 제안 | 고도화 2 · #11 |
-| DELETE | [`/account`](#a-account-del) | 계정 전체 삭제 | 미정 | 고도화 2 · #11 |
+| DELETE | [`/records/{record_id}`](#a-record-del) | 기록 삭제 요청 | 제안 | 고도화 2 · #11, #123 |
+| DELETE | [`/personas/{persona_id}`](#a-persona-del) | 대화 상대 삭제 요청 | 제안 | 고도화 2 · #123 |
+| GET | [`/deletion-jobs · /deletion-jobs/{job_id}`](#a-jobs) | 삭제 진행·부분 실패 확인 | 제안 | 고도화 2 · #11, #123 |
+| POST | [`/deletion-jobs/{job_id}/retry`](#a-job-retry) | 실패한 삭제 작업 다시 시작 | 제안 | 고도화 2 · #123 |
+| DELETE | [`/account`](#a-account-del) | 계정 전체 삭제 요청 | 제안 | 고도화 2 · #123 |
 
 기록 파일은 `POST /records` 응답의 서명 업로드 정보로 Storage에 직접 올립니다(API 목록에는 넣지 않음). 아래 '기록 파일 업로드'를 참고하세요.
 
@@ -163,6 +165,24 @@
 | attempt_count | integer | 시도 횟수 |
 | last_error_code | string \| null | 마지막 실패 코드 |
 | created_at, updated_at, finished_at | datetime | 생성·수정·완료 시각 (`finished_at`은 완료 시에만) |
+
+#### 삭제 작업의 상태와 처리 규칙
+
+삭제 요청은 작업을 만들 뿐 삭제가 끝난 것이 아닙니다. 삭제 worker(백엔드 프로세스의 백그라운드 작업)가 남은 단계를 처리하고, 앱은 작업 객체로 진행을 확인합니다. 아래 규칙은 모두 제안입니다(#123).
+
+| 항목 | 내용 |
+|---|---|
+| 상태 | `pending`(접수, worker가 아직 집지 않음) · `running`(worker가 처리 중) · `failed`(한 단계가 실패해 멈춤. 남은 단계는 그대로 남음) · `completed`(모든 단계가 끝남) |
+| 완료 조건 | `status = completed`이고 `remaining_steps`가 비어 있고 `finished_at`이 있을 때만 완료입니다. 한 단계라도 남거나 실패하면 완료가 아니며 부분 실패를 성공으로 표시하지 않습니다 |
+| 단계(`remaining_steps`) | `storage`(Storage 원본 객체) · `external_index`(외부 색인·검색 서비스의 자료. 지금은 대상 없음) · `adapter`(학습 산출물. 지금은 대상 없음) · `database`(DB 행: 전사문·조각·프로필 연결·기록 등) · `auth`(Supabase 로그인 계정. 계정 삭제에만). 대상이 없는 단계는 처음부터 목록에 넣지 않습니다 |
+| 처리 순서 | `storage` → `external_index` → `adapter` → `database` → `auth`(남은 것만). Storage 원본을 먼저 지운 뒤에만 DB 행을 지우며 DB가 이 순서를 강제합니다. 단계는 끝날 때마다 바로 `remaining_steps`에서 빠지고, 같은 단계를 다시 처리해도 결과가 같습니다(멱등) |
+| 시도 | worker가 작업을 집을 때마다 `attempt_count`가 1 올라갑니다. 한 작업은 한 번에 하나의 worker만 처리합니다 |
+| 자동 재시도 | 단계가 실패하면 worker가 간격을 두고 최대 3번(1분·5분·30분 뒤) 다시 시도하고, 그래도 안 되면 `failed`로 멈춥니다. 횟수와 간격은 임시 값입니다 |
+| 사용자 재시도 | `failed`인 작업은 `POST /deletion-jobs/{job_id}/retry`로 같은 작업 id를 다시 시작합니다. 자동 재시도 횟수와 무관하며, 새 작업을 만들어 부분 실패를 감추지 않습니다 |
+| 중단된 작업 | 서버가 재시작되거나 worker가 멈춰 `running` 작업이 일정 시간(5분, 임시 값) 갱신되지 않으면 다른 시도가 이어받아 `remaining_steps`부터 계속합니다 |
+| 실패 코드 | `last_error_code`는 안전한 코드만 씁니다: `storage_unavailable` · `storage_error` · `database_error` · `auth_error` · `external_index_error` · `adapter_error` · `worker_interrupted`. 내부 경로·예외 원문은 넣지 않습니다 |
+| 앱에 보이지 않는 것 | 삭제 대상 파일 경로 목록(`manifest`)은 앱에 보내지 않습니다 |
+| 보관 | 완료된 작업의 보관 기간은 정하지 않았습니다. 앱은 `GET /deletion-jobs`로 이전 작업을 복원합니다 |
 
 ### API 상세
 
@@ -676,7 +696,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 이름 | 위치 | 형식 | 필수 | 설명·제약 |
 |---|---|---|---|---|
 | Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻으며 앱이 보낸 `user_id`는 받지 않음 |
-| record_id | path | uuid | 필수 | 기록 id. 현재 상태가 `uploading`이어야 함(이미 `uploaded` 이후이면 위 멱등 규칙, `failed`·`deleting`이면 409 `CONFLICT`) |
+| record_id | path | uuid | 필수 | 기록 id. 현재 상태가 `uploading`이어야 함(이미 `uploaded` 이후이면 위 멱등 규칙, `failed`이면 409 `CONFLICT`, 삭제 중(`deleting`)이면 목록·상세와 같이 없는 기록으로 보아 404 `NOT_FOUND`) |
 | target_speaker | body | string \| null | 선택 | (제안) 예약 때 화자를 보내지 않았거나 업로드 뒤 검증에서 거절됐을 때 선택값(화자가 1명뿐이면 대화 상대로 확인한 값)을 다시 보냄. 앞뒤 공백 제거 후 1~100자. **키를 생략하면 예약 때 값을 유지**하고, 값을 보내면 예약 때 값을 덮어쓰며(재전송값 우선), **JSON `null`을 명시하면 예약 때 값을 지움**(#124의 "생략은 유지, 명시적 null은 해제"와 같은 규칙). 검증은 이렇게 합친 **최종 값**에 적용함('업로드 뒤 검증'의 '최종 선택값') |
 | provider_speaker | body | string \| null | 선택 | (제안) 위와 같음(생략은 유지, 값은 덮어씀, `null`은 해제). 화자가 2명 이상일 때만 값을 보내며 `target_speaker`와 함께 보냄. 화자가 1명뿐이거나 카카오톡이 아닌데 예약 때 보냈다면 `null`로 지움 |
 
@@ -705,8 +725,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 상태 | `code` | 상황 | 복구 |
 |---|---|---|---|
 | 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
-| 404 | `NOT_FOUND` | 없거나 남의 기록 | 기록 목록을 새로고침 |
-| 409 | `CONFLICT` | 기록이 `failed`·`deleting`이어서 업로드를 확인할 수 없음 | 새 `record_id`로 예약 |
+| 404 | `NOT_FOUND` | 없거나 남의 기록, 삭제 중인 기록 | 기록 목록을 새로고침 |
+| 409 | `CONFLICT` | 기록이 `failed`여서 업로드를 확인할 수 없음 | 새 `record_id`로 예약 |
 | 409 | `UPLOAD_MISSING`(`retryable: true`) | 원본이 없음 | 같은 주소로 다시 `PUT`, 만료·거절이면 재예약 |
 | 409 | `UPLOAD_SIZE_MISMATCH`(`retryable: false`) | 원본은 있으나 크기가 `size_bytes`와 다름 | 기록을 삭제하고 새 `record_id`로 다시 예약 |
 | 422 | `INVALID_INPUT` | 내용 형식 오류, 최종 선택값의 형식 오류(길이·쌍·동일인) | 내용 형식은 기록 삭제 후 새 예약, 최종 선택값은 값을 고쳐 재호출 |
@@ -974,10 +994,20 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 항목 | 내용 |
 |---|---|
 | 인증 | 필수 |
-| 단계·이슈 | 고도화 2 · #11 |
+| 단계·이슈 | 고도화 2 · #11, #123 |
 | 내부 호출 | DB `request_record_deletion(record_id)` → 기록이 즉시 `deleting`으로 바뀌어 조회에서 사라지고 삭제 작업 생성 |
 
-삭제 작업을 만든 것이지 파일 삭제가 끝난 것이 아닙니다. 같은 기록에 다시 요청하면 같은 작업을 돌려줍니다. 앱은 `status = completed`이고 `remaining_steps`가 비었을 때만 성공으로 표시합니다.
+삭제 작업을 만든 것이지 파일 삭제가 끝난 것이 아닙니다. 같은 기록에 다시 요청하면 같은 작업을 돌려줍니다(202). 앱은 `status = completed`이고 `remaining_steps`가 비었을 때만 성공으로 표시합니다. 처리 규칙은 '삭제 작업의 상태와 처리 규칙'을 따릅니다.
+
+##### 삭제 범위와 남는 것
+
+| 항목 | 내용 |
+|---|---|
+| 지워지는 것 | 원본 파일(Storage), 전사문(모든 `revision`), 검색 조각과 벡터, 프로필과 이 기록의 연결 |
+| 남는 것 | 과거 대화와 AI 답변(대화방·턴)은 지우지 않습니다(2026-11-23 결정). 삭제한 기록은 이후 검색·분석 입력에서 제외됩니다 |
+| 말투 프로필 | 이 기록의 확정본을 쓴 프로필은 삭제 요청 즉시 최신이 아닌 것으로 처리되어 프롬프트에 쓰이지 않고(대화 상대의 `data_revision`이 오름), 다음 분석(`POST /personas/{persona_id}/style-profile/analysis`)에서 남은 확정 기록으로 다시 만듭니다. 남은 확정 기록이 없으면 프로필도 없습니다(제안, #113·DB 확인) |
+| 삭제 중인 기록의 접근 | `deleting` 기록은 없는 기록과 같은 404입니다. `/uploaded`·텍스트 버전·확정처럼 그 기록의 id를 받는 API도 404입니다(`/uploaded`는 이전 계약의 409에서 바뀜) |
+| 업로드 취소 | 앱이 업로드를 취소할 때 예약만 있는 기록을 정리하는 데도 같은 요청을 씁니다 |
 
 ##### 요청
 
@@ -990,7 +1020,52 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
-| (본문) | 삭제 작업 객체 | 이 장의 '응답 객체' 절에 정의한 삭제 작업 객체 |
+| (본문) | 삭제 작업 객체 | 이 장의 '응답 객체' 절에 정의한 삭제 작업 객체(`target_type = record`) |
+
+##### 오류 응답
+
+| 상태 | `code` | 상황 | 복구 |
+|---|---|---|---|
+| 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
+| 404 | `NOT_FOUND` | 없거나 남의 기록. 삭제가 이미 끝나 사라진 기록도 같음 | 목록을 새로고침(앱은 사라진 기록으로 처리하고 이전 작업 id로 상태를 확인) |
+| 409 | `ACCOUNT_DELETING` | 계정 삭제가 진행 중 | 계정 삭제 작업을 확인 |
+| 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시(같은 작업을 돌려줌) |
+
+<a id="a-persona-del"></a>
+
+#### `DELETE /personas/{persona_id}` (제안) — 대화 상대 삭제 요청
+
+| 항목 | 내용 |
+|---|---|
+| 인증 | 필수 |
+| 단계·이슈 | 고도화 2 · #123 |
+| 내부 호출 | DB `request_persona_deletion(persona_id)`(제안, backend-db 문서의 '삭제 추가안') → 대화 상대가 즉시 `deleting`으로 바뀌어 조회에서 사라지고 삭제 작업 생성 |
+
+기록 삭제와 같은 방식(202, 삭제 작업, 같은 대상에 다시 요청하면 같은 작업)입니다. 대화 상대 자체가 사라지므로 범위가 더 넓습니다.
+
+| 항목 | 내용 |
+|---|---|
+| 지워지는 것 | 이 대화 상대의 모든 기록(원본·전사문·조각·프로필 연결), 말투 프로필, 대화방과 턴(이 대화 상대와 나눈 대화 이력). 기록 삭제 때의 "과거 대화 보존"은 적용하지 않습니다(대화 상대 삭제는 대화 이력까지 지우기로 정함) |
+| 남는 것 | 계정과 다른 대화 상대의 자료 |
+| 요청 직후 | 대화 상대(`status = deleting`)와 그 기록·대화방·프로필은 목록·상세에서 숨겨지고 모든 API가 404입니다. 새 대화·기록 생성도 404입니다 |
+| 처리 | `storage` → `external_index` → `adapter` → `database` |
+
+##### 요청
+
+| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
+|---|---|---|---|---|
+| Authorization | header | string | 필수 | `Bearer <Supabase JWT>` |
+| persona_id | path | uuid | 필수 | 대화 상대 id |
+
+##### 응답 (202) · 삭제 작업
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| (본문) | 삭제 작업 객체 | `target_type = persona` |
+
+##### 오류 응답
+
+기록 삭제 요청과 같습니다(401, 404, 409 `ACCOUNT_DELETING`, 503). 404는 없거나 남의 대화 상대입니다.
 
 <a id="a-jobs"></a>
 
@@ -999,10 +1074,10 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 항목 | 내용 |
 |---|---|
 | 인증 | 필수 |
-| 단계·이슈 | 고도화 2 · #11 |
+| 단계·이슈 | 고도화 2 · #11, #123 |
 | 내부 호출 | DB `list_deletion_jobs(limit, offset)` · `get_deletion_job(job_id)` |
 
-삭제 대상 파일 경로 목록(`manifest`)은 앱에 보내지 않습니다.
+삭제 대상 파일 경로 목록(`manifest`)은 앱에 보내지 않습니다. 진행 중인 작업은 앱이 3초 간격으로 최대 20번 확인하고, `failed`인 작업은 자동으로 다시 묻지 않습니다(앱의 현재 구현). 계정 삭제 작업은 로그인 계정이 사라진 뒤에는 조회할 수 없습니다(아래 `DELETE /account`).
 
 ##### 요청
 
@@ -1027,22 +1102,108 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 |---|---|---|
 | (본문) | 삭제 작업 객체 | 이 장의 '응답 객체' 절에 정의한 삭제 작업 객체 |
 
-<a id="a-account-del"></a>
+##### 오류 응답
 
-#### `DELETE /account` (미정) — 계정 전체 삭제
+| 상태 | `code` | 상황 | 복구 |
+|---|---|---|---|
+| 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료. 계정 삭제가 끝난 뒤의 요청도 같음 | 다시 로그인(계정 삭제 뒤에는 `DELETE /account`의 완료 판정을 따름) |
+| 404 | `NOT_FOUND` | 상세: 없거나 남의 작업 | 목록을 새로고침 |
+| 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시 |
+
+<a id="a-job-retry"></a>
+
+#### `POST /deletion-jobs/{job_id}/retry` (제안) — 실패한 삭제 작업 다시 시작
 
 | 항목 | 내용 |
 |---|---|
 | 인증 | 필수 |
-| 단계·이슈 | 고도화 2 · #11 |
+| 단계·이슈 | 고도화 2 · #123 |
+| 내부 호출 | DB `retry_deletion_job(job_id)`(제안, backend-db 문서의 '삭제 추가안') |
 
-##### 정해진 것과 정해지지 않은 것
+`failed`인 작업을 같은 작업 id로 다시 시작합니다. 새 작업을 만들지 않고 `remaining_steps`도 그대로 두며, 새 시도 번호는 worker가 작업을 집을 때 올라갑니다.
+
+| 작업 상태 | 응답 |
+|---|---|
+| `failed` | 202와 `pending`으로 바뀐 작업 객체 |
+| `pending`·`running` | 200과 현재 작업 객체(이미 처리 중이므로 아무것도 바꾸지 않음. 다시 보내도 안전) |
+| `completed` | 409 `CONFLICT` |
+
+##### 요청
+
+| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
+|---|---|---|---|---|
+| Authorization | header | string | 필수 | `Bearer <Supabase JWT>` |
+| job_id | path | uuid | 필수 | 삭제 작업 id |
+
+##### 응답 · 삭제 작업
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| (본문) | 삭제 작업 객체 | 위 표의 상태별 응답(202 또는 200) |
+
+##### 오류 응답
+
+| 상태 | `code` | 상황 | 복구 |
+|---|---|---|---|
+| 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
+| 404 | `NOT_FOUND` | 없거나 남의 작업 | 목록을 새로고침 |
+| 409 | `CONFLICT` | 이미 `completed`인 작업 | 새로 요청할 것이 없음 |
+| 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시 |
+
+<a id="a-account-del"></a>
+
+#### `DELETE /account` (제안) — 계정 전체 삭제 요청
 
 | 항목 | 내용 |
 |---|---|
-| DB 모듈 | 계정·대상(persona) 전체 삭제는 DB 모듈 범위 밖 (`target_type`에 `persona`, `account` 값만 정의됨) |
-| 필요한 작업 | Storage 원본 삭제 → 프로필·외부 색인·학습 산출물 정리 → 기록·파생 자료 삭제 → Auth 계정 제거를 처리하는 삭제 worker |
-| 요청·응답 규격 | 미정 |
+| 인증 | 필수 |
+| 단계·이슈 | 고도화 2 · #123 |
+| 내부 호출 | DB `request_account_deletion()`(제안, backend-db 문서의 '삭제 추가안') → 삭제 작업 생성. 이후 삭제 worker가 Storage·DB·Supabase Auth 순서로 처리 |
+
+로그인 계정과 앱 데이터 전체를 지우는 요청입니다. 개별 기록 삭제의 "과거 대화 보존"은 적용하지 않으며 대화 이력도 모두 지웁니다(2026-11-23 결정). 이 요청은 되돌릴 수 없고, 앱은 사용자가 범위를 확인하고 되돌릴 수 없다는 것을 이해했다고 체크한 뒤에만 보냅니다. 요청 본문은 없습니다.
+
+| 항목 | 내용 |
+|---|---|
+| 지워지는 것 | 모든 대화 상대와 그 기록(원본·전사문·조각·프로필), 대화방·턴(대화 이력), 이 계정의 앱 데이터 전부, Supabase 로그인 계정(`auth`) |
+| 요청 직후 | 모든 대화 상대가 `deleting`이 되어 조회에서 숨겨집니다. 새 대화 상대·기록·대화 생성과 수정은 409 `ACCOUNT_DELETING`으로 거절하고, 삭제 작업 조회(`GET /deletion-jobs`)와 다시 시작(`POST /deletion-jobs/{job_id}/retry`)만 계속 쓸 수 있습니다 |
+| 같은 계정에 다시 요청 | 진행 중인 같은 작업을 돌려줍니다(202) |
+| 처리 | `storage` → `external_index` → `adapter` → `database` → `auth`. `auth`(Supabase Auth 사용자 삭제)는 다른 단계가 모두 끝난 뒤 마지막에만 실행합니다 |
+| 앞 단계가 실패하면 | 로그인 계정이 남아 있으므로 `failed`로 조회되고 `POST /deletion-jobs/{job_id}/retry`로 이어서 처리합니다. 부분 실패를 완료로 표시하지 않습니다 |
+
+##### 완료 판정 (인증 계정이 사라지므로)
+
+마지막 단계에서 로그인 계정이 지워지면 같은 토큰의 요청은 서버의 토큰 확인(`/auth/v1/user`)에서 바로 401이 되고, 삭제 작업의 `user_id`도 `null`이 되어 `completed`를 로그인 상태로 조회할 수 없습니다. 그래서 계정 삭제 작업은 다음 규칙으로 완료를 판정합니다(제안).
+
+| 앱이 본 것 | 판정 |
+|---|---|
+| 조회가 200이고 `status = failed` | 실패. 사용자에게 알리고 다시 시작 요청 |
+| 조회가 200이고 진행 중(`pending`·`running`) | 계속 확인 |
+| 조회가 401이고, 이어서 한 세션 갱신(토큰 새로고침)이 **'사용자가 없음'으로 거절됨** | **완료**. `auth` 단계는 마지막에만 실행되므로 이 거절은 앞 단계가 모두 끝나고 계정이 지워졌다는 뜻입니다 |
+| 조회가 401이지만 세션 갱신이 성공 | 토큰만 만료됐던 것이므로 완료가 아님. 갱신된 토큰으로 다시 확인 |
+| 세션 갱신이 네트워크 오류 등 다른 이유로 실패 | 완료로 보지 않고 다시 확인 |
+
+완료로 판정한 뒤 앱은 화면의 기록·초안·선택한 파일·화자 이름을 비우고, 이 기기의 인증 정보를 지우고, 로그인 화면에서 완료를 안내합니다(앱 SC-06의 기존 처리). 이미 발급된 서명 업로드 주소와 진행 중이던 요청은 계정 삭제 때 더 이상 효력이 없어야 합니다(확인 필요).
+
+> 확인 필요(DB 담당 실측, #25 검증 한계): 삭제된 사용자의 토큰이 백엔드의 토큰 확인에서 즉시 401이 되는지, 세션 갱신이 '사용자 없음' 계열 오류로 거절되는지, 완료 뒤 작업 행에 개인 경로(`manifest`)가 남지 않는지. 확인되기 전까지 위 완료 판정은 제안입니다.
+
+##### 요청
+
+| 이름 | 위치 | 형식 | 필수 | 설명·제약 |
+|---|---|---|---|---|
+| Authorization | header | string | 필수 | `Bearer <Supabase JWT>`. 사용자 id는 서버가 토큰에서만 얻음 |
+
+##### 응답 (202) · 삭제 작업
+
+| 필드 | 형식 | 설명 |
+|---|---|---|
+| (본문) | 삭제 작업 객체 | `target_type = account`, `target_id`는 로그인한 사용자의 id |
+
+##### 오류 응답
+
+| 상태 | `code` | 상황 | 복구 |
+|---|---|---|---|
+| 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인. 계정 삭제를 이미 요청한 뒤라면 위 완료 판정 |
+| 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시(같은 작업을 돌려줌) |
 
 ### 기록 파일 업로드
 
@@ -1121,8 +1282,9 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 구현됨 (`/chat/voice`) | `/chat/voice` | true |
 | TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
 | 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health` 제외. 꺼져 있는 개발용 `/stt`·`/tts`는 켠 `dev` 환경에서 로그인이 필요하고 `local`에서만 필요 없음) | false |
-| 없거나 남의 항목 | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | 구현됨 | 항목 id를 받는 모든 API. 다른 사용자의 항목도 같은 응답 | false |
+| 없거나 남의 항목 | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | 구현됨 | 항목 id를 받는 모든 API. 다른 사용자의 항목과 삭제 중인 항목도 같은 응답 | false |
 | 이미 처리 중이거나 상태가 바뀜 | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | 구현됨 | 상태가 바뀔 수 있는 API | false |
+| 계정 삭제가 진행 중임 | 409 | `ACCOUNT_DELETING` | `계정 삭제가 진행 중이에요. 완료될 때까지 새로 만들거나 바꿀 수 없어요.` | 제안 (#123) | 삭제 작업 조회·다시 시작을 뺀 쓰기 API | false |
 | DB·Storage에 일시적으로 연결하지 못함 | 503 | `DB_UNAVAILABLE` | `일시적으로 저장소에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.` | DB는 구현됨, Storage 연결 실패는 제안 | DB·Storage를 쓰는 모든 API | true |
 | 업로드 완료를 알렸지만 원본이 없음 | 409 | `UPLOAD_MISSING` | `업로드가 끝나지 않았어요. 파일을 다시 올려 주세요.` | 제안 (현재 구현은 `CONFLICT`) | `/records/{record_id}/uploaded` | true |
 | 올린 원본의 크기가 예약한 크기와 다름 | 409 | `UPLOAD_SIZE_MISMATCH` | `올린 파일의 크기가 예약한 크기와 달라요. 기록을 지우고 다시 올려 주세요.` | 제안 (현재 구현은 `CONFLICT`) | `/records/{record_id}/uploaded` | false |
