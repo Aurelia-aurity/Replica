@@ -9,6 +9,7 @@ import 'auth/supabase_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
 import 'shared/conversation_widgets.dart';
+import 'records/record_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +36,13 @@ Future<AuthService> selectAuthService(AppConfig app, AuthConfig auth) async {
 }
 
 class ReplicaApp extends StatelessWidget {
-  const ReplicaApp({super.key, required this.authService, this.chatService});
+  const ReplicaApp({
+    super.key,
+    required this.authService,
+    this.chatService,
+    this.recordServiceFactory,
+  });
+  final RecordService Function()? recordServiceFactory;
   final AuthService authService;
   final ChatService? chatService;
 
@@ -66,6 +73,7 @@ class ReplicaApp extends StatelessWidget {
         ),
       ),
       home: AuthGate(
+        recordServiceFactory: recordServiceFactory,
         auth: authService,
         chat: chatService ?? const DemoChatService(),
       ),

@@ -139,6 +139,17 @@ class SupabaseAuthService extends AuthService {
   }
 
   @override
+  Future<void> clearStoredCredentials() async {
+    _acceptSessions = false;
+    try {
+      // The server user is gone; drop the persisted session on this device.
+      await _clearSdkSession();
+    } catch (_) {
+      /* Best effort: the identity is already cleared on screen. */
+    }
+  }
+
+  @override
   Future<void> signOut() async {
     _acceptSessions = false;
     // Remove the entire account navigation tree before waiting on the network.
