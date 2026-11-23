@@ -910,16 +910,17 @@ void main() {
   );
 
   testWidgets(
-    'reopened voice reply with stored speech is not requested again',
+    'reopened voice reply with finished speech is synthesized again',
     (tester) async {
       final service = Sc10Service();
+      final player = Sc10Player();
       await tester.pumpWidget(
         MaterialApp(
           home: VoiceScreen(
             conversationName: '합성 상대',
             service: service,
             recorder: Sc10Recorder(),
-            audioPlayer: Sc10Player(),
+            audioPlayer: player,
             lastQuestion: '지난 질문',
             lastReply: '저장된 답변',
             lastReplyDetails: const ChatReply(
@@ -931,22 +932,15 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('음성을 다시 받을 수 없어요'), findsOneWidget);
-      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
-      expect(find.text('음성 다시 시도'), findsNothing);
-      expect(
-        tester
-            .widget<IconButton>(
-              find.widgetWithIcon(IconButton, Icons.play_arrow),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.text('합성 음성 듣기'), findsOneWidget);
       expect(service.syntheses, 0);
+      await acceptPlay(tester);
+      expect(service.syntheses, 1);
+      expect(player.plays, 1);
     },
   );
 
-  testWidgets('unusable audio from a finished synthesis offers no retry', (
+  testWidgets('unusable audio from a finished synthesis offers a retry', (
     tester,
   ) async {
     final service = Sc10Service()
@@ -963,9 +957,10 @@ void main() {
     await startRecording(tester);
     await finishRecording(tester);
     expect(find.text('음성 대화 합성 답변'), findsOneWidget);
-    expect(find.text('음성 다시 시도'), findsNothing);
-    expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsOneWidget);
+    expect(find.text('음성 다시 시도'), findsOneWidget);
     expect(service.syntheses, 0);
+    await acceptPlay(tester);
+    expect(service.syntheses, 1);
   });
 
   testWidgets(
@@ -987,7 +982,6 @@ void main() {
       await acceptPlay(tester);
       expect(service.syntheses, 1);
       expect(find.text('음성 다시 시도'), findsOneWidget);
-      expect(find.textContaining('다시 받을 수 없어요. 답변 글은'), findsNothing);
       expect(player.plays, 0);
       expect(find.text('음성 대화 합성 답변'), findsOneWidget);
       service.speechFailure = null;
