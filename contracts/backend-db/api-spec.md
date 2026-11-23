@@ -71,6 +71,27 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 | `edit_text_draft` | `text_version_id: UUID`, `*`, `content: str`, `expected_updated_at: datetime` | `Row` | `draft`이며 수정 시각이 예상과 일치할 때만 편집. `draft`가 아니거나 수정 시각이 다르면 `ConflictError`. 확정본은 덮어쓰지 않고 새 `revision`을 만들어야 함 |
 | `confirm_record_text` | `text_version_id: UUID` | `Row` | 초안을 확정하고 이전 확정본을 `superseded`로 전환 |
 
+### DB 추가 배포안 (#121 · #124)
+
+`infra/supabase/record_metadata.sql`에 아래 SQL RPC를 구현했다. 원격 적용과 Python 래퍼 연결은 진행 중이다. 백엔드에서 함수 서명을 확인한 뒤 DB 패치, 롤백형 검증, PostgREST 호출 확인, 백엔드 연결 순서로 적용한다.
+
+모든 RPC는 `service_role`만 실행할 수 있다. `p_user_id`는 백엔드가 검증한 사용자 ID에서 얻고, SQL도 해당 소유자와 부모의 `active` 상태를 검사한다.
+
+| SQL RPC | 인자 | 반환·동작 |
+|---|---|---|
+| `update_persona_addresses` | `p_user_id: uuid`, `p_persona_id: uuid`, `p_fields: jsonb` | `personas` 행. `display_name`·`provider_address` 중 하나 이상을 담은 객체. 생략한 키는 유지하고 JSON `null`은 해제한다. 문자열은 앞뒤 공백 제거 후 1~50자다. `name`과 `data_revision`은 바꾸지 않는다. 앱의 `display_name: null`은 HTTP 계층에서 422로 거부하며, `provider_address`의 빈 문자열은 JSON `null`로 변환한다. |
+| `update_record_upload` | `p_user_id: uuid`, `p_record_id: uuid`, `p_expected_updated_at: timestamptz`, `p_status: text`, `p_speakers: jsonb`, `p_error_code: text 또는 null` | `records` 행. 현재 `uploading`이며 예상 수정 시각과 일치할 때 화자·상태·오류를 함께 저장한다. 상태는 `uploading` 또는 `uploaded`다. `p_speakers`는 `target_speaker`·`provider_speaker`의 부분 객체이며 `{}`도 허용한다. 생략한 키는 유지하고 JSON `null`은 해제한다. 문자열은 앞뒤 공백 제거 후 1~100자이며, 제공자만 지정하거나 두 역할을 같은 화자로 지정할 수 없다. 음성 기록은 화자를 지정할 수 없다. |
+
+`update_record_upload`의 `p_error_code`는 `null`, `speaker_required`, `speaker_not_found`, `speaker_not_allowed` 중 하나다. 오류를 남길 때는 `uploading`을 유지하고, `uploaded`로 전환할 때는 반드시 `null`을 보낸다. 파일 존재·크기·실제 화자 목록의 검사는 백엔드가 먼저 수행한다.
+
+백엔드는 파일을 읽기 전에 조회한 기록의 `updated_at`을 `p_expected_updated_at`으로 보낸다. 검증 중 화자나 상태가 바뀌면 `55000`으로 거부하므로, 오래 걸린 요청의 결과가 최신 선택을 덮지 않는다. 응답을 잃었거나 충돌했을 때는 기록을 다시 조회하고 이미 `uploaded` 이후라면 API의 기존 멱등 규칙을 적용한다.
+
+재예약에서 화자 필드를 생략한 것은 화자 없음이다. 이 경우 백엔드는 RPC에 두 키를 명시적으로 `null`로 보내 새 예약값을 저장한다. `/uploaded`에서는 생략한 키를 그대로 생략해 이전 값을 유지한다. 두 경로의 서로 다른 생략 규칙을 호출부에서 처리한다.
+
+잘못된 인자·최종 화자 조합은 `22023`, 없거나 소유자가 다르거나 삭제 중인 대상은 `P0002`, 상태·수정 시각 충돌은 `55000`이다. 기존 `ValidationError`·`NotFoundError`·`ConflictError` 매핑을 사용한다. 기존 Python 함수와 SQL RPC의 서명은 유지한다.
+
+청크 화자 역할, 텍스트 개정별 확인 연결, 반영 상태, 분석 스냅샷·작업·시도와 게시 검증은 #121·#112·#113의 후속 범위다.
+
 ### 말투 프로필·검색 함수 (이슈 #10, 검색은 전용 이슈 없음)
 
 | 함수 | 인자 (`*` 뒤는 이름을 지정해 호출) | 반환 | 동작·제약 |
