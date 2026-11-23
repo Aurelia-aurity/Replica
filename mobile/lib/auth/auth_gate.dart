@@ -141,6 +141,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                 recordService: records,
                 history: _conversationService(),
                 accountEmail: widget.auth.identity!.email,
+                accountCreatedAt: widget.auth.identity!.createdAt,
                 onSignOut: widget.auth.signOut,
                 onExpireSession: widget.auth is PreviewAuthService
                     ? (widget.auth as PreviewAuthService).expireSession

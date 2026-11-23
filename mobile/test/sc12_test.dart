@@ -2,9 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/auth/auth_service.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/settings/settings_screen.dart';
+
+class _DatedPreviewAuth extends PreviewAuthService {
+  @override
+  Future<void> signIn(String email, String password) async {
+    await super.signIn(email, password);
+    if (email == PreviewAuthService.emails.first) {
+      updateIdentity(
+        AuthIdentity(id: email, email: email, createdAt: DateTime(2026, 10, 9)),
+      );
+    }
+  }
+}
 
 Future<void> openMenu(WidgetTester tester, String label) async {
   await tester.scrollUntilVisible(
@@ -73,6 +86,28 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('settings shows the current account creation date only', (
+    tester,
+  ) async {
+    final auth = _DatedPreviewAuth();
+    addTearDown(auth.dispose);
+    final [first, second] = PreviewAuthService.emails;
+    await auth.signIn(first, PreviewAuthService.password);
+    await tester.pumpWidget(ReplicaApp(authService: auth));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('계정'));
+    await tester.pumpAndSettle();
+    expect(find.text('이메일 계정 · 2026.10.09 가입'), findsOneWidget);
+
+    await auth.signIn(second, PreviewAuthService.password);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('계정'));
+    await tester.pumpAndSettle();
+    expect(find.text(second), findsOneWidget);
+    expect(find.text('이메일 계정 · 가입일 정보 미제공'), findsOneWidget);
+    expect(find.textContaining('2026.10.09'), findsNothing);
+  });
 
   testWidgets('pending menus explain availability without simulated success', (
     tester,

@@ -15,6 +15,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.history,
     this.accountEmail,
+    this.accountCreatedAt,
     this.onSignOut,
     this.onExpireSession,
     this.recordService,
@@ -24,6 +25,7 @@ class HomeScreen extends StatefulWidget {
   final RecordService? recordService;
   final VoidCallback? onAccountDeleted;
   final String? accountEmail;
+  final DateTime? accountCreatedAt;
   final Future<void> Function()? onSignOut;
   final VoidCallback? onExpireSession;
 
@@ -183,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_tab == 3) {
       return SettingsScreen(
         accountEmail: widget.accountEmail,
+        accountCreatedAt: widget.accountCreatedAt,
         isDemo: widget.history.isDemo,
         onSignOut: widget.onSignOut,
         onDeleteAccount: widget.onAccountDeleted == null

@@ -7,11 +7,12 @@ const _settingsText = Color(0xFF17201C);
 const _settingsMuted = Color(0xFF5A6560);
 const _settingsDanger = Color(0xFFB42318);
 
-/// SC-12 UI. Account/consent queries and profile navigation are pending.
+/// SC-12 settings and account information.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
     this.accountEmail,
+    this.accountCreatedAt,
     required this.isDemo,
     this.onSignOut,
     this.onDeleteAccount,
@@ -20,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
   });
 
   final String? accountEmail;
+  final DateTime? accountCreatedAt;
   final bool isDemo;
   final Future<void> Function()? onSignOut;
 
@@ -28,6 +30,15 @@ class SettingsScreen extends StatelessWidget {
   final Future<void> Function()? onDeleteAccount;
   final VoidCallback? onExpireSession;
   final Widget? bottomNavigationBar;
+
+  String get _accountDateLabel {
+    final date = accountCreatedAt?.toLocal();
+    if (date == null) return '가입일 정보 미제공';
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year.$month.$day 가입';
+  }
 
   Future<void> _showDetails(
     BuildContext context, {
@@ -179,9 +190,9 @@ class SettingsScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                '이메일 계정 · 가입일 정보 미제공',
-                                style: TextStyle(
+                              Text(
+                                '이메일 계정 · $_accountDateLabel',
+                                style: const TextStyle(
                                   fontSize: 13,
                                   color: _settingsMuted,
                                 ),
