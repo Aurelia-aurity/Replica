@@ -116,10 +116,15 @@ void main() {
       const MaterialApp(home: SettingsScreen(isDemo: true)),
     );
     expect(find.text('이메일 정보 없음'), findsOneWidget);
+    expect(find.text('내 기록이 쓰이는 방식'), findsNothing);
     await openMenu(tester, '기록 사용 동의 내역');
+    expect(find.text('내 기록이 쓰이는 방식'), findsOneWidget);
+    expect(find.text('사용 범위 안내 초안'), findsOneWidget);
     expect(find.text('동의 내역을 아직 확인할 수 없어요'), findsOneWidget);
     expect(find.textContaining('회원가입 시 개인 기록 처리 동의'), findsOneWidget);
     expect(find.text('0건'), findsNothing);
+    await tester.ensureVisible(find.text('닫기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('닫기'));
     await tester.pumpAndSettle();
     await openMenu(tester, '계정 삭제');

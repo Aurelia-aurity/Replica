@@ -95,6 +95,23 @@ class SettingsScreen extends StatelessWidget {
     child: const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          '내 기록이 쓰이는 방식',
+          style: TextStyle(fontWeight: FontWeight.w600, color: _settingsText),
+        ),
+        SizedBox(height: 4),
+        Text('사용 범위 안내 초안', style: TextStyle(fontSize: 12)),
+        SizedBox(height: 12),
+        Text('말투 프로필 · 확정한 기록을 바탕으로 표현·호칭·끝맺음 등 말투 특징을 정리해요.'),
+        SizedBox(height: 8),
+        Text('기록 검색 · 질문과 관련된 내용을 확정한 기록에서 찾아요.'),
+        SizedBox(height: 8),
+        Text('응답 생성 · 찾은 기록과 말투 프로필을 참고해 AI가 응답을 만들어요. 실제 그분이 한 말은 아니에요.'),
+        SizedBox(height: 12),
+        Text('모델 학습에 사용할지는 아직 정해지지 않았어요.'),
+        SizedBox(height: 12),
+        Divider(color: Color(0xFFE6EAE8)),
+        SizedBox(height: 12),
         Icon(Icons.fact_check_outlined, size: 40, color: _settingsMuted),
         SizedBox(height: 16),
         Text(
