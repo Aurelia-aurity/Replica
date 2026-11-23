@@ -1,5 +1,6 @@
 """GPU-free real HTTP checks, with event-controlled generation and tokenization."""
 from contextlib import contextmanager
+from collections.abc import Iterator
 from http.client import HTTPConnection
 import importlib.util
 import io
@@ -75,8 +76,10 @@ class RecordingService(server.Service):
 
 
 @contextmanager
-def serving(service):
+def serving(service: server.Service, *, join_handlers: bool = False) -> Iterator[int]:
     httpd = server.Server(0, service)
+    if join_handlers:
+        httpd.daemon_threads = False
     thread = threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.01})
     thread.start()
     try:
