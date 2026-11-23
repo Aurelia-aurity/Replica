@@ -1,4 +1,4 @@
-# Temporary pre-fix reproduction workflow for #129; remove before the PR is ready.
+# Temporary AI flake reproduction workflow for #129; remove before the PR is ready.
 name: AI flake reproduction
 
 on:
@@ -59,7 +59,7 @@ jobs:
               printf -v run_id '%s-%02d' "$mode" "$i"
               if "$@" > "$REPRO_OUT/$run_id.log" 2>&1; then
                 rc=0
-                if [[ "$mode" != targeted-drain ]]; then rm "$REPRO_OUT/$run_id.log"; fi
+                rm "$REPRO_OUT/$run_id.log"
               else
                 rc=$?
                 failures=$((failures + 1))
@@ -85,48 +85,8 @@ jobs:
               ai/tests/test_persona.py::PersonaTests::test_raw_then_auth_then_structure_then_sizes_then_readiness
               ai/tests/test_persona_call_auth.py::PersonaCallAuthTests::test_denial_precedes_json_decode_even_for_valid_id_or_broken_body
             )
-            # Experimental control: keep the normal half-close but drain the receive side
-            # up to EOF, one second or RAW_LIMIT + 1 bytes, whichever comes first.
-            cat > "$REPRO_OUT/drain-probe.py" <<'PY'
-          import socket
-          import sys
-          from pathlib import Path
-          from time import monotonic
-
-          import pytest
-
-          sys.path.insert(0, str(Path("ai/src").resolve()))
-          from http_contract import InferenceHTTPServer, RAW_LIMIT
-
-          observed = []
-
-          def half_close_and_drain(server: InferenceHTTPServer, request: socket.socket) -> None:
-              size = 0
-              try:
-                  request.shutdown(socket.SHUT_WR)
-                  deadline = monotonic() + 1
-                  while size <= RAW_LIMIT and (remaining := deadline - monotonic()) > 0:
-                      request.settimeout(remaining)
-                      data = request.recv(min(8192, RAW_LIMIT + 1 - size))
-                      if not data:
-                          break
-                      size += len(data)
-              except OSError as error:
-                  observed.append(f"{type(error).__name__}:{error.errno}")
-              finally:
-                  observed.append(size)
-                  server.close_request(request)
-
-          InferenceHTTPServer.shutdown_request = half_close_and_drain
-          result = pytest.main(sys.argv[1:])
-          print(f"DRAIN_OBSERVED {observed}", flush=True)
-          raise SystemExit(result)
-          PY
             run_batch targeted 50 "${pytest[@]}" "${targets[@]}"
-            printf 'TARGETED original_fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
-            run_batch targeted-drain 50 python "$REPRO_OUT/drain-probe.py" -q -p no:cacheprovider "${targets[@]}"
-            printf 'TARGETED drain_fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
-            rm "$REPRO_OUT/drain-probe.py"
+            printf 'TARGETED fail=%s/50\n' "$BATCH_FAILURES" | tee -a "$REPRO_OUT/summary.txt"
           fi
       - name: Upload reproduction evidence
         if: ${{ !cancelled() }}
