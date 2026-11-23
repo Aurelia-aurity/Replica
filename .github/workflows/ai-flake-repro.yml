@@ -72,8 +72,10 @@ jobs:
           run_batch full 20 ai/tests
           full_fail=$BATCH_FAILURES
           run_batch isolated 10 ai/tests/test_smoke_persona.py
-          printf 'SUMMARY os=%s full_fail=%s/20 isolated_fail=%s/10\n' \
-            "$REPRO_OS" "$full_fail" "$BATCH_FAILURES" | tee "$REPRO_OUT/summary.txt"
+          isolated_fail=$BATCH_FAILURES
+          run_batch auth-isolated 10 ai/tests/test_persona_call_auth.py
+          printf 'SUMMARY os=%s full_fail=%s/20 isolated_fail=%s/10 auth_isolated_fail=%s/10\n' \
+            "$REPRO_OS" "$full_fail" "$isolated_fail" "$BATCH_FAILURES" | tee "$REPRO_OUT/summary.txt"
       - name: Upload reproduction evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
