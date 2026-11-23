@@ -267,6 +267,10 @@ class SettingsScreen extends StatelessWidget {
                     showChevron: false,
                     onTap: () => showDialog<void>(
                       context: context,
+                      // Keep the dialog in the account's navigation tree so it
+                      // is removed with that tree once sign-out clears the
+                      // identity, even if the remote request then fails.
+                      useRootNavigator: false,
                       builder: (_) => _SignOutDialog(onSignOut: onSignOut),
                     ),
                   ),

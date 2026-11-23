@@ -7,6 +7,24 @@ import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/settings/settings_screen.dart';
 
+/// Mirrors SupabaseAuthService.signOut: the local identity is cleared before
+/// the remote request, which then fails with a notice and an AuthFailure.
+class _RemoteSignOutFailureAuth extends PreviewAuthService {
+  final remote = Completer<void>();
+
+  @override
+  Future<void> signOut() async {
+    updateIdentity(null);
+    try {
+      await remote.future;
+    } catch (_) {
+      notice = '이 기기에서 로그아웃했어요. 서버 로그아웃 요청은 완료하지 못했어요.';
+      notifyListeners();
+      throw const AuthFailure('네트워크 연결을 확인하고 다시 시도해 주세요.');
+    }
+  }
+}
+
 class _DatedPreviewAuth extends PreviewAuthService {
   @override
   Future<void> signIn(String email, String password) async {
@@ -189,6 +207,40 @@ void main() {
       await tester.tap(find.text('취소'));
       await tester.pumpAndSettle();
       expect(find.text('synthetic@example.com'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'remote sign-out failure after local sign-out leaves only the login notice',
+    (tester) async {
+      final auth = _RemoteSignOutFailureAuth();
+      addTearDown(auth.dispose);
+      await auth.signIn(
+        PreviewAuthService.emails.first,
+        PreviewAuthService.password,
+      );
+      await tester.pumpWidget(ReplicaApp(authService: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('계정'));
+      await tester.pumpAndSettle();
+      await openMenu(tester, '로그아웃');
+      await tester.tap(find.widgetWithText(FilledButton, '로그아웃'));
+      await tester.pump();
+      // Local sign-out already removed the account tree and its dialog.
+      expect(auth.identity, isNull);
+      expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      auth.remote.completeError(StateError('synthetic offline'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
+      expect(find.byType(SettingsScreen), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('로그아웃하지 못했어요. 다시 시도해 주세요.'), findsNothing);
+      expect(find.text(PreviewAuthService.emails.first), findsNothing);
+      expect(
+        find.text('이 기기에서 로그아웃했어요. 서버 로그아웃 요청은 완료하지 못했어요.'),
+        findsOneWidget,
+      );
     },
   );
 
