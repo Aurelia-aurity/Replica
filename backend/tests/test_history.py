@@ -39,11 +39,25 @@ def make_persona(client, name="엄마") -> str:
     return client.post("/personas", json={"name": name}).json()["id"]
 
 
-def make_session(client, persona_id, title=None) -> str:
+def make_session(client, persona_id, title=None, session_id=None) -> str:
     ack = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
-    res = client.post("/sessions", json={"persona_id": persona_id, "ai_notice_ack_at": ack, "title": title})
+    body = {"persona_id": persona_id, "ai_notice_ack_at": ack, "title": title}
+    if session_id is not None:
+        body["session_id"] = session_id
+    res = client.post("/sessions", json=body)
     assert res.status_code == 201
     return res.json()["id"]
+
+
+def stamp(fake_db, session_ids, start="2026-11-15T10:00:00+00:00") -> None:
+    """생성 순서대로 서로 다른 `created_at`을 명시한다.
+
+    목록은 생성 시각 내림차순이고 같은 시각이면 id 내림차순이다. 시험이 `datetime.now()`가 만든 시각에 기대면
+    시계 해상도가 낮은 환경(Windows)에서 시각이 같아져 순서가 무작위 id에 좌우되므로, 순서를 보는 시험은 시각을 정한다.
+    """
+    base = datetime.fromisoformat(start)
+    for offset, session_id in enumerate(session_ids):
+        fake_db.sessions[session_id]["created_at"] = (base + timedelta(seconds=offset)).isoformat()
 
 
 def error_of(res) -> dict:
@@ -57,9 +71,10 @@ def test_empty_list_has_defaults(client):
     assert client.get("/sessions").json() == {"items": [], "limit": 50, "offset": 0}
 
 
-def test_list_is_newest_first_with_only_contract_fields(client):
+def test_list_is_newest_first_with_only_contract_fields(client, fake_db):
     persona = make_persona(client)
     first, second, third = (make_session(client, persona, title=t) for t in ("a", "b", "c"))
+    stamp(fake_db, [first, second, third])
 
     items = client.get("/sessions").json()["items"]
 
@@ -67,16 +82,32 @@ def test_list_is_newest_first_with_only_contract_fields(client):
     assert all(set(item) == SESSION_KEYS for item in items)
 
 
-def test_list_paging_and_persona_filter(client):
+def test_list_paging_and_persona_filter(client, fake_db):
     mom, dad = make_persona(client, "엄마"), make_persona(client, "아빠")
     mom_sessions = [make_session(client, mom) for _ in range(3)]
-    make_session(client, dad)
+    dad_session = make_session(client, dad)
+    stamp(fake_db, [*mom_sessions, dad_session])
 
     page = client.get("/sessions", params={"persona_id": mom, "limit": 2, "offset": 1}).json()
 
     assert (page["limit"], page["offset"]) == (2, 1)
     assert [item["id"] for item in page["items"]] == [mom_sessions[1], mom_sessions[0]]
     assert len(client.get("/sessions").json()["items"]) == 4
+
+
+def test_sessions_with_the_same_created_at_are_ordered_by_id_descending(client, fake_db):
+    persona = make_persona(client)
+    ids = ["00000000-0000-4000-8000-00000000000%d" % n for n in (3, 1, 2)]  # 만든 순서와 id 순서가 다르게
+    for session_id in ids:
+        make_session(client, persona, session_id=session_id)
+    for session_id in ids:
+        fake_db.sessions[session_id]["created_at"] = "2026-11-15T10:00:00+00:00"  # 모두 같은 시각
+
+    items = client.get("/sessions").json()["items"]
+
+    assert [item["id"] for item in items] == sorted(ids, reverse=True)
+    page = client.get("/sessions", params={"limit": 1, "offset": 1}).json()["items"]
+    assert [item["id"] for item in page] == [sorted(ids, reverse=True)[1]]
 
 
 @pytest.mark.parametrize("query, field", [("limit=0", "limit"), ("limit=101", "limit"), ("offset=-1", "offset"),
