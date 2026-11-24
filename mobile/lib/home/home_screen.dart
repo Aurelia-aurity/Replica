@@ -7,6 +7,7 @@ import '../records/record_controller.dart';
 import '../records/record_service.dart';
 import '../records/records_panel.dart';
 import '../records/deletion_sheet.dart';
+import '../settings/settings_screen.dart';
 import '../shared/conversation_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.history,
     this.accountEmail,
+    this.accountCreatedAt,
     this.onSignOut,
     this.onExpireSession,
     this.recordService,
@@ -23,7 +25,8 @@ class HomeScreen extends StatefulWidget {
   final RecordService? recordService;
   final VoidCallback? onAccountDeleted;
   final String? accountEmail;
-  final VoidCallback? onSignOut;
+  final DateTime? accountCreatedAt;
+  final Future<void> Function()? onSignOut;
   final VoidCallback? onExpireSession;
 
   @override
@@ -88,58 +91,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _account() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(widget.accountEmail ?? '계정'),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(sheetContext).pop();
-                  widget.onSignOut?.call();
-                },
-                child: const Text('로그아웃'),
-              ),
-              TextButton.icon(
-                onPressed: widget.onAccountDeleted == null
-                    ? null
-                    : () async {
-                        Navigator.of(sheetContext).pop();
-                        final deletion = _records.deletionFor(
-                          '#account',
-                          account: true,
-                        );
-                        final complete = await showDeletionSheet(
-                          context,
-                          deletion,
-                          preview: _records.service.isPreview,
-                        );
-                        if (mounted && complete == true) {
-                          widget.onAccountDeleted?.call();
-                        }
-                      },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('계정 삭제'),
-              ),
-              if (widget.onExpireSession != null)
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    widget.onExpireSession!();
-                  },
-                  child: const Text('세션 만료 확인 (미리보기)'),
-                ),
-            ],
-          ),
-        ),
-      ),
+    setState(() => _tab = 3);
+  }
+
+  /// Runs the records deletion flow for the whole account from SC-12.
+  Future<void> _deleteAccount() async {
+    final deletion = _records.deletionFor('#account', account: true);
+    final complete = await showDeletionSheet(
+      context,
+      deletion,
+      preview: _records.service.isPreview,
     );
+    if (mounted && complete == true) widget.onAccountDeleted?.call();
   }
 
   Future<void> _start({required bool voice}) async {
@@ -186,17 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
     selectedIndex: _tab,
     backgroundColor: Colors.white,
     indicatorColor: const Color(0xFFE3EFEB),
-    onDestinationSelected: (index) {
-      if (index < 3) {
-        setState(() {
-          _tab = index;
-          if (index == 0) _refreshRecent();
-          if (index == 1) _records.refresh();
-        });
-      } else {
-        _notice('설정 기능은 고도화 단계에서 제공할 예정입니다.');
-      }
-    },
+    onDestinationSelected: (index) => setState(() {
+      _tab = index;
+      if (index == 0) _refreshRecent();
+      if (index == 1) _records.refresh();
+    }),
     destinations: const [
       NavigationDestination(
         icon: Icon(Icons.home_outlined),
@@ -225,6 +182,19 @@ class _HomeScreenState extends State<HomeScreen> {
         bottomNavigationBar: _navigation(),
       );
     }
+    if (_tab == 3) {
+      return SettingsScreen(
+        accountEmail: widget.accountEmail,
+        accountCreatedAt: widget.accountCreatedAt,
+        isDemo: widget.history.isDemo,
+        onSignOut: widget.onSignOut,
+        onDeleteAccount: widget.onAccountDeleted == null
+            ? null
+            : _deleteAccount,
+        onExpireSession: widget.onExpireSession,
+        bottomNavigationBar: _navigation(),
+      );
+    }
     if (_tab == 2) {
       return HistoryScreen(
         service: widget.history,
@@ -245,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: '계정',
             icon: const Icon(Icons.person_outline),
-            onPressed: widget.onSignOut == null ? null : _account,
+            onPressed: _account,
           ),
         ],
       ),

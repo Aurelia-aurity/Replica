@@ -35,9 +35,10 @@ class AuthFailure implements Exception {
 }
 
 class AuthIdentity {
-  const AuthIdentity({required this.id, required this.email});
+  const AuthIdentity({required this.id, required this.email, this.createdAt});
   final String id;
   final String email;
+  final DateTime? createdAt;
 }
 
 /// The UI depends on this interface, never on tokens or Supabase SDK types.
