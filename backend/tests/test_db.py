@@ -364,7 +364,7 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
 class SettingsTests(unittest.TestCase):
     def test_document_lists_every_public_user_function(self):
         document = (Path(__file__).resolve().parents[2] / "docs/architecture/db-python-api.md").read_text(encoding="utf-8")
-        documented = set(re.findall(r"^\| ([a-z][a-z_]*) \|", document, re.M))
+        documented = set(re.findall(r"^\| ([a-z][a-z0-9_]*) \|", document, re.M))
         actual = {name for name, method in inspect.getmembers(UserDatabase, inspect.iscoroutinefunction)
                   if not name.startswith("_")}
         self.assertEqual(actual, documented)

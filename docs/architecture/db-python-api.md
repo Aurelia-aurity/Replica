@@ -223,3 +223,31 @@ job = await user_db.request_record_deletion(record["id"])
 - 원격 추가 이력: `20261028053701 weekend_db_integration`. 기존 함수 서명은 유지한다. 실제 앱/HTTP/AI·음성 바이트·파일 삭제·계정 삭제 기능 검증은 아니다.
 - 시험 계정 0명, 시험 후 public 애플리케이션 9개 테이블 모두 0건, Storage 객체 0건, 기존 Auth 사용자 2명 유지 확인. 실제 키는 출력하거나 커밋하지 않았다.
 - 호출 예시·오류 변환·응답 투영과 남은 파트 경계는 [주말 통합 인계](db-weekend-integration.md)를 참고한다. PR #45의 상태나 다른 담당자의 승인을 자동 변경하지 않는다.
+
+
+### 개인화 수명주기 함수 (#121)
+
+검증된 사용자 객체의 아래 비동기 메서드로 호출한다. UUID는 UUID 객체 또는 문자열이다. JSON 배열·객체는 복사하고 비유한 숫자는 거부한다. SQL은 현재 시도·입력 범위·동의·삭제 상태를 원자적으로 검사한다.
+
+| 함수 | 인자 | 반환 |
+|---|---|---|
+| update_persona_addresses | persona_id: Identifier, *, fields: Mapping[str, str \| None] | Row |
+| confirm_record_text_v2 | text_version_id: Identifier, *, source_format: str, units: Sequence[Mapping[str, Any]], speakers: Mapping[str, str \| None] | Row |
+| capture_personalization_snapshot | persona_id: Identifier, *, snapshot_id: Identifier, masking_policy_version: str | Row |
+| advance_personalization_source | persona_id: Identifier, *, expected_stamp: Identifier | str |
+| start_profile_analysis | snapshot_id: Identifier, *, operation_id: Identifier, deadline: datetime, runtime: Mapping[str, Any] | Row |
+| start_profile_analysis_node | operation_id: Identifier, *, attempt: int, node_id: Identifier, request_id: Identifier, kind: str, ranges: Sequence[Mapping[str, Any]], children: Sequence[Identifier] | Row |
+| finish_profile_analysis_node | operation_id: Identifier, *, attempt: int, node_id: Identifier, request_id: Identifier, runtime: Mapping[str, Any], status: str, content: Mapping[str, Any] \| None = None, model_name: str \| None = None, error_code: str \| None = None | Row |
+| publish_analysis_profile | operation_id: Identifier, *, attempt: int, root_node_id: Identifier | Row |
+| get_profile_analysis_result | operation_id: Identifier, *, attempt: int | Row |
+| start_record_index_build | snapshot_id: Identifier, *, build_id: Identifier, embedding_model: str, embedding_revision: str, dimensions: int | Row |
+| append_record_index_chunks | build_id: Identifier, *, chunks: Sequence[Mapping[str, Any]] | int |
+| activate_record_index_build | build_id: Identifier | Row |
+| fail_record_index_build | build_id: Identifier | Row |
+| read_persona_context | persona_id: Identifier, *, embedding_model: str, embedding_revision: str, query_embedding: Sequence[float], limit: int = 10, min_similarity: float = 0.5 | Row |
+| get_record_reflection | record_id: Identifier | str |
+| bind_persona_chat_turn | turn_id: Identifier, *, request_id: Identifier, snapshot_id: Identifier, build_id: Identifier, profile_id: Identifier | Row |
+| check_persona_chat_turn | turn_id: Identifier, *, request_id: Identifier, attempt: int | bool |
+| finish_persona_chat_turn | turn_id: Identifier, *, request_id: Identifier, attempt: int, ok: bool, text: str \| None = None, elapsed_ms: int \| None = None, error_code: str \| None = None, total_ms: int \| None = None, finish_reason: str \| None = None | Row |
+
+호출 순서·범위 형식·오류와 배포는 [개인화 DB 수명주기 명세](../../contracts/backend-db/personalization-lifecycle.md)를 따른다. P1201·P1202·P1203은 ValidationError이며 code를 보존한다.

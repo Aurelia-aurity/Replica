@@ -99,3 +99,18 @@ node infra/supabase/tests/verify_personalization_lifecycle.mjs .cache/db-check/n
 ~~~
 
 검증기는 저장소의 기존 SQL 전체와 새 패치를 적용한 뒤 롤백형 시나리오를 실행한다. 실제 GPU·마스킹·앱 연결은 해당 파트의 후속 통합 검증이다.
+
+## Python 호출과 검증
+
+`await Database(...).for_user(access_token)`으로 얻은 `UserDatabase`에서 SQL 이름과 같은 비동기 메서드를 호출한다. `p_user_id`는 전달하지 않는다. 메서드의 정확한 인자·기본값은 [Python 함수 표](api-spec.md#개인화-python-함수-121)에 있으며, SQL의 `p_ms`는 Python에서 `elapsed_ms`다.
+
+```python
+snapshot = await user.capture_personalization_snapshot(
+    persona_id, snapshot_id=uuid4(), masking_policy_version="synthetic-v1")
+operation = await user.start_profile_analysis(
+    snapshot["id"], operation_id=uuid4(), deadline=deadline, runtime=runtime)
+result = await user.get_profile_analysis_result(
+    operation["operation_id"], attempt=operation["attempt"])
+```
+
+2026-11-24 Python 함수 18개의 전송 인자·검증된 소유자 주입·화자 SQLSTATE 매핑을 포함해 백엔드 오프라인 시험 219개와 하위 검사 29개가 통과했다(실연결 선택 검사 8개는 기본 실행에서 제외). 별도로 `REPLICA_DB_MUTATING_TEST=1`을 설정하고 `python -m pytest -q tests/test_db_full_live.py`를 실행해 실제 개발 Supabase 대상 시험 2개가 통과했다. 기존 공개 함수 32개의 호환성과 새 함수 18개의 확정→스냅샷→분석·병합→게시→색인→대화 저장→원본 무효화를 확인했다. 각 시험은 임시 계정 2개와 합성 자료를 생성하고 종료 시 정리한다. 실행에는 로컬 `backend/.env`의 Supabase 설정이 필요하며 키·토큰은 출력하거나 커밋하지 않는다.

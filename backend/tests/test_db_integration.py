@@ -154,7 +154,7 @@ class EnvFileTests(unittest.TestCase):
                   if not name.startswith("_")}
         seen = set()
         for line in doc.splitlines():
-            match = re.match(r"^\| `([a-z][a-z_]*)` \|", line)
+            match = re.match(r"^\| `([a-z][a-z0-9_]*)` \|", line)
             # Split escaped union-type pipes correctly; do not filter by return
             # type, which previously omitted get_recent_history's list[dict].
             cells = re.split(r"(?<!\\)\|", line)
