@@ -377,6 +377,28 @@ void main() {
     });
   }
 
+  testWidgets('leaving right after a second quick failure leaves no notice', (
+    tester,
+  ) async {
+    final service = FakePersonaService()..createError = StateError('offline');
+    await openName(tester, newController(service));
+    await tester.enterText(find.byType(TextField), '엄마');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('저장하지 못했어요'), findsOneWidget);
+
+    // Fails again at once, while the first notice would still be on its
+    // way out, and the screen is left before anything settles.
+    await tester.tap(saveButton);
+    await tester.pump();
+    expect(service.created, hasLength(2));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(PersonaNameScreen), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
   testWidgets('leaving keeps a notice the screen did not show itself', (
     tester,
   ) async {

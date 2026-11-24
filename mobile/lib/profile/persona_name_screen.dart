@@ -71,6 +71,8 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
 
   /// Takes the failure notice down, if one is up. Only this screen's own
   /// notice: any other one (such as the previous screen's) stays as it is.
+  /// The current notice is closed because the failure notice is always the
+  /// current one while it is up (see the failure path of [_save]).
   void _hideFailureNotice() {
     if (_failureNotice == null) return;
     _failureNotice = null;
@@ -156,7 +158,15 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         _requestId = newPersonaId();
       }
       setState(() => _saving = false);
-      final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+      // The new notice takes over at once: nothing is left showing or waiting
+      // ahead of it. A notice still on its way out (an earlier failure's,
+      // say) would otherwise stay in front, the new one would wait behind
+      // it, and leaving now would take down the old one and let the new one
+      // appear on the screen below. So while [_failureNotice] is set it is
+      // the current notice, and [_hideFailureNotice] closes exactly it.
+      final messenger = ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..removeCurrentSnackBar();
       final notice = _failureNotice = messenger.showSnackBar(
         SnackBar(
           // Lifted above the button row so the failed name can be fixed and
