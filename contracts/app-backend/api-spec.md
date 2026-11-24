@@ -1145,7 +1145,7 @@ DB가 원인인 오류(`NOT_FOUND`, `CONFLICT`, `DB_UNAVAILABLE` 등)는 **DB �
 
 같은 `code`는 한 가지 문구만 씁니다. 2장·3장·DB 규격 문서의 `code`와 문구는 같고, 상황이 다르면 `code`를 나눕니다.
 
-AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 요청 종류별 자체 타임아웃(텍스트·TTS 180초, 음성 200초)으로 처리합니다. 백엔드의 AI 호출 대기 `LLM_TIMEOUT_SECONDS`(잠정 60초, #96에서 검토 중)는 앱의 대기 시간과 별개의 값입니다.
+AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 요청 종류별 자체 타임아웃(텍스트·TTS 180초, 음성 200초)으로 처리합니다. 백엔드의 AI 호출 대기 `LLM_TIMEOUT_SECONDS`(60초 확정, 통합 후 `llm_ms` 측정으로 조정)는 앱의 대기 시간과 별개의 값이며 앱 대기 시간보다 짧습니다.
 
 오류 본문에는 SQL, 예외 원문, 토큰, 질문·답변 내용, 서버 키를 넣지 않습니다.
 
