@@ -89,6 +89,10 @@ LLM 시도는 기존 start_chat_stage_v2로 먼저 등록한다. 그 뒤 context
 
 원격 적용은 새 증분 패치 이름 personalization_lifecycle_121로 한 번 실행한다. 기존 스키마는 지우거나 재실행하지 않는다. verify_personalization_lifecycle.sql은 합성 사용자·행을 롤백한다. 복구 시 백엔드의 새 개인화 경로 활성화를 되돌리고 추가 데이터·RPC는 보존한다. 자료 정리 worker는 관련 snapshot·노드·색인도 삭제 범위에 포함해야 한다. 과거 대화 보존 정책은 #123을 따른다.
 
+후속 파일 20261124050058_personalization_lifecycle_followup.sql은 그다음에 personalization_lifecycle_121_followup으로 한 번 적용한다. 외래 키 인덱스와 만료된 분석의 failed 판정을 보완하며, 이미 배포한 원본 파일은 다시 실행하지 않는다.
+
+2026-11-24 개발 프로젝트에 첫 패치를 20261124045853, 후속을 20261124050317로 적용했다. 두 패치 적용 뒤 원격 롤백형 검증을 통과했다. 실제 PostgREST 요청 8개의 시도 등록 경합에서 시도 번호 1~8을 중복 없이 받았고, 같은 결과를 동시에 게시한 두 요청은 같은 프로필 ID와 committed 영수증을 반환했다. 두 계정의 스냅샷 조회 격리, 활성 색인·프로필의 동일 스탬프, 원본 변경 뒤 컨텍스트 차단도 확인했다. 임시 계정과 합성 데이터는 정리했다.
+
 ~~~powershell
 npm install --prefix .cache/db-check --no-package-lock --no-save @electric-sql/pglite@0.3.14
 node infra/supabase/tests/verify_personalization_lifecycle.mjs .cache/db-check/node_modules/@electric-sql/pglite/dist/index.js
