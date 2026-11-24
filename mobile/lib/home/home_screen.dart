@@ -59,26 +59,41 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
   late Future<List<Conversation>> _recent;
 
-  /// Record services of this login, one per partner id ([_accountScope] for
-  /// the account alone), so switching back to a partner keeps its records.
-  final _recordServices = <String, RecordService>{};
+  /// Record state of this login, one controller (with its own service) per
+  /// partner id ([_accountScope] for the account alone). A controller is
+  /// kept until the login ends, not dropped when another partner is picked:
+  /// disposing it would cancel an upload still in progress and lose unsent
+  /// transcript edits of that partner.
+  final _recordControllers = <String, RecordController>{};
   static const _accountScope = '#account';
 
-  RecordController? _recordController;
-  String? _recordPersonaId;
-  VoidCallback? _accountDeleted;
+  /// Partner whose records the records tab last loaded.
+  String? _recordsLoadedFor;
 
   @override
   void initState() {
     super.initState();
     _refreshRecent();
+    widget.personas.addListener(_personasChanged);
     // Not synchronously: the listeners below must not rebuild during mount.
     Future.microtask(widget.personas.load);
   }
 
   @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.personas != widget.personas) {
+      oldWidget.personas.removeListener(_personasChanged);
+      widget.personas.addListener(_personasChanged);
+    }
+  }
+
+  @override
   void dispose() {
-    _recordController?.dispose();
+    widget.personas.removeListener(_personasChanged);
+    for (final controller in _recordControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -86,28 +101,42 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.personas.status == LoadStatus.idle ||
       widget.personas.status == LoadStatus.loading;
 
+  /// Record state for [personaId], or for the account alone when it is null.
+  /// Records belong to one partner (`persona_id` of the contract), so each
+  /// partner has its own controller and service: a list answer for one
+  /// partner can never show up under another.
+  ///
+  /// Only builds the controller the first time; it loads nothing, so it is
+  /// safe to call while building. Lists are loaded by [_loadRecords].
+  RecordController _recordsFor(String? personaId) =>
+      _recordControllers.putIfAbsent(personaId ?? _accountScope, () {
+        final service =
+            widget.recordServiceFor?.call(personaId) ?? PreviewRecordService();
+        return RecordController(
+          service,
+          onAccountDeleted: widget.accountDeletedFor?.call(service),
+        );
+      });
+
   /// Records of the current partner, or of the account alone while there is
-  /// none. Records belong to one partner (`persona_id` of the contract), so a
-  /// different partner gets its own controller and service: a list answer
-  /// for one partner can never show up under another.
-  RecordController get _records {
+  /// none.
+  RecordController get _records => _recordsFor(widget.personas.current?.id);
+
+  /// Loads the current partner's records list. The account scope holds no
+  /// list of its own, so nothing is loaded without a partner.
+  void _loadRecords() {
     final personaId = widget.personas.current?.id;
-    final current = _recordController;
-    if (current != null && _recordPersonaId == personaId) return current;
-    current?.dispose();
-    final service = _recordServices.putIfAbsent(
-      personaId ?? _accountScope,
-      () => widget.recordServiceFor?.call(personaId) ?? PreviewRecordService(),
-    );
-    _accountDeleted = widget.accountDeletedFor?.call(service);
-    _recordPersonaId = personaId;
-    final controller = RecordController(
-      service,
-      onAccountDeleted: _accountDeleted,
-    );
-    // The account scope holds no list of its own.
-    if (personaId != null) unawaited(controller.refresh());
-    return _recordController = controller;
+    _recordsLoadedFor = personaId;
+    if (personaId != null) unawaited(_recordsFor(personaId).refresh());
+  }
+
+  /// While the records tab is open, a newly current partner (the first load,
+  /// or one created from the tab) gets its list loaded. Outside the tab the
+  /// list is loaded when the tab is opened.
+  void _personasChanged() {
+    if (_tab != 1) return;
+    if (widget.personas.current?.id == _recordsLoadedFor) return;
+    _loadRecords();
   }
 
   void _refreshRecent() {
@@ -118,8 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// that partner's records, the same ones its records tab shows.
   Future<void> _openRecordUpload(BuildContext context, Persona persona) {
     widget.personas.select(persona.id);
-    final records = _records;
-    if (_recordPersonaId != persona.id) return Future.value();
+    // Not a partner the app holds (any more): nowhere to upload to.
+    if (widget.personas.current?.id != persona.id) return Future.value();
+    final records = _recordsFor(persona.id);
     records.beginSelection();
     return Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -144,8 +174,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// is unclear whose records would be cleaned up, so it waits for them.
   bool get _accountDeletionOffered {
     if (_personasLoading) return widget.accountDeletedFor != null;
-    _records;
-    return _accountDeleted != null;
+    // Only asks the controller; its records list is not loaded for this.
+    return _records.onAccountDeleted != null;
   }
 
   /// Runs the records deletion flow for the whole account from SC-12.
@@ -155,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     final records = _records;
-    final accountDeleted = _accountDeleted;
+    final accountDeleted = records.onAccountDeleted;
     if (accountDeleted == null) return;
     final deletion = records.deletionFor('#account', account: true);
     final complete = await showDeletionSheet(
@@ -230,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
     onDestinationSelected: (index) => setState(() {
       _tab = index;
       if (index == 0) _refreshRecent();
-      if (index == 1 && widget.personas.current != null) _records.refresh();
+      if (index == 1) _loadRecords();
     }),
     destinations: const [
       NavigationDestination(
@@ -310,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
       key: ObjectKey(records),
       controller: records,
       picker: widget.recordPicker,
-      onAccountDeleted: _accountDeleted,
+      onAccountDeleted: records.onAccountDeleted,
     );
     if (personas.personas.length < 2) return panel;
     // With several partners, say whose records these are.

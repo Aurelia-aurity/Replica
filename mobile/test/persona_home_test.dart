@@ -10,6 +10,7 @@ import 'package:mobile/profile/persona_name_screen.dart';
 import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/profile/speech_profile_screen.dart';
 import 'package:mobile/records/record_models.dart';
+import 'package:mobile/records/record_review.dart';
 import 'package:mobile/records/record_service.dart';
 import 'package:mobile/records/record_upload_screen.dart';
 import 'package:mobile/records/records_panel.dart';
@@ -39,17 +40,24 @@ class QuietChat implements ChatService {
 class NamedRecords extends PreviewRecordService {
   NamedRecords(this.fileName);
   final String fileName;
+
+  /// How often the list was requested.
+  int listCalls = 0;
+
   @override
-  Future<List<RecordEntry>> list() async => [
-    RecordEntry(
-      id: fileName,
-      name: fileName,
-      kind: RecordKind.text,
-      status: RecordStatus.ready,
-      createdAt: DateTime.utc(2026, 11, 1),
-      sizeBytes: 10,
-    ),
-  ];
+  Future<List<RecordEntry>> list() async {
+    listCalls++;
+    return [
+      RecordEntry(
+        id: fileName,
+        name: fileName,
+        kind: RecordKind.text,
+        status: RecordStatus.ready,
+        createdAt: DateTime.utc(2026, 11, 1),
+        sizeBytes: 10,
+      ),
+    ];
+  }
 }
 
 Future<void> pumpApp(
@@ -493,6 +501,75 @@ void main() {
       final service = upload.controller.service as SessionRecordService;
       expect(service.delegate, same(services['p2']));
       expect(services.keys, ['p2']);
+    });
+
+    testWidgets('picking another partner keeps the first one\'s record state', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(personas: const [mother, father]),
+        records: (id) => NamedRecords('$id-record.txt'),
+      );
+      await openRecords(tester);
+      final first = tester.widget<RecordsPanel>(find.byType(RecordsPanel));
+      // An unsent transcript edit of the first partner.
+      first.controller.reviewDrafts['p1-record.txt'] = const RecordReviewDraft(
+        content: '합성 수정',
+      );
+
+      await openHomeAndPick(tester, '아빠');
+      await openRecords(tester);
+      expect(find.text('p2-record.txt'), findsOneWidget);
+
+      await openHomeAndPick(tester, '엄마');
+      await openRecords(tester);
+      final again = tester.widget<RecordsPanel>(find.byType(RecordsPanel));
+      expect(again.controller, same(first.controller));
+      expect(again.controller.reviewDrafts['p1-record.txt']?.content, '합성 수정');
+      // Still usable: a disposed controller refuses new listeners.
+      expect(() => again.controller.addListener(() {}), returnsNormally);
+    });
+
+    testWidgets('only the records tab loads the records list', (tester) async {
+      final services = <String?, NamedRecords>{};
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(personas: const [mother]),
+        records: (id) => services[id] = NamedRecords('$id-record.txt'),
+      );
+      for (final tab in ['설정', '대화', '홈']) {
+        await tester.tap(find.text(tab).last);
+        await tester.pumpAndSettle();
+      }
+      expect(services['p1']?.listCalls ?? 0, 0);
+
+      await openRecords(tester);
+      expect(services['p1']!.listCalls, 1);
+      expect(find.text('p1-record.txt'), findsOneWidget);
+    });
+
+    testWidgets('a partner made from the records tab gets its records listed', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        factory: () => FakePersonaService(),
+        records: (id) => NamedRecords('$id-record.txt'),
+      );
+      await openRecords(tester);
+      await tester.tap(find.text('프로필 만들기'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '엄마');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, '저장'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RecordsPanel), findsOneWidget);
+      expect(find.textContaining('-record.txt'), findsOneWidget);
     });
   });
 }
