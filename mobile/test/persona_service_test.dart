@@ -135,6 +135,23 @@ void main() {
       );
     });
 
+    test('a partner being deleted is not taken for the stored one', () async {
+      final (service, _) = await httpService((request) async {
+        if (request.method == 'POST') {
+          return jsonResponse({
+            'error': {'code': 'CONFLICT'},
+          }, 409);
+        }
+        return jsonResponse(personaJson('p-new', '엄마', status: 'deleting'));
+      });
+      await expectLater(
+        service.create('엄마', personaId: 'p-new'),
+        throwsA(
+          isA<BackendFailure>().having((e) => e.code, 'code', 'CONFLICT'),
+        ),
+      );
+    });
+
     test(
       'a partner an earlier attempt stored is returned under its name',
       () async {
@@ -249,6 +266,36 @@ void main() {
         (_) async => envelope(404, 'NOT_FOUND'),
       );
       await expectLater(service.styleProfile('gone'), notFound);
+    });
+
+    test('a 404 for a partner being deleted stays the server 404', () async {
+      // The server's own 404, not one reworded as "not provided".
+      final notFound = throwsA(
+        isA<BackendFailure>()
+            .having((e) => e.statusCode, 'statusCode', 404)
+            .having((e) => e.code, 'code', isNot(apiNotProvided)),
+      );
+      for (final answer in [plain(404), envelope(404, 'NOT_FOUND')]) {
+        final (service, requests) = await httpService((request) async {
+          if (request.method == 'GET' && request.url.path == '/personas/p1') {
+            return jsonResponse(personaJson('p1', '엄마', status: 'deleting'));
+          }
+          return answer;
+        });
+        await expectLater(
+          service.update('p1', PersonaUpdate(displayName: '엄마')),
+          notFound,
+        );
+        await expectLater(service.styleProfile('p1'), notFound);
+        await expectLater(
+          service.requestAnalysis('p1', operationId: 'op-1'),
+          notFound,
+        );
+        expect(
+          requests.map((r) => '${r.method} ${r.url.path}'),
+          contains('GET /personas/p1'),
+        );
+      }
     });
   });
 

@@ -212,9 +212,10 @@ class HttpPersonaService implements PersonaService {
   /// [apiNotProvided] when the backend does not serve it yet:
   /// - 405: the path exists for other methods (`GET /personas/{id}`), so
   ///   `PATCH` is simply not there.
-  /// - 404 while the partner itself is found: the contract answers 404 only
-  ///   for a missing partner, so the route is missing. Both the plain
-  ///   framework answer and the `NOT_FOUND` envelope look alike otherwise.
+  /// - 404 while the partner itself is found active: the contract answers 404
+  ///   only for a missing partner, so the route is missing. Both the plain
+  ///   framework answer and the `NOT_FOUND` envelope look alike otherwise. A
+  ///   partner being deleted counts as missing, so its 404 is passed on as is.
   Future<Object?> _proposed(
     String personaId,
     Future<Object?> Function() request,
@@ -237,13 +238,19 @@ class HttpPersonaService implements PersonaService {
     code: apiNotProvided,
   );
 
+  /// The active partner [id] (`GET /personas/{id}`), or null when it is not
+  /// found, not active, or the lookup fails. The contract serves only active
+  /// partners here; the status is checked as well, as [list] does, so a
+  /// partner being deleted is never taken for a stored or existing one.
   Future<Persona?> _find(String id) async {
     try {
       final json = await _api.request(
         'GET',
         '/personas/${Uri.encodeComponent(id)}',
-      );
-      return Persona.fromJson(json as Map<String, dynamic>);
+      ) as Map<String, dynamic>;
+      if (json['status'] != 'active') return null;
+      final persona = Persona.fromJson(json);
+      return persona.id == id ? persona : null;
     } catch (_) {
       return null;
     }
