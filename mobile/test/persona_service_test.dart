@@ -374,13 +374,48 @@ void main() {
   });
 
   group('MemoryPersonaService (dummy account data)', () {
-    test('create is idempotent per id and rejects a reused id', () async {
+    test('create is idempotent per id', () async {
       final service = MemoryPersonaService();
       final first = await service.create('엄마', personaId: 'a');
       expect(await service.create('엄마', personaId: 'a'), first);
       expect(await service.list(), hasLength(1));
-      await expectLater(service.create('다른', personaId: 'a'), throwsStateError);
     });
+
+    test(
+      'a reused id returns the stored partner under its earlier name',
+      () async {
+        // As the HTTP service does once the server refuses a second partner
+        // under the same id (PersonaService.create).
+        final service = MemoryPersonaService();
+        final first = await service.create('엄마', personaId: 'a');
+        final again = await service.create('다른', personaId: 'a');
+        expect(again, first);
+        expect(again.name, '엄마');
+        expect(await service.list(), [first]);
+      },
+    );
+
+    test(
+      'SC-13 gives a stored earlier attempt the new name as display name',
+      () async {
+        // The same chain the screen runs after an uncertain save: create under
+        // the kept id, then apply the typed name when the stored one differs.
+        final service = MemoryPersonaService();
+        await service.create('엄마', personaId: 'a');
+        final controller = PersonaController(service);
+        addTearDown(controller.dispose);
+        await controller.load();
+        final stored = await controller.create('어머니', personaId: 'a');
+        expect(stored.label, '엄마');
+        final renamed = await controller.update(
+          stored.id,
+          PersonaUpdate(displayName: '어머니'),
+        );
+        expect(renamed.label, '어머니');
+        expect(renamed.name, '엄마');
+        expect(controller.personas, [renamed]);
+      },
+    );
 
     test('the newest partner comes first', () async {
       final service = MemoryPersonaService(

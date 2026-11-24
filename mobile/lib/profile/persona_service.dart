@@ -52,13 +52,15 @@ class MemoryPersonaService implements PersonaService {
   @override
   Future<List<Persona>> list() => _run(() async => [..._personas]);
 
+  /// As [PersonaService.create] promises, and as [HttpPersonaService] does
+  /// after the server refuses a second partner under the same id: a partner
+  /// already stored under [personaId] is returned unchanged, even under the
+  /// earlier attempt's name. Nothing is stored twice.
   @override
   Future<Persona> create(String name, {required String personaId}) =>
       _run(() async {
         for (final persona in _personas) {
-          if (persona.id != personaId) continue;
-          if (persona.name == name) return persona;
-          throw StateError('Persona id already used');
+          if (persona.id == personaId) return persona;
         }
         final persona = Persona(id: personaId, name: name);
         _personas.insert(0, persona);
