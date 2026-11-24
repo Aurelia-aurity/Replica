@@ -437,11 +437,22 @@ def test_storage_failure_at_uploaded_is_503_and_the_record_stays_uploading(clien
     assert fake_db.records[record_id]["status"] == "uploading"
 
 
-@pytest.mark.parametrize("status", ["failed", "deleting"])
-def test_uploaded_is_409_for_failed_or_deleting_records(client, fake_db, persona, status):
+def test_uploaded_is_409_for_a_failed_record(client, fake_db, persona):
     record_id = reserved(client, persona)
-    fake_db.records[record_id]["status"] = status
-    assert client.post(f"/records/{record_id}/uploaded").status_code == 409
+    fake_db.records[record_id]["status"] = "failed"
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 409 and error(res)["code"] == "CONFLICT"
+
+
+def test_uploaded_is_404_for_a_record_being_deleted(client, fake_db, storage, persona):
+    # 삭제 중인 기록은 목록·상세처럼 없는 기록이다(실제 조회는 RLS가 숨겨 404). failed의 409와 구분한다.
+    record_id = reserved(client, persona, size_bytes=len(PLAIN))
+    put_file(storage, fake_db, record_id, PLAIN)
+    fake_db.records[record_id]["status"] = "deleting"
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 404 and error(res)["code"] == "NOT_FOUND"
+    assert fake_db.upload_updates == []  # 삭제 중인 기록은 상태를 바꾸지 않는다
+    assert client.post("/records", json=body(persona, record_id=record_id)).status_code == 404  # 재예약도 같다
 
 
 def test_uploaded_for_an_unknown_record_is_404(client):
@@ -741,3 +752,74 @@ def test_a_result_that_is_older_than_the_latest_selection_does_not_overwrite_it(
     assert res.status_code == 409  # 오래된 검증 결과로 덮어쓰지 않는다
     stored = fake_db.records[record_id]
     assert (stored["status"], stored["target_speaker"], stored["provider_speaker"]) == ("uploading", "나", "엄마")
+
+
+# --- 재예약: 원본이 이미 있으면 새 서명 주소 없이 200, 남은 화자 오류는 지움 (DB 담당 실측, #120) ---
+
+
+def test_rereserving_after_the_file_is_stored_returns_200_without_a_new_upload(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, size_bytes=len(KAKAO), record_id=new_id())
+    consent = fake_db.records[record_id]["consent_at"]
+    put_file(storage, fake_db, record_id, KAKAO)
+    first = client.post(f"/records/{record_id}/uploaded")
+    assert first.status_code == 422 and error(first)["code"] == "SPEAKER_REQUIRED"  # 화자 확인 대기(uploading + speaker_required)
+    assert fake_db.records[record_id]["error_code"] == "speaker_required"
+    calls_before = len(storage.upload_calls)
+
+    res = reserve(client, persona, record_id=record_id, size_bytes=len(KAKAO), consent_at=consent)
+    assert res.status_code == 200 and res.json()["upload"] is None  # Storage는 있는 객체의 서명 주소를 거절하므로 발급하지 않음
+    assert res.json()["status"] == "uploading" and res.json()["error_code"] is None  # 새 시도이므로 대기 사유를 지움
+    assert len(storage.upload_calls) == calls_before
+
+    # 같은 파일로 /uploaded에서 화자만 고치는 복구 경로가 그대로 이어진다.
+    done = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마", "provider_speaker": "나"})
+    assert done.status_code == 200 and done.json()["status"] == "uploaded"
+
+
+def test_a_first_reservation_always_returns_an_upload(client, fake_db, storage, persona):
+    res = reserve(client, persona)
+    assert res.status_code == 201 and res.json()["upload"]["method"] == "PUT"
+
+
+def test_rereserving_with_the_same_speakers_still_clears_the_pending_error(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, size_bytes=len(PLAIN), target_speaker="엄마", provider_speaker="나")
+    consent = fake_db.records[record_id]["consent_at"]
+    put_file(storage, fake_db, record_id, PLAIN)
+    assert client.post(f"/records/{record_id}/uploaded").status_code == 422
+    assert fake_db.records[record_id]["error_code"] == "speaker_not_allowed"
+    fake_db.upload_updates.clear()
+
+    res = reserve(client, persona, record_id=record_id, size_bytes=len(PLAIN), consent_at=consent,
+                  target_speaker="엄마", provider_speaker="나")  # 화자 값은 그대로
+    assert res.status_code == 200 and res.json()["error_code"] is None
+    assert fake_db.upload_updates == [{"status": "uploading", "error_code": None,
+                                       "speakers": {"target_speaker": "엄마", "provider_speaker": "나"}}]
+
+
+def test_rereserving_without_a_pending_error_or_speaker_change_writes_nothing(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, record_id=new_id())
+    consent = fake_db.records[record_id]["consent_at"]
+    res = reserve(client, persona, record_id=record_id, consent_at=consent)
+    assert res.status_code == 200 and res.json()["upload"] is not None  # 원본이 아직 없으면 새 서명 주소
+    assert fake_db.upload_updates == []
+
+
+def test_rereserving_with_a_stored_file_of_another_size_is_200_and_uploaded_reports_the_mismatch(
+        client, fake_db, storage, persona):
+    record_id = reserved(client, persona, size_bytes=len(PLAIN), record_id=new_id())
+    consent = fake_db.records[record_id]["consent_at"]
+    put_file(storage, fake_db, record_id, PLAIN[:-1])
+    res = reserve(client, persona, record_id=record_id, size_bytes=len(PLAIN), consent_at=consent)
+    assert res.status_code == 200 and res.json()["upload"] is None
+    mismatch = client.post(f"/records/{record_id}/uploaded")
+    assert mismatch.status_code == 409 and error(mismatch)["code"] == "UPLOAD_SIZE_MISMATCH"
+
+
+def test_storage_failure_while_checking_the_original_at_rereservation_is_503(client, fake_db, storage, persona):
+    record_id = reserved(client, persona, record_id=new_id())
+    consent = fake_db.records[record_id]["consent_at"]
+    storage.down = True
+    res = reserve(client, persona, record_id=record_id, consent_at=consent)
+    assert res.status_code == 503 and error(res)["code"] == "DB_UNAVAILABLE"
+    storage.down = False
+    assert reserve(client, persona, record_id=record_id, consent_at=consent).status_code == 200  # 다시 보내면 복구

@@ -68,7 +68,7 @@ class UploadOut(BaseModel):
 
 
 class RecordReserved(RecordOut):
-    upload: UploadOut
+    upload: UploadOut | None  # 원본이 이미 올라가 있는 재예약이면 None
 
 
 class RecordList(BaseModel):

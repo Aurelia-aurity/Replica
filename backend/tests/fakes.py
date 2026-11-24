@@ -253,7 +253,7 @@ class FakeUserDB:
 
     async def get_record(self, record_id):
         row = self.records.get(str(record_id))
-        if row is None:
+        if row is None or row["status"] == "deleting":  # 삭제 중인 기록은 RLS가 숨긴다
             raise db.NotFoundError(code="P0002")
         return dict(row)
 
@@ -400,6 +400,8 @@ class FakeStorage:
 
     async def create_upload(self, object_path, *, mime_type):
         self._check()
+        if object_path in self.files:  # Storage는 이미 있는 객체의 서명 주소 발급을 400 KeyAlreadyExists로 거절한다(#120 실측)
+            raise StorageUnavailable()
         self.upload_calls.append((object_path, mime_type))
         return SignedUpload(url=f"https://storage.test/sign/{object_path}?token=t{len(self.upload_calls)}",
                             headers={"Content-Type": mime_type},

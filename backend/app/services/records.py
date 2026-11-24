@@ -126,8 +126,19 @@ async def _issue_upload(storage: StorageClient, row: dict) -> SignedUpload:
         raise _storage_down() from None
 
 
-async def reserve(user_db: db.UserDatabase, storage: StorageClient, req: RecordCreate) -> tuple[dict, SignedUpload, bool]:
-    """(기록 행, 서명 업로드 정보, 새로 만들었는지). 같은 `record_id`·같은 본문의 재예약이면 새로 만들지 않는다."""
+async def _original_exists(storage: StorageClient, row: dict) -> bool:
+    try:
+        return await storage.object_size(row["object_path"]) is not None
+    except StorageUnavailable:
+        raise _storage_down() from None
+
+
+async def reserve(user_db: db.UserDatabase, storage: StorageClient, req: RecordCreate) -> tuple[dict, SignedUpload | None, bool]:
+    """(기록 행, 서명 업로드 정보, 새로 만들었는지). 같은 `record_id`·같은 본문의 재예약이면 새로 만들지 않는다.
+
+    재예약인데 원본이 이미 Storage에 있으면 서명 주소를 새로 발급하지 않고 `None`을 돌려준다. Storage는 이미 있는 객체의
+    서명 주소 발급을 거절하고(400 KeyAlreadyExists, #120 실측) 원본은 덮어쓸 수 없으므로, 앱은 올리지 않고 `/uploaded`를 부른다.
+    """
     limit = max_upload_bytes()
     if req.size_bytes > limit:
         raise AppError(413, "FILE_TOO_LARGE", f"파일이 너무 커요. 최대 {limit // (1024 * 1024)}MB까지 올릴 수 있어요.",
@@ -150,12 +161,15 @@ async def reserve(user_db: db.UserDatabase, storage: StorageClient, req: RecordC
         row = await user_db.get_record(req.record_id)
         if row.get("status") != "uploading" or not _same_reservation(row, req):
             raise AppError(409, "CONFLICT", CONFLICT_MESSAGE, retryable=False) from None
-        if (row.get("target_speaker"), row.get("provider_speaker")) != (target, provider):
-            # 재예약 요청의 화자 값이 새 값이다(생략하면 없음). 두 키를 모두 보내 이전 값을 확실히 바꾼다.
+        if (row.get("target_speaker"), row.get("provider_speaker")) != (target, provider) or row.get("error_code"):
+            # 재예약은 새 확인 시도다. 요청의 화자 값이 새 값이고(생략하면 없음), 남아 있던 `speaker_*` 오류도 지운다.
+            # 두 키를 모두 보내 이전 값을 확실히 바꾸고, 같은 화자로 다시 예약해도 오류는 지워진다.
             row = await user_db.update_record_upload(
                 req.record_id, expected_updated_at=_read_at(row), status="uploading",
                 speakers={"target_speaker": target, "provider_speaker": provider})
         created = False
+        if await _original_exists(storage, row):
+            return row, None, False
     return row, await _issue_upload(storage, row), created
 
 
@@ -174,6 +188,8 @@ async def _remember_speaker_state(user_db: db.UserDatabase, record: dict, code: 
 async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record_id, body: UploadedBody | None) -> dict:
     record = await user_db.get_record(record_id)
     status = record.get("status")
+    if status == "deleting":
+        raise db.NotFoundError()  # 삭제 중인 기록은 목록·상세처럼 없는 기록이다(실제 조회는 RLS가 숨겨 이미 404).
     if status in _PROCESSED:
         return record  # 응답을 받지 못해 다시 호출한 경우: 현재 기록을 그대로 돌려준다.
     if status != "uploading":

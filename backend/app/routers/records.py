@@ -36,8 +36,9 @@ async def reserve_record(
         response.status_code = 200  # 같은 record_id·같은 본문의 재예약: 기록은 그대로 두고 새 업로드 정보만 준다.
     return {
         **_public(row),
-        "upload": {"url": upload.url, "method": "PUT", "headers": dict(upload.headers),
-                   "expires_at": upload.expires_at},
+        # 원본이 이미 올라가 있는 재예약은 upload가 null이다(새 서명 주소를 발급할 수 없음). 앱은 /uploaded를 부른다.
+        "upload": None if upload is None else {
+            "url": upload.url, "method": "PUT", "headers": dict(upload.headers), "expires_at": upload.expires_at},
     }
 
 
