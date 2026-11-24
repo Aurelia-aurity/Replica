@@ -1,20 +1,29 @@
 -- First forward patch for #121. Existing rows keep NULL and existing callers may omit the new columns.
 begin;
 
+-- Match Python str.strip() including NBSP, full-width space and Unicode separators.
+create function replica_private.trim_input(p_value text) returns text
+language sql immutable strict security invoker set search_path = '' as $$
+  select btrim(p_value, U&'\0009\000A\000B\000C\000D\001C\001D\001E\001F\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000');
+$$;
+revoke all on function replica_private.trim_input(text) from public, anon, authenticated;
+grant usage on schema replica_private to service_role;
+grant execute on function replica_private.trim_input(text) to service_role;
+
 alter table public.personas
   add column display_name text,
   add column provider_address text,
   add constraint personas_display_name_valid check (
-    char_length(display_name) between 1 and 50 and display_name !~ '^[[:space:]]|[[:space:]]$'
+    char_length(display_name) between 1 and 50 and display_name = replica_private.trim_input(display_name)
   ),
   add constraint personas_provider_address_valid check (
-    char_length(provider_address) between 1 and 50 and provider_address !~ '^[[:space:]]|[[:space:]]$'
+    char_length(provider_address) between 1 and 50 and provider_address = replica_private.trim_input(provider_address)
   );
 
 alter table public.records
   add column provider_speaker text,
   add constraint records_provider_speaker_valid check (
-    char_length(provider_speaker) between 1 and 100 and provider_speaker !~ '^[[:space:]]|[[:space:]]$'
+    char_length(provider_speaker) between 1 and 100 and provider_speaker = replica_private.trim_input(provider_speaker)
   );
 
 -- The backend supplies a verified owner ID. An omitted key preserves its value; JSON null clears it.
@@ -41,7 +50,7 @@ begin
       raise exception 'Invalid address patch field' using errcode = '22023';
     end if;
 
-    v_value := regexp_replace(p_fields ->> v_field, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+    v_value := replica_private.trim_input(p_fields ->> v_field);
     if v_value is not null and char_length(v_value) not between 1 and 50 then
       raise exception 'Address must contain 1 to 50 characters' using errcode = '22023';
     end if;
@@ -125,7 +134,7 @@ begin
     then
       raise exception 'Invalid speaker patch field' using errcode = '22023';
     end if;
-    v_value := regexp_replace(p_speakers ->> v_field, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+    v_value := replica_private.trim_input(p_speakers ->> v_field);
     if v_field = 'target_speaker' then
       v_target := v_value;
     else
@@ -133,8 +142,8 @@ begin
     end if;
   end loop;
 
-  v_target := regexp_replace(v_target, '^[[:space:]]+|[[:space:]]+$', '', 'g');
-  v_provider := regexp_replace(v_provider, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+  v_target := replica_private.trim_input(v_target);
+  v_provider := replica_private.trim_input(v_provider);
   if (v_target is not null and char_length(v_target) not between 1 and 100) or
     (v_provider is not null and char_length(v_provider) not between 1 and 100)
   then

@@ -44,6 +44,15 @@ begin
     or saved.name is distinct from 'Legacy persona name is preserved' or saved.data_revision is distinct from 7
   then raise exception 'Explicit null, original name or data revision changed unexpectedly'; end if;
 
+  saved := public.update_persona_addresses(u, p, '{"display_name":null}');
+  if saved.display_name is not null or saved.provider_address is not null
+    or saved.name is distinct from 'Legacy persona name is preserved' or saved.data_revision <> 7
+  then raise exception 'Clearing a display name changed another field'; end if;
+  saved := public.update_persona_addresses(u, p,
+    jsonb_build_object('display_name', U&'\00A0' || repeat('가', 50) || U&'\3000'));
+  if saved.display_name is distinct from repeat('가', 50)
+  then raise exception 'Unicode address whitespace differs from Python strip'; end if;
+
   foreach patch in array array[
     null::jsonb, 'null'::jsonb, '[]'::jsonb, '{}'::jsonb, '{"name":"bad"}'::jsonb,
     '{"display_name":4}'::jsonb, '{"provider_address":" \t\n "}'::jsonb,
@@ -99,6 +108,23 @@ begin
   select * into strict saved from public.records where id = r;
   select data_revision into source_revision from public.personas where id = p;
   previous_time := saved.updated_at;
+  saved := public.update_record_upload(u, r, saved.updated_at, 'uploading',
+    jsonb_build_object('target_speaker', U&'\3000' || '대상😀' || U&'\00A0',
+      'provider_speaker', U&'\00A0' || repeat('🙂', 100) || U&'\3000'), null);
+  if saved.target_speaker is distinct from '대상😀' or saved.provider_speaker is distinct from repeat('🙂', 100)
+  then raise exception 'Unicode speaker boundary or trim failed'; end if;
+  begin
+    perform public.update_record_upload(u, r, saved.updated_at, 'uploading',
+      jsonb_build_object('provider_speaker', repeat('🙂', 101)), null);
+    raise exception 'An oversized provider passed the RPC';
+  exception when sqlstate '22023' then null;
+  end;
+  begin
+    perform public.update_record_upload(u, r, saved.updated_at, 'uploading',
+      jsonb_build_object('provider_speaker', U&'\00A0' || '대상😀' || U&'\3000'), null);
+    raise exception 'A duplicate speaker after Unicode trim passed';
+  exception when sqlstate '22023' then null;
+  end;
   saved := public.update_record_upload(u, r, saved.updated_at, 'uploading',
     '{"target_speaker":"  Target  ","provider_speaker":"\tProvider\n"}', null);
   if saved.target_speaker is distinct from 'Target' or saved.provider_speaker is distinct from 'Provider'
