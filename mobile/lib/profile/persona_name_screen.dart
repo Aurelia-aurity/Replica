@@ -54,6 +54,11 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
   // partner with it, and the stored one is found instead.
   String _requestId = newPersonaId();
 
+  /// The failure notice this screen is showing. Its "다시 시도" saves on this
+  /// screen, so it must not outlive it: the notice lives in the app-wide
+  /// [ScaffoldMessenger] and would otherwise stay on the screen below.
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _failureNotice;
+
   bool get _isEdit => widget.editing != null;
   String? get _name => normalizePersonaName(_text.text);
   bool get _canSave => !_saving && _name != null;
@@ -64,10 +69,21 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     super.dispose();
   }
 
-  void _cancel() {
+  /// Takes the failure notice down, if one is up. Only this screen's own
+  /// notice: any other one (such as the previous screen's) stays as it is.
+  void _hideFailureNotice() {
+    if (_failureNotice == null) return;
+    _failureNotice = null;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    Navigator.of(context).pop();
   }
+
+  /// However the screen is left (cancel, the app bar's back button, the
+  /// system back gesture, or a save), the failure notice goes with it.
+  void _popped(bool didPop, Object? result) {
+    if (didPop) _hideFailureNotice();
+  }
+
+  void _cancel() => Navigator.of(context).pop();
 
   String _failureText(Object error) => switch (error) {
     BackendFailure(code: apiNotProvided) =>
@@ -101,7 +117,6 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
     final editing = widget.editing;
     // Same name: nothing to send, just go back.
     if (editing != null && name == editing.label) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       Navigator.of(context).pop(editing);
       return;
     }
@@ -118,6 +133,9 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         saved = await _create(name);
       }
       if (!mounted) return;
+      // Clear the way for the notice below, as before; the pop that follows
+      // then has no failure notice left to take down.
+      _failureNotice = null;
       final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
       if (saved.label != name) {
         // Stored by an earlier attempt under its name, and the new name could
@@ -138,27 +156,30 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
         _requestId = newPersonaId();
       }
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            // Lifted above the button row so the failed name can be fixed and
-            // saved again while the notice is still visible. The row sits above
-            // the bottom safe area, so the notice has to clear it as well.
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.fromLTRB(
-              16,
-              0,
-              16,
-              _noticeLift + MediaQuery.paddingOf(context).bottom,
-            ),
-            content: Text(_failureText(error)),
-            // A retry cannot help while the server lacks the API.
-            action: error is BackendFailure && error.code == apiNotProvided
-                ? null
-                : SnackBarAction(label: '다시 시도', onPressed: _save),
+      final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+      final notice = _failureNotice = messenger.showSnackBar(
+        SnackBar(
+          // Lifted above the button row so the failed name can be fixed and
+          // saved again while the notice is still visible. The row sits above
+          // the bottom safe area, so the notice has to clear it as well.
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            _noticeLift + MediaQuery.paddingOf(context).bottom,
           ),
-        );
+          content: Text(_failureText(error)),
+          // A retry cannot help while the server lacks the API.
+          action: error is BackendFailure && error.code == apiNotProvided
+              ? null
+              : SnackBarAction(label: '다시 시도', onPressed: _save),
+        ),
+      );
+      // Timed out or dismissed: nothing left to take down.
+      notice.closed.then((_) {
+        if (identical(_failureNotice, notice)) _failureNotice = null;
+      });
     }
   }
 
@@ -166,6 +187,7 @@ class _PersonaNameScreenState extends State<PersonaNameScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_saving,
+      onPopInvokedWithResult: _popped,
       child: Scaffold(
         backgroundColor: replicaBackground,
         appBar: AppBar(

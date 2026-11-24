@@ -350,6 +350,46 @@ void main() {
     expect(service.created, isEmpty);
   });
 
+  for (final leave in <String, Future<void> Function(WidgetTester)>{
+    'cancel': (tester) => tester.tap(find.text('취소')),
+    'the app bar back button': (tester) => tester.pageBack(),
+    'the system back gesture': (tester) => tester.binding.handlePopRoute(),
+  }.entries) {
+    testWidgets('leaving by ${leave.key} takes the failure notice along', (
+      tester,
+    ) async {
+      final service = FakePersonaService()..createError = StateError('offline');
+      final opened = await openName(tester, newController(service));
+      await tester.enterText(find.byType(TextField), '엄마');
+      await tester.pump();
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('저장하지 못했어요'), findsOneWidget);
+
+      await leave.value(tester);
+      await tester.pumpAndSettle();
+      expect(opened.returned, true);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      // No notice is left behind whose retry would save nowhere.
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text('다시 시도'), findsNothing);
+      expect(service.created, hasLength(1));
+    });
+  }
+
+  testWidgets('leaving keeps a notice the screen did not show itself', (
+    tester,
+  ) async {
+    await openName(tester, newController(FakePersonaService()));
+    final context = tester.element(find.byType(PersonaNameScreen));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('앞 화면의 알림')));
+    await tester.pump();
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+    expect(find.text('앞 화면의 알림'), findsOneWidget);
+  });
+
   testWidgets('saving blocks duplicate requests and leaving the screen', (
     tester,
   ) async {
