@@ -50,6 +50,12 @@ begin
  range1:=jsonb_build_array(jsonb_build_object('unit_id',s.manifest->0->>'id','start',0,'end',5));
  range2:=jsonb_build_array(jsonb_build_object('unit_id',s.manifest->1->>'id','start',0,'end',4));
  a:=public.start_profile_analysis(u,s.id,op_old,deadline,runtime);
+ begin
+   update public.profile_analysis_attempts set deadline=clock_timestamp()-interval '1 second' where operation_id=op_old;
+   if public.get_record_reflection(u,r)<>'failed' then raise exception 'Expired analysis remained pending'; end if;
+   raise exception 'Restore deadline fixture' using errcode='P1299';
+ exception when sqlstate 'P1299' then null;
+ end;
  perform public.start_profile_analysis_node(u,op_old,a.attempt,leaf1,request1,'analyze',range1,'{}');
  a:=public.start_profile_analysis(u,s.id,op,deadline,runtime);
  if a.attempt<>2 then raise exception 'Analysis attempt did not advance'; end if;
@@ -277,6 +283,13 @@ begin
  exception when sqlstate '55000' then null;
  end;
  update public.records set status='deleting' where id=r;
+ select source_stamp into old_stamp from public.personas where id=p;
+ perform public.advance_personalization_source(u,p,old_stamp);
+ begin
+   perform public.advance_personalization_source(u,p,old_stamp);
+   raise exception 'Policy invalidation accepted an old source stamp';
+ exception when sqlstate '55000' then null;
+ end;
 end $$;
 
 set local role authenticated;

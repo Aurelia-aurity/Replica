@@ -42,6 +42,7 @@ try {
   await db.exec(await sql("record_metadata.sql"));
   phase = "lifecycle patch";
   await db.exec(await sql("20261124043921_personalization_lifecycle.sql"));
+  await db.exec(await sql("20261124050058_personalization_lifecycle_followup.sql"));
   phase = "rollback lifecycle verification";
   await db.exec(await sql("verify_personalization_lifecycle.sql"));
   assert.equal((await db.query("select count(*)::int as n from auth.users")).rows[0].n,0);
