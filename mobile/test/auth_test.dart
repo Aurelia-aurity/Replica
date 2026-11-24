@@ -218,7 +218,11 @@ void main() {
       await tester.tap(find.byTooltip('계정'));
       await tester.pumpAndSettle();
       expect(find.text('preview.a@example.com'), findsOneWidget);
+      await tester.ensureVisible(find.text('로그아웃'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('로그아웃'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, '로그아웃'));
       await tester.pumpAndSettle();
       expect(auth.identity, isNull);
       expect(find.text('preview.a@example.com'), findsNothing);

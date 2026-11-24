@@ -16,6 +16,7 @@ import 'package:mobile/records/record_models.dart';
 import 'package:mobile/records/record_review.dart';
 import 'package:mobile/records/records_panel.dart';
 import 'package:mobile/records/deletion_sheet.dart';
+import 'package:mobile/settings/settings_screen.dart';
 
 import 'records_test.dart' show ApiTestAuth, Transfer;
 import 'record_review_test.dart' show ReviewFixture;
@@ -24,6 +25,27 @@ import 'record_review_test.dart' show ReviewFixture;
 PersonaService withPartner() => MemoryPersonaService(
   personas: const [Persona(id: 'p1', name: '엄마')],
 );
+
+/// Opens SC-12 from the home account button and taps its account deletion row.
+Future<void> openAccountDeletion(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('계정'));
+  await tester.pumpAndSettle();
+  final row = find.text('계정 삭제');
+  await tester.scrollUntilVisible(
+    row,
+    180,
+    scrollable: find
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.ensureVisible(row);
+  await tester.pumpAndSettle();
+  await tester.tap(row);
+  await tester.pumpAndSettle();
+}
 
 /// Signed-in account that is not a preview login, without any network access.
 class _RealAccountAuth extends PreviewAuthService {
@@ -243,10 +265,7 @@ void main() {
         ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('계정'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('계정 삭제'));
-      await tester.pumpAndSettle();
+      await openAccountDeletion(tester);
       // Deleting needs an explicit acknowledgement first.
       expect(
         tester
@@ -280,10 +299,7 @@ void main() {
         ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('계정'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('계정 삭제'));
-      await tester.pumpAndSettle();
+      await openAccountDeletion(tester);
       await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
@@ -310,10 +326,7 @@ void main() {
       ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('계정'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('계정 삭제'));
-    await tester.pumpAndSettle();
+    await openAccountDeletion(tester);
     await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('delete-confirm')));
@@ -339,10 +352,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('계정'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('계정 삭제'));
-      await tester.pumpAndSettle();
+      await openAccountDeletion(tester);
       await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
@@ -374,10 +384,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('계정'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('계정 삭제'));
-      await tester.pumpAndSettle();
+      await openAccountDeletion(tester);
       await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
@@ -421,10 +428,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('계정'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('계정 삭제'));
-      await tester.pumpAndSettle();
+      await openAccountDeletion(tester);
       await tester.tap(find.byKey(const ValueKey('account-delete-understood')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
@@ -465,13 +469,9 @@ void main() {
       ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('계정'));
-    await tester.pumpAndSettle();
-    final button = find.widgetWithText(TextButton, '계정 삭제');
-    expect(button, findsOneWidget);
-    expect(tester.widget<TextButton>(button).onPressed, isNull);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
+    await openAccountDeletion(tester);
+    // SC-12 only explains that deletion is unavailable; nothing is sent.
+    expect(find.text('계정 삭제는 아직 지원하지 않아요'), findsOneWidget);
     expect(find.text('계정과 모든 자료를 삭제할까요?'), findsNothing);
     expect(service.requests, 0);
     expect(auth.identity, isNotNull);

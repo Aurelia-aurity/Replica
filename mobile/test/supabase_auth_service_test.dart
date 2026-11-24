@@ -60,6 +60,7 @@ void main() {
     });
     await auth.signIn('synthetic@example.com', 'Example123!');
     expect(auth.identity!.id, userId);
+    expect(auth.identity!.createdAt, DateTime.utc(2026, 10, 9));
     expect(jsonDecode(requests.first.body)['email'], 'synthetic@example.com');
     expect(requests.first.url.queryParameters['grant_type'], 'password');
     expect(

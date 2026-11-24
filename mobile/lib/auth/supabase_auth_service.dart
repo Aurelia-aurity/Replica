@@ -40,7 +40,11 @@ class SupabaseAuthService extends AuthService {
     updateIdentity(
       session == null
           ? null
-          : AuthIdentity(id: session.user.id, email: session.user.email ?? ''),
+          : AuthIdentity(
+              id: session.user.id,
+              email: session.user.email ?? '',
+              createdAt: DateTime.tryParse(session.user.createdAt),
+            ),
       expiresAt: session?.expiresAt == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(session!.expiresAt! * 1000),

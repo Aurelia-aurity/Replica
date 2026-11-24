@@ -184,8 +184,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                 history: _conversationService(),
                 personas: _personaController(),
                 accountEmail: widget.auth.identity!.email,
-                onSignOut: () =>
-                    unawaited(widget.auth.signOut().catchError((Object _) {})),
+                accountCreatedAt: widget.auth.identity!.createdAt,
+                onSignOut: widget.auth.signOut,
                 onExpireSession: widget.auth is PreviewAuthService
                     ? (widget.auth as PreviewAuthService).expireSession
                     : null,
