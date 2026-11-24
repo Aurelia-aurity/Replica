@@ -146,7 +146,14 @@ class HttpPersonaService implements PersonaService {
         '/personas',
         body: {'name': name, 'persona_id': personaId},
       );
-      return Persona.fromJson(json as Map<String, dynamic>);
+      final persona = Persona.fromJson(json as Map<String, dynamic>);
+      // An answer about another partner is not this save's answer. Taking it
+      // would select that partner, and SC-13 would then rename it. Like any
+      // unusable answer it leaves the save uncertain: the id is looked up.
+      if (persona.id != personaId) {
+        throw const FormatException('Wrong persona');
+      }
+      return persona;
     } catch (error) {
       if (isDefiniteRejection(error)) rethrow;
       // The write may have succeeded before the answer was lost (timeout,

@@ -135,6 +135,39 @@ void main() {
       );
     });
 
+    test('an answer about another partner is not taken as saved', () async {
+      final (service, requests) = await httpService((request) async {
+        if (request.method == 'POST') {
+          return jsonResponse(personaJson('other', '아빠'), 201);
+        }
+        return jsonResponse({'detail': 'Not Found'}, 404);
+      });
+      await expectLater(
+        service.create('엄마', personaId: 'p-new'),
+        throwsFormatException,
+      );
+      // Uncertain like any unusable answer, so the app's id was looked up.
+      expect(requests.map((r) => '${r.method} ${r.url.path}'), [
+        'POST /personas',
+        'GET /personas/p-new',
+      ]);
+    });
+
+    test(
+      'after an answer about another partner the stored one is found',
+      () async {
+        final (service, _) = await httpService((request) async {
+          if (request.method == 'POST') {
+            return jsonResponse(personaJson('other', '아빠'), 201);
+          }
+          return jsonResponse(personaJson('p-new', '엄마'));
+        });
+        final persona = await service.create('엄마', personaId: 'p-new');
+        expect(persona.id, 'p-new');
+        expect(persona.name, '엄마');
+      },
+    );
+
     test('a partner being deleted is not taken for the stored one', () async {
       final (service, _) = await httpService((request) async {
         if (request.method == 'POST') {
