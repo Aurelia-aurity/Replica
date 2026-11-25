@@ -33,4 +33,4 @@ and separate run authorization. Do not use double timings as performance evidenc
 
 `analyze_timing.py <결과 디렉터리>`는 phase·arm·근거 수·제공 동시성·HTTP 상태별로 새 지표의 n·p50·p95·최댓값과 TTFT 누락 수를 계산합니다. 표본이 없으면 null이며 percentile은 nearest-rank 방식입니다. `first_unforced_token_ns`는 요청 시작 기준 ns, 나머지 첫 토큰 시간은 ms, 구간 시간은 ns입니다. 기존 `measure_local.py --rounds 1`은 28개 loopback 요청을 실행하며 서버 로그를 결합하지 않아 클라이언트의 TTFT는 계속 미관측으로 표시합니다.
 
-이 확장은 아직 동결하지 않았습니다. job 55389의 v1 기준·manifest·원시 결과는 그대로 보존하며 새 필드로 과거 값을 추정하지 않습니다. 실모델 실행 전에는 새 protocol ID와 source manifest를 검토·동결하고 별도 실행 승인을 받아야 합니다. doubles 시간으로 GPU 성능이나 STT-to-playback 완료를 주장하지 않습니다.
+이 확장의 실모델 측정은 job 55817(`f2255580`)에서 수행했으며 결과는 `experiments/results/2026-11-14-issue96-warmup-timing/README.md`에 정리했습니다. job 55389의 v1 기준·manifest·원시 결과는 그대로 보존하며 새 필드로 과거 값을 추정하지 않습니다. doubles 시간으로 GPU 성능이나 STT-to-playback 완료를 주장하지 않습니다.
