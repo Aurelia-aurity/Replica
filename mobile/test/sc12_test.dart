@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/auth/auth_service.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
+import 'package:mobile/profile/persona_models.dart';
+import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/settings/settings_screen.dart';
 
 /// Mirrors SupabaseAuthService.signOut: the local identity is cleared before
@@ -63,7 +65,15 @@ void main() {
         PreviewAuthService.emails.first,
         PreviewAuthService.password,
       );
-      await tester.pumpWidget(ReplicaApp(authService: auth));
+      await tester.pumpWidget(
+        ReplicaApp(
+          authService: auth,
+          // Starting a chat from home needs a partner.
+          personaServiceFactory: () => MemoryPersonaService(
+            personas: const [Persona(id: 'p1', name: '엄마')],
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('계정'));
       await tester.pumpAndSettle();

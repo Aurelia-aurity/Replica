@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
+import 'package:mobile/profile/persona_models.dart';
+import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/http_record_transport.dart';
 import 'package:mobile/records/record_controller.dart';
@@ -296,7 +298,11 @@ void main() {
         await tester.pumpWidget(
           ReplicaApp(
             authService: auth,
-            recordServiceFactory: () =>
+            // Records belong to a partner, so the records tab needs one.
+            personaServiceFactory: () => MemoryPersonaService(
+              personas: const [Persona(id: 'p1', name: '엄마')],
+            ),
+            recordServiceFactory: (_) =>
                 services++ == 0 ? service : PreviewRecordService(),
           ),
         );

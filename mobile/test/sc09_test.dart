@@ -77,7 +77,11 @@ Future<void> openAndSend(
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: ChatScreen(service: service, audioPlayer: player),
+      home: ChatScreen(
+        service: service,
+        conversationName: '합성 상대',
+        audioPlayer: player,
+      ),
     ),
   );
   await tester.enterText(find.byType(TextField), '합성 질문');
@@ -261,6 +265,7 @@ void main() {
       MaterialApp(
         home: ChatScreen(
           service: service,
+          conversationName: '합성 상대',
           audioPlayer: player,
           initialMessages: const [
             (text: '지난 질문', isUser: true),

@@ -8,6 +8,10 @@ enum BackendFailureKind {
   generic,
 }
 
+/// App-only failure code (the server never sends it): the backend does not
+/// serve this API yet, such as the PR #117 proposals. Not worth retrying.
+const apiNotProvided = 'API_NOT_PROVIDED';
+
 /// Frontend error contract; no HTTP client or server implementation here.
 class BackendFailure implements Exception {
   const BackendFailure(
@@ -15,6 +19,7 @@ class BackendFailure implements Exception {
     this.code,
     this.retryable = false,
     this.stage,
+    this.statusCode,
   });
   const BackendFailure.unauthenticated()
     : this(BackendFailureKind.unauthenticated, code: 'UNAUTHENTICATED');
@@ -22,6 +27,11 @@ class BackendFailure implements Exception {
   final String? code;
   final bool retryable;
   final String? stage;
+
+  /// HTTP status of the answer this failure came from; null when there was
+  /// no answer. Lets an adapter tell a route the server lacks (404/405 with no
+  /// envelope) from a refusal.
+  final int? statusCode;
 
   bool get canRetry =>
       kind == BackendFailureKind.network ||
@@ -48,6 +58,7 @@ class BackendFailure implements Exception {
     'CONFLICT' || 'TURN_ID_CONFLICT' => '이미 처리 중이거나 상태가 바뀌었어요. 이력을 새로고침해 주세요.',
     'NOT_FOUND' => '대화나 대화 상대를 찾을 수 없어요.',
     'NO_PERSONA' => '대화할 상대가 없어요.',
+    apiNotProvided => '아직 준비 중인 기능이에요.',
     'INTERNAL_ERROR' => '서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     'UNAUTHENTICATED' => '로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.',
     _ =>
@@ -75,6 +86,7 @@ class BackendFailure implements Exception {
       stage: error is Map && ['stt', 'llm', 'tts'].contains(error['stage'])
           ? error['stage'] as String
           : null,
+      statusCode: statusCode,
     );
   }
 }

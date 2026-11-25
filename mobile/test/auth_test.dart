@@ -8,6 +8,8 @@ import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/chat/chat_service.dart';
 import 'package:mobile/main.dart';
 
+import 'persona_test_support.dart';
+
 class PendingChat implements ChatService {
   final pending = Completer<String>();
   @override
@@ -41,6 +43,9 @@ Future<void> login(
 }
 
 Future<void> openChat(WidgetTester tester) async {
+  if (find.text('프로필 만들기').evaluate().isNotEmpty) {
+    await nameFirstPartner(tester);
+  }
   await tester.tap(find.text('텍스트로 대화'));
   await tester.pumpAndSettle();
   await tester.tap(find.byType(Checkbox));
@@ -273,6 +278,7 @@ void main() {
     addTearDown(auth.dispose);
     await tester.pumpWidget(ReplicaApp(authService: auth));
     await login(tester);
+    await nameFirstPartner(tester);
     await tester.tap(find.text('텍스트로 대화'));
     await tester.pumpAndSettle();
     auth.expireSession();

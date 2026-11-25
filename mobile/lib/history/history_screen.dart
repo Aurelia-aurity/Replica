@@ -4,20 +4,26 @@ import 'package:flutter/material.dart';
 
 import '../chat/ai_disclosure_sheet.dart';
 import '../chat/chat_screen.dart';
+import '../profile/persona_models.dart';
 import '../shared/conversation_widgets.dart';
 import 'conversation.dart';
 import 'conversation_service.dart';
 
+/// [conversationName] is the partner name set in SC-13 ([conversationTitle]).
+/// There is no stand-in title: a conversation is only opened once its partner
+/// has a name.
 Future<void> openConversation(
   BuildContext context,
   ConversationService service,
   Conversation conversation, {
   bool? voice,
+  required String conversationName,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
     builder: (_) => _ConversationRoute(
       service: service,
       conversation: conversation,
+      conversationName: conversationName,
       voice: voice ?? conversation.lastVoice,
     ),
   ),
@@ -27,11 +33,13 @@ class _ConversationRoute extends StatefulWidget {
   const _ConversationRoute({
     required this.service,
     required this.conversation,
+    required this.conversationName,
     required this.voice,
   });
 
   final ConversationService service;
   final Conversation conversation;
+  final String conversationName;
   final bool voice;
 
   @override
@@ -84,8 +92,9 @@ class _ConversationRouteState extends State<_ConversationRoute> {
       // When the pending request finishes, display the newly fetched turns.
       key: ObjectKey(conversation),
       service: _chat,
-      conversationName:
-          conversation.personaName ?? (widget.service.isDemo ? '엄마' : '대화 상대'),
+      // Chosen when the conversation was opened from the partners the app
+      // holds, so a renamed partner keeps its new name after a refresh.
+      conversationName: widget.conversationName,
       initialVoiceMode: widget.voice,
       acknowledgedAt: conversation.acknowledgedAt,
       initialMessages: conversation.messages,
@@ -100,11 +109,32 @@ class _ConversationRouteState extends State<_ConversationRoute> {
   }
 }
 
+/// Shown when a conversation is attempted without a named partner. The home
+/// card says what to do (create the profile, or retry loading it).
+const partnerMissingNotice = '대화 상대를 확인할 수 없어요. 홈에서 대화 상대를 확인해 주세요.';
+
+/// Title for [conversation]: the current name of its partner among
+/// [partners] (the ones the app holds, updated by SC-13 at once), else the
+/// name the conversation service reported. The service's name can be older
+/// than a rename, so it is only used for a partner the app does not hold.
+/// Null when neither is known; the conversation is then not opened.
+String? conversationTitle(
+  Conversation conversation,
+  Iterable<Persona> partners,
+) {
+  for (final partner in partners) {
+    if (partner.id == conversation.personaId) return partner.label;
+  }
+  return conversation.personaName;
+}
+
+/// Starts a conversation with [persona] (the partner picked on the home card)
+/// after the AI notice, then opens it.
 Future<void> startConversation(
   BuildContext context,
   ConversationService service, {
   bool voice = false,
-  ConversationPersona? persona,
+  required Persona persona,
 }) async {
   final acknowledgedAt = await showAiDisclosure(
     context,
@@ -114,7 +144,7 @@ Future<void> startConversation(
   final personaService = service is PersonaConversationService
       ? service as PersonaConversationService
       : null;
-  final conversation = persona != null && personaService != null
+  final conversation = personaService != null
       ? await personaService.createForPersona(
           persona.id,
           acknowledgedAt,
@@ -122,7 +152,13 @@ Future<void> startConversation(
         )
       : await service.create(acknowledgedAt, voice: voice);
   if (!context.mounted) return;
-  await openConversation(context, service, conversation, voice: voice);
+  await openConversation(
+    context,
+    service,
+    conversation,
+    voice: voice,
+    conversationName: persona.label,
+  );
 }
 
 class HistoryScreen extends StatefulWidget {
@@ -131,10 +167,19 @@ class HistoryScreen extends StatefulWidget {
     required this.service,
     this.bottomNavigationBar,
     this.selectedPersona,
+    this.partners = const [],
   });
   final ConversationService service;
   final Widget? bottomNavigationBar;
-  final ConversationPersona? selectedPersona;
+
+  /// Partner picked on the home card. New conversations are started with it.
+  /// Null while there is no partner (or it is not loaded): nothing can be
+  /// started then.
+  final Persona? selectedPersona;
+
+  /// Every partner the app holds, for conversation titles. Without them only
+  /// [selectedPersona] is known.
+  final List<Persona> partners;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
@@ -188,6 +233,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _start() async {
     if (_starting || _opening != null) return;
+    final persona = widget.selectedPersona;
+    if (persona == null) {
+      _notice(partnerMissingNotice);
+      return;
+    }
     setState(() => _starting = true);
     try {
       final voice = await showModalBottomSheet<bool>(
@@ -234,7 +284,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         context,
         widget.service,
         voice: voice,
-        persona: widget.selectedPersona,
+        persona: persona,
       );
       if (mounted) await _load();
     } catch (_) {
@@ -250,7 +300,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final latest = await widget.service.get(item.id);
       if (!mounted) return;
-      await openConversation(context, widget.service, latest);
+      final selected = widget.selectedPersona;
+      final name = conversationTitle(
+        latest,
+        widget.partners.isNotEmpty
+            ? widget.partners
+            : [?selected],
+      );
+      if (name == null) {
+        _notice(partnerMissingNotice);
+        return;
+      }
+      await openConversation(
+        context,
+        widget.service,
+        latest,
+        conversationName: name,
+      );
       if (mounted) await _load();
     } catch (_) {
       if (mounted) _notice('대화를 불러오지 못했어요.', retry: () => _open(item));

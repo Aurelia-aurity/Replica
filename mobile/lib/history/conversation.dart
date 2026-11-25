@@ -2,6 +2,8 @@ import 'dart:math';
 
 import '../chat/chat_reply.dart';
 
+/// The partner of a conversation as the conversation screens need it. [name]
+/// is the name to show (the display name when one is set).
 class ConversationPersona {
   const ConversationPersona({
     required this.id,
@@ -23,7 +25,18 @@ class ConversationPersona {
         !['active', 'deleting'].contains(status)) {
       throw const FormatException('Invalid persona');
     }
-    return ConversationPersona(id: id, name: name.trim(), status: status);
+    // The name shown for the partner: the user's display name (PR #117,
+    // proposal) when set, otherwise the name given at creation.
+    final displayName = json['display_name'];
+    if (displayName != null && displayName is! String) {
+      throw const FormatException('Invalid persona');
+    }
+    final label = (displayName as String?)?.trim() ?? '';
+    return ConversationPersona(
+      id: id,
+      name: label.isEmpty ? name.trim() : label,
+      status: status,
+    );
   }
 }
 

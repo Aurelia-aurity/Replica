@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
+import 'package:mobile/profile/persona_models.dart';
+import 'package:mobile/profile/persona_service.dart';
 import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_deletion.dart';
@@ -18,6 +20,11 @@ import 'package:mobile/settings/settings_screen.dart';
 
 import 'records_test.dart' show ApiTestAuth, Transfer;
 import 'record_review_test.dart' show ReviewFixture;
+
+/// Records belong to a partner, so the records tab needs one.
+PersonaService withPartner() => MemoryPersonaService(
+  personas: const [Persona(id: 'p1', name: '엄마')],
+);
 
 /// Opens SC-12 from the home account button and taps its account deletion row.
 Future<void> openAccountDeletion(WidgetTester tester) async {
@@ -255,7 +262,7 @@ void main() {
       await auth.signIn('preview.a@example.com', PreviewAuthService.password);
       final service = DeletionFixture()..fail = false;
       await tester.pumpWidget(
-        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+        ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
       );
       await tester.pumpAndSettle();
       await openAccountDeletion(tester);
@@ -289,7 +296,7 @@ void main() {
       await auth.signIn('preview.a@example.com', PreviewAuthService.password);
       final service = DeletionFixture()..fail = false;
       await tester.pumpWidget(
-        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+        ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
       );
       await tester.pumpAndSettle();
       await openAccountDeletion(tester);
@@ -316,7 +323,7 @@ void main() {
     await auth.signIn('preview.a@example.com', PreviewAuthService.password);
     final service = DeletionFixture()..fail = false;
     await tester.pumpWidget(
-      ReplicaApp(authService: auth, recordServiceFactory: () => service),
+      ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
     );
     await tester.pumpAndSettle();
     await openAccountDeletion(tester);
@@ -338,7 +345,11 @@ void main() {
       await auth.signIn('preview.a@example.com', PreviewAuthService.password);
       final service = DeletionFixture()..fail = false;
       await tester.pumpWidget(
-        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+        ReplicaApp(
+          authService: auth,
+          personaServiceFactory: withPartner,
+          recordServiceFactory: (_) => service,
+        ),
       );
       await tester.pumpAndSettle();
       await openAccountDeletion(tester);
@@ -366,7 +377,11 @@ void main() {
       await auth.signIn('preview.a@example.com', PreviewAuthService.password);
       final service = DeletionFixture()..fail = false;
       await tester.pumpWidget(
-        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+        ReplicaApp(
+          authService: auth,
+          personaServiceFactory: withPartner,
+          recordServiceFactory: (_) => service,
+        ),
       );
       await tester.pumpAndSettle();
       await openAccountDeletion(tester);
@@ -406,7 +421,11 @@ void main() {
       await auth.signIn('preview.a@example.com', PreviewAuthService.password);
       final service = DeletionFixture()..fail = false;
       await tester.pumpWidget(
-        ReplicaApp(authService: auth, recordServiceFactory: () => service),
+        ReplicaApp(
+          authService: auth,
+          personaServiceFactory: withPartner,
+          recordServiceFactory: (_) => service,
+        ),
       );
       await tester.pumpAndSettle();
       await openAccountDeletion(tester);
@@ -447,7 +466,7 @@ void main() {
     await auth.signIn('preview.a@example.com', PreviewAuthService.password);
     final service = DeletionFixture()..fail = false;
     await tester.pumpWidget(
-      ReplicaApp(authService: auth, recordServiceFactory: () => service),
+      ReplicaApp(authService: auth, recordServiceFactory: (_) => service),
     );
     await tester.pumpAndSettle();
     await openAccountDeletion(tester);

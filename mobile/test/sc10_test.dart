@@ -181,6 +181,7 @@ Future<void> mountVoice(
       home: parent
           ? ChatScreen(
               service: service,
+              conversationName: '합성 상대',
               initialVoiceMode: true,
               audioPlayer: sc09.Sc09Player(),
               voiceRecorder: recorder,

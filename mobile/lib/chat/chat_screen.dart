@@ -22,7 +22,7 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.service,
-    this.conversationName = '엄마',
+    required this.conversationName,
     this.initialVoiceMode = false,
     this.acknowledgedAt,
     this.initialMessages = const [],

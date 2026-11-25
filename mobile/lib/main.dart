@@ -8,6 +8,7 @@ import 'auth/preview_auth_service.dart';
 import 'auth/supabase_auth_service.dart';
 import 'chat/chat_service.dart';
 import 'config/app_config.dart';
+import 'profile/persona_service.dart';
 import 'shared/conversation_widgets.dart';
 import 'records/record_service.dart';
 
@@ -40,11 +41,18 @@ class ReplicaApp extends StatelessWidget {
     super.key,
     required this.authService,
     this.chatService,
+    this.personaServiceFactory,
     this.recordServiceFactory,
   });
-  final RecordService Function()? recordServiceFactory;
+  /// Replaces the default record service. Called once per partner id for
+  /// that partner's records, and with null for account-wide deletion when
+  /// there is no partner yet. For tests and previews.
+  final RecordService Function(String? personaId)? recordServiceFactory;
   final AuthService authService;
   final ChatService? chatService;
+
+  /// Replaces the default partner service. For tests and previews.
+  final PersonaService Function()? personaServiceFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +84,7 @@ class ReplicaApp extends StatelessWidget {
         recordServiceFactory: recordServiceFactory,
         auth: authService,
         chat: chatService ?? const DemoChatService(),
+        personaServiceFactory: personaServiceFactory,
       ),
     );
   }

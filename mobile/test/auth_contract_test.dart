@@ -8,6 +8,8 @@ import 'package:mobile/chat/chat_service.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/services/backend_service.dart';
 
+import 'persona_test_support.dart';
+
 class ControlledChat implements ChatService {
   final pending = <Completer<String>>[];
   @override
@@ -45,6 +47,9 @@ Future<void> login(
 }
 
 Future<void> openChat(WidgetTester tester) async {
+  if (find.text('프로필 만들기').evaluate().isNotEmpty) {
+    await nameFirstPartner(tester);
+  }
   await tester.tap(find.text('텍스트로 대화'));
   await tester.pumpAndSettle();
   await tester.tap(find.byType(Checkbox));
@@ -239,7 +244,7 @@ void main() {
       await tester.pumpAndSettle();
       switch (result) {
         case SignUpResult.signedIn:
-          expect(find.text('텍스트로 대화'), findsOneWidget);
+          expect(find.text('프로필을 만들어 주세요'), findsOneWidget);
         case SignUpResult.emailVerificationRequired:
           expect(find.textContaining('이메일의 인증 링크'), findsOneWidget);
           expect(auth.identity, isNull);

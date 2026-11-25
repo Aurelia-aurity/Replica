@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../chat/chat_service.dart';
+import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import '../services/request_timeouts.dart';
 import 'conversation.dart';
@@ -45,9 +45,17 @@ abstract class PersonaConversationService {
 /// Owned by one login generation, never shared between accounts or persisted.
 class MemoryConversationService
     implements VoiceConversationService, PersonaConversationService {
-  MemoryConversationService({required this.backend, required this.chat});
+  MemoryConversationService({
+    required this.backend,
+    required this.chat,
+    this.personaSource,
+  });
   final BackendService backend;
   final ChatService chat;
+
+  /// Partners of the dummy account (the ones named in SC-13). Without it the
+  /// fixed [previewPersona] is the only partner.
+  final Future<List<ConversationPersona>> Function()? personaSource;
   final _items = <String, Conversation>{};
   final _voiceReplies = <String, VoiceReply>{};
   static const previewPersona = ConversationPersona(id: 'preview', name: '엄마');
@@ -60,11 +68,22 @@ class MemoryConversationService
   Future<Conversation> get(String id) => backend.run(() async => _items[id]!);
   @override
   Future<Conversation> create(DateTime acknowledgedAt, {bool voice = false}) =>
-      createForPersona(previewPersona.id, acknowledgedAt, voice: voice);
+      backend.run(() async {
+        final active = await personas();
+        if (active.isEmpty) {
+          throw const BackendFailure(
+            BackendFailureKind.generic,
+            code: 'NO_PERSONA',
+          );
+        }
+        return createForPersona(active.first.id, acknowledgedAt, voice: voice);
+      });
 
   @override
-  Future<List<ConversationPersona>> personas() =>
-      backend.run(() async => const [previewPersona]);
+  Future<List<ConversationPersona>> personas() => backend.run(
+    () async =>
+        personaSource == null ? const [previewPersona] : personaSource!(),
+  );
 
   @override
   Future<Conversation> createForPersona(
@@ -72,14 +91,15 @@ class MemoryConversationService
     DateTime acknowledgedAt, {
     bool voice = false,
   }) => backend.run(() async {
-    if (personaId != previewPersona.id) {
+    final selected = (await personas()).where((p) => p.id == personaId);
+    if (selected.isEmpty) {
       throw const BackendFailure(BackendFailureKind.generic, code: 'NOT_FOUND');
     }
     final now = DateTime.now();
     final item = Conversation(
       id: newConversationId(),
-      personaId: previewPersona.id,
-      personaName: previewPersona.name,
+      personaId: personaId,
+      personaName: selected.first.name,
       createdAt: now,
       updatedAt: now,
       acknowledgedAt: acknowledgedAt,
@@ -199,11 +219,20 @@ class HttpConversationService
     required this.baseUrl,
     required this.client,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+    this.personaSource,
+  }) : _now = now ?? DateTime.now,
+       _api = ApiClient(backend: backend, baseUrl: baseUrl, client: client);
   final BackendService backend;
   final Uri baseUrl;
   final http.Client client;
   final DateTime Function() _now;
+  final ApiClient _api;
+
+  /// Partners the app already holds (the home card's list, kept by the
+  /// partner service). With it this service takes partners and their names
+  /// from there instead of requesting `GET /personas` itself, so there is one
+  /// list and one set of names. Without it, it asks the server.
+  final Future<List<ConversationPersona>> Function()? personaSource;
 
   /// Until when the backend may still be working on a turn's speech request.
   /// Kept per login, so it survives leaving the screen or backgrounding the app.
@@ -215,10 +244,7 @@ class HttpConversationService
   @override
   bool get isDemo => false;
 
-  Uri _uri(String path, [Map<String, String>? query]) => baseUrl.replace(
-    path: '${baseUrl.path.replaceFirst(RegExp(r'/$'), '')}$path',
-    queryParameters: query,
-  );
+  Uri _uri(String path, [Map<String, String>? query]) => _api.uri(path, query);
 
   Future<Object?> _request(
     String method,
@@ -227,60 +253,26 @@ class HttpConversationService
     Map<String, Object?>? body,
     Duration timeout = textRequestTimeout,
     String timeoutCode = 'AI_TIMEOUT',
-  }) {
-    final request = http.Request(method, _uri(path, query))
-      ..headers['Content-Type'] = 'application/json';
-    if (body != null) request.body = jsonEncode(body);
-    return _perform(request, timeout: timeout, timeoutCode: timeoutCode);
-  }
+  }) => _api.request(
+    method,
+    path,
+    query: query,
+    body: body,
+    timeout: timeout,
+    timeoutCode: timeoutCode,
+    unavailableCode: 'AI_UNAVAILABLE',
+  );
 
   Future<Object?> _perform(
     http.BaseRequest request, {
     Duration timeout = textRequestTimeout,
     String timeoutCode = 'AI_TIMEOUT',
-  }) => backend.run(() async {
-    final headers = await backend.auth.authorizationHeaders();
-    // Check generation again after asynchronous token acquisition.
-    return backend.run(() async {
-      request.headers.addAll(headers);
-      late http.Response response;
-      try {
-        response = await (() async => http.Response.fromStream(
-          await client.send(request),
-        ))().timeout(timeout);
-      } on TimeoutException {
-        throw BackendFailure(
-          BackendFailureKind.network,
-          code: timeoutCode,
-          retryable: true,
-        );
-      } on http.ClientException {
-        throw const BackendFailure(
-          BackendFailureKind.network,
-          code: 'AI_UNAVAILABLE',
-          retryable: true,
-        );
-      }
-      Object? json;
-      if (response.bodyBytes.isNotEmpty) {
-        try {
-          json = jsonDecode(utf8.decode(response.bodyBytes));
-        } catch (_) {
-          if (response.statusCode >= 200 && response.statusCode < 300) rethrow;
-        }
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw BackendFailure.fromResponse(
-          statusCode: response.statusCode,
-          body: json,
-        );
-      }
-      if (request.method == 'DELETE' && response.statusCode != 204) {
-        throw const FormatException('Deletion not confirmed');
-      }
-      return json;
-    });
-  });
+  }) => _api.perform(
+    request,
+    timeout: timeout,
+    timeoutCode: timeoutCode,
+    unavailableCode: 'AI_UNAVAILABLE',
+  );
 
   Future<List<ConversationTurn>> _turns(String id) async {
     final turns = <ConversationTurn>[];
@@ -314,6 +306,15 @@ class HttpConversationService
 
   @override
   Future<List<ConversationPersona>> personas() async {
+    final source = personaSource;
+    final result = source == null ? await _fetchPersonas() : await source();
+    for (final persona in result) {
+      _personaNames[persona.id] = persona.name;
+    }
+    return result;
+  }
+
+  Future<List<ConversationPersona>> _fetchPersonas() async {
     final result = <ConversationPersona>[];
     var offset = 0;
     while (true) {
@@ -332,14 +333,14 @@ class HttpConversationService
       if (page.length < limit) break;
       offset += page.length;
     }
-    for (final persona in result) {
-      _personaNames[persona.id] = persona.name;
-    }
     return result;
   }
 
   Future<String?> _personaName(String id) async {
+    // The held list costs no request and may have changed since: read it.
+    if (personaSource != null) await personas();
     if (_personaNames.containsKey(id)) return _personaNames[id];
+    // Not a partner the app holds (one being deleted, say): ask for it alone.
     final json = await _request(
       'GET',
       '/personas/${Uri.encodeComponent(id)}',

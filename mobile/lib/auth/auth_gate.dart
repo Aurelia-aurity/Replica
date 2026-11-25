@@ -5,8 +5,12 @@ import 'package:http/http.dart' as http;
 
 import '../chat/chat_service.dart';
 import '../config/app_config.dart';
+import '../history/conversation.dart';
 import '../history/conversation_service.dart';
 import '../home/home_screen.dart';
+import '../profile/persona_controller.dart';
+import '../profile/persona_service.dart';
+import '../services/api_client.dart';
 import '../services/backend_service.dart';
 import '../records/record_service.dart';
 import 'auth_screen.dart';
@@ -19,11 +23,18 @@ class AuthGate extends StatefulWidget {
     super.key,
     required this.auth,
     required this.chat,
+    this.personaServiceFactory,
     this.recordServiceFactory,
   });
-  final RecordService Function()? recordServiceFactory;
+
+  /// Record service for one partner's records (`persona_id`), or for
+  /// account-wide deletion when [personaId] is null. Preview data otherwise.
+  final RecordService Function(String? personaId)? recordServiceFactory;
   final AuthService auth;
   final ChatService chat;
+
+  /// Replaces the default partner service (preview data or HTTP). For tests.
+  final PersonaService Function()? personaServiceFactory;
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
@@ -32,28 +43,61 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   var _navigator = GlobalKey<NavigatorState>();
   late int _generation;
   ConversationService? _history;
+  PersonaController? _personas;
   http.Client? _historyClient;
 
   void _resetHistory() {
     _historyClient?.close();
     _historyClient = null;
     _history = null;
+    _personas?.dispose();
+    _personas = null;
+  }
+
+  /// One client for every HTTP adapter of this login.
+  http.Client get _client => _historyClient ??= http.Client();
+
+  PersonaController _personaController() {
+    if (_personas != null) return _personas!;
+    final factory = widget.personaServiceFactory;
+    final backend = BackendService(widget.auth);
+    final PersonaService service = factory != null
+        ? factory()
+        : widget.auth.isPreview
+        ? MemoryPersonaService(backend: backend)
+        : HttpPersonaService(
+            ApiClient(
+              backend: backend,
+              baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
+              client: _client,
+            ),
+          );
+    return _personas = PersonaController(service);
   }
 
   ConversationService _conversationService() {
     if (_history != null) return _history!;
     final backend = BackendService(widget.auth);
+    final personas = _personaController();
+    // One partner list per login: the one the home card loaded and SC-13
+    // updates. The conversation services read it instead of asking the
+    // server again, so a partner and its name are the same everywhere.
+    Future<List<ConversationPersona>> heldPartners() async => [
+      for (final persona in personas.personas)
+        ConversationPersona(id: persona.id, name: persona.label),
+    ];
     if (widget.auth.isPreview) {
       return _history = MemoryConversationService(
         backend: backend,
         chat: widget.chat,
+        personaSource: heldPartners,
       );
     }
-    final client = _historyClient = http.Client();
     return _history = HttpConversationService(
       backend: backend,
       baseUrl: AppConfig.fromEnvironment().backendBaseUrl,
-      client: client,
+      client: _client,
+      personaSource: heldPartners,
     );
   }
 
@@ -127,19 +171,18 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           key: _navigator,
           onGenerateRoute: (_) => MaterialPageRoute<void>(
             builder: (_) {
-              final records = SessionRecordService(
-                backend: BackendService(widget.auth),
-                delegate:
-                    widget.recordServiceFactory?.call() ??
-                    PreviewRecordService(),
-              );
+              final generation = widget.auth.generation;
               return HomeScreen(
-                onAccountDeleted: _accountDeletedFor(
-                  records,
-                  widget.auth.generation,
+                recordServiceFor: (personaId) => SessionRecordService(
+                  backend: BackendService(widget.auth),
+                  delegate:
+                      widget.recordServiceFactory?.call(personaId) ??
+                      PreviewRecordService(),
                 ),
-                recordService: records,
+                accountDeletedFor: (records) =>
+                    _accountDeletedFor(records, generation),
                 history: _conversationService(),
+                personas: _personaController(),
                 accountEmail: widget.auth.identity!.email,
                 accountCreatedAt: widget.auth.identity!.createdAt,
                 onSignOut: widget.auth.signOut,
