@@ -525,6 +525,83 @@ def test_a_concurrent_call_that_finished_first_is_answered_with_the_current_reco
     assert res.status_code == 200 and res.json()["status"] == "uploaded"
 
 
+def test_a_concurrent_call_that_finished_first_with_other_speakers_is_409_not_200(client, fake_db, storage, persona):
+    """다른 요청이 반대 화자 쌍으로 먼저 확정했다면, 이쪽의 유효한 요청을 성공 재시도로 돌려주면 안 된다(PM 리뷰)."""
+    record_id = reserved(client, persona)
+    put_file(storage, fake_db, record_id, KAKAO)
+    original = fake_db.update_record_upload
+
+    async def another_request_confirms_the_opposite_pair(record_id_, *, expected_updated_at, status, speakers, error_code=None):
+        await original(record_id_, expected_updated_at=expected_updated_at, status="uploaded",
+                       speakers={"target_speaker": "나", "provider_speaker": "엄마"})
+        return await original(record_id_, expected_updated_at=expected_updated_at, status=status,
+                              speakers=speakers, error_code=error_code)  # 이쪽은 수정 시각·상태가 바뀌어 충돌
+
+    fake_db.update_record_upload = another_request_confirms_the_opposite_pair
+    res = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마", "provider_speaker": "나"})
+    assert res.status_code == 409 and error(res)["code"] == "CONFLICT"
+    stored = fake_db.records[record_id]
+    assert (stored["status"], stored["target_speaker"], stored["provider_speaker"]) == ("uploaded", "나", "엄마")
+
+
+def test_a_concurrent_call_that_finished_first_with_the_same_speakers_is_still_200(client, fake_db, storage, persona):
+    record_id = reserved(client, persona)
+    put_file(storage, fake_db, record_id, KAKAO)
+    original = fake_db.update_record_upload
+
+    async def another_request_confirms_the_same_pair(record_id_, *, expected_updated_at, status, speakers, error_code=None):
+        await original(record_id_, expected_updated_at=expected_updated_at, status="uploaded",
+                       speakers={"target_speaker": "엄마", "provider_speaker": "나"})
+        return await original(record_id_, expected_updated_at=expected_updated_at, status=status,
+                              speakers=speakers, error_code=error_code)
+
+    fake_db.update_record_upload = another_request_confirms_the_same_pair
+    res = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": " 엄마 ", "provider_speaker": "나"})
+    assert res.status_code == 200 and (res.json()["target_speaker"], res.json()["provider_speaker"]) == ("엄마", "나")
+
+
+def _confirmed_kakao(client, fake_db, storage, persona) -> str:
+    record_id = reserved(client, persona)
+    put_file(storage, fake_db, record_id, KAKAO)
+    done = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마", "provider_speaker": "나"})
+    assert done.status_code == 200 and done.json()["status"] == "uploaded"
+    return record_id
+
+
+@pytest.mark.parametrize("payload", [
+    None,                                                          # 본문 없는 재호출(응답 유실 뒤)
+    {},                                                            # 화자 키를 모두 생략: 확정값 유지
+    {"target_speaker": "엄마"},                                    # 일부 키만, 저장값과 같음
+    {"provider_speaker": "나"},
+    {"target_speaker": " 엄마 ", "provider_speaker": " 나 "},       # 앞뒤 공백은 제거해 비교
+    {"target_speaker": "엄마", "provider_speaker": "나"},          # 같은 쌍을 다시 보냄
+])
+def test_repeating_uploaded_with_a_compatible_or_no_speaker_choice_is_200(client, fake_db, storage, persona, payload):
+    record_id = _confirmed_kakao(client, fake_db, storage, persona)
+    res = client.post(f"/records/{record_id}/uploaded") if payload is None else client.post(
+        f"/records/{record_id}/uploaded", json=payload)
+    assert res.status_code == 200 and res.json()["status"] == "uploaded"
+    assert (res.json()["target_speaker"], res.json()["provider_speaker"]) == ("엄마", "나")
+
+
+@pytest.mark.parametrize("payload", [
+    {"target_speaker": "나", "provider_speaker": "엄마"},          # 반대 쌍
+    {"target_speaker": "엄마", "provider_speaker": "다른사람"},    # 제공자만 다름
+    {"target_speaker": "다른사람"},                                # 대화 상대만 다름
+    {"provider_speaker": None},                                    # 명시적 null은 '없음'이라 저장값과 모순
+    {"target_speaker": "엄마", "provider_speaker": None},
+])
+def test_repeating_uploaded_with_a_different_speaker_choice_is_409_and_keeps_the_stored_roles(
+        client, fake_db, storage, persona, payload):
+    record_id = _confirmed_kakao(client, fake_db, storage, persona)
+    fake_db.upload_updates.clear()
+    res = client.post(f"/records/{record_id}/uploaded", json=payload)
+    assert res.status_code == 409 and error(res)["code"] == "CONFLICT"
+    stored = fake_db.records[record_id]
+    assert (stored["status"], stored["target_speaker"], stored["provider_speaker"]) == ("uploaded", "엄마", "나")
+    assert fake_db.upload_updates == []  # 모순 요청은 아무것도 쓰지 않는다
+
+
 def test_a_conflict_that_is_not_a_finished_record_stays_409(client, fake_db, storage, persona):
     record_id = reserved(client, persona, size_bytes=len(PLAIN))
     put_file(storage, fake_db, record_id, PLAIN)

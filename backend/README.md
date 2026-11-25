@@ -68,8 +68,8 @@ Swagger(`/docs`)에서 요청·응답 형식을 확인하고 직접 호출해 �
 | `GET /sessions`, `GET /sessions/{id}` | `persona_id?`, `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}`(최신순) / 대화방 객체 |
 | `GET /sessions/{id}/turns` | `after_turn_no`, `limit` (로그인 필요) | `{items, after_turn_no, limit}` (`turn_no` 오름차순, 턴 객체) |
 | `DELETE /sessions/{id}` | (로그인 필요) | 204. 대화방과 그 턴의 DB 행만 삭제 |
-| `POST /records` | JSON `{persona_id, kind, original_name, mime_type, size_bytes, consent_at, consent_version, target_speaker?, provider_speaker?, record_id?}` (로그인 필요) | 기록 객체 + 서명 업로드 정보 `upload` (201, 같은 `record_id`·같은 본문의 재예약은 200). 서명 주소는 비공개 Storage 버킷 `replica-records`로 발급함(버킷은 있음. 서버 키로 서명 발급·`PUT`·정보 조회·읽기는 #120에서 직접 호출로 확인했고, 백엔드가 발급한 주소로 올려 `/uploaded`까지 가는 통합과 음성 시그니처용 `Range` 읽기는 아직 확인 전) |
-| `POST /records/{id}/uploaded` | 선택 JSON `{target_speaker?, provider_speaker?}` (로그인 필요) | 기록 객체. Storage의 원본 존재·크기와 카카오톡 화자 선택을 확인한 뒤 `uploaded`로 바꿈. 이미 처리된 기록은 200 |
+| `POST /records` | JSON `{persona_id, kind, original_name, mime_type, size_bytes, consent_at, consent_version, target_speaker?, provider_speaker?, record_id?}` (로그인 필요) | 기록 객체 + 서명 업로드 정보 `upload` (201, 같은 `record_id`·같은 본문의 재예약은 200이며 원본이 이미 Storage에 있으면 `upload`는 `null`). 서명 주소는 비공개 Storage 버킷 `replica-records`로 발급함(버킷은 있음. #120의 직접 호출과 DB 담당의 개발 환경 확인(2026-11-24, #128 코멘트)으로 서명 발급·`PUT`·정보 조회·읽기, 백엔드가 발급한 주소로 올려 `/uploaded` 200, 음성 `Range` 206을 확인함. 만료된 서명 주소의 응답과 재예약 수정 뒤 실환경 재실행은 아직 확인 전) |
+| `POST /records/{id}/uploaded` | 선택 JSON `{target_speaker?, provider_speaker?}` (로그인 필요) | 기록 객체. Storage의 원본 존재·크기와 카카오톡 화자 선택을 확인한 뒤 `uploaded`로 바꿈. 이미 처리된 기록은 200(저장된 확정 화자와 다른 값을 보내면 409) |
 | `GET /records`, `GET /records/{id}` | `persona_id`, `limit`, `offset` (로그인 필요) | 목록 `{items, limit, offset}` / 기록 객체 (삭제 중인 기록은 제외) |
 | `POST /chat/text` | JSON `{session_id, turn_id, message}` (로그인 필요) | `{turn_id, answer, is_ai_generated, finish_reason, model_name, timings}` |
 | `POST /chat/voice` | multipart `file`(녹음), `session_id`, `turn_id` (로그인 필요) | `{turn_id, transcript, answer, is_ai_generated, finish_reason, model_name, tts_status, audio_base64, audio_format, tts_error, timings}` |

@@ -119,6 +119,25 @@ def _same_reservation(row: dict, req: RecordCreate) -> bool:
     )
 
 
+def _speaker_choice_conflicts(record: dict, body: UploadedBody | None) -> bool:
+    """이미 처리된 기록에 다시 온 `/uploaded`의 화자 선택이 저장된 확정값과 모순되는지.
+
+    본문이 없거나 화자 키를 생략하면(확정값 유지) 모순이 아니다. 키를 보냈으면 앞뒤 공백을 뺀 값이 저장값과 같아야 하고,
+    명시적 `null`은 '없음'이라 저장값이 있으면 모순이다. 모순을 200으로 돌려주면 호출한 쪽이 자기가 고른 화자가
+    저장된 것으로 오인하므로(확정 화자는 이후 사실·말투 추출의 기준), 호출한 쪽은 409를 받는다.
+    """
+    if body is None:
+        return False
+    for key in ("target_speaker", "provider_speaker"):
+        if key in body.model_fields_set:
+            value = getattr(body, key)
+            if isinstance(value, str):
+                value = value.strip()
+            if value != record.get(key):
+                return True
+    return False
+
+
 async def _issue_upload(storage: StorageClient, row: dict) -> SignedUpload:
     try:
         return await storage.create_upload(row["object_path"], mime_type=row["mime_type"])
@@ -191,7 +210,11 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
     if status == "deleting":
         raise db.NotFoundError()  # 삭제 중인 기록은 목록·상세처럼 없는 기록이다(실제 조회는 RLS가 숨겨 이미 404).
     if status in _PROCESSED:
-        return record  # 응답을 받지 못해 다시 호출한 경우: 현재 기록을 그대로 돌려준다.
+        # 응답을 받지 못해 다시 호출한 경우: 현재 기록을 그대로 돌려준다. 다만 이미 확정된 화자와 다른 선택을 보냈다면
+        # 성공 재시도가 아니므로 거절한다(본문이 없거나 같은 값이면 200).
+        if _speaker_choice_conflicts(record, body):
+            raise AppError(409, "CONFLICT", CONFLICT_MESSAGE, retryable=False)
+        return record
     if status != "uploading":
         raise AppError(409, "CONFLICT", CONFLICT_MESSAGE, retryable=False)
 
@@ -264,5 +287,8 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
         # 같은 호출이 동시에 와서 다른 요청이 먼저 처리했다면(응답 유실 뒤 재호출 등) 현재 기록을 돌려준다.
         current = await user_db.get_record(record_id)
         if current.get("status") in _PROCESSED:
+            # 다른 요청이 다른 화자로 먼저 확정했다면 그 결과를 성공 재시도로 돌려주지 않는다.
+            if _speaker_choice_conflicts(current, body):
+                raise AppError(409, "CONFLICT", CONFLICT_MESSAGE, retryable=False) from None
             return current
         raise
