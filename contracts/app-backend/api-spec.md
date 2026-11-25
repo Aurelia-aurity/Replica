@@ -164,7 +164,7 @@
 | remaining_steps | string[] | 남은 단계. `storage` · `database` · `auth` · `external_index` · `adapter` 중 일부. 완료되면 빈 배열 |
 | attempt_count | integer | 시도 횟수 |
 | last_error_code | string \| null | 마지막 실패 코드 |
-| next_attempt_at | datetime \| null | (제안) 자동 재시도를 기다리는 `pending`일 때 다음 시도 시각. 그 밖에는 `null` |
+| next_attempt_at | datetime \| null | (제안) 자동 재시도를 기다리는 `pending`일 때만 값이 있는 다음 시도 시각. 작업을 집어 `running`이 될 때, 사용자 재시도로 `pending`이 될 때, `failed`·`completed`일 때는 항상 `null`입니다. 앱은 `pending`이면서 이 값이 있을 때만 '자동으로 다시 시도하는 중'으로 보여 주고, `pending`인데 `null`이면 접수되어 곧 처리를 기다리는 중입니다 |
 | created_at, updated_at, finished_at | datetime | 생성·수정·완료 시각 (`finished_at`은 완료 시에만) |
 
 #### 삭제 작업의 상태와 처리 규칙
@@ -179,8 +179,8 @@
 | 처리 순서와 표시 순서 | 서버는 `storage` → `external_index` → `adapter` → `database` → `auth`(남은 것만) 순서로 처리하며, Storage 원본을 먼저 지운 뒤에만 DB 행을 지웁니다(DB가 이 순서를 강제). 단계는 끝날 때마다 바로 `remaining_steps`에서 빠지고 같은 단계를 다시 처리해도 결과가 같습니다(멱등). 앱은 화면의 단계 목록 순서를 스스로 정하고, 단계가 끝났는지는 `remaining_steps`에 남아 있는지로만 판단하며 처리 순서에 의존하지 않습니다 |
 | 소유권 | worker가 작업을 집을 때 소유 토큰(`lease_token`)을 받고, 진행을 알리거나 단계를 끝낼 때마다 이 토큰을 함께 보냅니다. 토큰이 다르면(예: 5분 넘게 갱신이 없어 다른 시도가 이어받은 뒤에 도착한 이전 시도의 늦은 완료·실패) 서버가 거절하고 아무것도 바꾸지 않습니다. 한 작업에는 한 번에 하나의 소유 토큰만 유효합니다 |
 | 진행 신호와 이어받기 | 처리 중인 worker는 일정 간격(예: 30초)마다 `updated_at`을 갱신해 진행 중임을 알립니다. `running`이 5분(임시 값) 동안 갱신되지 않을 때만 멈춘 것으로 보고 다른 시도가 새 소유 토큰으로 `remaining_steps`부터 이어받습니다. 개별 Storage·DB 호출에는 이보다 훨씬 짧은 시간 제한을 둡니다 |
-| 시도와 자동 재시도 | worker가 작업을 집을 때마다 `attempt_count`가 1 올라갑니다(누적). 단계가 실패하면 `last_error_code`를 남기고, 자동 재시도 횟수가 남아 있으면 작업을 `pending`으로 돌리고 `next_attempt_at`(1분·5분·30분 뒤, 임시 값)을 정합니다. 3번을 다 쓰고도 실패하면 `failed`로 멈춥니다 |
-| 사용자 재시도 | `POST /deletion-jobs/{job_id}/retry`는 `failed`인 작업을 같은 작업 id로 `pending`(바로 시도)으로 되돌리고 자동 재시도 횟수를 0으로 초기화합니다(재시도 요청마다 자동 재시도 3번의 새 예산). `attempt_count`는 이어서 늘어납니다. 새 작업을 만들어 부분 실패를 감추지 않습니다 |
+| 시도와 자동 재시도 | worker가 작업을 집을 때마다 `attempt_count`가 1 올라갑니다(누적). 단계가 실패하면 `last_error_code`를 남기고, 자동 재시도 횟수가 남아 있으면 작업을 `pending`으로 돌리고 `next_attempt_at`(1분·5분·30분 뒤, 임시 값)을 정합니다. 3번을 다 쓰고도 실패하면 `failed`로 멈춥니다. 작업을 집는 순간 `next_attempt_at`은 `null`이 됩니다. 계정 삭제에서 로그인 계정이 이미 지워진 뒤의 마무리는 이 횟수 제한 없이 계속 다시 시도합니다('DELETE /account'의 'Auth 삭제 뒤 정리와 복구') |
+| 사용자 재시도 | `POST /deletion-jobs/{job_id}/retry`는 `failed`인 작업을 같은 작업 id로 `pending`(바로 시도)으로 되돌리며 `next_attempt_at`은 `null`로 둡니다(자동 재시도 대기가 아니므로 앱이 '자동으로 다시 시도하는 중'으로 보여 주지 않음). 자동 재시도 횟수는 0으로 초기화합니다(재시도 요청마다 자동 재시도 3번의 새 예산). `attempt_count`는 이어서 늘어납니다. 새 작업을 만들어 부분 실패를 감추지 않습니다 |
 | 앱의 조회와 복원 | 앱은 `pending`·`running`인 작업을 시트가 열려 있는 동안 3초 간격으로 최대 20번 확인하고, `failed`는 자동으로 다시 묻지 않습니다. 그 뒤에는 기록 목록의 삭제 요청 카드로 남기고, 목록을 새로고침하면 `GET /deletion-jobs`로 복원해 다시 확인합니다. `pending`이면서 `next_attempt_at`이 있으면 "자동으로 다시 시도하는 중"으로, `failed`면 부분 실패와 다시 시도 버튼으로 보여 줍니다 |
 | 실패 코드 | `last_error_code`는 안전한 코드만 씁니다: `storage_unavailable` · `storage_error` · `database_error` · `auth_error` · `external_index_error` · `adapter_error` · `worker_interrupted`. 내부 경로·예외 원문은 넣지 않습니다 |
 | 앱에 보이지 않는 것 | 삭제 대상 파일 경로 목록(`manifest`)과 소유 토큰(`lease_token`)은 앱에 보내지 않습니다 |
@@ -194,7 +194,7 @@
 | `failed`인 작업을 다시 시작 | `POST /deletion-jobs/{job_id}/retry`만 가능합니다 |
 | 삭제가 이미 끝나 행이 사라진 대상에 `DELETE` | 404 |
 | `completed`인 작업에 retry | 200과 현재 작업 객체입니다(409가 아님. 앱이 응답을 그대로 완료로 처리) |
-| 계정 삭제를 요청한 뒤 | 삭제 작업 조회, retry, 같은 `DELETE /account`(진행 중인 같은 작업을 202)만 허용하고 그 밖의 쓰기는 409 `ACCOUNT_DELETING` |
+| 계정 삭제를 요청한 뒤 | 그 계정 삭제 작업이 `completed`가 되기 전에는(`pending`·`running`·`failed` 모두) 삭제 작업 조회, retry, 같은 `DELETE /account`(진행 중이거나 실패한 같은 작업을 202)만 허용하고 그 밖의 쓰기는 409 `ACCOUNT_DELETING`입니다. 삭제를 취소하는 API가 없고 데이터는 이미 숨겨졌으므로 `failed`여도 쓰기를 열지 않습니다 |
 
 ##### 합의가 남은 범위 (제안)
 
@@ -1023,9 +1023,9 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 
 | 항목 | 내용 |
 |---|---|
-| 지워지는 것 | 원본 파일(Storage), 전사문(모든 `revision`), 검색 조각과 벡터, 프로필과 이 기록의 연결 |
+| 지워지는 것 | 원본 파일(Storage), 전사문(모든 `revision`), 검색 조각과 벡터, 이 기록에 의존하는 프로필 버전과 그 연결(아래 '말투 프로필') |
 | 남는 것 | 과거 대화와 AI 답변(대화방·턴)은 지우지 않습니다(2026-11-23 결정). 삭제한 기록은 이후 검색·분석 입력에서 제외됩니다 |
-| 말투 프로필 | 이 기록의 확정본을 쓴 프로필은 삭제 요청 즉시 최신이 아닌 것으로 처리되어 프롬프트에 쓰이지 않고(대화 상대의 `data_revision`이 오름), 다음 분석(`POST /personas/{persona_id}/style-profile/analysis`)에서 남은 확정 기록으로 다시 만듭니다. 남은 확정 기록이 없으면 프로필도 없습니다(제안, #113·DB 확인) |
+| 말투 프로필 | 이 기록의 확정본을 출처로 가진 프로필 버전은 삭제 요청 즉시 최신이 아닌 것으로 처리되어 프롬프트에 쓰이지 않습니다(대화 상대의 `data_revision`이 오름). 즉시 쓰지 않는 것과 물리적 삭제는 별개이므로, `database` 단계가 출처 연결이 사라지기 전에 그 프로필 버전을 식별해 본문(`content`)까지 **지웁니다**. 이 기록과 무관한 프로필 버전이나 삭제 요청 뒤 새로 만들어져 이 기록을 쓰지 않은 버전은 지우지 않습니다. 이 정리까지 끝나야 `database` 단계가 끝난 것입니다. 다음 분석(`POST /personas/{persona_id}/style-profile/analysis`)에서 남은 확정 기록으로 다시 만들고, 남은 확정 기록이 없으면 프로필도 없습니다. 과거 대화 답변은 지우지 않습니다(제안, #113·DB 확인) |
 | 삭제 중인 기록의 접근 | `deleting` 기록은 없는 기록과 같은 404입니다. `/uploaded`·텍스트 버전·확정처럼 그 기록의 id를 받는 API도 404입니다(`/uploaded`는 이전 계약의 409에서 바뀜). **삭제 요청(`DELETE`)은 예외**로, 진행 중이거나 실패한 같은 작업을 202로 돌려줍니다 |
 | 업로드 취소 | 앱이 업로드를 취소할 때 예약만 있는 기록을 정리하는 데도 같은 요청을 씁니다 |
 
@@ -1048,7 +1048,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 |---|---|---|---|
 | 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
 | 404 | `NOT_FOUND` | 없거나 남의 기록. 삭제가 이미 끝나 사라진 기록도 같음(진행 중인 삭제는 404가 아니라 같은 작업 202) | 목록을 새로고침(앱은 사라진 기록으로 처리하고 이전 작업 id로 상태를 확인) |
-| 409 | `ACCOUNT_DELETING` | 계정 삭제가 진행 중 | 계정 삭제 작업을 확인 |
+| 409 | `ACCOUNT_DELETING` | 계정 삭제 작업이 `completed`가 되기 전(`failed` 포함) | 계정 삭제 작업을 확인 |
 | 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시(같은 작업을 돌려줌) |
 
 <a id="a-persona-del"></a>
@@ -1127,7 +1127,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 상태 | `code` | 상황 | 복구 |
 |---|---|---|---|
 | 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
-| 401 | `ACCOUNT_DELETED` | 계정 삭제가 끝나 로그인 계정이 사라짐 | 완료로 처리하고 로그인 화면으로(아래 `DELETE /account`) |
+| 401 | `ACCOUNT_DELETED` | 계정 삭제 작업이 `completed`이고 로그인 계정이 사라짐 | 완료로 처리하고 로그인 화면으로(아래 `DELETE /account`) |
+| 401 | `ACCOUNT_DELETION_INCOMPLETE` | 로그인 계정은 사라졌지만 계정 삭제 작업이 아직 `completed`가 아님 | 완료로 처리하지 않고 '마무리하는 중'으로 안내, 같은 토큰으로 다시 확인(아래 `DELETE /account`) |
 | 404 | `NOT_FOUND` | 상세: 없거나 남의 작업 | 목록을 새로고침 |
 | 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시 |
 
@@ -1185,37 +1186,44 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 항목 | 내용 |
 |---|---|
 | 지워지는 것 | 모든 대화 상대와 그 기록(원본·전사문·조각·프로필), 대화방·턴(대화 이력), 이 계정의 앱 데이터 전부, Supabase 로그인 계정(`auth`) |
-| 요청 직후 | 모든 대화 상대와 기록이 `deleting`이 되어 조회에서 숨겨집니다. 새 대화 상대·기록·대화 생성과 수정은 409 `ACCOUNT_DELETING`으로 거절하고, 삭제 작업 조회·다시 시작·같은 `DELETE /account`만 계속 쓸 수 있습니다 |
+| 요청 직후 | 모든 대화 상대와 기록이 `deleting`이 되어 조회에서 숨겨집니다. 새 대화 상대·기록·대화 생성과 수정은 409 `ACCOUNT_DELETING`으로 거절하고, 삭제 작업 조회·다시 시작·같은 `DELETE /account`만 계속 쓸 수 있습니다. 작업이 `completed`가 되기 전에는 `failed`여도 같습니다 |
 | 같은 계정에 다시 요청 | 진행 중이거나 실패한 같은 작업을 돌려줍니다(202) |
 | 처리 | `storage` → `external_index` → `adapter` → `database` → `auth`. 기록이 없으면 `storage` 단계 없이 `database`부터 진행합니다. `auth`(Supabase Auth 사용자 삭제)는 다른 단계가 모두 끝난 뒤 마지막에만 실행합니다 |
 | 앞 단계가 실패하면 | 로그인 계정이 남아 있으므로 자동 재시도 대기(`pending`) 또는 `failed`로 조회되고, `failed`는 `POST /deletion-jobs/{job_id}/retry`로 이어서 처리합니다. 부분 실패를 완료로 표시하지 않습니다 |
+| 이미 열린 개별 삭제 작업 | 계정 삭제를 요청하면 그 계정의 열린(`pending`·`running`·`failed`) 기록 삭제 작업은 이 계정 삭제 작업이 **흡수**합니다(제안, 대화 상대 삭제도 같음). 하위 작업이 남긴 원본 경로도 계정 작업이 지우므로 `storage` 단계가 놓치지 않고, 하위 작업은 이 작업의 `database` 단계가 끝날 때 함께 `completed`로 닫히며 `manifest`가 비워집니다. 열린 개별 작업 때문에 계정 삭제가 거절되는 일은 없습니다 |
 
 ##### 완료 판정 (인증 계정이 사라지므로)
 
-마지막 단계에서 로그인 계정이 지워지면 같은 토큰으로는 `GET /deletion-jobs`가 더 이상 되지 않고 작업의 `user_id`도 `null`이 됩니다. 이때 앱이 완료를 알 수 있도록 서버가 전용 신호를 돌려줍니다(제안).
+마지막 단계에서 로그인 계정이 지워지면 같은 토큰으로는 `GET /deletion-jobs`가 더 이상 되지 않고 작업의 `user_id`도 `null`이 됩니다. 이때 앱이 완료를 알 수 있도록 서버가 전용 신호를 돌려줍니다(제안). **완료는 로그인 계정이 사라졌다는 뜻이 아니라 계정 삭제 작업이 `completed`**(모든 단계와 `manifest` 비우기까지 끝남)라는 뜻입니다. 로그인 계정이 사라졌지만 작업이 끝나지 않았다면 완료 신호를 보내지 않습니다.
 
-| 서버가 하는 일 | 내용 |
+| 서버가 본 것 | 응답 |
 |---|---|
-| `ACCOUNT_DELETED` 판정 | 백엔드는 토큰 확인(`/auth/v1/user`)에서 삭제된 사용자의 토큰(`user_not_found`)을 받으면, 토큰의 `sub`와 같은 대상의 계정 삭제 작업(`target_type = account`)이 있을 때만 401 `ACCOUNT_DELETED`를 돌려줍니다. `sub`는 작업을 찾는 키로만 쓰고 권한 판단에는 쓰지 않습니다. 해당 작업이 없으면 일반 401 `UNAUTHENTICATED`입니다 |
+| 토큰 확인(`/auth/v1/user`)이 삭제된 사용자(`user_not_found`)를 돌려주고, 토큰의 `sub`와 같은 대상의 계정 삭제 작업(`target_type = account`)이 `completed` | 401 `ACCOUNT_DELETED` |
+| 같은 조건이지만 그 작업이 아직 `completed`가 아님(Auth 삭제 직후 작업 정리 전, 또는 `storage`·`database` 단계 중에 Auth 사용자만 먼저 지워진 경우) | 401 `ACCOUNT_DELETION_INCOMPLETE` |
+| 같은 조건이지만 `sub`의 계정 삭제 작업이 없음(예: 관리자가 직접 삭제) | 일반 401 `UNAUTHENTICATED` |
+
+`sub`는 작업을 찾는 키로만 쓰고 권한 판단에는 쓰지 않습니다.
 
 | 앱이 본 것 | 판정 |
 |---|---|
 | 조회가 200이고 `status = failed` | 실패. 사용자에게 알리고 다시 시작 요청 |
 | 조회가 200이고 `pending`(자동 재시도 대기 포함)·`running` | 계속 확인 |
 | 401 `ACCOUNT_DELETED` | **완료**. 일반 401 처리(로그인 만료 안내와 세션 무효화)보다 먼저 이 코드만 따로 분기해 '계정 삭제 완료'를 안내하고 로컬 정리를 합니다 |
+| 401 `ACCOUNT_DELETION_INCOMPLETE` | **완료 아님**. 일반 401보다 먼저 분기해 '계정 삭제를 마무리하는 중'으로 보여 주고 같은 토큰으로 다시 확인합니다. 로컬 정리와 로그인 화면 이동은 하지 않습니다 |
 | 일반 401 `UNAUTHENTICATED` | 로그인 만료이며 완료가 아닙니다. 다시 로그인한 뒤 작업을 조회합니다 |
 
-계정이 지워졌는데 삭제 작업이 없는 경우(예: 관리자가 직접 삭제)는 `ACCOUNT_DELETED`가 아니라 일반 401이므로 성공으로 표시하지 않습니다. 이렇게 완료를 서버가 작업과 묶어 알리므로 앱이 갱신 실패 같은 간접 증거로 성공을 추정하지 않습니다.
+앱이 같은 토큰으로 확인할 수 있는 것은 access token이 만료되기 전까지뿐입니다. 그 안에 `completed`가 되지 않으면 앱은 완료를 확인하지 못한 채 일반 401로 끝납니다. 이 경우에도 서버가 작업을 끝까지 처리하므로(아래 '마무리의 재시도') 앱은 완료를 단정하지 않고 '삭제를 처리하는 중일 수 있다'고 안내할 수 있습니다. 계정이 지워졌는데 삭제 작업이 없는 경우(예: 관리자가 직접 삭제)는 일반 401이고, 작업이 있는데 아직 `completed`가 아니면(예: 삭제가 진행 중인데 관리자가 Auth 사용자만 먼저 지움) `ACCOUNT_DELETION_INCOMPLETE`입니다. 어느 쪽도 성공으로 표시하지 않으며, 앱이 갱신 실패 같은 간접 증거로 성공을 추정하지 않습니다.
 
 ##### Auth 삭제 뒤 정리와 복구
 
 | 항목 | 내용 |
 |---|---|
-| 정리 | worker는 Auth 사용자를 지운 뒤 `auth` 단계를 끝내 작업을 `completed`로 바꾸고 `finished_at`을 채우며 `manifest`를 비웁니다. 앱의 완료 신호(`ACCOUNT_DELETED`)는 계정이 사라졌다는 뜻이고 작업 행 정리는 서버가 이어서 보장합니다 |
-| Auth 삭제 뒤 중단 | Auth 삭제와 작업 정리 사이에 서버가 멈추면 `remaining_steps = ["auth"]`가 남아 있으므로, 중단된 작업의 이어받기 규칙에 따라 worker가 다시 집습니다. Auth 사용자 삭제는 이미 없으면 성공으로 보는 멱등 호출이라 정리만 이어서 끝냅니다. 작업은 작업 id로 처리하므로 `user_id`가 `null`이 되어도 영향이 없습니다 |
-| 앱이 보는 상태 | 이 사이에도 같은 토큰의 요청은 `ACCOUNT_DELETED`를 받습니다(작업이 있고 계정이 없음) |
+| 정리 | worker는 Auth 사용자를 지운 뒤(이미 없으면 성공으로 봄) `auth` 단계를 끝내 작업을 `completed`로 바꾸고 `finished_at`을 채우며 `manifest`를 비웁니다. 서버는 이 시점부터 `ACCOUNT_DELETED`를 보냅니다 |
+| Auth 삭제 뒤 중단 | Auth 삭제와 작업 정리 사이에 서버가 멈추면 `remaining_steps = ["auth"]`가 남아 있으므로, 소유 토큰이 만료된 뒤(5분) worker가 다시 집습니다. Auth 사용자 삭제는 이미 없으면 성공인 멱등 호출이라 정리만 이어서 끝냅니다. 작업은 작업 id로 처리하므로 `user_id`가 `null`이 되어도 영향이 없습니다 |
+| 앱이 보는 상태 | 이 사이에 같은 토큰의 요청은 `ACCOUNT_DELETION_INCOMPLETE`를 받고, `completed`가 된 뒤에야 `ACCOUNT_DELETED`를 받습니다 |
+| 마무리의 재시도 | 로그인 계정이 이미 지워진 뒤에는 사용자가 인증도 retry도 할 수 없습니다. 그래서 이 구간의 마무리 실패는 자동 재시도 횟수를 쓰지 않고 `failed`로 멈추지 않으며, `pending`과 `next_attempt_at`(최대 30분 간격)으로 계속 다시 시도합니다. 그래도 멈추면 운영자가 사용자 없이 작업 id로 다시 시작합니다(backend-db의 `retry_deletion_job` 운영자 호출). 앞 단계(`storage`~`database`)와 Auth 사용자 삭제 호출의 실패는 로그인 계정이 남아 있으므로 기존 규칙(자동 재시도 3번 뒤 `failed`, 사용자 retry)을 따릅니다 |
 
-> 확인 필요(DB 담당 실측, #25 검증 한계): 삭제된 사용자의 토큰으로 `/auth/v1/user`를 부르면 `user_not_found`로 구별되는지, 이미 지운 사용자를 다시 지우는 Auth Admin 호출이 성공으로 취급되는지, 완료 뒤 작업 행에 개인 경로(`manifest`)가 남지 않는지. 확인되기 전까지 위 완료 판정은 제안입니다.
+> 확인 필요(DB 담당 실측, #25 검증 한계): 삭제된 사용자의 토큰으로 `/auth/v1/user`를 부르면 `user_not_found`로 구별되는지, 이미 지운 사용자를 다시 지우는 Auth Admin 호출이 성공으로 취급되는지, 완료 뒤 작업 행에 개인 경로(`manifest`)가 남지 않는지, 흡수한 하위 작업이 상위 작업의 `database` 단계 끝에 함께 닫히는지. 확인되기 전까지 위 완료 판정은 제안입니다.
 
 ##### 요청
 
@@ -1234,7 +1242,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 상태 | `code` | 상황 | 복구 |
 |---|---|---|---|
 | 401 | `UNAUTHENTICATED` | 로그인하지 않음·토큰 만료 | 다시 로그인 |
-| 401 | `ACCOUNT_DELETED` | 계정 삭제가 끝나 로그인 계정이 사라짐 | 완료로 처리 |
+| 401 | `ACCOUNT_DELETED` | 계정 삭제 작업이 `completed`이고 로그인 계정이 사라짐 | 완료로 처리 |
+| 401 | `ACCOUNT_DELETION_INCOMPLETE` | 로그인 계정은 사라졌지만 계정 삭제 작업이 아직 `completed`가 아님 | 완료로 처리하지 않고 같은 토큰으로 다시 확인 |
 | 503 | `DB_UNAVAILABLE`(`retryable: true`) | DB에 일시적으로 연결하지 못함 | 같은 요청을 다시(같은 작업을 돌려줌) |
 
 ### 기록 파일 업로드
@@ -1314,7 +1323,8 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | STT 단계 실패 (시간 초과 포함) | 502 | `STT_FAILED` (`stage: stt`) | `음성을 글자로 바꾸지 못했어요. 다시 시도해 주세요.` | 구현됨 (`/chat/voice`) | `/chat/voice` | true |
 | TTS 단계 실패 (시간 초과 포함). 단독 재시도·단독 호출 | 502 | `TTS_FAILED` (`stage: tts`) | `음성 합성에 실패했어요. 답변 글은 그대로 볼 수 있으니, 잠시 후 다시 시도해 주세요.` | 구현됨 (`/chat/turns/{turn_id}/tts`). `/chat/voice`의 TTS 실패는 아래 '오류가 아닌 부분 실패' | `/chat/turns/{turn_id}/tts` | true |
 | 로그인하지 않음, 토큰 없음·만료·잘못됨 | 401 | `UNAUTHENTICATED` | `로그인이 필요하거나 만료되었어요. 다시 로그인해 주세요.` | 구현됨 | 인증 필요 API 전부 (`/health` 제외. 꺼져 있는 개발용 `/stt`·`/tts`는 켠 `dev` 환경에서 로그인이 필요하고 `local`에서만 필요 없음) | false |
-| 계정 삭제가 끝나 로그인 계정이 사라짐 | 401 | `ACCOUNT_DELETED` | `계정 삭제가 끝났어요.` | 제안 (#123) | 인증 필요 API 전부(삭제된 사용자의 토큰이고 계정 삭제 작업이 있을 때만) | false |
+| 계정 삭제가 끝나 로그인 계정이 사라짐 | 401 | `ACCOUNT_DELETED` | `계정 삭제가 끝났어요.` | 제안 (#123) | 인증 필요 API 전부(삭제된 사용자의 토큰이고 계정 삭제 작업이 `completed`일 때만) | false |
+| 로그인 계정은 사라졌지만 계정 삭제 작업이 끝나지 않음 | 401 | `ACCOUNT_DELETION_INCOMPLETE` | `계정 삭제를 마무리하고 있어요.` | 제안 (#123) | 인증 필요 API 전부(삭제된 사용자의 토큰이고 계정 삭제 작업이 `completed`가 아닐 때) | true |
 | 없거나 남의 항목 | 404 | `NOT_FOUND` | `찾을 수 없는 항목이에요. 목록을 새로고침해 주세요.` | 구현됨 | 항목 id를 받는 모든 API. 다른 사용자의 항목과 삭제 중인 항목도 같은 응답 | false |
 | 이미 처리 중이거나 상태가 바뀜 | 409 | `CONFLICT` | `이미 처리 중이거나 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.` | 구현됨 | 상태가 바뀔 수 있는 API | false |
 | 계정 삭제가 진행 중임 | 409 | `ACCOUNT_DELETING` | `계정 삭제가 진행 중이에요. 완료될 때까지 새로 만들거나 바꿀 수 없어요.` | 제안 (#123) | 삭제 작업 조회·다시 시작을 뺀 쓰기 API | false |
