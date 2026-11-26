@@ -6,6 +6,9 @@ freeze and ONE school GPU generation job, not judging or service changes.
 B/A/C imply 3960 planned generations, not already executed answers.
 The separately authorized #95 DEV semantic-annotator check is validation only.
 Source manifests are reproducibility checks, not freeze receipts.
+This sanitized distribution changes operational metadata only. Historical
+Git objects, freeze tarballs, and receipts remain unchanged; recorded freeze
+digests describe those original bytes, not byte identity with sanitized files.
 
 ## Arms and artifacts
 
@@ -39,18 +42,72 @@ hashes and rendered-to-source IDs are recorded. QA enumerates every possible
 family-local retained subset for token caps without needing embedding retrieval.
 Full KURE retrieval/prepared packs remain separate from source-only QA.
 
+```bash
+# Step 1: Queue check immediately before a separately authorized manual Slurm submission
+# Replace the synthetic example value with the approved submission login username
+export SLURM_LOGIN_USER="operator"
+squeue -h -u "$SLURM_LOGIN_USER"
+```
+
+> Stop condition: immediately before submitting, replace the synthetic `"operator"` example so `SLURM_LOGIN_USER` is set to the approved submission login username (not the Slurm accounting account), and verify that the `squeue` command above exits with status `0` and outputs zero job rows of any status. If `SLURM_LOGIN_USER` is unset or unverified, the query fails, or any job row of any status is returned, stop immediately and never run the submission block below.
+
+```bash
+# Step 2: Single separately authorized manual Slurm submission
+# Run only immediately after Step 1 exits 0 with zero job rows of any status
+export STAGE100_EXECUTE_DEV=YES
+export STAGE100_EXPECTED_NODE="gpu-node-01.example.invalid"
+export STAGE100_REPO="/path/to/Replica"
+export STAGE100_PACK="/path/to/prepared-pack/pack.json"
+export STAGE100_MODEL="/path/to/frozen-model"
+export STAGE100_FREEZE_RECEIPT="/path/to/freeze-receipt.json"
+export STAGE100_OUTPUT="/path/to/new-generations.jsonl"
+export STAGE100_PYTHON="/path/to/training-venv/bin/python"
+sbatch --nodelist="$STAGE100_EXPECTED_NODE" experiments/stage1-100/dev.sbatch
+```
+
 Generation and later scoring commands (scoring remains separately authorized):
 
 ```bash
+# Run only inside an existing Slurm allocation; replace the synthetic hostname with the authorized actual allocated node
+export STAGE100_EXECUTE_DEV=YES
+export STAGE100_EXPECTED_NODE="gpu-node-01.example.invalid"
 python experiments/stage1-100/run100.py PACK MODEL FREEZE_RECEIPT NEW_OUTPUT
 python experiments/stage1-100/scoring100.py PLAN RESOLVED_ANNOTATIONS NEW_SCORE_JSON
 ```
 
-The runner requires the approved freeze receipt, criteria without
-a draft first-line marker, `STAGE100_EXECUTE_DEV=YES`, and an existing explicitly selected node
-Slurm allocation. Submit `dev.sbatch` only under the single-job authorization
-and with an empty `squeue -h -u "$SLURM_LOGIN_USER"`. Existing training environment
-only; scripts do not install packages or call judges.
+Both `dev.sbatch` and `run100.py` require `STAGE100_EXECUTE_DEV=YES`, nonempty
+`SLURM_JOB_ID`, and an explicit single-host `STAGE100_EXPECTED_NODE` with no
+default or bypass. `STAGE100_EXPECTED_NODE` must be one ASCII hostname (short or
+dotted, up to 253 characters, labels 1 to 63 characters using letters, digits,
+and interior hyphens; no Slurm host lists, ranges, option strings, spaces, or
+trailing dot) and must match `SLURMD_NODENAME` verbatim, including case and
+short/dotted form. This is a runtime check against Slurm-provided values, not
+independent scheduler attestation. Missing, invalid, or mismatched approval or
+node placement fails before reading experiment artifacts (not before module
+imports). Neither entry path submits, queries, or requests allocations, and real
+site identifiers or operating values must not be printed or committed.
+
+Before one separately authorized manual `sbatch` submission, select the approved
+single node outside Git, replace the synthetic `"operator"` example with the
+approved submission login username (not the Slurm accounting account) in
+`SLURM_LOGIN_USER`, confirm immediately before submitting that `squeue` exits
+`0` with zero job rows of any status, export all eight required `STAGE100_*`
+variables above, and pass `--nodelist="$STAGE100_EXPECTED_NODE"` to `sbatch`.
+Existing Slurm resource options, `STAGE100_PYTHON`, `STAGE100_MODEL`,
+`PYTHONPATH`, and CLI path contracts remain unchanged. Scripts do not install
+packages or invoke judges, and this document neither claims nor authorizes a new
+GPU run.
+
+`run100.py` retains the approved freeze-receipt check and the runtime
+`CRITERIA.md` first-line unfrozen-marker guard: it verifies the runtime
+`CRITERIA.md` path (not `CONFIRM_CRITERIA.md`), rejects a criteria file whose
+first line carries the unfrozen marker, checks prepared-pack, criteria, and
+rubric digests against the approved freeze receipt, and then checks code/profile
+digests listed in the pack, including `run100.py`. An original unchanged local
+receipt, pack, and criteria set matches only the original runner and local
+evidence; it cannot validate changed runner code or sanitized criteria. Any
+separately authorized future run against changed code requires a new matched
+prepared pack, frozen inputs, and approved freeze receipt.
 
 `CRITERIA.md` is committed as the frozen criteria before generation.
 The fixed primary360 uses one-sided exact McNemar alpha .05 plus >=5 percentage
@@ -129,4 +186,8 @@ hash-bound historical DEV scorer. `retry_confirm100.py` generalizes the DEV
 checkpoint-resume wrapper: one identical-payload retry for structural or no-label
 capacity/transport failure; second failure is INCONCLUSIVE, never dropped labels.
 The local prepared command/receipt and submission evidence are kept outside git.
+The retry wrapper defaults to the prepared route under the checkout root. When
+using a separate checkout without that route, use the existing `--route` option
+to point to the same readable file. Missing or unusable routes are setup errors
+and produce no run output; the wrapper does not supply a replacement.
 No judges, additional generation jobs or service changes are implied.

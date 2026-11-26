@@ -16,9 +16,9 @@
 
 ### 2.1 사전 고정
 
-응답 생성 전에 평가 기준([`CRITERIA.md`](../../stage1-100/CRITERIA.md)), 주석 기준([`ANNOTATION_RUBRIC.md`](../../stage1-100/ANNOTATION_RUBRIC.md)), 데이터 매니페스트, 검색 준비 팩, 채점 경로 식별자를 고정했다. 아래 동결 커밋과 `experiments/stage1-100/` 자료는 `feat/100-speaker-attribution` 브랜치 병합 커밋을 통해 이번 PR에 함께 포함된다.
+응답 생성 전에 평가 기준([`CRITERIA.md`](../../stage1-100/CRITERIA.md)), 주석 기준([`ANNOTATION_RUBRIC.md`](../../stage1-100/ANNOTATION_RUBRIC.md)), 데이터 매니페스트, 검색 준비 팩, 채점 경로 식별자를 고정했다. 이 문서에 기록한 두 동결 커밋 참조는 원본 동결 커밋에 대응하는 정제 커밋이다. 원본 동결 객체와 바이트 단위로 동일하지는 않다.
 
-- 동결 커밋: `c7856df015245e437f9444cd723085326d660ae2` (2026-11-09, `feat/100-speaker-attribution` 병합으로 이번 PR 이력에 포함)
+- 정제 동결 커밋: `6569761a6df0a6f1787fd07f1eb5dc65d33653b1` (2026-11-09 원본 동결에 대응하는 정제 커밋)
 - [`CRITERIA.md`](../../stage1-100/CRITERIA.md) SHA-256: `b4047472247c60e85d86f640c42d9051afef983573597f5107148a12eb4bb337`
 - [`ANNOTATION_RUBRIC.md`](../../stage1-100/ANNOTATION_RUBRIC.md) SHA-256: `a0f8a2c4b3d5bf24cc1cfbb59a6886456599da9b4593fb2c11a19eed86cae4d1`
 - [`dev-v3/manifest.json`](../../stage1-100/dev-v3/manifest.json) SHA-256: `26d6d693cb9002cb33251b564dc9cb8f16d3f9ba7ef57e4dd31df660ecc450e4`
@@ -118,8 +118,12 @@
 
 ### 5.1 별도 기준과 동결 정보
 
-- 동결 커밋: `c2ccd907946b6b198af61eaf8ffd5abf0fcee55b` (2026-11-10, `feat/100-speaker-attribution` 병합으로 이번 PR 이력에 포함)
-- [`CONFIRM_CRITERIA.md`](../../stage1-100/CONFIRM_CRITERIA.md) SHA-256: `08527944d89e0fa18ddb4176be9127da94410bc91032db1e15719b4521e780c0`
+- 정제 동결 커밋: `b4978e33e62c8c7c552480272b45541b9842b4b8` (2026-11-10 원본 동결에 대응하는 정제 커밋)
+- Historical frozen `CONFIRM_CRITERIA.md` SHA-256: `08527944d89e0fa18ddb4176be9127da94410bc91032db1e15719b4521e780c0`
+- Sanitized distributable [`CONFIRM_CRITERIA.md`](../../stage1-100/CONFIRM_CRITERIA.md) SHA-256: `9bf1b42ac4b801b2538dfb632692e5ae64c767d76f196bf26a59c8123ac705cf`
+
+`Historical frozen CONFIRM_CRITERIA.md SHA-256` 값은 원본 동결 파일의 바이트 해시 이력이다. `Sanitized distributable CONFIRM_CRITERIA.md SHA-256` 값은 링크된 정제 사본의 무결성을 검증한다.
+
 - [`confirm-v3/manifest.json`](../../stage1-100/confirm-v3/manifest.json) SHA-256: `846056e2df37fadf3e8d8e8c2f34cef85132e4d48315c41598d9d2e8d1bbdb28`
 - 검색 준비 팩(`pack.json`) SHA-256: `c16d8e66eccb546e1508c32587c87faac2e9ee9b167e37f5e580c73171f9d179`
 - 데이터: 시드 `10009112027`, 네임스페이스 `s100-c3`, 동일 1,320문항/3,960응답 구조. `DEV-v3`와 동일한 사건군 조합 0건, 사건군 ID·문항 ID 충돌 0건.

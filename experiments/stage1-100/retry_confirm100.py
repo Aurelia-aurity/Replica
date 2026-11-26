@@ -155,6 +155,10 @@ def main(prepared: Path, output: Path, identity: Path, authorization: str,
     reject_forbidden(prepared, output, identity)
     if not authorization.strip():
         raise ValueError(("Separate judge authorization required",))
+    # Relative overrides are interpreted from the scorer's working directory.
+    route = ROOT / route
+    if not route.is_file() or not os.access(route, os.R_OK):
+        raise typer.BadParameter("Expected a readable route file.", param_hint="--route")
     command = (
         sys.executable, "-B", "-s", "-u", str(route), "live",
         str(prepared), str(output), str(identity), "--authorization", authorization,

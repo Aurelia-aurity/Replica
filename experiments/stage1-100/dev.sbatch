@@ -47,7 +47,6 @@ if [[ -z ${STAGE100_OUTPUT:-} ]]; then
   printf '%s\n' 'STAGE100_OUTPUT: New output file required' >&2
   exit 1
 fi
-test "$STAGE100_EXECUTE_DEV" = YES
 if [[ -z ${STAGE100_PYTHON:-} ]]; then
   printf '%s\n' 'STAGE100_PYTHON: Absolute training interpreter path required' >&2
   exit 1

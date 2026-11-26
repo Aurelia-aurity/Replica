@@ -233,10 +233,19 @@ diagnostic, not invalidity or grounds for exclusions/regeneration.
 
 To keep the original runner and exact judge route identity byte-identical,
 the staged runtime preserves old `CRITERIA.md` as `DEV_CRITERIA.md` and uses
-a byte-copy of this committed `CONFIRM_CRITERIA.md` as runtime `CRITERIA.md`.
-The receipt binds THIS file's digest; each generation records that digest.
+a byte-copy of the original frozen `CONFIRM_CRITERIA.md` as runtime `CRITERIA.md`.
+The historical receipt binds the original digest, which each generation records.
+This sanitized copy is for distribution, not replay against that receipt.
 No Python/route code or local historical DEV criteria is replaced.
 Pack/source draft markers are superseded only by this frozen receipt.
+
+> Historical provenance note: the original unchanged receipt, prepared pack, and
+> criteria matched the original runner and remain verifiable only against that
+> original local evidence. This sanitized copy is for distribution only; that
+> historical receipt cannot validate changed runner code or this sanitized copy,
+> and no default or bypass exists. Any separately authorized future run against
+> changed code requires a new matched pack, frozen inputs, and approved freeze
+> receipt. No new GPU run or replay is claimed or authorized.
 
 Later offline preparation/live command is prepared separately as
 `.local-work/issue100/CONFIRM_JUDGE_COMMAND.sh`, using new judge-v2 output
