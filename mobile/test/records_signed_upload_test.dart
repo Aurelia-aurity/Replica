@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -8,6 +9,7 @@ import 'package:mobile/records/api_record_service.dart';
 import 'package:mobile/records/http_record_transport.dart';
 import 'package:mobile/records/record_controller.dart';
 import 'package:mobile/records/record_models.dart';
+import 'package:mobile/records/record_upload_screen.dart';
 import 'package:mobile/services/backend_service.dart';
 
 import 'records_test.dart' show ApiTestAuth, file, recordJson;
@@ -43,8 +45,19 @@ Map<String, Object?> _signed(
   'expires_at': _now.add(valid).toIso8601String(),
 };
 
-Map<String, Object?> _error(String code, {required bool retryable}) => {
-  'error': {'code': code, 'message': '합성 오류', 'retryable': retryable},
+Map<String, Object?> _error(
+  String code, {
+  required bool retryable,
+  String? field,
+  List<String>? speakers,
+}) => {
+  'error': {
+    'code': code,
+    'message': '합성 오류',
+    'retryable': retryable,
+    'field': ?field,
+    'speakers': ?speakers,
+  },
 };
 
 /// A synthetic backend and Storage following the app-backend contract.
@@ -64,6 +77,16 @@ class _Server {
 
   /// Runs after each `PUT` reaches Storage.
   void Function()? afterPut;
+
+  /// When set, `/uploaded` checks the final speaker values as the contract's
+  /// '업로드 뒤 검증' does. Null means the server does not see a chat.
+  var checkSpeakers = false;
+  List<String>? fileSpeakers;
+
+  /// Bodies `/uploaded` received, in order (an empty map when none was sent).
+  final uploadedBodies = <Map<String, Object?>>[];
+  final _target = <String, String?>{};
+  final _provider = <String, String?>{};
 
   final _status = <String, String>{};
   final _stored = <String>{};
@@ -111,6 +134,9 @@ class _Server {
       reservationIds.add(id);
       reservations++;
       _status.putIfAbsent(id, () => 'uploading');
+      // A reservation's speaker values replace the earlier ones.
+      _target[id] = json['target_speaker'] as String?;
+      _provider[id] = json['provider_speaker'] as String?;
       if (storedOnReserve) _stored.add(id);
       final upload = uploads.isEmpty
           ? _signed(reservations)
@@ -154,11 +180,56 @@ class _Server {
       if (_wrongSize.contains(id)) {
         return _json(_error('UPLOAD_SIZE_MISMATCH', retryable: false), 409);
       }
+      final sent = bytes.isEmpty
+          ? <String, Object?>{}
+          : jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      uploadedBodies.add(sent);
+      // Leaving a key out keeps the reserved value; null clears it.
+      if (sent.containsKey('target_speaker')) {
+        _target[id] = sent['target_speaker'] as String?;
+      }
+      if (sent.containsKey('provider_speaker')) {
+        _provider[id] = sent['provider_speaker'] as String?;
+      }
+      final refused = checkSpeakers ? _speakerError(id) : null;
+      if (refused != null) return _json(refused, 422);
       _status[id] = 'uploaded';
       return _json(recordJson(id, status: 'uploaded'), 200);
     }
     return _json({}, 404);
   });
+
+  Map<String, Object?>? _speakerError(String id) {
+    final names = fileSpeakers;
+    final target = _target[id], provider = _provider[id];
+    Map<String, Object?> refuse(String code, String field) => _error(
+      code,
+      retryable: true,
+      field: field,
+      speakers: names ?? const [],
+    );
+    if (names == null) {
+      return target != null || provider != null
+          ? refuse('SPEAKER_NOT_ALLOWED', 'target_speaker')
+          : null;
+    }
+    if (names.length == 1 && provider != null) {
+      return refuse('SPEAKER_NOT_ALLOWED', 'provider_speaker');
+    }
+    if (target == null) return refuse('SPEAKER_REQUIRED', 'target_speaker');
+    if (!names.contains(target)) {
+      return refuse('SPEAKER_NOT_FOUND', 'target_speaker');
+    }
+    if (names.length >= 2) {
+      if (provider == null) {
+        return refuse('SPEAKER_REQUIRED', 'provider_speaker');
+      }
+      if (!names.contains(provider)) {
+        return refuse('SPEAKER_NOT_FOUND', 'provider_speaker');
+      }
+    }
+    return null;
+  }
 
   static Map<String, Object?> _job(String id) => {
     'id': 'job-$id',
@@ -172,6 +243,7 @@ class _Server {
       http.StreamedResponse(
         Stream.value(utf8.encode(jsonEncode(body))),
         status,
+        headers: {'content-type': 'application/json'},
       );
 }
 
@@ -473,6 +545,216 @@ void main() {
       expect(c.attempt, isNull);
       expect(c.uploadRetryAllowed, isFalse);
       expect(c.uploadError, contains('크기가 맞지 않아'));
+    });
+  });
+
+  group('speaker errors after the upload', () {
+    RecordFile chat(String body) {
+      final bytes = utf8.encode(body);
+      return RecordFile(
+        name: 'kakao.txt',
+        sizeBytes: bytes.length,
+        openRead: () => Stream.value(bytes),
+      );
+    }
+
+    const pair = '[엄마] [오후 3:12] 밥은 먹었니?\n[나] [오후 3:13] 네\n';
+
+    Future<RecordController> picked(RecordFile picked) async {
+      final c = RecordController(service());
+      addTearDown(c.dispose);
+      c.select(picked);
+      c.setConsent(true);
+      await pumpEventQueue();
+      return c;
+    }
+
+    test(
+      'the service keeps the record at completion for a new choice',
+      () async {
+        server
+          ..checkSpeakers = true
+          ..fileSpeakers = ['엄마', '나'];
+        final attempt = upload();
+        final api = service();
+        await expectLater(
+          api.upload(attempt, () {}),
+          throwsA(
+            isA<BackendFailure>()
+                .having((f) => f.code, 'code', 'SPEAKER_REQUIRED')
+                .having((f) => f.field, 'field', 'target_speaker')
+                .having((f) => f.speakers, 'speakers', ['엄마', '나']),
+          ),
+        );
+        expect(attempt.stage, UploadStage.complete);
+        attempt
+          ..targetSpeaker = '엄마'
+          ..providerSpeaker = '나'
+          ..speakersChanged = true;
+        server.calls.clear();
+        await api.upload(attempt, () {});
+        // The file is not sent again.
+        expect(server.calls, [
+          'GET /records/{id}',
+          'POST /records/{id}/uploaded',
+        ]);
+        expect(server.uploadedBodies.last, {
+          'target_speaker': '엄마',
+          'provider_speaker': '나',
+        });
+        expect(attempt.stage, UploadStage.done);
+      },
+    );
+
+    test(
+      'the user chooses from the server list and only /uploaded is called',
+      () async {
+        server
+          ..checkSpeakers = true
+          ..fileSpeakers = ['엄마', '나'];
+        // The device read the file as plain text.
+        final c = await picked(file('synthetic.txt'));
+        expect(c.needsSpeakers, isFalse);
+        await c.send();
+        expect(c.uploadSucceeded, isFalse);
+        expect(c.speakerRecovery, isTrue);
+        expect(c.uploadError, contains('다시 골라'));
+        expect(c.analysis!.speakers.map((s) => s.name), ['엄마', '나']);
+        expect(c.canUpload, isFalse);
+        c.selectTarget('엄마');
+        c.selectProvider('나');
+        expect(c.canUpload, isTrue);
+        await c.send();
+        expect(c.uploadSucceeded, isTrue);
+        expect(c.speakerRecovery, isFalse);
+        expect(server.storageRequests, hasLength(1));
+        expect(server.uploadedBodies.last, {
+          'target_speaker': '엄마',
+          'provider_speaker': '나',
+        });
+      },
+    );
+
+    test('a lone speaker from the server still needs the user tap', () async {
+      server
+        ..checkSpeakers = true
+        ..fileSpeakers = ['엄마'];
+      final c = await picked(file('synthetic.txt'));
+      await c.send();
+      expect(c.speakerRecovery, isTrue);
+      expect(c.singleSpeaker, isTrue);
+      expect(c.targetSpeaker, isNull);
+      expect(c.canUpload, isFalse);
+      c.selectTarget('엄마');
+      await c.send();
+      expect(c.uploadSucceeded, isTrue);
+      // An explicit null leaves no provider for a one-speaker file.
+      expect(server.uploadedBodies.last, {
+        'target_speaker': '엄마',
+        'provider_speaker': null,
+      });
+    });
+
+    test('values the server does not allow are cleared at once', () async {
+      server.checkSpeakers = true; // Not a chat for the server.
+      final c = await picked(chat(pair));
+      c.selectTarget('엄마');
+      c.selectProvider('나');
+      await c.send();
+      expect(c.uploadSucceeded, isTrue);
+      expect(c.speakerRecovery, isFalse);
+      expect(server.uploadedBodies, [
+        <String, Object?>{},
+        {'target_speaker': null, 'provider_speaker': null},
+      ]);
+    });
+
+    test('a provider for a one-speaker file is cleared at once', () async {
+      server
+        ..checkSpeakers = true
+        ..fileSpeakers = ['엄마'];
+      final c = await picked(chat(pair));
+      c.selectTarget('엄마');
+      c.selectProvider('나');
+      await c.send();
+      expect(c.uploadSucceeded, isTrue);
+      expect(server.uploadedBodies.last, {
+        'target_speaker': '엄마',
+        'provider_speaker': null,
+      });
+    });
+
+    test('after clearing, a missing speaker is chosen again', () async {
+      server
+        ..checkSpeakers = true
+        ..fileSpeakers = ['아빠'];
+      final c = await picked(chat(pair));
+      c.selectTarget('엄마');
+      c.selectProvider('나');
+      await c.send();
+      expect(c.uploadSucceeded, isFalse);
+      expect(c.speakerRecovery, isTrue);
+      expect(c.analysis!.speakers.map((s) => s.name), ['아빠']);
+      // '엄마' is not in the server's list any more.
+      expect(c.targetSpeaker, isNull);
+      expect(c.providerSpeaker, isNull);
+    });
+
+    test('a new file leaves the speaker choice behind', () async {
+      server
+        ..checkSpeakers = true
+        ..fileSpeakers = ['엄마', '나'];
+      final c = await picked(file('synthetic.txt'));
+      await c.send();
+      expect(c.speakerRecovery, isTrue);
+      final first = c.attempt!.id;
+      c.beginSelection();
+      await pumpEventQueue();
+      expect(c.speakerRecovery, isFalse);
+      expect(c.analysis, isNull);
+      // The waiting record is cleaned up.
+      expect(server.deletedIds, [first]);
+    });
+
+    testWidgets('SC-04 shows the server speakers to choose again', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 2000);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      server
+        ..checkSpeakers = true
+        ..fileSpeakers = ['엄마', '나'];
+      final c = RecordController(service());
+      addTearDown(c.dispose);
+      await tester.runAsync(() async {
+        c.select(file('synthetic.txt'));
+        c.setConsent(true);
+        await pumpEventQueue();
+        await c.send();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RecordUploadScreen(controller: c, picker: () async => null),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('누구의 말투를 반영할까요?'), findsOneWidget);
+      expect(find.textContaining('다시 골라'), findsOneWidget);
+      // The server gives names only, so no message counts are shown.
+      expect(find.textContaining('메시지 '), findsNothing);
+      FilledButton button() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('record-upload')),
+      );
+      expect(button().onPressed, isNull);
+      expect(find.text('선택한 화자로 이어서 올리기'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('speaker-target-엄마')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('speaker-provider-나')));
+      await tester.pump();
+      expect(button().onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
     });
   });
 

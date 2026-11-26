@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'record_models.dart';
 
 class ChatSpeaker {
-  const ChatSpeaker(this.name, this.messages);
+  const ChatSpeaker(this.name, [this.messages]);
   final String name;
-  final int messages;
+
+  /// Messages counted on the device; null for names the server listed.
+  final int? messages;
 }
 
 /// Result of inspecting a `.txt` file on the device (SC-04 items 2–4).
@@ -20,6 +22,16 @@ class TextAnalysis {
     this.messages = 0,
   });
   static const plain = TextAnalysis(kakao: false);
+
+  /// The speakers the server found in the uploaded file (`error.speakers`),
+  /// most messages first. The server's judgment is final, so it replaces what
+  /// the device found. An empty list means the server did not see a chat.
+  factory TextAnalysis.fromServer(List<String> names) => names.isEmpty
+      ? plain
+      : TextAnalysis(
+          kakao: true,
+          speakers: [for (final name in names) ChatSpeaker(name)],
+        );
   final bool kakao;
   final List<ChatSpeaker> speakers;
   final int messages;
@@ -69,7 +81,7 @@ Future<TextAnalysis> analyzeTextRecord(RecordFile file) async {
   if (total < 2) return TextAnalysis.plain;
   final speakers = [
     for (final entry in counts.entries) ChatSpeaker(entry.key, entry.value),
-  ]..sort((a, b) => b.messages.compareTo(a.messages));
+  ]..sort((a, b) => b.messages!.compareTo(a.messages!));
   return TextAnalysis(kakao: true, speakers: speakers, messages: total);
 }
 

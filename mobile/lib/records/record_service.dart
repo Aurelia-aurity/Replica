@@ -5,6 +5,14 @@ import 'record_playback.dart';
 import 'record_review.dart';
 import 'transcript_segments.dart';
 
+/// The server refused the speaker values for the uploaded file (422
+/// `SPEAKER_REQUIRED` · `SPEAKER_NOT_FOUND` · `SPEAKER_NOT_ALLOWED`).
+bool isSpeakerFailure(BackendFailure failure) => const {
+  'SPEAKER_REQUIRED',
+  'SPEAKER_NOT_FOUND',
+  'SPEAKER_NOT_ALLOWED',
+}.contains(failure.code);
+
 abstract class RecordService
     implements RecordReviewService, RecordDeletionService {
   @override

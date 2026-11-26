@@ -340,6 +340,8 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                               ? '기록 목록 보기'
                               : busy
                               ? (_kind == RecordKind.text ? '반영 중' : '전사 중')
+                              : c.speakerRecovery
+                              ? '선택한 화자로 이어서 올리기'
                               : c.uploadError != null
                               ? '다시 시도'
                               : '올리기',
@@ -408,7 +410,7 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
   }
 
   List<Widget> _speakerSections(RecordController c, TextAnalysis analysis) {
-    final locked = c.uploading || c.attempt != null;
+    final locked = c.uploading || (c.attempt != null && !c.speakerRecovery);
     final single = c.singleSpeaker;
     Widget group({
       required String title,
@@ -540,8 +542,10 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text('메시지 ${formatCount(speaker.messages)}개', style: _muted),
+              if (speaker.messages != null) ...[
+                const SizedBox(width: 8),
+                Text('메시지 ${formatCount(speaker.messages!)}개', style: _muted),
+              ],
             ],
           ),
         ),

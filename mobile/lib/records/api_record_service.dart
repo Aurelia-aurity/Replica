@@ -283,7 +283,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     String method,
     String path, {
     Map<String, String>? query,
-    Map<String, Object>? body,
+    Map<String, Object?>? body,
     bool allowNotFound = false,
   }) => _backend.run(() async {
     final headers = await auth.authorizationHeaders();
@@ -494,7 +494,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     }
     if (existing.status == RecordStatus.uploading) {
       try {
-        await _request('POST', '/records/${upload.id}/uploaded');
+        await _uploaded(upload);
       } on BackendFailure catch (failure) {
         if (failure.code != 'UPLOAD_MISSING') rethrow;
         // Send it again: to the same signature, or to a new one when the
@@ -561,12 +561,36 @@ class ApiRecordService extends RecordService implements RecordApiClient {
   /// `UPLOAD_MISSING` means it did not, and the file is sent.
   Future<bool> _completedAlready(RecordUpload upload) async {
     try {
-      await _request('POST', '/records/${upload.id}/uploaded');
+      await _uploaded(upload);
       return true;
     } on BackendFailure catch (failure) {
       if (failure.code != 'UPLOAD_MISSING') rethrow;
       upload.transferStarted = false;
       return false;
+    }
+  }
+
+  /// `POST /records/{id}/uploaded`, with speakers chosen again if any.
+  ///
+  /// A speaker error (422 `SPEAKER_*`) means the server has the original and
+  /// read its speakers, so the record waits at the completion step: choosing
+  /// again calls `/uploaded` only, without sending the file again.
+  Future<void> _uploaded(RecordUpload upload) async {
+    final body = upload.uploadedJson(
+      includeSpeakers: policy.sendSpeakerSelection,
+    );
+    try {
+      await _request(
+        'POST',
+        '/records/${upload.id}/uploaded',
+        body: body.isEmpty ? null : body,
+      );
+    } on BackendFailure catch (failure) {
+      if (isSpeakerFailure(failure)) {
+        upload.stage = UploadStage.complete;
+        upload.transferStarted = false;
+      }
+      rethrow;
     }
   }
 

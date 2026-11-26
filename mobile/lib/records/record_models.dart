@@ -271,9 +271,21 @@ class RecordUpload {
     providerSpeaker: providerSpeaker,
   );
 
-  /// Chosen on SC-04 for KakaoTalk exports. Names stay in memory only.
-  final String? targetSpeaker;
-  final String? providerSpeaker;
+  /// Chosen on SC-04 for KakaoTalk exports. Names stay in memory only. They
+  /// change when the server asks to choose again after the upload.
+  String? targetSpeaker;
+  String? providerSpeaker;
+
+  /// The speakers were chosen again after the server refused them, so the
+  /// next `/uploaded` carries them (an explicit null clears a value).
+  bool speakersChanged = false;
+
+  /// Body of `POST /records/{id}/uploaded`. Leaving the keys out keeps the
+  /// reserved values.
+  Map<String, Object?> uploadedJson({bool includeSpeakers = false}) =>
+      includeSpeakers && speakersChanged
+      ? {'target_speaker': targetSpeaker, 'provider_speaker': providerSpeaker}
+      : const {};
   UploadStage stage = UploadStage.reserve;
   bool reservationRequested = false;
 
