@@ -165,6 +165,7 @@
 | attempt_count | integer | 시도 횟수 |
 | last_error_code | string \| null | 마지막 실패 코드 |
 | next_attempt_at | datetime \| null | (제안) 자동 재시도를 기다리는 `pending`일 때만 값이 있는 다음 시도 시각. 작업을 집어 `running`이 될 때, 사용자 재시도로 `pending`이 될 때, `failed`·`completed`일 때는 항상 `null`입니다. 앱은 `pending`이면서 이 값이 있을 때만 '자동으로 다시 시도하는 중'으로 보여 주고, `pending`인데 `null`이면 접수되어 곧 처리를 기다리는 중입니다 |
+| parent_job_id | uuid \| null | (제안) 이 작업을 흡수한 상위 작업(`persona`·`account`)의 id. 값이 있으면 이 작업은 상위 작업이 처리하므로 이 작업의 `status`·`last_error_code`와 다시 시도 버튼 대신 상위 작업을 따릅니다. 하위 작업은 상위 작업의 `database` 단계가 성공할 때 같은 트랜잭션에서 `completed`로 닫힙니다 |
 | created_at, updated_at, finished_at | datetime | 생성·수정·완료 시각 (`finished_at`은 완료 시에만) |
 
 #### 삭제 작업의 상태와 처리 규칙
@@ -181,7 +182,7 @@
 | 진행 신호와 이어받기 | 처리 중인 worker는 일정 간격(예: 30초)마다 `updated_at`을 갱신해 진행 중임을 알립니다. `running`이 5분(임시 값) 동안 갱신되지 않을 때만 멈춘 것으로 보고 다른 시도가 새 소유 토큰으로 `remaining_steps`부터 이어받습니다. 개별 Storage·DB 호출에는 이보다 훨씬 짧은 시간 제한을 둡니다 |
 | 시도와 자동 재시도 | worker가 작업을 집을 때마다 `attempt_count`가 1 올라갑니다(누적). 단계가 실패하면 `last_error_code`를 남기고, 자동 재시도 횟수가 남아 있으면 작업을 `pending`으로 돌리고 `next_attempt_at`(1분·5분·30분 뒤, 임시 값)을 정합니다. 3번을 다 쓰고도 실패하면 `failed`로 멈춥니다. 작업을 집는 순간 `next_attempt_at`은 `null`이 됩니다. 계정 삭제에서 로그인 계정이 이미 지워진 뒤의 마무리는 이 횟수 제한 없이 계속 다시 시도합니다('DELETE /account'의 'Auth 삭제 뒤 정리와 복구') |
 | 사용자 재시도 | `POST /deletion-jobs/{job_id}/retry`는 `failed`인 작업을 같은 작업 id로 `pending`(바로 시도)으로 되돌리며 `next_attempt_at`은 `null`로 둡니다(자동 재시도 대기가 아니므로 앱이 '자동으로 다시 시도하는 중'으로 보여 주지 않음). 자동 재시도 횟수는 0으로 초기화합니다(재시도 요청마다 자동 재시도 3번의 새 예산). `attempt_count`는 이어서 늘어납니다. 새 작업을 만들어 부분 실패를 감추지 않습니다 |
-| 앱의 조회와 복원 | 앱은 `pending`·`running`인 작업을 시트가 열려 있는 동안 3초 간격으로 최대 20번 확인하고, `failed`는 자동으로 다시 묻지 않습니다. 그 뒤에는 기록 목록의 삭제 요청 카드로 남기고, 목록을 새로고침하면 `GET /deletion-jobs`로 복원해 다시 확인합니다. `pending`이면서 `next_attempt_at`이 있으면 "자동으로 다시 시도하는 중"으로, `failed`면 부분 실패와 다시 시도 버튼으로 보여 줍니다 |
+| 앱의 조회와 복원 | 앱은 `pending`·`running`인 작업을 시트가 열려 있는 동안 3초 간격으로 최대 20번 확인하고, `failed`는 자동으로 다시 묻지 않습니다. 그 뒤에는 기록 목록의 삭제 요청 카드로 남기고, 목록을 새로고침하면 `GET /deletion-jobs`로 복원해 다시 확인합니다. `pending`이면서 `next_attempt_at`이 있으면 "자동으로 다시 시도하는 중"으로, `failed`면 부분 실패와 다시 시도 버튼으로 보여 줍니다. `parent_job_id`가 있는 작업은 상위 작업이 처리하므로 실패 표시와 다시 시도 버튼을 숨기고 '계정 삭제에 포함됨'(대화 상대 삭제면 '대화 상대 삭제에 포함됨')으로 보여 주며 상위 작업을 확인합니다 |
 | 실패 코드 | `last_error_code`는 안전한 코드만 씁니다: `storage_unavailable` · `storage_error` · `database_error` · `auth_error` · `external_index_error` · `adapter_error` · `worker_interrupted`. 내부 경로·예외 원문은 넣지 않습니다 |
 | 앱에 보이지 않는 것 | 삭제 대상 파일 경로 목록(`manifest`)과 소유 토큰(`lease_token`)은 앱에 보내지 않습니다 |
 | 보관 | 완료된 작업의 보관 기간은 정하지 않았습니다. 앱은 `GET /deletion-jobs`로 이전 작업을 복원합니다 |
@@ -194,6 +195,7 @@
 | `failed`인 작업을 다시 시작 | `POST /deletion-jobs/{job_id}/retry`만 가능합니다 |
 | 삭제가 이미 끝나 행이 사라진 대상에 `DELETE` | 404 |
 | `completed`인 작업에 retry | 200과 현재 작업 객체입니다(409가 아님. 앱이 응답을 그대로 완료로 처리) |
+| 흡수된 작업(`parent_job_id`가 있음)에 retry | 200과 현재 작업 객체입니다(아무것도 바꾸지 않음. 상위 작업이 처리하며 단독으로 집지 않습니다) |
 | 계정 삭제를 요청한 뒤 | 그 계정 삭제 작업이 `completed`가 되기 전에는(`pending`·`running`·`failed` 모두) 삭제 작업 조회, retry, 같은 `DELETE /account`(진행 중이거나 실패한 같은 작업을 202)만 허용하고 그 밖의 쓰기는 409 `ACCOUNT_DELETING`입니다. 삭제를 취소하는 API가 없고 데이터는 이미 숨겨졌으므로 `failed`여도 쓰기를 열지 않습니다 |
 
 ##### 합의가 남은 범위 (제안)
@@ -1149,6 +1151,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | `failed` | 202와 `pending`으로 바뀐 작업 객체 |
 | `pending`·`running` | 200과 현재 작업 객체(이미 처리 중이므로 아무것도 바꾸지 않음. 다시 보내도 안전) |
 | `completed` | 200과 현재 작업 객체(409가 아님. 자동 재시도가 먼저 끝낸 작업에 사용자가 재시도를 눌러도 앱이 응답을 그대로 완료로 처리) |
+| 흡수된 작업(`parent_job_id`가 있음) | 200과 현재 작업 객체(아무것도 바꾸지 않음. 상위 작업이 처리하며 단독으로 집지 않으므로 앱은 이 작업의 다시 시도 버튼을 보이지 않고 상위 작업을 확인) |
 
 ##### 요청
 
@@ -1188,9 +1191,9 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 지워지는 것 | 모든 대화 상대와 그 기록(원본·전사문·조각·프로필), 대화방·턴(대화 이력), 이 계정의 앱 데이터 전부, Supabase 로그인 계정(`auth`) |
 | 요청 직후 | 모든 대화 상대와 기록이 `deleting`이 되어 조회에서 숨겨집니다. 새 대화 상대·기록·대화 생성과 수정은 409 `ACCOUNT_DELETING`으로 거절하고, 삭제 작업 조회·다시 시작·같은 `DELETE /account`만 계속 쓸 수 있습니다. 작업이 `completed`가 되기 전에는 `failed`여도 같습니다 |
 | 같은 계정에 다시 요청 | 진행 중이거나 실패한 같은 작업을 돌려줍니다(202) |
-| 처리 | `storage` → `external_index` → `adapter` → `database` → `auth`. 기록이 없으면 `storage` 단계 없이 `database`부터 진행합니다. `auth`(Supabase Auth 사용자 삭제)는 다른 단계가 모두 끝난 뒤 마지막에만 실행합니다 |
-| 앞 단계가 실패하면 | 로그인 계정이 남아 있으므로 자동 재시도 대기(`pending`) 또는 `failed`로 조회되고, `failed`는 `POST /deletion-jobs/{job_id}/retry`로 이어서 처리합니다. 부분 실패를 완료로 표시하지 않습니다 |
-| 이미 열린 개별 삭제 작업 | 계정 삭제를 요청하면 그 계정의 열린(`pending`·`running`·`failed`) 기록 삭제 작업은 이 계정 삭제 작업이 **흡수**합니다(제안, 대화 상대 삭제도 같음). 하위 작업이 남긴 원본 경로도 계정 작업이 지우므로 `storage` 단계가 놓치지 않고, 하위 작업은 이 작업의 `database` 단계가 끝날 때 함께 `completed`로 닫히며 `manifest`가 비워집니다. 열린 개별 작업 때문에 계정 삭제가 거절되는 일은 없습니다 |
+| 처리 | `storage` → `external_index` → `adapter` → `database` → `auth`. `storage` 단계는 기록의 원본 경로와 흡수한 하위 작업이 남긴 경로를 합친 `manifest`에 경로가 하나라도 있을 때 둡니다. 기록 행이 없어도 흡수한 경로가 남아 있으면 `storage`가 먼저 처리하고, 경로가 하나도 없을 때만 `database`부터 진행합니다. `auth`(Supabase Auth 사용자 삭제)는 다른 단계가 모두 끝난 뒤 마지막에만 실행합니다 |
+| 앞 단계가 실패하면 | 로그인 계정이 남아 있는 동안에는 자동 재시도 대기(`pending`) 또는 `failed`로 조회되고(로그인 계정이 이미 사라진 작업은 아래 '앞 단계에서 로그인 계정이 먼저 사라진 경우'), `failed`는 `POST /deletion-jobs/{job_id}/retry`로 이어서 처리합니다. 부분 실패를 완료로 표시하지 않습니다 |
+| 이미 열린 개별 삭제 작업 | 계정 삭제를 요청하면 그 계정의 열린(`pending`·`running`·`failed`) 기록 삭제 작업은 이 계정 삭제 작업이 **흡수**합니다(제안, 대화 상대 삭제도 같음). 이미 `persona` 작업에 흡수된 기록 작업은 계정 작업을 직접 가리키도록 다시 묶고 `persona` 작업 자신도 흡수합니다(상위는 항상 계정 작업 하나). 하위 작업이 남긴 원본 경로는 상위 `manifest`에 합쳐 계정 작업의 `storage` 단계가 지우며, 하위 작업의 `manifest`는 그 `storage`와 `database`가 끝나기 전에는 비우지 않습니다. 하위 작업은 이 작업의 `database` 단계가 성공할 때 같은 트랜잭션에서(다시 묶은 작업 포함, `parent_job_id`가 이 계정 작업인 모든 작업) `completed`로 닫히고 `manifest`가 비워집니다. 열린 개별 작업 때문에 계정 삭제가 거절되는 일은 없습니다 |
 
 ##### 완료 판정 (인증 계정이 사라지므로)
 
@@ -1199,7 +1202,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 서버가 본 것 | 응답 |
 |---|---|
 | 토큰 확인(`/auth/v1/user`)이 삭제된 사용자(`user_not_found`)를 돌려주고, 토큰의 `sub`와 같은 대상의 계정 삭제 작업(`target_type = account`)이 `completed` | 401 `ACCOUNT_DELETED` |
-| 같은 조건이지만 그 작업이 아직 `completed`가 아님(Auth 삭제 직후 작업 정리 전, 또는 `storage`·`database` 단계 중에 Auth 사용자만 먼저 지워진 경우) | 401 `ACCOUNT_DELETION_INCOMPLETE` |
+| 같은 조건이지만 그 작업이 아직 `completed`가 아님(Auth 삭제 직후 작업 정리 전, 또는 Storage 정리가 끝난 뒤 `external_index`·`adapter`·`database` 단계 중에 Auth 사용자만 먼저 지워진 경우) | 401 `ACCOUNT_DELETION_INCOMPLETE` |
 | 같은 조건이지만 `sub`의 계정 삭제 작업이 없음(예: 관리자가 직접 삭제) | 일반 401 `UNAUTHENTICATED` |
 
 `sub`는 작업을 찾는 키로만 쓰고 권한 판단에는 쓰지 않습니다.
@@ -1210,9 +1213,9 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 조회가 200이고 `pending`(자동 재시도 대기 포함)·`running` | 계속 확인 |
 | 401 `ACCOUNT_DELETED` | **완료**. 일반 401 처리(로그인 만료 안내와 세션 무효화)보다 먼저 이 코드만 따로 분기해 '계정 삭제 완료'를 안내하고 로컬 정리를 합니다 |
 | 401 `ACCOUNT_DELETION_INCOMPLETE` | **완료 아님**. 일반 401보다 먼저 분기해 '계정 삭제를 마무리하는 중'으로 보여 주고 같은 토큰으로 다시 확인합니다. 로컬 정리와 로그인 화면 이동은 하지 않습니다 |
-| 일반 401 `UNAUTHENTICATED` | 로그인 만료이며 완료가 아닙니다. 다시 로그인한 뒤 작업을 조회합니다 |
+| 일반 401 `UNAUTHENTICATED` | 로그인 만료이며 완료가 아닙니다. 계정이 남아 있는 경우에만 다시 로그인한 뒤 작업을 조회합니다. 계정 삭제를 요청한 뒤 토큰이 만료되어 이 응답을 받았다면 완료 여부를 알 수 없으므로(아래 설명) 완료로도 실패로도 단정하지 않습니다 |
 
-앱이 같은 토큰으로 확인할 수 있는 것은 access token이 만료되기 전까지뿐입니다. 그 안에 `completed`가 되지 않으면 앱은 완료를 확인하지 못한 채 일반 401로 끝납니다. 이 경우에도 서버가 작업을 끝까지 처리하므로(아래 '마무리의 재시도') 앱은 완료를 단정하지 않고 '삭제를 처리하는 중일 수 있다'고 안내할 수 있습니다. 계정이 지워졌는데 삭제 작업이 없는 경우(예: 관리자가 직접 삭제)는 일반 401이고, 작업이 있는데 아직 `completed`가 아니면(예: 삭제가 진행 중인데 관리자가 Auth 사용자만 먼저 지움) `ACCOUNT_DELETION_INCOMPLETE`입니다. 어느 쪽도 성공으로 표시하지 않으며, 앱이 갱신 실패 같은 간접 증거로 성공을 추정하지 않습니다.
+앱이 같은 토큰으로 확인할 수 있는 것은 access token이 만료되기 전까지뿐입니다. 그 안에 `completed`가 되지 않으면 앱은 완료를 확인하지 못한 채 일반 401로 끝납니다. 이 경우에도 서버가 작업을 끝까지 처리하므로(아래 '마무리의 재시도') 앱은 완료를 단정하지 않고 '삭제를 처리하는 중일 수 있다'고 안내할 수 있습니다. 계정이 지워졌는데 삭제 작업이 없는 경우(예: 관리자가 직접 삭제)는 일반 401이고, 작업이 있는데 아직 `completed`가 아니면(예: Storage 정리 뒤 삭제가 진행 중인데 관리자가 Auth 사용자만 먼저 지움) `ACCOUNT_DELETION_INCOMPLETE`입니다. 어느 쪽도 성공으로 표시하지 않으며, 앱이 갱신 실패 같은 간접 증거로 성공을 추정하지 않습니다.
 
 ##### Auth 삭제 뒤 정리와 복구
 
@@ -1221,9 +1224,20 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 정리 | worker는 Auth 사용자를 지운 뒤(이미 없으면 성공으로 봄) `auth` 단계를 끝내 작업을 `completed`로 바꾸고 `finished_at`을 채우며 `manifest`를 비웁니다. 서버는 이 시점부터 `ACCOUNT_DELETED`를 보냅니다 |
 | Auth 삭제 뒤 중단 | Auth 삭제와 작업 정리 사이에 서버가 멈추면 `remaining_steps = ["auth"]`가 남아 있으므로, 소유 토큰이 만료된 뒤(5분) worker가 다시 집습니다. Auth 사용자 삭제는 이미 없으면 성공인 멱등 호출이라 정리만 이어서 끝냅니다. 작업은 작업 id로 처리하므로 `user_id`가 `null`이 되어도 영향이 없습니다 |
 | 앱이 보는 상태 | 이 사이에 같은 토큰의 요청은 `ACCOUNT_DELETION_INCOMPLETE`를 받고, `completed`가 된 뒤에야 `ACCOUNT_DELETED`를 받습니다 |
-| 마무리의 재시도 | 로그인 계정이 이미 지워진 뒤에는 사용자가 인증도 retry도 할 수 없습니다. 그래서 이 구간의 마무리 실패는 자동 재시도 횟수를 쓰지 않고 `failed`로 멈추지 않으며, `pending`과 `next_attempt_at`(최대 30분 간격)으로 계속 다시 시도합니다. 그래도 멈추면 운영자가 사용자 없이 작업 id로 다시 시작합니다(backend-db의 `retry_deletion_job` 운영자 호출). 앞 단계(`storage`~`database`)와 Auth 사용자 삭제 호출의 실패는 로그인 계정이 남아 있으므로 기존 규칙(자동 재시도 3번 뒤 `failed`, 사용자 retry)을 따릅니다 |
+| 마무리의 재시도 | 로그인 계정이 이미 지워진 작업(소유자 `user_id`가 `null`이고 `completed`가 아닌 '고아 작업')은 사용자가 인증도 retry도 할 수 없으므로 서버가 스스로 끝까지 처리합니다. 단계가 실패해도 자동 재시도 횟수를 쓰지 않고 `failed`로 멈추지 않으며 `pending`과 `next_attempt_at`(최대 30분 간격)으로 계속 다시 시도합니다. 감지와 복구 규칙은 backend-db의 '로그인 계정이 먼저 사라진 작업(고아 작업)'을 따르며, 운영자가 사용자 없이 작업 id로 다시 시작하는 호출(`retry_deletion_job`)은 보조 수단입니다. 로그인 계정이 남아 있는 동안의 실패(`storage`~`database`, Auth 사용자 삭제 호출)는 기존 규칙(자동 재시도 3번 뒤 `failed`, 사용자 retry)을 따릅니다 |
 
-> 확인 필요(DB 담당 실측, #25 검증 한계): 삭제된 사용자의 토큰으로 `/auth/v1/user`를 부르면 `user_not_found`로 구별되는지, 이미 지운 사용자를 다시 지우는 Auth Admin 호출이 성공으로 취급되는지, 완료 뒤 작업 행에 개인 경로(`manifest`)가 남지 않는지, 흡수한 하위 작업이 상위 작업의 `database` 단계 끝에 함께 닫히는지. 확인되기 전까지 위 완료 판정은 제안입니다.
+##### 앞 단계에서 로그인 계정이 먼저 사라진 경우
+
+| 항목 | 내용 |
+|---|---|
+| 일어날 수 있는 경우 | 지울 Storage 원본이 이미 지워진 뒤(`storage` 단계 완료 후)이거나 지울 원본이 없는 사용자입니다. 기록이 남은 채 `storage`가 끝나기 전에 Auth 사용자만 지우려 하면 DB의 기록 삭제 보호가 막아 Auth 삭제가 거절되므로(DB 담당 확인 필요) 원본 파일이 고아로 남는 조기 소실은 생기지 않는 것으로 봅니다 |
+| 감지 | 서버(삭제 worker)가 `user_id`가 `null`이고 `completed`가 아닌 작업을 고아 작업으로 봅니다. 이미 `failed`로 멈춘 작업도 포함합니다. Auth 서버를 따로 호출하지 않고 작업 행만 봅니다 |
+| 복구 | 같은 worker가 고아 작업을 다시 집어 `remaining_steps`부터 끝냅니다. 앱이나 사용자의 요청은 필요 없습니다. 남은 단계는 이미 없는 행·객체를 성공으로 보는 멱등 처리입니다 |
+| 대상 식별 | `user_id`가 비어 있으므로 작업 id와 `target_id`(계정 작업은 삭제된 사용자의 id), 작업의 `manifest`로 처리합니다 |
+| 응답 | 완료로 앞당기지 않습니다. 작업이 있으면 `ACCOUNT_DELETION_INCOMPLETE`, `completed`가 된 뒤에야 `ACCOUNT_DELETED`입니다 |
+| 작업이 없을 때 | 정리할 `manifest`가 없으므로 복구 대상이 아니고 서버는 일반 401로 응답합니다(운영 점검 범위) |
+
+> 확인 필요(DB 담당 실측, #25 검증 한계): 삭제된 사용자의 토큰으로 `/auth/v1/user`를 부르면 `user_not_found`로 구별되는지, 이미 지운 사용자를 다시 지우는 Auth Admin 호출이 성공으로 취급되는지, 완료 뒤 작업 행에 개인 경로(`manifest`)가 남지 않는지, 흡수한 하위 작업이 상위 작업의 `database` 단계 끝에 함께 닫히는지, Auth 사용자 삭제의 cascade가 기록 삭제 보호(`guard_record_delete`)를 어떻게 지나는지(기록이 남은 채 Storage 정리 전이면 거절되고 정리 뒤에는 통과하는지), `user_id`가 `on delete set null`로 비는 시점. 확인되기 전까지 위 완료 판정과 복구 규칙은 제안입니다.
 
 ##### 요청
 
