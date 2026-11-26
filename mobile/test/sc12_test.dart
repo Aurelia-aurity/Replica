@@ -6,8 +6,12 @@ import 'package:mobile/auth/auth_service.dart';
 import 'package:mobile/auth/preview_auth_service.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/profile/persona_models.dart';
+import 'package:mobile/profile/persona_name_screen.dart';
 import 'package:mobile/profile/persona_service.dart';
+import 'package:mobile/profile/speech_profile_screen.dart';
 import 'package:mobile/settings/settings_screen.dart';
+
+import 'persona_test_support.dart';
 
 /// Mirrors SupabaseAuthService.signOut: the local identity is cleared before
 /// the remote request, which then fails with a notice and an AuthFailure.
@@ -38,6 +42,44 @@ class _DatedPreviewAuth extends PreviewAuthService {
     }
   }
 }
+
+/// Partners whose list is held until [gate] completes (none: answers now).
+class _HeldListPersonas extends FakePersonaService {
+  Completer<void>? gate = Completer<void>();
+
+  @override
+  Future<List<Persona>> list() async {
+    final held = gate;
+    final items = super.list(); // counts the call before holding it
+    if (held != null) await held.future;
+    return items;
+  }
+}
+
+/// Signs in the first preview account and shows SC-12 with [personas].
+Future<PreviewAuthService> openSettings(
+  WidgetTester tester,
+  FakePersonaService personas, {
+  bool settle = true,
+}) async {
+  final auth = PreviewAuthService();
+  addTearDown(auth.dispose);
+  await auth.signIn(
+    PreviewAuthService.emails.first,
+    PreviewAuthService.password,
+  );
+  await tester.pumpWidget(
+    ReplicaApp(authService: auth, personaServiceFactory: () => personas),
+  );
+  settle ? await tester.pumpAndSettle() : await tester.pump();
+  await tester.tap(find.widgetWithText(NavigationDestination, '설정'));
+  settle ? await tester.pumpAndSettle() : await tester.pump();
+  return auth;
+}
+
+String shownProfileId(WidgetTester tester) => tester
+    .widget<SpeechProfileScreen>(find.byType(SpeechProfileScreen))
+    .personaId;
 
 Future<void> openMenu(WidgetTester tester, String label) async {
   await tester.scrollUntilVisible(
@@ -286,5 +328,151 @@ void main() {
     await tester.ensureVisible(find.text('닫기'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  group('speech profile menu', () {
+    testWidgets('opens SC-07 of the selected partner', (tester) async {
+      final personas = FakePersonaService(
+        personas: const [
+          Persona(id: 'p1', name: '엄마'),
+          Persona(id: 'p2', name: '아빠'),
+        ],
+      );
+      await openSettings(tester, personas);
+      await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('persona-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('아빠').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(NavigationDestination, '설정'));
+      await tester.pumpAndSettle();
+
+      await openMenu(tester, '말투 프로필');
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      expect(shownProfileId(tester), 'p2');
+      expect(find.textContaining('화면 연결은 준비 중이에요'), findsNothing);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        3,
+      );
+    });
+
+    testWidgets('without a partner it names one in SC-13, then shows SC-07', (
+      tester,
+    ) async {
+      final personas = FakePersonaService();
+      await openSettings(tester, personas);
+      await openMenu(tester, '말투 프로필');
+      expect(find.byType(PersonaNameScreen), findsOneWidget);
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+
+      // Cancelling SC-13 returns to the settings and saves nothing.
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(personas.created, isEmpty);
+
+      await openMenu(tester, '말투 프로필');
+      await tester.enterText(find.byType(TextField), '합성 상대');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, '저장'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      expect(shownProfileId(tester), personas.created.single.id);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      // The new partner is now the one SC-07 opens for.
+      await openMenu(tester, '말투 프로필');
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(shownProfileId(tester), personas.created.single.id);
+    });
+
+    testWidgets('while the partners load it asks to wait, opens nothing', (
+      tester,
+    ) async {
+      final personas = _HeldListPersonas()
+        ..personas.add(const Persona(id: 'p1', name: '엄마'));
+      await openSettings(tester, personas, settle: false);
+      await openMenu(tester, '말투 프로필');
+      expect(find.text('대화 상대를 불러오는 중이에요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+
+      personas.gate!.complete();
+      await tester.pumpAndSettle();
+      await openMenu(tester, '말투 프로필');
+      expect(shownProfileId(tester), 'p1');
+    });
+
+    testWidgets('after a failed list it loads again, never offers a new one', (
+      tester,
+    ) async {
+      final personas = FakePersonaService()..listError = StateError('offline');
+      await openSettings(tester, personas);
+      final calls = personas.listCalls;
+      await openMenu(tester, '말투 프로필');
+      expect(find.text('대화 상대를 불러오지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+      expect(personas.listCalls, calls + 1);
+
+      personas
+        ..listError = null
+        ..personas.add(const Persona(id: 'p1', name: '엄마'));
+      await openMenu(tester, '말투 프로필');
+      expect(personas.listCalls, calls + 2);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(shownProfileId(tester), 'p1');
+    });
+
+    testWidgets('taps while a failed list loads again open one screen', (
+      tester,
+    ) async {
+      final personas = _HeldListPersonas()
+        ..gate = null
+        ..listError = StateError('offline');
+      await openSettings(tester, personas);
+      final calls = personas.listCalls;
+      final reload = personas.gate = Completer<void>();
+      personas
+        ..listError = null
+        ..personas.add(const Persona(id: 'p1', name: '엄마'));
+      await tester.ensureVisible(find.text('말투 프로필'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pump();
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pump();
+      expect(personas.listCalls, calls + 1);
+      expect(find.text('대화 상대를 불러오는 중이에요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+
+      reload.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('after a failed list that is truly empty it goes to SC-13', (
+      tester,
+    ) async {
+      final personas = FakePersonaService()..listError = StateError('offline');
+      await openSettings(tester, personas);
+      personas.listError = null;
+      await openMenu(tester, '말투 프로필');
+      expect(find.byType(PersonaNameScreen), findsOneWidget);
+    });
   });
 }

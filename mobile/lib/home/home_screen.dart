@@ -196,6 +196,45 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted && complete == true) accountDeleted();
   }
 
+  /// SC-12 "말투 프로필": SC-07 of the current partner. Without a partner it
+  /// starts with SC-13, as the home card does, and SC-07 follows once the
+  /// partner is saved.
+  ///
+  /// While the partners load (also a reload after a failure) it only asks to
+  /// wait, so taps during the reload open nothing more.
+  Future<void> _openSpeechProfile() async {
+    final personas = widget.personas;
+    if (personas.current == null && _personasLoading) {
+      _notice('대화 상대를 불러오는 중이에요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    // After a failed list it is unknown whether a partner exists: load the
+    // list again rather than offer a new partner.
+    if (personas.current == null && personas.status == LoadStatus.failed) {
+      await personas.load();
+      if (!mounted || _tab != 3) return;
+      if (personas.status != LoadStatus.ready) {
+        _notice('대화 상대를 불러오지 못했어요. 다시 시도해 주세요.');
+        return;
+      }
+    }
+    final persona = personas.current;
+    if (persona != null) {
+      await openSpeechProfile(
+        context,
+        personas,
+        persona,
+        onOpenRecordUpload: _openRecordUpload,
+      );
+    } else {
+      await createPersonaThenProfile(
+        context,
+        personas,
+        onOpenRecordUpload: _openRecordUpload,
+      );
+    }
+  }
+
   Future<void> _start({required bool voice}) async {
     if (_starting) return;
     final persona = widget.personas.current;
@@ -394,6 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
         accountCreatedAt: widget.accountCreatedAt,
         isDemo: widget.history.isDemo,
         onSignOut: widget.onSignOut,
+        onOpenSpeechProfile: _openSpeechProfile,
         onDeleteAccount: _accountDeletionOffered ? _deleteAccount : null,
         onExpireSession: widget.onExpireSession,
         bottomNavigationBar: _navigation(),
