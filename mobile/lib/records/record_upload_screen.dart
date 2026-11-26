@@ -409,20 +409,22 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
 
   List<Widget> _speakerSections(RecordController c, TextAnalysis analysis) {
     final locked = c.uploading || c.attempt != null;
+    final single = c.singleSpeaker;
     Widget group({
       required String title,
       required String keyPrefix,
       required String? selected,
       required String? blocked,
       required void Function(String) onSelect,
+      bool disabled = false,
     }) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: Color(0xFF4C5C54),
+            color: disabled ? const Color(0xFF9AA5A0) : const Color(0xFF4C5C54),
           ),
         ),
         const SizedBox(height: 12),
@@ -437,7 +439,10 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                   key: ValueKey('$keyPrefix-${analysis.speakers[i].name}'),
                   speaker: analysis.speakers[i],
                   selected: selected == analysis.speakers[i].name,
-                  enabled: !locked && blocked != analysis.speakers[i].name,
+                  enabled:
+                      !locked &&
+                      !disabled &&
+                      blocked != analysis.speakers[i].name,
                   onTap: () => onSelect(analysis.speakers[i].name),
                 ),
               ],
@@ -456,25 +461,39 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
         onSelect: c.selectTarget,
       ),
       const SizedBox(height: 10),
-      const Text(
-        '고르지 않은 사람의 메시지는 문맥으로만 쓰고, 다른 사람의 개인 정보는 저장 전에 가려요.',
-        style: _muted,
-      ),
+      if (single)
+        const Text(
+          '이 화자가 대화 상대일 때만 선택해 주세요. 대화 상대가 아니라면 선택하지 말고 다른 파일을 골라 주세요.',
+          key: ValueKey('speaker-single-notice'),
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.6,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4C5C54),
+          ),
+        )
+      else
+        const Text(
+          '고르지 않은 사람의 메시지는 문맥으로만 쓰고, 다른 사람의 개인 정보는 저장 전에 가려요.',
+          style: _muted,
+        ),
       const SizedBox(height: 24),
       group(
         title: '이 기록을 제공한 사람은 누구인가요?',
         keyPrefix: 'speaker-provider',
-        selected: c.providerSpeaker,
+        selected: single ? null : c.providerSpeaker,
         blocked: c.targetSpeaker,
         onSelect: c.selectProvider,
+        disabled: single,
       ),
       const SizedBox(height: 10),
-      Text(
-        c.service.policy.sendSpeakerSelection
-            ? '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.'
-            : '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
-        style: _muted,
-      ),
+      Text(switch ((single, c.service.policy.sendSpeakerSelection)) {
+        (true, true) => '화자가 한 명뿐인 기록이라 제공자는 고르지 않아요. 선택한 화자만 대화 상대로 함께 저장돼요.',
+        (true, false) => '화자가 한 명뿐인 기록이라 제공자는 고르지 않아요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
+        (false, true) =>
+          '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.',
+        (false, false) => '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
+      }, style: _muted),
     ];
   }
 

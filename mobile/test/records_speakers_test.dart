@@ -35,6 +35,10 @@ const _ios = '''2025. 9. 20. 오후 3:12, 엄마 : 밥은 먹었니?
 2025-09-20 15:15, 나 : 곧 갈게
 ''';
 
+const _solo = '''[엄마] [오후 3:12] 밥은 먹었니?
+[엄마] [오후 3:13] 조심히 와
+''';
+
 void main() {
   group('analyzeTextRecord', () {
     test(
@@ -93,12 +97,16 @@ void main() {
       expect(TextAnalysis.plain.label, '일반 텍스트');
     });
 
-    test('a one-person chat needs no speaker selection', () async {
-      final solo = await analyzeTextRecord(
-        _text('[나] [오후 3:12] 메모\n[나] [오후 3:13] 또 메모'),
-      );
+    test('a one-person chat asks for the speaker but no provider', () async {
+      final solo = await analyzeTextRecord(_text(_solo));
       expect(solo.kakao, isTrue);
-      expect(solo.needsSpeakerSelection, isFalse);
+      expect(solo.singleSpeaker, isTrue);
+      expect(solo.needsSpeakerSelection, isTrue);
+      expect(solo.needsProviderSelection, isFalse);
+      final pair = await analyzeTextRecord(_text(_android));
+      expect(pair.singleSpeaker, isFalse);
+      expect(pair.needsProviderSelection, isTrue);
+      expect(TextAnalysis.plain.needsSpeakerSelection, isFalse);
     });
 
     test('thousands are grouped', () {
@@ -143,6 +151,74 @@ void main() {
         )['target_speaker'],
         '엄마',
       );
+    });
+
+    test(
+      'a one-speaker chat waits for the user to confirm that speaker',
+      () async {
+        final controller = RecordController(PreviewRecordService());
+        addTearDown(controller.dispose);
+        controller.select(_text(_solo));
+        controller.setConsent(true);
+        await pumpEventQueue();
+        expect(controller.singleSpeaker, isTrue);
+        expect(controller.needsProvider, isFalse);
+        // Never confirmed on the user's behalf.
+        expect(controller.targetSpeaker, isNull);
+        expect(controller.canUpload, isFalse);
+        // There is nobody else to name as the provider.
+        controller.selectProvider('엄마');
+        expect(controller.providerSpeaker, isNull);
+        controller.selectTarget('엄마');
+        expect(controller.canUpload, isTrue);
+        // Picking the only speaker again takes the confirmation back.
+        controller.selectTarget('엄마');
+        expect(controller.targetSpeaker, isNull);
+        expect(controller.canUpload, isFalse);
+        controller.selectTarget('엄마');
+        await controller.send();
+        expect(controller.uploadSucceeded, isTrue);
+        final upload = controller.attempt!;
+        expect(upload.targetSpeaker, '엄마');
+        expect(upload.providerSpeaker, isNull);
+        final body = upload.reservationJson('persona', includeSpeakers: true);
+        expect(body['target_speaker'], '엄마');
+        expect(body.containsKey('provider_speaker'), isFalse);
+      },
+    );
+
+    test(
+      'consent alone does not upload an unconfirmed one-speaker chat',
+      () async {
+        final controller = RecordController(PreviewRecordService());
+        addTearDown(controller.dispose);
+        controller.select(_text(_solo));
+        controller.setConsent(true);
+        await controller.send();
+        expect(controller.uploadSucceeded, isFalse);
+        expect(controller.attempt, isNull);
+      },
+    );
+
+    test('changing from a one-speaker chat clears the confirmation', () async {
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      controller.select(_text(_solo));
+      await pumpEventQueue();
+      controller.selectTarget('엄마');
+      controller.select(_text(_android, name: 'pair.txt'));
+      expect(controller.targetSpeaker, isNull);
+      await pumpEventQueue();
+      expect(controller.singleSpeaker, isFalse);
+      expect(controller.needsProvider, isTrue);
+      controller.setConsent(true);
+      controller.selectTarget('엄마');
+      expect(controller.canUpload, isFalse);
+      // In a multi-speaker chat picking again keeps the choice.
+      controller.selectTarget('엄마');
+      expect(controller.targetSpeaker, '엄마');
+      controller.selectProvider('나');
+      expect(controller.canUpload, isTrue);
     });
 
     test('plain text uploads without a speaker step', () async {
@@ -273,4 +349,54 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'SC-04 asks to confirm a lone speaker and locks the provider choice',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 2000);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      controller.select(_text(_solo));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RecordUploadScreen(
+            controller: controller,
+            picker: () async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      FilledButton upload() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('record-upload')),
+      );
+      expect(find.text('누구의 말투를 반영할까요?'), findsOneWidget);
+      expect(find.text('이 기록을 제공한 사람은 누구인가요?'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('speaker-single-notice')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('대화 상대일 때만 선택해 주세요'), findsOneWidget);
+      expect(find.textContaining('제공자는 고르지 않아요'), findsOneWidget);
+      expect(find.text('메시지 2개'), findsNWidgets(2));
+      // The provider area stays visible but cannot be used.
+      expect(
+        tester
+            .widget<InkWell>(find.byKey(const ValueKey('speaker-provider-엄마')))
+            .onTap,
+        isNull,
+      );
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      // Consent alone is not the speaker confirmation.
+      expect(upload().onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('speaker-target-엄마')));
+      await tester.pump();
+      expect(controller.targetSpeaker, '엄마');
+      expect(upload().onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

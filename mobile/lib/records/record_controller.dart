@@ -302,15 +302,22 @@ class RecordController extends ChangeNotifier {
   }
 
   bool get needsSpeakers => analysis?.needsSpeakerSelection ?? false;
+  bool get needsProvider => analysis?.needsProviderSelection ?? false;
+  bool get singleSpeaker => analysis?.singleSpeaker ?? false;
 
   void selectTarget(String? name) {
-    if (uploading || attempt != null || name == providerSpeaker) return;
+    if (uploading || attempt != null) return;
+    // Picking the only speaker is the confirmation, so picking them again
+    // takes it back.
+    if (singleSpeaker && name != null && name == targetSpeaker) name = null;
+    if (name != null && name == providerSpeaker) return;
     targetSpeaker = name;
     _changed();
   }
 
   void selectProvider(String? name) {
-    if (uploading || attempt != null || name == targetSpeaker) return;
+    if (uploading || attempt != null || !needsProvider) return;
+    if (name == targetSpeaker) return;
     providerSpeaker = name;
     _changed();
   }
@@ -328,7 +335,9 @@ class RecordController extends ChangeNotifier {
       !analyzing &&
       !uploadSucceeded &&
       uploadRetryAllowed &&
-      (!needsSpeakers || (targetSpeaker != null && providerSpeaker != null));
+      (!needsSpeakers ||
+          (targetSpeaker != null &&
+              (!needsProvider || providerSpeaker != null)));
 
   /// Cancelling is possible until the file is fully transferred.
   bool get canCancelUpload =>
@@ -352,7 +361,8 @@ class RecordController extends ChangeNotifier {
       consentAt: DateTime.now(),
       consentVersion: service.policy.consentVersion,
       targetSpeaker: needsSpeakers ? targetSpeaker : null,
-      providerSpeaker: needsSpeakers ? providerSpeaker : null,
+      // A one-speaker file sends the confirmed speaker alone.
+      providerSpeaker: needsProvider ? providerSpeaker : null,
     );
     current.onProgress = _changed;
     uploading = true;

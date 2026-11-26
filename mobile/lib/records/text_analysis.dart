@@ -24,8 +24,16 @@ class TextAnalysis {
   final List<ChatSpeaker> speakers;
   final int messages;
 
-  /// Picking whose speech to learn and who provided the file needs two people.
-  bool get needsSpeakerSelection => kakao && speakers.length >= 2;
+  /// Every chat export asks whose speech to learn, even with one speaker:
+  /// the file alone cannot tell whether that person is the provider or the
+  /// conversation partner, so the user confirms it by picking them.
+  bool get needsSpeakerSelection => kakao && speakers.isNotEmpty;
+
+  /// Naming who provided the file needs a second person in it. A file with
+  /// one speaker leaves the provider out rather than guessing one.
+  bool get needsProviderSelection => kakao && speakers.length >= 2;
+
+  bool get singleSpeaker => kakao && speakers.length == 1;
   String get label => kakao ? '카카오톡 대화로 인식됨' : '일반 텍스트';
 }
 
