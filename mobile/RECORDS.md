@@ -83,7 +83,8 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 | 예약 | `POST /records`, UUID·상대 ID·파일 정보·동의 시각·버전 전달. `user_id` 미전달 |
 | 예약·재예약 | 이전 예약이 있으면 같은 UUID로 `GET /records/{id}`를 먼저 조회해 `uploading`을 지난 기록은 끝난 것으로 봄. 그 외에는 같은 ID로 `POST /records`를 다시 보내 응답의 `upload`(서명 주소)를 새로 받음. `upload: null`이면 원본이 이미 있으므로 전송을 건너뜀(PR #128) |
 | 원본 전송 | 예약 응답의 `upload.url`·`method`·`headers`로 Storage에 직접 `PUT`(앱 토큰은 붙이지 않음). 만료 30초 전부터는 보내기 전에 같은 ID로 재예약. Storage가 거절하면(401·403 포함) **로그아웃하지 않고** 한 번 재예약해 다시 보내며, 또 거절되면 재시도 가능한 오류(`STORAGE_REJECTED`)로 멈춤. 진행률은 `upload.reportProgress`, 취소는 `upload.cancelToken` |
-| 완료 알림 | `GET /records/{id}`로 상태 확인 후 아직 `uploading`이면 `POST /records/{id}/uploaded`. 전송이 끊겼거나 거절된 뒤 다시 보낼 때는 먼저 `/uploaded`로 원본이 있는지 확인해, 200이면 끝내고 409 `UPLOAD_MISSING`이면 다시 `PUT`함. 완료 알림이 `UPLOAD_MISSING`이면 다음 시도에서 다시 보냄 |
+| 완료 알림 | `GET /records/{id}`로 상태 확인 후 아직 `uploading`이면 `POST /records/{id}/uploaded`. 전송이 끊겼거나 거절된 뒤 다시 보낼 때는 먼저 `/uploaded`로 원본이 있는지 확인해, 200이면 끝내고 409 `UPLOAD_MISSING`이면 다시 `PUT`함 |
+| 완료 알림의 409 | `UPLOAD_MISSING`: 같은 시도 안에서 한 번 자동으로 다시 보냄(서명이 유효하면 같은 주소, 없거나 만료됐으면 재예약). 또 없으면 재시도 가능한 오류로 멈추고 다음 시도에서 다시 보냄. `UPLOAD_SIZE_MISMATCH`: 같은 기록으로는 고칠 수 없어 `DELETE /records/{id}`로 기록을 지우고(삭제 요청 카드에 남김), 기기 파일 크기가 예약 때와 같으면 같은 파일·동의·화자 선택으로 **새 기록 ID**를 예약해 한 번 다시 올림. 파일 크기가 달라졌거나 다시 불일치하면 파일을 다시 고르도록 안내. 삭제 요청이 실패하면 기록을 남겨 다시 시도할 수 있게 함 |
 | 취소 정리 | 예약만 있고 `uploading`이면 `DELETE /records/{id}`. 이미 완료된 업로드는 지우지 않음 |
 | 목록 | `GET /records?persona_id=...&limit=100&offset=...`, 페이지를 이어 읽고 ID 중복과 `deleting` 제외 |
 | 전사 | `GET /records/{id}/text-versions`, `PATCH /text-versions/{id}`(`expected_updated_at`), `POST /text-versions/{id}/confirm` |
@@ -111,7 +112,7 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 
 | 항목 | 현재 앱의 처리 | 제안 |
 | --- | --- | --- |
-| 원본 파일 업로드 방식·인증 | 예약 응답의 `upload`로 Storage에 직접 `PUT`, 만료·거절 시 같은 ID로 재예약 | 계약: 서명 업로드와 `/uploaded` 완료 알림. 남은 일: 실제 Storage로 확인(버킷 `replica-records` 미생성 #120, 만료된 서명 응답 미확인), `UPLOAD_SIZE_MISMATCH`의 기록 삭제 후 새 예약 |
+| 원본 파일 업로드 방식·인증 | 예약 응답의 `upload`로 Storage에 직접 `PUT`, 만료·거절 시 같은 ID로 재예약 | 계약: 서명 업로드와 `/uploaded` 완료 알림. 남은 일: 실제 Storage로 확인(버킷 `replica-records` 미생성 #120, 만료된 서명 응답 미확인) |
 | 지원 형식·최대 용량 | 형식 4종 고정, **25 MiB는 미리보기 값** | 서버 한도를 정해 `RecordPolicy`에 주입 |
 | 전사 구간·타임스탬프·화자 | 있으면 표시, 없으면 줄 단위 | 텍스트 버전 객체에 `segments[{text,start_ms,end_ms,speaker,uncertain_words}]` 추가. 이어 붙인 `text`가 `content`와 같아야 함 |
 | 원본 음성 조회 | 재생 연결 전 안내 | 인증된 재생용(서명) URL 발급 |
