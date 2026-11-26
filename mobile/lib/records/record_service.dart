@@ -410,7 +410,6 @@ class SessionRecordService extends RecordService {
   Future<void> completeUpload(
     String recordId, {
     Map<String, String?>? speakers,
-  }) => backend.run(
-    () => delegate.completeUpload(recordId, speakers: speakers),
-  );
+  }) =>
+      backend.run(() => delegate.completeUpload(recordId, speakers: speakers));
 }

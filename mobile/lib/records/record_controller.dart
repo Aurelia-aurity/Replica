@@ -512,6 +512,18 @@ class RecordController extends ChangeNotifier {
       if (error.code == 'UPLOAD_SIZE_MISMATCH') {
         return '저장된 원본의 크기가 맞지 않아 올리지 못했어요. 파일을 다시 선택해 주세요.';
       }
+      // Without `field` the file's content was refused (unreadable text, a
+      // speaker name over 100 characters, too many speakers, no messages, an
+      // audio format mismatch). The same record cannot be fixed.
+      if (error.code == 'INVALID_INPUT' && error.field == null) {
+        return '파일 내용을 처리하지 못했어요. 파일을 확인한 뒤 ‘새 파일로 시작’으로 다시 올려 주세요. 올리던 기록은 이때 지워져요.';
+      }
+      if (error.code == 'NOT_FOUND') {
+        return '기록을 찾을 수 없어요. 이미 삭제됐을 수 있어요. 기록 목록을 확인한 뒤 새 파일로 다시 올려 주세요.';
+      }
+      if (error.code == 'RECORD_DELETING') {
+        return '이 기록은 삭제되고 있어요. 새 파일로 다시 올려 주세요.';
+      }
       if (error.kind == BackendFailureKind.forbidden) {
         return '이 기록을 올릴 권한이 없어요.';
       }

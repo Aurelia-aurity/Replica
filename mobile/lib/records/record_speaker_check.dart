@@ -128,7 +128,9 @@ class SpeakerCheckController extends ChangeNotifier {
   String _message(BackendFailure failure) => switch (failure.code) {
     'UPLOAD_MISSING' => '원본 파일이 서버에 없어요. 이 기록을 삭제하고 새로 올려 주세요.',
     'CONFLICT' => '이 기록은 더 이상 이어서 올릴 수 없어요. 이 기록을 삭제하고 새로 올려 주세요.',
-    'NOT_FOUND' => '기록을 찾을 수 없어요. 기록 목록을 새로고침해 주세요.',
+    'NOT_FOUND' => '기록을 찾을 수 없어요. 이미 삭제됐을 수 있어요. 기록 목록을 새로고침해 주세요.',
+    'INVALID_INPUT' when failure.field == null =>
+      '파일 내용을 처리하지 못했어요. 파일을 확인하고 이 기록을 삭제한 뒤 새로 올려 주세요.',
     _ =>
       failure.kind == BackendFailureKind.network
           ? '연결 상태를 확인하고 다시 시도해 주세요.'

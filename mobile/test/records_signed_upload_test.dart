@@ -83,6 +83,13 @@ class _Server {
   var checkSpeakers = false;
   List<String>? fileSpeakers;
 
+  /// A 422 answer for the next reservation or `/uploaded`, if set.
+  Map<String, Object?>? refuseReservation;
+  Map<String, Object?>? refuseUploaded;
+
+  /// The record disappears once its original is in Storage (GET answers 404).
+  var forgetAfterPut = false;
+
   /// Bodies `/uploaded` received, in order (an empty map when none was sent).
   final uploadedBodies = <Map<String, Object?>>[];
   final _target = <String, String?>{};
@@ -102,6 +109,7 @@ class _Server {
       final id = _signedFor[request.url.path]!;
       final put = puts.isEmpty ? _Put.ok : puts.removeAt(0);
       afterPut?.call();
+      if (forgetAfterPut) _status.remove(id);
       switch (put) {
         case _Put.ok:
           _stored.add(id);
@@ -129,6 +137,11 @@ class _Server {
     );
     calls.add('${request.method} $path');
     if (request.method == 'POST' && path == '/records') {
+      final refused = refuseReservation;
+      if (refused != null) {
+        refuseReservation = null;
+        return _json(refused, 422);
+      }
       final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
       final id = json['record_id'] as String;
       reservationIds.add(id);
@@ -179,6 +192,11 @@ class _Server {
       }
       if (_wrongSize.contains(id)) {
         return _json(_error('UPLOAD_SIZE_MISMATCH', retryable: false), 409);
+      }
+      final refusedUpload = refuseUploaded;
+      if (refusedUpload != null) {
+        refuseUploaded = null;
+        return _json(refusedUpload, 422);
       }
       final sent = bytes.isEmpty
           ? <String, Object?>{}
@@ -755,6 +773,96 @@ void main() {
       await tester.pump();
       expect(button().onPressed, isNotNull);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('error messages', () {
+    test('BackendFailure keeps field and speakers from the envelope', () {
+      final withField = BackendFailure.fromResponse(
+        statusCode: 422,
+        body: _error('INVALID_INPUT', retryable: false, field: 'size_bytes'),
+      );
+      expect(withField.code, 'INVALID_INPUT');
+      expect(withField.field, 'size_bytes');
+      expect(withField.speakers, isNull);
+      final plain = BackendFailure.fromResponse(
+        statusCode: 422,
+        body: _error('INVALID_INPUT', retryable: false),
+      );
+      expect(plain.field, isNull);
+      final speakers = BackendFailure.fromResponse(
+        statusCode: 422,
+        body: _error(
+          'SPEAKER_REQUIRED',
+          retryable: true,
+          field: 'target_speaker',
+          speakers: ['엄마'],
+        ),
+      );
+      expect(speakers.speakers, ['엄마']);
+      // A malformed list is dropped rather than half read.
+      final broken = BackendFailure.fromResponse(
+        statusCode: 422,
+        body: {
+          'error': {
+            'code': 'SPEAKER_REQUIRED',
+            'speakers': ['엄마', 3],
+          },
+        },
+      );
+      expect(broken.speakers, isNull);
+    });
+
+    RecordController picked() {
+      final c = RecordController(service());
+      addTearDown(c.dispose);
+      c.select(file('voice.m4a'));
+      c.setConsent(true);
+      return c;
+    }
+
+    test(
+      'a refused file content asks to start again with a new file',
+      () async {
+        server.refuseUploaded = _error('INVALID_INPUT', retryable: false);
+        final c = picked();
+        await c.send();
+        expect(c.uploadSucceeded, isFalse);
+        expect(c.uploadError, contains('파일 내용을 처리하지 못했어요'));
+        expect(c.uploadError, contains('새 파일로 시작'));
+        expect(c.uploadRetryAllowed, isFalse);
+        final id = c.attempt!.id;
+        // Starting again removes the record that waited.
+        c.beginSelection();
+        await pumpEventQueue();
+        expect(server.deletedIds, [id]);
+      },
+    );
+
+    test('a refused field keeps the general message', () async {
+      server.refuseReservation = _error(
+        'INVALID_INPUT',
+        retryable: false,
+        field: 'consent_at',
+      );
+      final c = picked();
+      await c.send();
+      expect(c.uploadSucceeded, isFalse);
+      expect(c.uploadError, isNot(contains('파일 내용')));
+    });
+
+    test('a record that disappeared is not retried', () async {
+      server.forgetAfterPut = true;
+      final c = picked();
+      await c.send();
+      expect(c.uploadSucceeded, isFalse);
+      expect(c.uploadError, contains('기록을 찾을 수 없어요'));
+      expect(c.uploadError, isNot(contains('다시 시도할 수 있어요')));
+      expect(c.uploadRetryAllowed, isFalse);
+      c.beginSelection();
+      await pumpEventQueue();
+      // Nothing is left to delete.
+      expect(server.deletedIds, isEmpty);
     });
   });
 

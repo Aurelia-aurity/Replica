@@ -488,9 +488,10 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     // A previous completion may have succeeded even if its response was lost.
     final existing = await _find(upload.id);
     upload.cancelToken.throwIfCancelled();
-    if (existing == null) throw StateError('Record no longer exists');
+    // The record is gone (404): retrying the same record cannot help.
+    if (existing == null) throw _recordMissing;
     if (existing.status == RecordStatus.deleting) {
-      throw StateError('Record deleted');
+      throw _recordDeleting;
     }
     if (existing.status == RecordStatus.uploading) {
       try {
@@ -524,7 +525,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       throw StateError('Record ID mismatch');
     }
     if (existing?.status == RecordStatus.deleting) {
-      throw StateError('Record deleted');
+      throw _recordDeleting;
     }
     if (existing != null && existing.status != RecordStatus.uploading) {
       upload.stage = UploadStage.done;
@@ -544,7 +545,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     final reserved = RecordEntry.fromJson(json);
     if (reserved.id != upload.id) throw StateError('Record ID mismatch');
     if (reserved.status == RecordStatus.deleting) {
-      throw StateError('Record deleted');
+      throw _recordDeleting;
     }
     // Every reservation answer replaces the previous signature.
     final info = json['upload'];
@@ -605,6 +606,16 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       rethrow;
     }
   }
+
+  static const _recordMissing = BackendFailure(
+    BackendFailureKind.generic,
+    code: 'NOT_FOUND',
+    statusCode: 404,
+  );
+  static const _recordDeleting = BackendFailure(
+    BackendFailureKind.generic,
+    code: 'RECORD_DELETING',
+  );
 
   /// Storage still refuses after a renewed signature. Retrying the same
   /// record reserves it again, and the session stays signed in.
