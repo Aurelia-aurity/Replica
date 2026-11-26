@@ -1,5 +1,12 @@
 # 이슈 #8 프론트엔드 검증 기록
 
+## 2026-11-26 인증 메일 재전송 (#125)
+
+- 가입 후 이메일 인증 안내와 미인증 로그인 오류에 ‘인증 메일 다시 보내기’를 추가했습니다. 규칙은 [AUTH_CONTRACT.md](AUTH_CONTRACT.md#인증-메일-재전송-125)를 참고하세요.
+- `test/auth_resend_test.dart` 13개: 두 진입점, 대상 이메일(공백 제거·이후 입력값 무시), 요청 중 버튼·입력·전환 비활성과 중복 요청 차단, 성공·요청 제한·연결 실패·그 밖의 실패 안내와 재요청, 다른 주소 입력·모드 전환 시 버튼 제거, 더미 안내, SDK 요청(`POST /auth/v1/resend`, `type: signup`, `redirect_to`)과 오류 코드·429·5xx·연결 실패 변환.
+- 기준 `main`(`7c0c123`)에 이 변경을 더한 상태에서 전체 Flutter 테스트 **447개** 통과, `flutter analyze --no-pub` No issues found, 변경한 파일의 `dart format` 통과.
+- 실제 Supabase 프로젝트의 재전송 메일 수신, 이메일 발송 제한 값, 실기기 화면은 미검증입니다.
+
 ## 2026-10-28 PR #62 수정 요청 반영
 
 - 실제 main 진입점이 AppConfig와 AuthConfig를 읽고 dev + preview에서만 더미 인증을 선택하도록 수정했습니다. staging/prod의 supabase 설정은 인증 미설정 화면으로 연결하며 SDK나 서버에 연결하지 않습니다. staging/prod에서 preview를 지정하면 기존 설정 가드가 실행을 거부합니다.
