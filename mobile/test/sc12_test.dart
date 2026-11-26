@@ -50,14 +50,15 @@ class _HeldListPersonas extends FakePersonaService {
   @override
   Future<List<Persona>> list() async {
     final held = gate;
-    final items = super.list(); // counts the call before holding it
+    // Answered (and counted) first, so a failure is never left unawaited.
+    final items = await super.list();
     if (held != null) await held.future;
     return items;
   }
 }
 
 /// Signs in the first preview account and shows SC-12 with [personas].
-Future<PreviewAuthService> openSettings(
+Future<void> openSettings(
   WidgetTester tester,
   FakePersonaService personas, {
   bool settle = true,
@@ -74,7 +75,6 @@ Future<PreviewAuthService> openSettings(
   settle ? await tester.pumpAndSettle() : await tester.pump();
   await tester.tap(find.widgetWithText(NavigationDestination, '설정'));
   settle ? await tester.pumpAndSettle() : await tester.pump();
-  return auth;
 }
 
 String shownProfileId(WidgetTester tester) => tester
