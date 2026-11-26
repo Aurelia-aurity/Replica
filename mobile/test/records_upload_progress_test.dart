@@ -1002,6 +1002,15 @@ void main() {
       expect(on['target_speaker'], '엄마');
       expect(on['provider_speaker'], '나');
       expect(on.containsKey('user_id'), isFalse);
+      // The contract now carries the speaker fields, so they are sent by
+      // default.
+      expect(
+        const RecordPolicy(
+          maxBytes: 1,
+          consentVersion: 'test',
+        ).sendSpeakerSelection,
+        isTrue,
+      );
     });
   });
 }

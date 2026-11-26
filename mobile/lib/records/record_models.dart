@@ -149,13 +149,14 @@ class RecordPolicy {
   const RecordPolicy({
     required this.maxBytes,
     required this.consentVersion,
-    this.sendSpeakerSelection = false,
+    this.sendSpeakerSelection = true,
   });
   final int maxBytes;
   final String consentVersion;
 
-  /// The draft reservation has no speaker fields. Enable only after the app and
-  /// backend agree on them; until then the selection stays on the device.
+  /// Sends `target_speaker` (and `provider_speaker` when the chat has two or
+  /// more speakers) with the reservation, as the app-backend contract
+  /// specifies. Turn it off to keep the selection on the device only.
   final bool sendSpeakerSelection;
   String? validate(RecordFile file) {
     if (!const ['txt', 'wav', 'mp3', 'm4a'].contains(file.extension)) {

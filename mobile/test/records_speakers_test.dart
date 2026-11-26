@@ -139,7 +139,7 @@ void main() {
       final upload = controller.attempt!;
       expect(upload.targetSpeaker, '엄마');
       expect(upload.providerSpeaker, '나');
-      // Never part of the draft reservation unless the contract adds them.
+      // Only included when the policy asks for them.
       expect(
         upload.reservationJson('persona').containsKey('target_speaker'),
         isFalse,
@@ -378,6 +378,8 @@ void main() {
       );
       expect(find.textContaining('대화 상대일 때만 선택해 주세요'), findsOneWidget);
       expect(find.textContaining('제공자는 고르지 않아요'), findsNothing);
+      // The choice is sent, so the "not sent" notice is gone.
+      expect(find.textContaining('전송하지 않아요'), findsNothing);
       expect(find.text('메시지 2개'), findsNWidgets(2));
       // The provider area stays visible but cannot be used.
       expect(
