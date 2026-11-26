@@ -171,11 +171,9 @@ void main() {
         expect(controller.providerSpeaker, isNull);
         controller.selectTarget('엄마');
         expect(controller.canUpload, isTrue);
-        // Picking the only speaker again takes the confirmation back.
+        // Picking the only speaker again keeps the confirmation.
         controller.selectTarget('엄마');
-        expect(controller.targetSpeaker, isNull);
-        expect(controller.canUpload, isFalse);
-        controller.selectTarget('엄마');
+        expect(controller.targetSpeaker, '엄마');
         await controller.send();
         expect(controller.uploadSucceeded, isTrue);
         final upload = controller.attempt!;
@@ -379,7 +377,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('대화 상대일 때만 선택해 주세요'), findsOneWidget);
-      expect(find.textContaining('제공자는 고르지 않아요'), findsOneWidget);
+      expect(find.textContaining('제공자는 고르지 않아요'), findsNothing);
       expect(find.text('메시지 2개'), findsNWidgets(2));
       // The provider area stays visible but cannot be used.
       expect(

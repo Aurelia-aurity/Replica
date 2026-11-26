@@ -306,11 +306,7 @@ class RecordController extends ChangeNotifier {
   bool get singleSpeaker => analysis?.singleSpeaker ?? false;
 
   void selectTarget(String? name) {
-    if (uploading || attempt != null) return;
-    // Picking the only speaker is the confirmation, so picking them again
-    // takes it back.
-    if (singleSpeaker && name != null && name == targetSpeaker) name = null;
-    if (name != null && name == providerSpeaker) return;
+    if (uploading || attempt != null || name == providerSpeaker) return;
     targetSpeaker = name;
     _changed();
   }

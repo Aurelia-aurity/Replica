@@ -486,14 +486,16 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
         onSelect: c.selectProvider,
         disabled: single,
       ),
-      const SizedBox(height: 10),
-      Text(switch ((single, c.service.policy.sendSpeakerSelection)) {
-        (true, true) => '화자가 한 명뿐인 기록이라 제공자는 고르지 않아요. 선택한 화자만 대화 상대로 함께 저장돼요.',
-        (true, false) => '화자가 한 명뿐인 기록이라 제공자는 고르지 않아요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
-        (false, true) =>
-          '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.',
-        (false, false) => '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
-      }, style: _muted),
+      if (!single || !c.service.policy.sendSpeakerSelection) ...[
+        const SizedBox(height: 10),
+        Text(switch ((single, c.service.policy.sendSpeakerSelection)) {
+          (true, _) =>
+            '화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
+          (false, true) =>
+            '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.',
+          (false, false) => '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
+        }, style: _muted),
+      ],
     ];
   }
 
