@@ -35,6 +35,17 @@ class ResendAuth extends PreviewAuthService {
   }
 }
 
+/// Holds each sign-in until the test answers it.
+class PendingSignInAuth extends ResendAuth {
+  final signIns = <Completer<void>>[];
+  @override
+  Future<void> signIn(String email, String password) {
+    final request = Completer<void>();
+    signIns.add(request);
+    return request.future;
+  }
+}
+
 Future<void> signUp(WidgetTester tester, {String address = email}) async {
   await tester.ensureVisible(find.byKey(const ValueKey('auth-switch')));
   await tester.tap(find.byKey(const ValueKey('auth-switch')));
@@ -165,41 +176,125 @@ void main() {
     },
   );
 
-  testWidgets(
-    'resend is offered only for the address that still needs confirmation',
-    (tester) async {
-      final auth = ResendAuth(
-        signInFailure: AuthFailureKind.invalidCredentials,
-      );
-      addTearDown(auth.dispose);
-      await tester.pumpWidget(ReplicaApp(authService: auth));
-      await signIn(tester);
-      expect(find.byKey(resendKey), findsNothing);
+  testWidgets('other sign-in failures offer no resend', (tester) async {
+    final auth = ResendAuth(signInFailure: AuthFailureKind.invalidCredentials);
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(ReplicaApp(authService: auth));
+    await signIn(tester);
+    expect(find.text('이메일 또는 비밀번호가 맞지 않아요'), findsOneWidget);
+    expect(find.byKey(resendKey), findsNothing);
+  });
 
-      final unconfirmed = ResendAuth(
-        signInFailure: AuthFailureKind.emailNotVerified,
-      );
-      addTearDown(unconfirmed.dispose);
-      await tester.pumpWidget(ReplicaApp(authService: unconfirmed));
-      await tester.pumpAndSettle();
-      await signIn(tester);
-      expect(find.byKey(resendKey), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const ValueKey('auth-email')),
-        'other.synthetic@example.com',
-      );
-      await tester.pump();
-      expect(find.byKey(resendKey), findsNothing);
+  testWidgets('resend follows the address of the latest refused sign-in only', (
+    tester,
+  ) async {
+    const other = 'other.synthetic@example.com';
+    final auth = ResendAuth(signInFailure: AuthFailureKind.emailNotVerified);
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(ReplicaApp(authService: auth));
+    await signIn(tester);
+    await tapResend(tester);
+    auth.pending.last.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(resultKey), findsOneWidget);
 
-      await signIn(tester);
-      expect(find.byKey(resendKey), findsOneWidget);
-      await tester.ensureVisible(find.byKey(const ValueKey('auth-switch')));
-      await tester.tap(find.byKey(const ValueKey('auth-switch')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(resendKey), findsNothing);
-      expect(unconfirmed.requests, isEmpty);
-    },
-  );
+    // Only spaces around the same address keep the button.
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email')),
+      ' $email ',
+    );
+    await tester.pump();
+    expect(find.byKey(resendKey), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), other);
+    await tester.pump();
+    expect(find.byKey(resendKey), findsNothing);
+    expect(find.byKey(resultKey), findsNothing);
+
+    await signIn(tester, address: other);
+    await tapResend(tester);
+    expect(auth.requests, [email, other]);
+    auth.pending.last.complete();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-switch')));
+    await tester.tap(find.byKey(const ValueKey('auth-switch')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(resendKey), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('auth-switch')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(resendKey), findsNothing);
+  });
+
+  testWidgets('a new sign-in request removes resend until it is refused', (
+    tester,
+  ) async {
+    final auth = PendingSignInAuth();
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(ReplicaApp(authService: auth));
+    // The submit spinner never settles while the sign-in is held.
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), email);
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password')),
+      PreviewAuthService.password,
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pump();
+    auth.signIns.last.completeError(
+      const AuthFailure('x', kind: AuthFailureKind.emailNotVerified),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(resendKey), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pump();
+    expect(find.byKey(resendKey), findsNothing);
+    auth.signIns.last.completeError(
+      const AuthFailure('x', kind: AuthFailureKind.emailNotVerified),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(resendKey), findsOneWidget);
+    expect(auth.requests, isEmpty);
+  });
+
+  testWidgets('resend notice fits a 320px screen with large text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.reset);
+    final auth = ResendAuth(signInFailure: AuthFailureKind.emailNotVerified);
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.8)),
+          child: child!,
+        ),
+        home: ReplicaApp(authService: auth),
+      ),
+    );
+    await signIn(tester);
+    expect(
+      MediaQuery.textScalerOf(tester.element(find.byKey(resendKey))),
+      const TextScaler.linear(1.8),
+    );
+    await tapResend(tester);
+    auth.pending.last.completeError(
+      const AuthFailure('x', kind: AuthFailureKind.rateLimited),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(resultKey));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(resultText(tester), rateLimitedText);
+    await tester.tap(find.byKey(resendKey));
+    await tester.pump();
+    expect(auth.requests, hasLength(2));
+  });
 
   testWidgets('signup that needs no confirmation offers no resend', (
     tester,
