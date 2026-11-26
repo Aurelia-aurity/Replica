@@ -17,6 +17,7 @@
 | [AI 활용](ai-usage.md) | 공통 기준, 개인 로컬 문서 관리, PR·이슈 활용·검증 기록 |
 | [학교 GPU 접속 확인 결과](architecture/school-gpu-access.md) | #14 학교 회신, 접속·Slurm 관측과 미확인 운영 조건 |
 | [프로젝트 일정](project-schedule.md) | 최종 계획과 최신 공지, 발표·보고서 일정 |
+| [실험 색인](../experiments/README.md) | LLM 기준선 평가, 지표 확장, 단계별 실험 결과 문서 목록 |
 | [10월 2일 멘토 미팅](meetings/2026-10-02-mentor-meeting.md) | 멘토의 조언과 후속 작업 |
 | [10월 7일 팀 미팅](meetings/2026-10-07-weekly-team-meeting.md) | 설계·연동·역할·발표 준비 |
 
