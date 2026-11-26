@@ -45,7 +45,7 @@ release the active slot; its worker emits a separate terminal `generate` record.
 
 기존 `prepare_tokenize`와 `generate`를 유지하면서 `persona_prompt_assembly`, `prompt_assembly`, `template_tokenize`, `prefix_encode`, `input_setup`, `model_generate_call`, `output_decode`, `cuda_drain`, `adapter_parse_guard`, `success_body`를 해당 호출 경계에서 기록합니다. baseline에는 persona 전용 구간이 없습니다. 이력을 줄여 다시 준비하면 `prompt_assembly`와 `template_tokenize`가 시도마다 반복됩니다. `template_tokenize`에는 chat template과 토큰화가 함께 들어가며 `model_generate_call`은 framework의 host 경과 시간입니다. 구간 밖의 분기·기록 비용이 남으므로 세부 구간 합이 바깥 구간과 같다고 주장하지 않습니다. 중첩 구간도 더하지 않습니다.
 
-streamer는 첫 prompt callback을 제외하고 토큰 ID나 본문을 저장하지 않습니다. 첫 토큰과 접두사 뒤 첫 토큰에서만 시계를 읽고 이후 callback은 즉시 반환합니다. Transformers 자체는 prompt와 각 생성 토큰에 `.cpu()`를 수행하므로 전송과 Python callback 비용이 추가됩니다. 로그 기록 비용도 포함해 실제 GPU 지연·출력 동일성·계측 오버헤드는 새 GPU 실행에서 확인해야 합니다. 로컬 doubles 검증은 이 수치를 대신하지 않습니다. warmup은 기존 세 번의 생성·검증을 그대로 수행하며 새 TTFT 관측은 외부 요청에만 연결합니다. 프롬프트·프로필·근거·답변·헤더·토큰 ID는 로그에 남기지 않습니다.
+streamer는 첫 prompt callback을 제외하고 토큰 ID나 본문을 저장하지 않습니다. 첫 토큰과 접두사 뒤 첫 토큰에서만 시계를 읽고 이후 callback은 즉시 반환합니다. Transformers 자체는 prompt와 각 생성 토큰에 `.cpu()`를 수행하므로 전송과 Python callback 비용이 추가됩니다. 실제 GPU 지연과 TTFT는 job 55817에서 측정했으며 결과는 `experiments/results/2026-11-14-issue96-warmup-timing/README.md`에 정리했습니다. 로그 기록 비용도 포함해 job 55389와 비교한 출력 동일성과 계측 오버헤드는 별도 확인이 필요합니다. 로컬 doubles 검증은 이 수치를 대신하지 않습니다. warmup은 기존 세 번의 생성·검증을 그대로 수행하며 새 TTFT 관측은 외부 요청에만 연결합니다. 프롬프트·프로필·근거·답변·헤더·토큰 ID는 로그에 남기지 않습니다.
 
 Local event-controlled tests use the existing command
 `python3 -B -m unittest discover -s ai/tests -v`. The doubled measurement
@@ -107,7 +107,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s ai/tests -p 'test_reco
 
 ### 확인된 환경과 검증 상태
 
-2026-10-09 사용자가 DIS02에서 제공한 패키지 메타데이터:
+2026-10-09 사용자가 GPU-NODE-A에서 제공한 패키지 메타데이터:
 
 | 항목 | 값 |
 | --- | --- |
@@ -120,9 +120,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s ai/tests -p 'test_reco
 이전 사용자 실행에서 RTX A6000 48 GB, driver 525.105.17, CUDA 연산과 BF16 단일 질문 응답을 확인했습니다. 그 실행은 이번 CLI의 검증을 대신하지 않습니다. `nvidia-smi`의 CUDA 12.0 표시는 driver 지원 정보입니다.
 
 - GPU 없는 mock 검사는 로딩 옵션·배치·입력·오류 처리 계약을 확인합니다.
-- 새 CLI의 실제 GPU 실행: 2026-10-09 사용자 제공 DIS02 로그에서 checkpoint 4/4 로딩과 응답 생성을 확인했습니다. Codex가 직접 서버에서 실행한 것은 아닙니다. 종료 코드는 별도로 전달받지 않았습니다.
-- 모델 다운로드 revision: `a09a35458c702b33eeacc393d103063234e8bc28`. 2026-10-09 사용자 제공 ABRM02 출력에서 다운로드 메타데이터(`download/*.metadata`)의 첫 줄을 대조해 이 SHA 한 개만 확인했습니다. 해당 메타데이터의 revision 일치 근거이며 모델 파일의 해시·무결성 검사 결과는 아닙니다.
-- `requirements.txt`는 관측한 직접 의존성을 고정합니다. `requirements-observed.txt`에는 2026-10-09 사용자가 DIS02에서 전달한 전체 설치 목록 40개를 기록했습니다. pip·setuptools와 전이 의존성도 포함한 관측 스냅샷이며, wheel hash를 검증한 lock 또는 새 환경에서 재설치를 검증한 결과는 아닙니다.
+- 새 CLI의 실제 GPU 실행: 2026-10-09 사용자 제공 GPU-NODE-A 로그에서 checkpoint 4/4 로딩과 응답 생성을 확인했습니다. Codex가 직접 서버에서 실행한 것은 아닙니다. 종료 코드는 별도로 전달받지 않았습니다.
+- 모델 다운로드 revision: `a09a35458c702b33eeacc393d103063234e8bc28`. 2026-10-09 사용자 제공 LOGIN-NODE-A 출력에서 다운로드 메타데이터(`download/*.metadata`)의 첫 줄을 대조해 이 SHA 한 개만 확인했습니다. 해당 메타데이터의 revision 일치 근거이며 모델 파일의 해시·무결성 검사 결과는 아닙니다.
+- `requirements.txt`는 관측한 직접 의존성을 고정합니다. `requirements-observed.txt`에는 2026-10-09 사용자가 GPU-NODE-A에서 전달한 전체 설치 목록 40개를 기록했습니다. pip·setuptools와 전이 의존성도 포함한 관측 스냅샷이며, wheel hash를 검증한 lock 또는 새 환경에서 재설치를 검증한 결과는 아닙니다.
 
 ### 환경 준비
 
@@ -143,10 +143,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s ai/tests -p 'test_reco
 
 모델도 로그인 노드에서 공식 Hub의 특정 revision으로 먼저 받아 shared home에 둡니다. 이미 다운로드한 모델은 재다운로드하지 않고 기존 revision 메타데이터부터 확인합니다. 모델 다운로드는 CLI 실행과 분리됩니다.
 
-GPU 할당 예시입니다. DIS02 가용성은 현재 상태를 확인해야 합니다.
+GPU 할당 예시입니다. GPU-NODE-A 가용성은 현재 상태를 확인해야 합니다.
 
 ```bash
-srun --gres=gpu:1 -p p02 --nodelist=DIS02 --job-name=replica-llm --time=00:30:00 --pty bash
+srun --gres=gpu:1 -p GPU-PARTITION-A --nodelist=GPU-NODE-A --job-name=replica-llm --time=00:30:00 --pty bash
 hostname
 nvidia-smi
 ~/replica-llm-venv/bin/python -m pip install --no-index \
@@ -225,7 +225,7 @@ python ai/scripts/smoke_persona.py --help
 
 가짜 엔진과 실제 로컬 HTTP로 생성·계약·인용·축소 가드를 검사합니다.
 
-2026-11-05 교내 `p02`/`DIS02` GPU 환경(Slurm 작업 `35892`)에서 합성 입력만으로 `ai/scripts/smoke_persona.py`를 실행해 10개 검증 항목을 모두 통과했습니다(`COMPLETED`, 종료 코드 `0:0`, 56초). 이번 실행으로 실모델 준비 상태, 근거 유무 및 대화 이력 조건별 페르소나 정상 응답, 인용 번호의 입력 청크 UUID 매핑, 명시적으로 선택된 baseline 경로와 1토큰 깨진 JSON 유도 시의 안전한 `500` 반환을 확인했습니다. 또한 제어된 첫 실제 CUDA forward 계측을 통해 클라이언트 연결 해제나 `504` 타임아웃 발생 시에도 실제 생성이 끝날 때까지 전역 `request_id`와 슬롯이 조기 해제되지 않고 유지됨을 검증했습니다(`409`/`429`). 다만 이는 제어된 계측 결과일 뿐 일반 요청 겹침 성능이나 즉시 GPU 연산 취소의 증명은 아닙니다. 아울러 실제 임베딩·인덱스·DB 연동 및 최신성, 실모델 응답에 대한 #70 가드 치환 발동과 의미적 근거 충실도·품질, 운영 인증, AWS·앱 E2E 검증은 이번 범위에 포함되지 않습니다.
+2026-11-05 교내 `GPU-PARTITION-A`/`GPU-NODE-A` GPU 환경(Slurm 작업 `35892`)에서 합성 입력만으로 `ai/scripts/smoke_persona.py`를 실행해 10개 검증 항목을 모두 통과했습니다(`COMPLETED`, 종료 코드 `0:0`, 56초). 이번 실행으로 실모델 준비 상태, 근거 유무 및 대화 이력 조건별 페르소나 정상 응답, 인용 번호의 입력 청크 UUID 매핑, 명시적으로 선택된 baseline 경로와 1토큰 깨진 JSON 유도 시의 안전한 `500` 반환을 확인했습니다. 또한 제어된 첫 실제 CUDA forward 계측을 통해 클라이언트 연결 해제나 `504` 타임아웃 발생 시에도 실제 생성이 끝날 때까지 전역 `request_id`와 슬롯이 조기 해제되지 않고 유지됨을 검증했습니다(`409`/`429`). 다만 이는 제어된 계측 결과일 뿐 일반 요청 겹침 성능이나 즉시 GPU 연산 취소의 증명은 아닙니다. 아울러 실제 임베딩·인덱스·DB 연동 및 최신성, 실모델 응답에 대한 #70 가드 치환 발동과 의미적 근거 충실도·품질, 운영 인증, AWS·앱 E2E 검증은 이번 범위에 포함되지 않습니다.
 
 임베딩 실행 위치와 인덱스·메타데이터 및 백엔드 호출 전환은 담당자 합의가 남아 있고, 이 구현만으로 #78 전체 완료를 뜻하지 않습니다.
 
@@ -249,7 +249,7 @@ cover auth ordering, private logs, shared slots and disconnect/504 recovery.
 
 계약의 기준 소스는 병합된 `contracts/baseline` 및 `contracts/backend-ai/api-spec.md`의 섹션 1입니다. HTTP 테스트는 병합된 정식 예제를 사용하며 기존에 복사해 두었던 픽스처는 과거 기록용으로만 유지됩니다.
 
-**과거 실행 기록:** 2026-10-25 학교 DIS02에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`). 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 이 기록은 아래 설정이나 현재 배포의 검증 결과가 아닙니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
+**과거 실행 기록:** 2026-10-25 학교 GPU-NODE-A에서 Qwen3-8B로 실모델 smoke를 1회 실행해 9개 항목을 모두 통과했습니다(Slurm 작업 23586, `--context-limit 4096`). 모델 준비까지 약 200초, 첫 요청 11.1초, 이후 요청 0.3~4.5초였습니다. 서비스 인증·추론 마감·외부 연결·운영 문맥 한도·장시간 운영은 검증하지 않았습니다. 이 기록은 아래 설정이나 현재 배포의 검증 결과가 아닙니다. 로컬에서는 GPU 없는 실제 loopback HTTP 테스트, Slurm 스크립트 구문 검사와 CLI 도움말을 확인합니다.
 
 ### 모델·요청·수락 규칙
 
@@ -302,7 +302,7 @@ export REPLICA_PYTHON="$HOME/replica-llm-venv/bin/python"
 export REPLICA_MODEL_PATH="$HOME/replica-models/local-snapshot"
 export REPLICA_PORT=18043
 mkdir -p "$HOME/replica-logs/issue43"
-sbatch --partition p02 --nodelist DIS02 --time 00:30:00 \
+sbatch --partition GPU-PARTITION-A --nodelist GPU-NODE-A --time 00:30:00 \
   --output="$HOME/replica-logs/issue43/slurm-%j.out" \
   ai/scripts/serve_baseline.sbatch --context-limit 4096
 ```
