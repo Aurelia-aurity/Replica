@@ -159,11 +159,16 @@ void main() {
       if (request.method == 'POST' && request.url.path == '/records') {
         reservations++;
         final body = jsonDecode(request.body) as Map;
+        // A lost answer is reserved again with the same ID for its signature.
+        expect(savedId ?? body['record_id'], body['record_id']);
         savedId = body['record_id'] as String;
         expect(body['persona_id'], 'persona');
         expect(body.containsKey('user_id'), isFalse);
         expect(body['mime_type'], 'text/plain');
-        throw http.ClientException('lost reservation response');
+        if (reservations == 1) {
+          throw http.ClientException('lost reservation response');
+        }
+        return http.Response(jsonEncode(recordJson(savedId!)), 200);
       }
       if (request.method == 'POST') {
         completions++;
@@ -198,7 +203,7 @@ void main() {
       throwsA(isA<BackendFailure>()),
     );
     await service.upload(upload, () {});
-    expect(reservations, 1);
+    expect(reservations, 2);
     expect(transfer.calls, 1);
     expect(completions, 1);
     expect(upload.stage, UploadStage.done);

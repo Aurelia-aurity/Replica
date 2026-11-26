@@ -82,9 +82,10 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 | 단계 | 초안에 따른 동작 |
 | --- | --- |
 | 예약 | `POST /records`, UUID·상대 ID·파일 정보·동의 시각·버전 전달. `user_id` 미전달 |
-| 예약 결과 불명 | 같은 UUID로 `GET /records/{id}` 조회. 404일 때만 같은 ID로 예약 재시도 |
-| 원본 전송 | `RecordFileTransport.ensureUploaded` 주입. 진행률은 `upload.reportProgress`, 취소는 `upload.cancelToken` |
-| 완료 알림 | `GET /records/{id}`로 상태 확인 후 아직 `uploading`이면 `POST /records/{id}/uploaded`. 전송 완료 단계는 재전송하지 않음 |
+| 예약·재예약 | 이전 예약이 있으면 같은 UUID로 `GET /records/{id}`를 먼저 조회해 `uploading`을 지난 기록은 끝난 것으로 봄. 그 외에는 같은 ID로 `POST /records`를 다시 보내 응답의 `upload`(서명 주소)를 새로 받음. `upload: null`이면 원본이 이미 있으므로 전송을 건너뜀(PR #128) |
+| 원본 전송 | 예약 응답의 `upload.url`·`method`·`headers`로 Storage에 직접 `PUT`(앱 토큰은 붙이지 않음). 만료 30초 전부터는 보내기 전에 같은 ID로 재예약. Storage가 거절하면(401·403 포함) **로그아웃하지 않고** 한 번 재예약해 다시 보내며, 또 거절되면 재시도 가능한 오류(`STORAGE_REJECTED`)로 멈춤. 진행률은 `upload.reportProgress`, 취소는 `upload.cancelToken` |
+| 완료 알림 | `GET /records/{id}`로 상태 확인 후 아직 `uploading`이면 `POST /records/{id}/uploaded`. 전송이 끊겼거나 거절된 뒤 다시 보낼 때는 먼저 `/uploaded`로 원본이 있는지 확인해, 200이면 끝내고 409 `UPLOAD_MISSING`이면 다시 `PUT`함 |
+| 완료 알림의 409 | `UPLOAD_MISSING`: 같은 시도 안에서 한 번 자동으로 다시 보냄(서명이 유효하면 같은 주소, 없거나 만료됐으면 재예약). 또 없으면 재시도 가능한 오류로 멈추고 다음 시도에서 다시 보냄. `UPLOAD_SIZE_MISMATCH`: 같은 기록으로는 고칠 수 없어 `DELETE /records/{id}`로 기록을 지우고(삭제 요청 카드에 남김), 기기 파일 크기가 예약 때와 같으면 같은 파일·동의·화자 선택으로 **새 기록 ID**를 예약해 한 번 다시 올림. 파일 크기가 달라졌거나 다시 불일치하면 파일을 다시 고르도록 안내. 삭제 요청이 실패하면 기록을 남겨 다시 시도할 수 있게 함 |
 | 취소 정리 | 예약만 있고 `uploading`이면 `DELETE /records/{id}`. 이미 완료된 업로드는 지우지 않음 |
 | 목록 | `GET /records?persona_id=...&limit=100&offset=...`, 페이지를 이어 읽고 ID 중복과 `deleting` 제외 |
 | 전사 | `GET /records/{id}/text-versions`, `PATCH /text-versions/{id}`(`expected_updated_at`), `POST /text-versions/{id}/confirm` |
@@ -93,7 +94,7 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 
 ### 파일 전송 구현
 
-`HttpRecordFileTransport`는 합의된 대상으로 원본을 스트리밍하며 실제 진행률과 취소를 처리합니다. 대상 URL·메서드·헤더는 `resolveTarget` 콜백이 정하고 앱은 추정하지 않습니다. 파일이 선택 후 바뀌면(`FILE_CHANGED`) 예약한 크기보다 더 보내지 않고 멈춥니다. 원본 덮어쓰기 방지와 결과 불명 복구는 합의된 프로토콜(대상 헤더·`alreadyStored` 콜백)의 책임입니다.
+`HttpRecordFileTransport`는 예약 응답의 서명 업로드 정보(`upload.uploadTarget`)로 원본을 스트리밍하며 실제 진행률과 취소를 처리합니다. 대상 URL·메서드·헤더는 서버가 준 값만 쓰고 앱은 추정하지 않으며, 서명 주소가 인증을 대신하므로 `Authorization` 헤더를 보내지 않습니다. Storage의 오류 응답은 백엔드 오류 봉투가 아니라 `RecordStorageRejected`로 구분해, 401·403이어도 세션을 끝내지 않습니다. 파일이 선택 후 바뀌면(`FILE_CHANGED`) 예약한 크기보다 더 보내지 않고 멈춥니다. 원본 덮어쓰기는 Storage가 거절하고, 결과를 모르는 전송은 `ApiRecordService`가 `/uploaded`로 확인합니다. 테스트나 다른 대상에는 `resolveTarget` 콜백을 따로 줄 수 있습니다.
 
 ### 합의 전 기능을 꽂는 곳
 
@@ -112,7 +113,7 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 
 | 항목 | 현재 앱의 처리 | 계약 상태·남은 일 |
 | --- | --- | --- |
-| 원본 파일 업로드 방식·인증 | 전송 구현은 있으나 대상은 주입 | 계약: `POST /records` 응답의 `upload`(`url`·`method`·`headers`·`expires_at`)로 Storage에 직접 `PUT`하고 `/uploaded`로 완료를 알림. 남은 일: `upload`를 전송 대상으로 연결, 만료·거절 시 같은 ID로 재예약, `/uploaded`의 409 `UPLOAD_MISSING`·`UPLOAD_SIZE_MISMATCH` 복구. 버킷 `replica-records`는 아직 없음(#120) |
+| 원본 파일 업로드 방식·인증 | 예약 응답의 `upload`로 Storage에 직접 `PUT`, 만료·거절 시 같은 ID로 재예약 | 계약: 서명 업로드와 `/uploaded` 완료 알림. 남은 일: 실제 Storage로 확인(버킷 `replica-records` 미생성 #120, 만료된 서명 응답 미확인) |
 | 지원 형식·최대 용량 | 형식 4종 고정, 미리보기 한도 25 MiB | 계약: `.txt`·`.wav`·`.mp3`·`.m4a`, 25 MiB(26,214,400바이트), 초과는 413 `FILE_TOO_LARGE`. 남은 일: 실제 서비스의 `RecordPolicy`에 같은 값 주입 |
 | 전사 구간·타임스탬프·화자 | 있으면 표시, 없으면 줄 단위 | 계약에 없음. 제안: 텍스트 버전 객체에 `segments[{text,start_ms,end_ms,speaker,uncertain_words}]` 추가. 이어 붙인 `text`가 `content`와 같아야 함 |
 | 원본 음성 조회 | 재생 연결 전 안내 | 계약에 없음. 제안: 인증된 재생용(서명) URL 발급 |

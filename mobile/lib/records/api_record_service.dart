@@ -11,13 +11,23 @@ import 'record_playback.dart';
 import 'record_review.dart';
 import 'record_service.dart';
 
-/// Supply only after agreeing the upload protocol. Must reconcile an ambiguous
-/// previous transfer, preserve record ID and never overwrite an existing
-/// original. Report progress with `upload.reportProgress` and stop with
-/// `UploadCancelled` once `upload.cancelToken` is cancelled.
-/// See `HttpRecordFileTransport` for a streaming implementation.
+/// Sends one original file, normally to the signed upload of the record's
+/// latest reservation (`upload.uploadTarget`). Report progress with
+/// `upload.reportProgress`, stop with `UploadCancelled` once
+/// `upload.cancelToken` is cancelled, and raise [RecordStorageRejected] when
+/// Storage refuses the request. See `HttpRecordFileTransport`.
 abstract class RecordFileTransport {
   Future<void> ensureUploaded(RecordUpload upload);
+}
+
+/// Storage refused the transfer (for example an expired or rejected
+/// signature). Storage is not the backend: this never ends the session, and
+/// the record is reserved again for a new signature.
+class RecordStorageRejected implements Exception {
+  const RecordStorageRejected(this.statusCode);
+  final int statusCode;
+  @override
+  String toString() => 'RecordStorageRejected($statusCode)';
 }
 
 /// Authenticated access to the backend for the optional hooks below.
@@ -71,7 +81,15 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     required this.policy,
     required this.fileTransport,
     this.extensions = const RecordApiExtensions(),
+    this.clock = DateTime.now,
   }) : _backend = BackendService(auth);
+
+  /// Used to tell whether a signed upload URL has expired.
+  final DateTime Function() clock;
+
+  /// A signature this close to expiring is renewed before sending, so it does
+  /// not run out between the check and the request.
+  static const signatureMargin = Duration(seconds: 30);
   final http.Client client;
   final Uri baseUrl;
   final AuthService auth;
@@ -399,58 +417,165 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       throw StateError('Consent version changed');
     }
     upload.cancelToken.throwIfCancelled();
-    if (upload.stage == UploadStage.reserve) {
-      RecordEntry? existing;
-      if (upload.reservationRequested) existing = await _find(upload.id);
-      upload.cancelToken.throwIfCancelled();
-      if (existing == null) {
-        upload.reservationRequested = true;
-        final response = await _request(
-          'POST',
-          '/records',
-          body: upload.reservationJson(
-            personaId,
-            includeSpeakers: policy.sendSpeakerSelection,
-          ),
-        );
-        existing = RecordEntry.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>,
-        );
+    // One automatic renewal per attempt for an expired or refused signature;
+    // a second refusal is left to the user's retry.
+    var renewed = false;
+    // One automatic resend when `/uploaded` finds no original.
+    var resent = false;
+    while (upload.stage != UploadStage.done) {
+      if (upload.stage == UploadStage.complete) {
+        resent = await _complete(upload, resend: !resent) || resent;
+        onStageChanged();
+        continue;
+      }
+      if (upload.stage == UploadStage.reserve) {
+        await _reserve(upload);
+        onStageChanged();
+        continue;
       }
       upload.cancelToken.throwIfCancelled();
-      if (existing.id != upload.id) throw StateError('Record ID mismatch');
-      if (existing.status == RecordStatus.deleting) {
-        throw StateError('Record deleted');
+      // An earlier transfer may have stored the file even though its answer
+      // was lost: ask the server first (contract: '끊긴 전송·응답 유실').
+      if (upload.transferStarted && await _completedAlready(upload)) {
+        upload.stage = UploadStage.done;
+        onStageChanged();
+        return;
       }
-      upload.stage = existing.status == RecordStatus.uploading
-          ? UploadStage.transfer
-          : UploadStage.done;
-      onStageChanged();
-    }
-    if (upload.stage == UploadStage.transfer) {
       upload.cancelToken.throwIfCancelled();
+      if (upload.originalStored) {
+        upload.stage = UploadStage.complete;
+        onStageChanged();
+        continue;
+      }
+      final target = upload.uploadTarget;
+      if (target != null &&
+          target.expiredAt(clock(), margin: signatureMargin)) {
+        // Reserve again with the same ID before sending.
+        upload.stage = UploadStage.reserve;
+        if (renewed) throw _storageFailure(null);
+        renewed = true;
+        continue;
+      }
       upload.reportProgress(0);
-      await _backend.run(() => fileTransport.ensureUploaded(upload));
+      upload.transferStarted = true;
+      try {
+        await _backend.run(() => fileTransport.ensureUploaded(upload));
+      } on RecordStorageRejected catch (rejection) {
+        upload.cancelToken.throwIfCancelled();
+        // Expired or refused signature: reserve again with the same ID. The
+        // next transfer asks `/uploaded` first, in case the file is stored.
+        upload.stage = UploadStage.reserve;
+        if (renewed) throw _storageFailure(rejection.statusCode);
+        renewed = true;
+        continue;
+      }
       // The file is stored but the user cancelled meanwhile: discard it.
       upload.cancelToken.throwIfCancelled();
       upload.stage = UploadStage.complete;
       onStageChanged();
     }
-    if (upload.stage == UploadStage.complete) {
-      upload.cancelToken.throwIfCancelled();
-      // A previous completion may have succeeded even if its response was lost.
-      final existing = await _find(upload.id);
-      upload.cancelToken.throwIfCancelled();
-      if (existing == null) throw StateError('Record no longer exists');
-      if (existing.status == RecordStatus.deleting) {
-        throw StateError('Record deleted');
-      }
-      if (existing.status == RecordStatus.uploading) {
+  }
+
+  /// Tells the server the original is in place. Returns true when the server
+  /// had no original (409 `UPLOAD_MISSING`) and [resend] allowed sending it
+  /// again; otherwise that failure is rethrown with the upload set to send the
+  /// file on the next attempt.
+  ///
+  /// 409 `UPLOAD_SIZE_MISMATCH` is rethrown as is: a stored original cannot be
+  /// replaced, so the caller deletes the record and starts a new one.
+  Future<bool> _complete(RecordUpload upload, {required bool resend}) async {
+    upload.cancelToken.throwIfCancelled();
+    // A previous completion may have succeeded even if its response was lost.
+    final existing = await _find(upload.id);
+    upload.cancelToken.throwIfCancelled();
+    if (existing == null) throw StateError('Record no longer exists');
+    if (existing.status == RecordStatus.deleting) {
+      throw StateError('Record deleted');
+    }
+    if (existing.status == RecordStatus.uploading) {
+      try {
         await _request('POST', '/records/${upload.id}/uploaded');
+      } on BackendFailure catch (failure) {
+        if (failure.code != 'UPLOAD_MISSING') rethrow;
+        // Send it again: to the same signature, or to a new one when the
+        // reservation gave none (it had said the original was stored).
+        upload.stage = upload.uploadTarget == null
+            ? UploadStage.reserve
+            : UploadStage.transfer;
+        upload.originalStored = false;
+        upload.transferStarted = false;
+        if (!resend) rethrow;
+        return true;
       }
-      upload.cancelToken.throwIfCancelled();
+    }
+    upload.cancelToken.throwIfCancelled();
+    upload.stage = UploadStage.done;
+    return false;
+  }
+
+  /// Reserves the record, or reserves it again with the same ID, which returns
+  /// a fresh signed upload (or `upload: null` when the original is already
+  /// stored). A record that has moved past `uploading` is finished.
+  Future<void> _reserve(RecordUpload upload) async {
+    RecordEntry? existing;
+    if (upload.reservationRequested) existing = await _find(upload.id);
+    upload.cancelToken.throwIfCancelled();
+    if (existing != null && existing.id != upload.id) {
+      throw StateError('Record ID mismatch');
+    }
+    if (existing?.status == RecordStatus.deleting) {
+      throw StateError('Record deleted');
+    }
+    if (existing != null && existing.status != RecordStatus.uploading) {
       upload.stage = UploadStage.done;
-      onStageChanged();
+      return;
+    }
+    upload.reservationRequested = true;
+    final response = await _request(
+      'POST',
+      '/records',
+      body: upload.reservationJson(
+        personaId,
+        includeSpeakers: policy.sendSpeakerSelection,
+      ),
+    );
+    upload.cancelToken.throwIfCancelled();
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final reserved = RecordEntry.fromJson(json);
+    if (reserved.id != upload.id) throw StateError('Record ID mismatch');
+    if (reserved.status == RecordStatus.deleting) {
+      throw StateError('Record deleted');
+    }
+    // Every reservation answer replaces the previous signature.
+    final info = json['upload'];
+    upload.originalStored = json.containsKey('upload') && info == null;
+    upload.uploadTarget = info == null
+        ? null
+        : RecordUploadTarget.fromJson(info);
+    upload.stage = reserved.status == RecordStatus.uploading
+        ? UploadStage.transfer
+        : UploadStage.done;
+  }
+
+  /// Asks `/uploaded` whether an earlier transfer already stored the file.
+  /// `UPLOAD_MISSING` means it did not, and the file is sent.
+  Future<bool> _completedAlready(RecordUpload upload) async {
+    try {
+      await _request('POST', '/records/${upload.id}/uploaded');
+      return true;
+    } on BackendFailure catch (failure) {
+      if (failure.code != 'UPLOAD_MISSING') rethrow;
+      upload.transferStarted = false;
+      return false;
     }
   }
+
+  /// Storage still refuses after a renewed signature. Retrying the same
+  /// record reserves it again, and the session stays signed in.
+  BackendFailure _storageFailure(int? statusCode) => BackendFailure(
+    BackendFailureKind.generic,
+    code: 'STORAGE_REJECTED',
+    retryable: true,
+    statusCode: statusCode,
+  );
 }
