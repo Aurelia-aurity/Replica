@@ -360,26 +360,83 @@ class RecordController extends ChangeNotifier {
     uploadNotice = null;
     _changed();
     try {
-      await service.upload(current, _changed);
+      await _uploadReplacingMismatch(current);
       if (_disposed) return;
       uploadSucceeded = true;
       await refresh();
     } on UploadCancelled {
       if (_disposed) return;
-      await _afterCancel(current);
+      // A mismatch may have replaced the attempt with a new record.
+      await _afterCancel(attempt ?? current);
     } catch (error) {
       if (_disposed) return;
-      if (current.cancelToken.isCancelled) {
-        await _afterCancel(current);
+      final latest = attempt ?? current;
+      if (latest.cancelToken.isCancelled) {
+        await _afterCancel(latest);
       } else {
         uploadRetryAllowed = error is! BackendFailure || error.retryable;
         uploadError = _uploadMessage(error);
       }
     } finally {
       current.onProgress = null;
+      attempt?.onProgress = null;
       uploading = false;
       cancelling = false;
       _changed();
+    }
+  }
+
+  /// Runs the upload. A stored original whose size differs from the
+  /// reservation (409 `UPLOAD_SIZE_MISMATCH`) cannot be replaced under the
+  /// same record, so the record is deleted and, if the file on the device is
+  /// still the reserved size, the same file, consent and speakers are sent
+  /// once more as a new record. Otherwise the user picks the file again.
+  Future<void> _uploadReplacingMismatch(RecordUpload first) async {
+    var current = first;
+    for (var restarted = false; ; restarted = true) {
+      try {
+        await service.upload(current, _changed);
+        if (restarted) {
+          uploadNotice = '저장된 원본의 크기가 달라 이전 임시 기록을 지우고 새 기록으로 다시 올렸어요.';
+        }
+        return;
+      } on BackendFailure catch (failure) {
+        if (failure.code != 'UPLOAD_SIZE_MISMATCH' ||
+            current.cancelToken.isCancelled) {
+          rethrow;
+        }
+      }
+      // A failed delete request keeps the attempt, so retrying asks again.
+      await _discardUpload(current);
+      if (_disposed) return;
+      final unchanged = !restarted && await _hasReservedSize(current.file);
+      if (_disposed) return;
+      if (!unchanged) {
+        // The record is gone; picking the file again starts a new one.
+        attempt = null;
+        throw BackendFailure(
+          BackendFailureKind.generic,
+          code: restarted ? 'UPLOAD_SIZE_MISMATCH' : 'FILE_CHANGED',
+        );
+      }
+      current = current.restart()..onProgress = _changed;
+      attempt = current;
+      uploadNotice = '저장된 원본의 크기가 달라 이전 임시 기록을 지우고 새 기록으로 다시 올리고 있어요.';
+      _changed();
+    }
+  }
+
+  /// Whether the picked file still has the size it was reserved with.
+  Future<bool> _hasReservedSize(RecordFile file) async {
+    try {
+      var size = 0;
+      await for (final chunk in file.openRead()) {
+        size += chunk.length;
+        if (size > file.sizeBytes) return false;
+      }
+      return size == file.sizeBytes;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -388,6 +445,9 @@ class RecordController extends ChangeNotifier {
     if (error is BackendFailure) {
       if (error.code == 'FILE_CHANGED') {
         return '올리는 도중 파일이 바뀌었어요. 파일을 다시 선택해 주세요.';
+      }
+      if (error.code == 'UPLOAD_SIZE_MISMATCH') {
+        return '저장된 원본의 크기가 맞지 않아 올리지 못했어요. 파일을 다시 선택해 주세요.';
       }
       if (error.kind == BackendFailureKind.forbidden) {
         return '이 기록을 올릴 권한이 없어요.';

@@ -420,8 +420,14 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     // One automatic renewal per attempt for an expired or refused signature;
     // a second refusal is left to the user's retry.
     var renewed = false;
-    while (upload.stage == UploadStage.reserve ||
-        upload.stage == UploadStage.transfer) {
+    // One automatic resend when `/uploaded` finds no original.
+    var resent = false;
+    while (upload.stage != UploadStage.done) {
+      if (upload.stage == UploadStage.complete) {
+        resent = await _complete(upload, resend: !resent) || resent;
+        onStageChanged();
+        continue;
+      }
       if (upload.stage == UploadStage.reserve) {
         await _reserve(upload);
         onStageChanged();
@@ -439,7 +445,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       if (upload.originalStored) {
         upload.stage = UploadStage.complete;
         onStageChanged();
-        break;
+        continue;
       }
       final target = upload.uploadTarget;
       if (target != null &&
@@ -468,32 +474,43 @@ class ApiRecordService extends RecordService implements RecordApiClient {
       upload.stage = UploadStage.complete;
       onStageChanged();
     }
-    if (upload.stage == UploadStage.complete) {
-      upload.cancelToken.throwIfCancelled();
-      // A previous completion may have succeeded even if its response was lost.
-      final existing = await _find(upload.id);
-      upload.cancelToken.throwIfCancelled();
-      if (existing == null) throw StateError('Record no longer exists');
-      if (existing.status == RecordStatus.deleting) {
-        throw StateError('Record deleted');
-      }
-      if (existing.status == RecordStatus.uploading) {
-        try {
-          await _request('POST', '/records/${upload.id}/uploaded');
-        } on BackendFailure catch (failure) {
-          if (failure.code == 'UPLOAD_MISSING') {
-            // The server has no original after all: send it again next time.
-            upload.stage = UploadStage.transfer;
-            upload.originalStored = false;
-            upload.transferStarted = false;
-          }
-          rethrow;
-        }
-      }
-      upload.cancelToken.throwIfCancelled();
-      upload.stage = UploadStage.done;
-      onStageChanged();
+  }
+
+  /// Tells the server the original is in place. Returns true when the server
+  /// had no original (409 `UPLOAD_MISSING`) and [resend] allowed sending it
+  /// again; otherwise that failure is rethrown with the upload set to send the
+  /// file on the next attempt.
+  ///
+  /// 409 `UPLOAD_SIZE_MISMATCH` is rethrown as is: a stored original cannot be
+  /// replaced, so the caller deletes the record and starts a new one.
+  Future<bool> _complete(RecordUpload upload, {required bool resend}) async {
+    upload.cancelToken.throwIfCancelled();
+    // A previous completion may have succeeded even if its response was lost.
+    final existing = await _find(upload.id);
+    upload.cancelToken.throwIfCancelled();
+    if (existing == null) throw StateError('Record no longer exists');
+    if (existing.status == RecordStatus.deleting) {
+      throw StateError('Record deleted');
     }
+    if (existing.status == RecordStatus.uploading) {
+      try {
+        await _request('POST', '/records/${upload.id}/uploaded');
+      } on BackendFailure catch (failure) {
+        if (failure.code != 'UPLOAD_MISSING') rethrow;
+        // Send it again: to the same signature, or to a new one when the
+        // reservation gave none (it had said the original was stored).
+        upload.stage = upload.uploadTarget == null
+            ? UploadStage.reserve
+            : UploadStage.transfer;
+        upload.originalStored = false;
+        upload.transferStarted = false;
+        if (!resend) rethrow;
+        return true;
+      }
+    }
+    upload.cancelToken.throwIfCancelled();
+    upload.stage = UploadStage.done;
+    return false;
   }
 
   /// Reserves the record, or reserves it again with the same ID, which returns

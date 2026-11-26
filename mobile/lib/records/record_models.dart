@@ -260,6 +260,16 @@ class RecordUpload {
   final DateTime consentAt;
   final String consentVersion;
 
+  /// A new record (new ID) for the same file, consent and speaker choice,
+  /// for when the stored original cannot be fixed under this record.
+  RecordUpload restart() => RecordUpload(
+    file: file,
+    consentAt: consentAt,
+    consentVersion: consentVersion,
+    targetSpeaker: targetSpeaker,
+    providerSpeaker: providerSpeaker,
+  );
+
   /// Chosen on SC-04 for KakaoTalk exports. Names stay in memory only.
   final String? targetSpeaker;
   final String? providerSpeaker;
