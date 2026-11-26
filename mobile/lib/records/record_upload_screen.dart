@@ -222,7 +222,14 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                     if (c.analysisError != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
-                        child: Text(c.analysisError!, style: _muted),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            c.analysisError!,
+                            key: const ValueKey('record-text-unreadable'),
+                            style: const TextStyle(color: Color(0xFFB3261E)),
+                          ),
+                        ),
                       ),
                     if (_kind == RecordKind.text) ...[
                       if (c.needsSpeakers) ..._speakerSections(c, analysis!),

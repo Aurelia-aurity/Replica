@@ -66,17 +66,39 @@ void main() {
       );
     });
 
-    test('tolerates a byte order mark and malformed bytes', () async {
+    test('accepts a byte order mark and rejects broken bytes', () async {
       final bom = await analyzeTextRecord(
         _text('﻿[엄마] [오후 3:12] 안녕\n[나] [오후 3:13] 응'),
       );
       expect(bom.speakers.length, 2);
-      final broken = RecordFile(
+      RecordFile bytes(List<int> data) => RecordFile(
         name: 'x.txt',
-        sizeBytes: 5,
-        openRead: () => Stream.value([0xff, 0xfe, 0x41, 0x0a, 0xff]),
+        sizeBytes: data.length,
+        openRead: () => Stream.value(data),
       );
-      expect((await analyzeTextRecord(broken)).kakao, isFalse);
+      // Broken bytes, as the server would refuse them.
+      for (final data in [
+        [0xff, 0xfe, 0x41, 0x0a, 0xff],
+        // '안녕' saved as CP949 (EUC-KR) instead of UTF-8.
+        [0xbe, 0xc8, 0xb3, 0xe7],
+        // A file cut in the middle of a character.
+        [...utf8.encode('[엄마] [오후 3:12] 안'), 0xeb, 0x85],
+      ]) {
+        await expectLater(
+          analyzeTextRecord(bytes(data)),
+          throwsA(isA<TextNotUtf8>()),
+          reason: '$data',
+        );
+      }
+      // A character split across two chunks is still read.
+      final split = utf8.encode('[엄마] [오후 3:12] 안녕\n[나] [오후 3:13] 응');
+      final chunked = RecordFile(
+        name: 'x.txt',
+        sizeBytes: split.length,
+        openRead: () =>
+            Stream.fromIterable([split.sublist(0, 20), split.sublist(20)]),
+      );
+      expect((await analyzeTextRecord(chunked)).speakers.length, 2);
     });
 
     test('plain text, one stray timestamp and audio are not chats', () async {
@@ -229,7 +251,7 @@ void main() {
       expect(controller.attempt!.targetSpeaker, isNull);
     });
 
-    test('a file that cannot be read still uploads as a whole file', () async {
+    test('a file that cannot be read is not uploaded', () async {
       final controller = RecordController(
         PreviewRecordService(),
         analyze: (_) async => throw StateError('unreadable'),
@@ -238,8 +260,36 @@ void main() {
       controller.select(_text('내용'));
       controller.setConsent(true);
       await controller.send();
-      expect(controller.analysisError, isNotNull);
-      expect(controller.uploadSucceeded, isTrue);
+      expect(controller.analysisError, contains('파일을 읽지 못했어요'));
+      expect(controller.textUnreadable, isTrue);
+      expect(controller.canUpload, isFalse);
+      expect(controller.attempt, isNull);
+      expect(controller.uploadSucceeded, isFalse);
+    });
+
+    test('text that is not UTF-8 is stopped before the upload', () async {
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      final cp949 = [0xbe, 0xc8, 0xb3, 0xe7];
+      controller.select(
+        RecordFile(
+          name: 'diary.txt',
+          sizeBytes: cp949.length,
+          openRead: () => Stream.value(cp949),
+        ),
+      );
+      controller.setConsent(true);
+      await controller.send();
+      expect(controller.analysisError, contains('UTF-8'));
+      expect(controller.canUpload, isFalse);
+      // No reservation was made.
+      expect(controller.attempt, isNull);
+      // Another file starts clean.
+      controller.select(_text('오늘의 일기', name: 'ok.txt'));
+      await pumpEventQueue();
+      expect(controller.analysisError, isNull);
+      controller.setConsent(true);
+      expect(controller.canUpload, isTrue);
     });
 
     test(
@@ -295,6 +345,48 @@ void main() {
         expect(controller.needsSpeakers, isFalse);
       },
     );
+  });
+
+  testWidgets('SC-04 explains a text that is not UTF-8 and blocks it', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 2000);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final controller = RecordController(PreviewRecordService());
+    addTearDown(controller.dispose);
+    final broken = [0xff, 0xfe, 0x41];
+    controller.select(
+      RecordFile(
+        name: 'broken.txt',
+        sizeBytes: broken.length,
+        openRead: () => Stream.value(broken),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RecordUploadScreen(
+          controller: controller,
+          picker: () async => null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('record-text-unreadable')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('UTF-8로 저장된 텍스트 파일만'), findsOneWidget);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('record-upload')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('SC-04 shows speakers, counts and blocks the same person', (

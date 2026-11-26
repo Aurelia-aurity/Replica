@@ -289,23 +289,29 @@ class RecordController extends ChangeNotifier {
 
   Future<void> _analyze(RecordFile file, int token) async {
     TextAnalysis? result;
-    var failed = false;
+    Object? failure;
     try {
       result = await analyze(file);
-    } catch (_) {
-      failed = true;
+    } catch (error) {
+      failure = error;
     }
     if (_disposed || token != _analysisToken) return;
     analyzing = false;
-    if (failed) {
-      // The upload does not depend on the speaker step; fall back to the file.
-      analysis = TextAnalysis.plain;
-      analysisError = '파일 내용을 확인하지 못해 화자 선택 없이 올려요.';
-    } else {
+    if (failure == null) {
       analysis = result;
+    } else {
+      // The server would refuse a text it cannot read, so it is not sent:
+      // the reservation would be left behind for nothing.
+      analysis = null;
+      analysisError = failure is TextNotUtf8
+          ? 'UTF-8로 저장된 텍스트 파일만 올릴 수 있어요. 파일을 UTF-8로 다시 저장한 뒤 선택해 주세요.'
+          : '파일을 읽지 못했어요. 파일을 다시 선택해 주세요.';
     }
     _changed();
   }
+
+  /// The picked text could not be read as UTF-8 (or at all).
+  bool get textUnreadable => analysisError != null;
 
   bool get needsSpeakers => analysis?.needsSpeakerSelection ?? false;
   bool get needsProvider => analysis?.needsProviderSelection ?? false;
@@ -340,6 +346,7 @@ class RecordController extends ChangeNotifier {
       consent &&
       !uploading &&
       !analyzing &&
+      !textUnreadable &&
       !uploadSucceeded &&
       uploadRetryAllowed &&
       (!needsSpeakers ||
