@@ -71,6 +71,14 @@ abstract class AuthService extends ChangeNotifier {
   @protected
   Future<SignUpResult> performRegistration(SignUpRequest request);
 
+  /// Asks the auth provider to send the signup confirmation email to [email]
+  /// again.
+  ///
+  /// The provider may answer the same way whether or not [email] belongs to an
+  /// unconfirmed account, so success only means the request was accepted.
+  /// Throws [AuthFailure]; [AuthFailureKind.rateLimited] means try later.
+  Future<void> resendSignUpConfirmation(String email);
+
   Future<void> signOut();
 
   /// Future backend clients must call this for each request, not cache tokens.
@@ -142,6 +150,9 @@ class UnconfiguredAuthService extends AuthService {
       throw const AuthFailure('인증 환경 설정이 필요합니다.');
   @override
   Future<SignUpResult> performRegistration(SignUpRequest request) async =>
+      throw const AuthFailure('인증 환경 설정이 필요합니다.');
+  @override
+  Future<void> resendSignUpConfirmation(String email) async =>
       throw const AuthFailure('인증 환경 설정이 필요합니다.');
   @override
   Future<void> signOut() async => updateIdentity(null);

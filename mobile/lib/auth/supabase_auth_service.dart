@@ -88,6 +88,12 @@ class SupabaseAuthService extends AuthService {
             kind: AuthFailureKind.rateLimited,
           );
       }
+      if (error.statusCode == '429') {
+        return const AuthFailure(
+          '요청이 많아요. 잠시 후 다시 시도해 주세요.',
+          kind: AuthFailureKind.rateLimited,
+        );
+      }
     }
     return const AuthFailure('인증 요청을 완료하지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
   }
@@ -124,6 +130,19 @@ class SupabaseAuthService extends AuthService {
       return response.session != null
           ? SignUpResult.signedIn
           : SignUpResult.emailVerificationRequired;
+    } catch (error) {
+      throw _failure(error);
+    }
+  }
+
+  @override
+  Future<void> resendSignUpConfirmation(String email) async {
+    try {
+      await _client.auth.resend(
+        type: OtpType.signup,
+        email: email,
+        emailRedirectTo: emailRedirectTo,
+      );
     } catch (error) {
       throw _failure(error);
     }

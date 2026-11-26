@@ -22,15 +22,31 @@ class _AuthScreenState extends State<AuthScreen> {
       _networkFailed = false;
   String? _error, _emailServerError, _message;
 
+  /// The address whose signup still needs email confirmation, set only after
+  /// a signup asks for confirmation or a sign-in is refused as unconfirmed.
+  /// Resending goes to this address, not to whatever the field holds later.
+  String? _resendEmail;
+  bool _resending = false, _resendFailed = false;
+  String? _resendResult;
+
+  /// Signup, sign-in and resend never run at the same time.
+  bool get _locked => _busy || _resending;
+
   bool get _canSubmit =>
       widget.service.isConfigured &&
-      !_busy &&
+      !_locked &&
       _email.text.trim().isNotEmpty &&
       _password.text.isNotEmpty &&
       (!_signUp || (_confirmation.text.isNotEmpty && _consent));
 
+  void _clearResend() {
+    _resendEmail = null;
+    _resendResult = null;
+    _resendFailed = false;
+  }
+
   void _switchMode() {
-    if (_busy) return;
+    if (_locked) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _signUp = !_signUp;
@@ -40,7 +56,41 @@ class _AuthScreenState extends State<AuthScreen> {
       _networkFailed = false;
       _consent = false;
       _obscure = true;
+      _clearResend();
       _resetFormKeepingEmail();
+    });
+  }
+
+  Future<void> _resend() async {
+    final email = _resendEmail;
+    if (email == null || _locked) return;
+    setState(() {
+      _resending = true;
+      _resendResult = null;
+      _resendFailed = false;
+    });
+    String result;
+    var failed = true;
+    try {
+      await widget.service.resendSignUpConfirmation(email);
+      failed = false;
+      result = widget.service.isPreview
+          ? '인증 메일 재전송 화면 확인을 마쳤어요. 미리보기에서는 실제 메일을 보내지 않아요.'
+          : '인증 메일을 다시 요청했어요. 메일함과 스팸메일함을 확인한 후 로그인해 주세요.';
+    } on AuthFailure catch (error) {
+      result = switch (error.kind) {
+        AuthFailureKind.rateLimited => '인증 메일 요청이 많아요. 잠시 후 다시 시도해 주세요.',
+        AuthFailureKind.network => '네트워크 연결을 확인하고 다시 시도해 주세요.',
+        _ => '인증 메일을 다시 보내지 못했어요. 다시 시도해 주세요.',
+      };
+    } catch (_) {
+      result = '인증 메일을 다시 보내지 못했어요. 다시 시도해 주세요.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _resending = false;
+      _resendResult = result;
+      _resendFailed = failed;
     });
   }
 
@@ -56,17 +106,19 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!_canSubmit || !_form.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    final email = _email.text.trim();
     setState(() {
       _busy = true;
       _error = null;
       _networkFailed = false;
       _message = null;
+      _clearResend();
     });
     try {
       if (_signUp) {
         final result = await widget.service.register(
           SignUpRequest(
-            email: _email.text.trim(),
+            email: email,
             password: _password.text,
             personalRecordsConsent: _consent,
           ),
@@ -86,11 +138,16 @@ class _AuthScreenState extends State<AuthScreen> {
                     : '회원가입이 완료되었어요. 로그인해 주세요.',
               SignUpResult.signedIn => null,
             };
+            // Resetting the form reports an empty email field, which clears
+            // any resend address, so the address is kept after the reset.
             _resetFormKeepingEmail();
+            if (result == SignUpResult.emailVerificationRequired) {
+              _resendEmail = email;
+            }
           });
         }
       } else {
-        await widget.service.signIn(_email.text.trim(), _password.text);
+        await widget.service.signIn(email, _password.text);
       }
     } on AuthFailure catch (error) {
       if (!mounted) return;
@@ -105,7 +162,11 @@ class _AuthScreenState extends State<AuthScreen> {
         case AuthFailureKind.invalidCredentials:
           setState(() => _error = '이메일 또는 비밀번호가 맞지 않아요');
         case AuthFailureKind.emailNotVerified:
-          setState(() => _error = '이메일 인증을 완료한 후 로그인해 주세요.');
+          setState(() {
+            _error = '이메일 인증을 완료한 후 로그인해 주세요.';
+            // Only a refused sign-in names an unconfirmed address.
+            if (!_signUp) _resendEmail = email;
+          });
         case AuthFailureKind.weakPassword:
           setState(() => _error = '비밀번호가 보안 정책을 충족하지 않습니다.');
         case AuthFailureKind.rateLimited:
@@ -240,7 +301,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             TextFormField(
                               key: const ValueKey('auth-email'),
                               controller: _email,
-                              enabled: !_busy,
+                              enabled: !_locked,
                               keyboardType: TextInputType.emailAddress,
                               autocorrect: false,
                               autofillHints: const [AutofillHints.email],
@@ -249,9 +310,14 @@ class _AuthScreenState extends State<AuthScreen> {
                                   AutovalidateMode.onUserInteraction,
                               forceErrorText: _emailServerError,
                               decoration: _decoration(hint: 'user@example.com'),
-                              onChanged: (_) => setState(() {
+                              onChanged: (value) => setState(() {
                                 _emailServerError = null;
                                 _error = null;
+                                // A different address has no pending
+                                // confirmation to resend.
+                                if (value.trim() != _resendEmail) {
+                                  _clearResend();
+                                }
                               }),
                               validator: (value) {
                                 final email = value?.trim() ?? '';
@@ -266,7 +332,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: TextButton(
-                                  onPressed: _busy ? null : _switchMode,
+                                  onPressed: _locked ? null : _switchMode,
                                   child: const Text('로그인으로 전환'),
                                 ),
                               ),
@@ -275,7 +341,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             TextFormField(
                               key: const ValueKey('auth-password'),
                               controller: _password,
-                              enabled: !_busy,
+                              enabled: !_locked,
                               obscureText: _obscure,
                               autocorrect: false,
                               enableSuggestions: false,
@@ -296,7 +362,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               decoration: _decoration(
                                 suffix: IconButton(
                                   tooltip: _obscure ? '비밀번호 보기' : '비밀번호 숨기기',
-                                  onPressed: _busy
+                                  onPressed: _locked
                                       ? null
                                       : () => setState(
                                           () => _obscure = !_obscure,
@@ -325,7 +391,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               TextFormField(
                                 key: const ValueKey('auth-confirmation'),
                                 controller: _confirmation,
-                                enabled: !_busy,
+                                enabled: !_locked,
                                 obscureText: _obscure,
                                 autocorrect: false,
                                 enableSuggestions: false,
@@ -343,7 +409,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               CheckboxListTile(
                                 key: const ValueKey('auth-consent'),
                                 value: _consent,
-                                onChanged: _busy
+                                onChanged: _locked
                                     ? null
                                     : (value) => setState(
                                         () => _consent = value ?? false,
@@ -378,6 +444,43 @@ class _AuthScreenState extends State<AuthScreen> {
                                 _message!,
                                 style: const TextStyle(height: 1.5),
                               ),
+                            ],
+                            if (_resendEmail != null) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                key: const ValueKey('auth-resend'),
+                                onPressed: _locked ? null : _resend,
+                                icon: _resending
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.forward_to_inbox_outlined,
+                                      ),
+                                label: Text(
+                                  _resending ? '인증 메일 요청 중…' : '인증 메일 다시 보내기',
+                                ),
+                              ),
+                              if (_resendResult case final String result) ...[
+                                const SizedBox(height: 8),
+                                Semantics(
+                                  liveRegion: true,
+                                  child: Text(
+                                    result,
+                                    key: const ValueKey('auth-resend-result'),
+                                    style: TextStyle(
+                                      height: 1.5,
+                                      color: _resendFailed
+                                          ? Theme.of(context).colorScheme.error
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                             if (_networkFailed) ...[
                               const SizedBox(height: 18),
@@ -434,7 +537,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                                 TextButton(
                                   key: const ValueKey('auth-switch'),
-                                  onPressed: _busy ? null : _switchMode,
+                                  onPressed: _locked ? null : _switchMode,
                                   child: Text(
                                     _signUp ? '로그인' : '회원가입',
                                     style: const TextStyle(
