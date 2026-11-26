@@ -4,7 +4,8 @@
 
 - 가입 후 이메일 인증 안내와 미인증 로그인 오류에 ‘인증 메일 다시 보내기’를 추가했습니다. 규칙은 [AUTH_CONTRACT.md](AUTH_CONTRACT.md#인증-메일-재전송-125)를 참고하세요.
 - `test/auth_resend_test.dart` 16개: 두 진입점, 대상 이메일(공백 제거·이후 입력값 무시·가장 최근에 거절된 로그인 주소), 요청 중 버튼·입력·전환 비활성과 중복 요청 차단, 새 로그인 요청 중 버튼 제거, 성공·요청 제한·연결 실패·그 밖의 실패 안내와 재요청, 다른 주소 입력·모드 전환 시 버튼 제거, 다른 로그인 실패에는 버튼 없음, 320×568·글자 1.8배 배치, 더미 안내, SDK 요청(`POST /auth/v1/resend`, `type: signup`, `redirect_to`)과 오류 코드·429·5xx·연결 실패 변환.
-- 기준 `main`(`7c0c123`)에 이 변경을 더한 상태에서 전체 Flutter 테스트 **450개** 통과, `flutter analyze --no-pub` No issues found, 변경한 파일의 `dart format` 통과.
+- 기준 `main`(`7c0c123`)에 이 변경을 더한 상태에서 전체 Flutter 테스트 **452개** 통과, `flutter analyze --no-pub` No issues found, 변경한 파일의 `dart format` 통과.
+- 위젯 렌더링 캡처 5장을 `docs/screenshots/issue125/`에 추가했습니다(`test/auth_resend_capture_test.dart`, [캡처 안내](docs/screenshots/issue125/README.md)). 이 파일의 2개 테스트는 일반 실행에서도 같은 흐름을 검사하고, 캡처 모드에서만 이미지를 씁니다.
 - 실제 Supabase 프로젝트의 재전송 메일 수신, 이메일 발송 제한 값, 실기기 화면은 미검증입니다.
 
 ## 2026-10-28 PR #62 수정 요청 반영
