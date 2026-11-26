@@ -86,6 +86,7 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 | 원본 전송 | 예약 응답의 `upload.url`·`method`·`headers`로 Storage에 직접 `PUT`(앱 토큰은 붙이지 않음). 만료 30초 전부터는 보내기 전에 같은 ID로 재예약. Storage가 거절하면(401·403 포함) **로그아웃하지 않고** 한 번 재예약해 다시 보내며, 또 거절되면 재시도 가능한 오류(`STORAGE_REJECTED`)로 멈춤. 진행률은 `upload.reportProgress`, 취소는 `upload.cancelToken` |
 | 완료 알림 | `GET /records/{id}`로 상태 확인 후 아직 `uploading`이면 `POST /records/{id}/uploaded`. 전송이 끊겼거나 거절된 뒤 다시 보낼 때는 먼저 `/uploaded`로 원본이 있는지 확인해, 200이면 끝내고 409 `UPLOAD_MISSING`이면 다시 `PUT`함 |
 | 완료 알림의 409 | `UPLOAD_MISSING`: 같은 시도 안에서 한 번 자동으로 다시 보냄(서명이 유효하면 같은 주소, 없거나 만료됐으면 재예약). 또 없으면 재시도 가능한 오류로 멈추고 다음 시도에서 다시 보냄. `UPLOAD_SIZE_MISMATCH`: 같은 기록으로는 고칠 수 없어 `DELETE /records/{id}`로 기록을 지우고(삭제 요청 카드에 남김), 기기 파일 크기가 예약 때와 같으면 같은 파일·동의·화자 선택으로 **새 기록 ID**를 예약해 한 번 다시 올림. 파일 크기가 달라졌거나 다시 불일치하면 파일을 다시 고르도록 안내. 삭제 요청이 실패하면 기록을 남겨 다시 시도할 수 있게 함 |
+| 완료 알림의 422 화자 오류 | `SPEAKER_REQUIRED`·`SPEAKER_NOT_FOUND`: 서버가 준 `error.speakers`로 화자 선택 영역을 다시 띄움(서버 판정이 기기 분석을 대신하며 메시지 수는 표시하지 않음). 목록에 없는 선택은 지우고, 화자가 1명이면 사용자가 직접 눌러야 함. ‘선택한 화자로 이어서 올리기’를 누르면 고른 값을 담아 `/uploaded`만 다시 부르며 **파일은 다시 올리지 않음**(값이 없는 쪽은 `null`로 보내 예약 때 값을 지움). `SPEAKER_NOT_ALLOWED`: 묻지 않고 해당 값을 `null`로 지워 한 번 다시 부름(`field`가 `provider_speaker`면 제공자만, 아니면 둘 다). ‘새 파일로 시작’을 누르면 기다리던 기록을 지움 |
 | 취소 정리 | 예약만 있고 `uploading`이면 `DELETE /records/{id}`. 이미 완료된 업로드는 지우지 않음 |
 | 목록 | `GET /records?persona_id=...&limit=100&offset=...`, 페이지를 이어 읽고 ID 중복과 `deleting` 제외 |
 | 전사 | `GET /records/{id}/text-versions`, `PATCH /text-versions/{id}`(`expected_updated_at`), `POST /text-versions/{id}/confirm` |
@@ -118,7 +119,7 @@ SC-03~SC-06 화면기획서(`레플리카 화면 기획서_ver.2`)와 2026-10-13
 | 전사 구간·타임스탬프·화자 | 있으면 표시, 없으면 줄 단위 | 계약에 없음. 제안: 텍스트 버전 객체에 `segments[{text,start_ms,end_ms,speaker,uncertain_words}]` 추가. 이어 붙인 `text`가 `content`와 같아야 함 |
 | 원본 음성 조회 | 재생 연결 전 안내 | 계약에 없음. 제안: 인증된 재생용(서명) URL 발급 |
 | 전사 실패 재시도 | 버튼 비활성 | 계약에 없음. 제안: 재요청 API |
-| 화자·제공자 | 예약 요청에 `target_speaker`를 보내고, 화자가 2명 이상이면 `provider_speaker`도 보냄(`sendSpeakerSelection` 기본 켬) | 계약: 예약 요청의 두 필드, 1인 화자는 `target_speaker`만. 남은 일: `/uploaded`의 422 `SPEAKER_*`와 `error.speakers`로 다시 선택해 재호출, 목록의 `error_code: speaker_*`를 '확인 필요'로 표시. 서버가 받는지는 PR #128 병합 뒤 확인 |
+| 화자·제공자 | 예약 요청에 `target_speaker`를 보내고, 화자가 2명 이상이면 `provider_speaker`도 보냄(`sendSpeakerSelection` 기본 켬) | 계약: 예약 요청의 두 필드, 1인 화자는 `target_speaker`만. `/uploaded`의 422 `SPEAKER_*`는 `error.speakers`로 다시 골라 재호출함. 남은 일: 목록의 `error_code: speaker_*`를 '확인 필요'로 표시(앱을 다시 연 뒤 이어가기). 서버가 받는지는 PR #128 병합 뒤 확인 |
 | 기록별 반영 증거 | 사용자 요청의 임시 기준으로 업로드·전사 확정 저장 성공을 반영됨으로 표시 | 계약: 기록 객체의 `reflection_status`(`none`·`pending`·`reflected`·`failed`)가 제안으로 들어감. 서버가 아직 주지 않아(#122) 앱은 연결 전 |
 | 확정 여부 | 기록마다 텍스트 버전 조회 | 계약에 없음. 제안: 기록 객체에 확정 시각 포함 |
 | 삭제 작업 재개 | ‘상태 다시 확인’만 | 계약에 없음. 제안: worker 재개 API |
