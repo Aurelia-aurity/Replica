@@ -570,6 +570,18 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     }
   }
 
+  @override
+  Future<void> completeUpload(
+    String recordId, {
+    Map<String, String?>? speakers,
+  }) async {
+    await _request(
+      'POST',
+      '/records/$recordId/uploaded',
+      body: speakers == null || speakers.isEmpty ? null : speakers,
+    );
+  }
+
   /// `POST /records/{id}/uploaded`, with speakers chosen again if any.
   ///
   /// A speaker error (422 `SPEAKER_*`) means the server has the original and

@@ -60,8 +60,16 @@ class RecordEntry {
   /// Saved successfully according to the current UI completion rule.
   bool get confirmed => personalization == ReviewProfileState.reflected;
 
+  /// `/uploaded` refused the speakers (`error_code: speaker_*`) and the record
+  /// waits in `uploading` for the user to choose them. Not in progress: it
+  /// does not move until the user opens it.
+  bool get needsSpeakerCheck =>
+      status == RecordStatus.uploading &&
+      (errorCode?.startsWith('speaker_') ?? false);
+
   bool get inProgress =>
       !confirmed &&
+      !needsSpeakerCheck &&
       (status == RecordStatus.uploading ||
           status == RecordStatus.uploaded ||
           status == RecordStatus.processing ||
@@ -101,7 +109,12 @@ class RecordEntry {
   );
 
   String get statusLabel => switch (status) {
-    RecordStatus.uploading => kind == RecordKind.audio ? '전사 중' : '반영 중',
+    RecordStatus.uploading =>
+      needsSpeakerCheck
+          ? '확인 필요'
+          : kind == RecordKind.audio
+          ? '전사 중'
+          : '반영 중',
     RecordStatus.uploaded || RecordStatus.processing =>
       confirmed
           ? '반영됨'
