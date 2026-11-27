@@ -90,6 +90,12 @@ class _Server {
   /// The record disappears once its original is in Storage (GET answers 404).
   var forgetAfterPut = false;
 
+  /// The server fails the record once its original is in Storage.
+  var failAfterPut = false;
+
+  /// Marks the latest record as failed by the server.
+  void markFailed() => _status[reservationIds.last] = 'failed';
+
   /// Bodies `/uploaded` received, in order (an empty map when none was sent).
   final uploadedBodies = <Map<String, Object?>>[];
   final _target = <String, String?>{};
@@ -110,6 +116,7 @@ class _Server {
       final put = puts.isEmpty ? _Put.ok : puts.removeAt(0);
       afterPut?.call();
       if (forgetAfterPut) _status.remove(id);
+      if (failAfterPut) _status[id] = 'failed';
       switch (put) {
         case _Put.ok:
           _stored.add(id);
@@ -187,6 +194,9 @@ class _Server {
       return _json(_job(id), 202);
     }
     if (path == '/records/{id}/uploaded') {
+      if (_status[id] == 'failed') {
+        return _json(_error('CONFLICT', retryable: false), 409);
+      }
       if (!_stored.contains(id)) {
         return _json(_error('UPLOAD_MISSING', retryable: true), 409);
       }
@@ -333,6 +343,23 @@ void main() {
       'POST /records/{id}/uploaded',
     ]);
     expect(server.reservationIds, [attempt.id, attempt.id]);
+    expect(attempt.stage, UploadStage.done);
+  });
+
+  test('a device clock running ahead does not block the upload', () async {
+    // Every signature looks expired to a clock two hours ahead.
+    now = _now.add(const Duration(hours: 2));
+    final attempt = upload();
+    await service().upload(attempt, () {});
+    expect(server.calls, [
+      'POST /records',
+      // Renewed once, then sent anyway: Storage decides.
+      'GET /records/{id}',
+      'POST /records',
+      'PUT /signed/2',
+      'GET /records/{id}',
+      'POST /records/{id}/uploaded',
+    ]);
     expect(attempt.stage, UploadStage.done);
   });
 
@@ -849,6 +876,32 @@ void main() {
       await c.send();
       expect(c.uploadSucceeded, isFalse);
       expect(c.uploadError, isNot(contains('파일 내용')));
+    });
+
+    test('a record the server failed is not shown as saved', () async {
+      server.failAfterPut = true;
+      final c = picked();
+      await c.send();
+      expect(c.uploadSucceeded, isFalse);
+      expect(c.uploadError, contains('처리하지 못했어요'));
+      expect(c.uploadRetryAllowed, isFalse);
+      // Only the completion check ran; /uploaded was not called.
+      expect(server.calls.last, 'GET /records/{id}');
+    });
+
+    test('a record failed before it is reserved again is not saved', () async {
+      server.puts.addAll([_Put.forbidden, _Put.forbidden]);
+      final c = picked();
+      await c.send();
+      expect(c.uploadError, isNotNull);
+      expect(c.uploadRetryAllowed, isTrue);
+      server.markFailed();
+      server.calls.clear();
+      await c.send();
+      expect(c.uploadSucceeded, isFalse);
+      expect(c.uploadError, contains('처리하지 못했어요'));
+      // Not reserved again once the lookup shows it failed.
+      expect(server.calls, ['GET /records/{id}']);
     });
 
     test('a record that disappeared is not retried', () async {

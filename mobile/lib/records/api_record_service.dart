@@ -448,11 +448,13 @@ class ApiRecordService extends RecordService implements RecordApiClient {
         continue;
       }
       final target = upload.uploadTarget;
-      if (target != null &&
+      // Renew a signature the device clock sees as expiring, once. A fresh
+      // signature that still looks expired means the device clock is off, so
+      // it is sent anyway and Storage decides; its refusal is handled below.
+      if (!renewed &&
+          target != null &&
           target.expiredAt(clock(), margin: signatureMargin)) {
-        // Reserve again with the same ID before sending.
         upload.stage = UploadStage.reserve;
-        if (renewed) throw _storageFailure(null);
         renewed = true;
         continue;
       }
@@ -493,6 +495,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     if (existing.status == RecordStatus.deleting) {
       throw _recordDeleting;
     }
+    if (existing.status == RecordStatus.failed) throw _recordFailed;
     if (existing.status == RecordStatus.uploading) {
       try {
         await _uploaded(upload);
@@ -527,6 +530,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     if (existing?.status == RecordStatus.deleting) {
       throw _recordDeleting;
     }
+    if (existing?.status == RecordStatus.failed) throw _recordFailed;
     if (existing != null && existing.status != RecordStatus.uploading) {
       upload.stage = UploadStage.done;
       return;
@@ -547,6 +551,7 @@ class ApiRecordService extends RecordService implements RecordApiClient {
     if (reserved.status == RecordStatus.deleting) {
       throw _recordDeleting;
     }
+    if (reserved.status == RecordStatus.failed) throw _recordFailed;
     // Every reservation answer replaces the previous signature.
     final info = json['upload'];
     upload.originalStored = json.containsKey('upload') && info == null;
@@ -615,6 +620,13 @@ class ApiRecordService extends RecordService implements RecordApiClient {
   static const _recordDeleting = BackendFailure(
     BackendFailureKind.generic,
     code: 'RECORD_DELETING',
+  );
+
+  /// The server could not process the record (`status: failed`). It is not a
+  /// finished upload, and the same record cannot be sent again.
+  static const _recordFailed = BackendFailure(
+    BackendFailureKind.generic,
+    code: 'RECORD_FAILED',
   );
 
   /// Storage still refuses after a renewed signature. Retrying the same

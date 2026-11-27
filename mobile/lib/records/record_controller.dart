@@ -531,6 +531,9 @@ class RecordController extends ChangeNotifier {
       if (error.code == 'RECORD_DELETING') {
         return '이 기록은 삭제되고 있어요. 새 파일로 다시 올려 주세요.';
       }
+      if (error.code == 'RECORD_FAILED') {
+        return '서버에서 이 기록을 처리하지 못했어요. 기록 목록에서 상태를 확인하거나 새 파일로 다시 올려 주세요.';
+      }
       if (error.kind == BackendFailureKind.forbidden) {
         return '이 기록을 올릴 권한이 없어요.';
       }
