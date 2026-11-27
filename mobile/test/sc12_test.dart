@@ -465,6 +465,91 @@ void main() {
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
+    /// SC-12 after a failed list, whose next list (with [partners]) is held
+    /// until the returned completer completes. "말투 프로필" is tapped once.
+    Future<(_HeldListPersonas, Completer<void>)> tapDuringReload(
+      WidgetTester tester, {
+      List<Persona> partners = const [],
+    }) async {
+      final personas = _HeldListPersonas()
+        ..gate = null
+        ..listError = StateError('offline');
+      await openSettings(tester, personas);
+      final reload = personas.gate = Completer<void>();
+      personas
+        ..listError = null
+        ..personas.addAll(partners);
+      await tester.ensureVisible(find.text('말투 프로필'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('말투 프로필'));
+      await tester.pump();
+      return (personas, reload);
+    }
+
+    /// Goes to the home tab and back to SC-12. The home tab shows a spinner
+    /// while the partners load, so it is pumped for a while, not settled.
+    Future<void> leaveAndComeBack(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(SettingsScreen), findsNothing);
+      await tester.tap(find.widgetWithText(NavigationDestination, '설정'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+    }
+
+    testWidgets('a reload answered under the sign-out dialog opens nothing', (
+      tester,
+    ) async {
+      final (_, reload) = await tapDuringReload(
+        tester,
+        partners: const [Persona(id: 'p1', name: '엄마')],
+      );
+      await openMenu(tester, '로그아웃');
+      expect(find.widgetWithText(FilledButton, '로그아웃'), findsOneWidget);
+
+      reload.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+      expect(find.widgetWithText(FilledButton, '로그아웃'), findsOneWidget);
+
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+      // The list itself was updated: the next tap opens the partner.
+      await openMenu(tester, '말투 프로필');
+      expect(shownProfileId(tester), 'p1');
+    });
+
+    testWidgets('a reload answered after leaving and coming back opens '
+        'nothing', (tester) async {
+      final (_, reload) = await tapDuringReload(
+        tester,
+        partners: const [Persona(id: 'p1', name: '엄마')],
+      );
+      await leaveAndComeBack(tester);
+
+      reload.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byType(SpeechProfileScreen), findsNothing);
+      await openMenu(tester, '말투 프로필');
+      expect(shownProfileId(tester), 'p1');
+    });
+
+    testWidgets('an empty reload answered after leaving opens no SC-13', (
+      tester,
+    ) async {
+      final (personas, reload) = await tapDuringReload(tester);
+      await leaveAndComeBack(tester);
+
+      reload.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byType(PersonaNameScreen), findsNothing);
+      expect(personas.created, isEmpty);
+    });
+
     testWidgets('after a failed list that is truly empty it goes to SC-13', (
       tester,
     ) async {
