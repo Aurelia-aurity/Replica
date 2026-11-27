@@ -14,10 +14,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const email = 'new.synthetic@example.com';
 const resendKey = ValueKey('auth-resend');
 const resultKey = ValueKey('auth-resend-result');
-const sentText = '인증 메일을 다시 요청했어요. 메일함과 스팸메일함을 확인한 후 로그인해 주세요.';
-const rateLimitedText = '인증 메일 요청이 많아요. 잠시 후 다시 시도해 주세요.';
+const sentText = '인증 메일을 다시 요청했어요.';
+const rateLimitedText = '잠시 후 다시 시도해 주세요.';
 const networkText = '네트워크 연결을 확인하고 다시 시도해 주세요.';
-const failedText = '인증 메일을 다시 보내지 못했어요. 다시 시도해 주세요.';
+const failedText = '요청하지 못했어요. 다시 시도해 주세요.';
 
 /// Records each resend address and lets the test answer it.
 class ResendAuth extends PreviewAuthService {
@@ -120,14 +120,14 @@ void main() {
       await tester.pumpWidget(ReplicaApp(authService: auth));
       await signUp(tester, address: '  $email ');
       expect(find.textContaining('이메일의 인증 링크'), findsOneWidget);
-      expect(find.text('인증 메일 다시 보내기'), findsOneWidget);
+      expect(find.text('인증 메일 재전송'), findsOneWidget);
 
       await tapResend(tester);
       expect(auth.requests, [email]);
       expect(onPressed(tester, resendKey), isNull);
       expect(onPressed(tester, const ValueKey('auth-submit')), isNull);
       expect(onPressed(tester, const ValueKey('auth-switch')), isNull);
-      expect(find.text('인증 메일 요청 중…'), findsOneWidget);
+      expect(find.text('요청 중…'), findsOneWidget);
       await tester.tap(find.byKey(resendKey), warnIfMissed: false);
       await tester.pump();
       expect(auth.requests, hasLength(1));
@@ -147,7 +147,7 @@ void main() {
       addTearDown(auth.dispose);
       await tester.pumpWidget(ReplicaApp(authService: auth));
       await signIn(tester);
-      expect(find.text('이메일 인증을 완료한 후 로그인해 주세요.'), findsOneWidget);
+      expect(find.text('이메일 인증이 필요해요.'), findsOneWidget);
 
       for (final (failure, message) in [
         (
@@ -316,7 +316,7 @@ void main() {
     await signIn(tester);
     await tapResend(tester);
     await tester.pumpAndSettle();
-    expect(resultText(tester), contains('실제 메일을 보내지 않아요'));
+    expect(resultText(tester), contains('메일은 보내지 않아요'));
   });
 
   testWidgets('preview resend failure keeps the button for another try', (

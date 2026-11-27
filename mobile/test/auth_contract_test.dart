@@ -257,7 +257,7 @@ void main() {
   }
 
   for (final entry in {
-    AuthFailureKind.emailNotVerified: '이메일 인증을 완료한 후 로그인해 주세요.',
+    AuthFailureKind.emailNotVerified: '이메일 인증이 필요해요.',
     AuthFailureKind.rateLimited: '요청이 많아요. 잠시 후 다시 시도해 주세요.',
     AuthFailureKind.weakPassword: '비밀번호가 보안 정책을 충족하지 않습니다.',
   }.entries) {

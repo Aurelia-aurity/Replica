@@ -4,9 +4,9 @@ SC-01 로그인 화면을 390×844 논리 크기에서 Flutter 위젯으로 렌�
 
 | 파일 | 확인 가능한 화면 |
 | --- | --- |
-| `signup-verification.png` | 가입 결과가 이메일 인증 필요일 때 로그인 화면으로 돌아온 안내와 ‘인증 메일 다시 보내기’. 비밀번호 칸의 ‘비밀번호를 입력해 주세요.’는 가입 뒤 비밀번호를 비우는 기존 동작이며 이번 변경과 무관합니다([이슈 #8 캡처](../issue8/README.md)의 `signup-preview-result.png`와 같음) |
-| `login-unverified.png` | 미인증 계정의 로그인 오류와 ‘인증 메일 다시 보내기’ |
-| `resend-pending.png` | 재전송 요청 중. 버튼이 ‘인증 메일 요청 중…’으로 바뀌고 입력칸·로그인·회원가입 전환이 비활성 |
+| `signup-verification.png` | 가입 결과가 이메일 인증 필요일 때 로그인 화면으로 돌아온 안내와 ‘인증 메일 재전송’. 비밀번호 칸의 ‘비밀번호를 입력해 주세요.’는 가입 뒤 비밀번호를 비우는 기존 동작이며 이번 변경과 무관합니다([이슈 #8 캡처](../issue8/README.md)의 `signup-preview-result.png`와 같음) |
+| `login-unverified.png` | 미인증 계정의 로그인 오류와 ‘인증 메일 재전송’ |
+| `resend-pending.png` | 재전송 요청 중. 버튼이 ‘요청 중…’으로 바뀌고 입력칸·로그인·회원가입 전환이 비활성 |
 | `resend-sent.png` | 재전송 요청 성공 안내 |
 | `resend-rate-limited.png` | 요청 제한 안내. 버튼은 다시 누를 수 있음 |
 

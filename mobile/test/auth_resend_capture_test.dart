@@ -85,14 +85,14 @@ void main() {
     addTearDown(auth.dispose);
     await show(tester, auth);
     await signIn(tester);
-    expect(find.text('이메일 인증을 완료한 후 로그인해 주세요.'), findsOneWidget);
+    expect(find.text('이메일 인증이 필요해요.'), findsOneWidget);
     await save(tester, 'login-unverified');
 
     await tester.tap(find.byKey(resendKey));
     // The progress indicator never settles while the request is held.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('인증 메일 요청 중…'), findsOneWidget);
+    expect(find.text('요청 중…'), findsOneWidget);
     await save(tester, 'resend-pending');
 
     auth.pending.last.complete();

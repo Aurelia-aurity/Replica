@@ -75,16 +75,16 @@ class _AuthScreenState extends State<AuthScreen> {
       await widget.service.resendSignUpConfirmation(email);
       failed = false;
       result = widget.service.isPreview
-          ? '인증 메일 재전송 화면 확인을 마쳤어요. 미리보기에서는 실제 메일을 보내지 않아요.'
-          : '인증 메일을 다시 요청했어요. 메일함과 스팸메일함을 확인한 후 로그인해 주세요.';
+          ? '미리보기라 메일은 보내지 않아요.'
+          : '인증 메일을 다시 요청했어요.';
     } on AuthFailure catch (error) {
       result = switch (error.kind) {
-        AuthFailureKind.rateLimited => '인증 메일 요청이 많아요. 잠시 후 다시 시도해 주세요.',
+        AuthFailureKind.rateLimited => '잠시 후 다시 시도해 주세요.',
         AuthFailureKind.network => '네트워크 연결을 확인하고 다시 시도해 주세요.',
-        _ => '인증 메일을 다시 보내지 못했어요. 다시 시도해 주세요.',
+        _ => '요청하지 못했어요. 다시 시도해 주세요.',
       };
     } catch (_) {
-      result = '인증 메일을 다시 보내지 못했어요. 다시 시도해 주세요.';
+      result = '요청하지 못했어요. 다시 시도해 주세요.';
     }
     if (!mounted) return;
     setState(() {
@@ -131,7 +131,7 @@ class _AuthScreenState extends State<AuthScreen> {
             _obscure = true;
             _message = switch (result) {
               SignUpResult.emailVerificationRequired =>
-                '회원가입 요청을 받았어요. 이메일의 인증 링크를 확인한 후 로그인해 주세요.',
+                '이메일의 인증 링크를 확인한 후 로그인해 주세요.',
               SignUpResult.loginRequired =>
                 widget.service.isPreview
                     ? '회원가입 화면 확인을 마쳤어요. 실제 계정 생성 없이 미리보기 계정으로 로그인해 주세요.'
@@ -163,7 +163,7 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() => _error = '이메일 또는 비밀번호가 맞지 않아요');
         case AuthFailureKind.emailNotVerified:
           setState(() {
-            _error = '이메일 인증을 완료한 후 로그인해 주세요.';
+            _error = '이메일 인증이 필요해요.';
             // Only a refused sign-in names an unconfirmed address.
             if (!_signUp) _resendEmail = email;
           });
@@ -461,9 +461,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     : const Icon(
                                         Icons.forward_to_inbox_outlined,
                                       ),
-                                label: Text(
-                                  _resending ? '인증 메일 요청 중…' : '인증 메일 다시 보내기',
-                                ),
+                                label: Text(_resending ? '요청 중…' : '인증 메일 재전송'),
                               ),
                               if (_resendResult case final String result) ...[
                                 const SizedBox(height: 8),
