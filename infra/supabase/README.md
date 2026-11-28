@@ -100,3 +100,24 @@ HTTP API, 실제 업로드/다운로드/파일 삭제, AI 서비스 호출, 계�
 - 성능 점검의 [미사용 인덱스 안내](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) 6개는 실제 서비스 데이터/트래픽이 없는 초기 상태의 참고 사항이다. 지금 삭제하지 않고 사용 패턴을 측정한 뒤 판단한다.
 
 재검증은 운영 트래픽이 없는 개발 환경에서 postgres 권한으로 `verify_redesign.sql` 전체를 한 번에 실행한다. 실행 도중 오류가 난 연결에서는 명시적으로 ROLLBACK한다. 데이터베이스 검증 통과는 파일 삭제·계정 삭제·실제 API 연동까지 완성됐다는 뜻이 아니다.
+
+## #124 원격 배포와 복구
+
+대상은 개발용 Replica 프로젝트 `hfmrhmuhcbmskhjagpzg`다. 선행 이력은 `replica_db_redesign`, `weekend_db_integration`, `guard_llm_request_id`, `expire_chat_stages_v2`이며 기존 `records`·`personas`, 서버 역할 권한, 수정 시각·자료 무효화 트리거가 있어야 한다.
+
+1. `supabase_migrations.schema_migrations`와 컬럼·함수 카탈로그를 읽어 `replica_record_metadata_121`이 적용되지 않았는지 확인한다. 이미 적용됐다면 원본 패치를 다시 실행하지 않고 적용 이력·정의를 비교한다.
+2. Supabase MCP `apply_migration`의 이름을 `replica_record_metadata_121`로 지정하고 `record_metadata.sql` 전체를 한 번 적용한다. CLI migrations 디렉터리는 아직 구성되지 않아 이 SQL은 배포 보관본으로 관리한다. MCP가 발급한 version, Git 커밋, 검증 결과를 PR #124에 기록한다.
+3. SQL Editor 또는 MCP `execute_sql`에서 `verify_record_metadata.sql` 전체를 실행한다. 마지막 ROLLBACK은 시험 계정·행을 되돌리고 이미 적용한 스키마는 유지한다.
+4. 서버 키·임시 계정 두 개로 PostgREST의 두 RPC, 22023·P0002·55000 응답, 매번 변경되는 `updated_at`, 다른 계정 접근 차단과 사용자 토큰의 컬럼 조회를 확인한다. 키·JWT는 로그에 쓰지 않고 시험 계정·행을 정리한다.
+5. #128의 실제 예약→서명 PUT→업로드 확인 흐름까지 확인한 뒤 백엔드를 활성화한다. `NOTIFY pgrst, 'reload schema'`는 패치에 포함되며 실제 RPC 응답으로 재로딩을 확인한다.
+
+배포 장애 시 백엔드 코드와 활성화를 이전 버전으로 되돌린다. 새 nullable 컬럼·RPC는 유지해 새로 저장된 호칭·화자를 보존한다. 이미 성공한 패치를 다시 실행하거나 컬럼을 DROP하는 방식으로 복구하지 않는다. 스키마 자체의 수정이 필요하면 데이터를 보존하는 별도 증분 패치로 처리한다.
+
+로컬 검증은 Node.js와 고정된 `@electric-sql/pglite@0.3.14`를 사용한다. 저장소 루트에서 다음을 실행한다.
+
+```powershell
+npm install --prefix .cache/db-check --no-package-lock --no-save @electric-sql/pglite@0.3.14
+node infra/supabase/tests/verify_record_metadata.mjs .cache/db-check/node_modules/@electric-sql/pglite/dist/index.js
+```
+
+검증기는 합성 Auth·역할을 만들고, 저장소의 테이블 정의·수정시각·무효화 트리거·RLS 정책을 사용한다. 패치 전에 삽입한 기존 행의 보존과 패치 뒤 롤백 검증을 확인한다. GPU·앱 연결과 여러 PostgreSQL 세션의 동시 실행은 이 로컬 검증 범위 밖이다.
