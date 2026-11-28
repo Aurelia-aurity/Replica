@@ -76,7 +76,7 @@ class _AuthScreenState extends State<AuthScreen> {
       failed = false;
       result = widget.service.isPreview
           ? '미리보기라 메일은 보내지 않아요.'
-          : '인증 메일을 다시 요청했어요.';
+          : '인증 메일을 다시 요청했어요. 메일함을 확인해 주세요.';
     } on AuthFailure catch (error) {
       result = switch (error.kind) {
         AuthFailureKind.rateLimited => '잠시 후 다시 시도해 주세요.',

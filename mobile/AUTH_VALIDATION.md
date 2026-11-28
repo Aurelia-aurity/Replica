@@ -8,6 +8,7 @@
 - 위젯 렌더링 캡처 5장을 `docs/screenshots/issue125/`에 추가했습니다(`test/auth_resend_capture_test.dart`, [캡처 안내](docs/screenshots/issue125/README.md)). 이 파일의 2개 테스트는 일반 실행에서도 같은 흐름을 검사하고, 캡처 모드에서만 이미지를 씁니다.
 - 실제 Supabase 프로젝트의 재전송 메일 수신, 이메일 발송 제한 값, 실기기 화면은 미검증입니다.
 - 2026-11-27: 미인증 로그인 오류·재전송 버튼·결과 안내 문구와 가입 후 이메일 인증 안내를 줄였습니다(규칙은 [AUTH_CONTRACT.md](AUTH_CONTRACT.md#인증-메일-재전송-125)). 전체 Flutter 테스트 **452개** 통과, `flutter analyze --no-pub` No issues found, 캡처 5장을 다시 만들었습니다.
+- 2026-11-29 PR #141 리뷰 반영: 재전송 성공 문구에 메일 확인 안내를 다시 넣었습니다(‘인증 메일을 다시 요청했어요. 메일함을 확인해 주세요.’). 미인증 로그인 경로에는 가입 안내가 없어 성공 뒤 다음 행동이 보이지 않았습니다. `test/auth_resend_test.dart`가 두 경로의 성공 문구 전체를 비교합니다.
 
 ## 2026-10-28 PR #62 수정 요청 반영
 

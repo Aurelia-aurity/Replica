@@ -14,7 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const email = 'new.synthetic@example.com';
 const resendKey = ValueKey('auth-resend');
 const resultKey = ValueKey('auth-resend-result');
-const sentText = '인증 메일을 다시 요청했어요.';
+const sentText = '인증 메일을 다시 요청했어요. 메일함을 확인해 주세요.';
 const rateLimitedText = '잠시 후 다시 시도해 주세요.';
 const networkText = '네트워크 연결을 확인하고 다시 시도해 주세요.';
 const failedText = '요청하지 못했어요. 다시 시도해 주세요.';
