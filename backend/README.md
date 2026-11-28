@@ -127,7 +127,7 @@ AWS EC2 배포 시에는 외부 노출을 막기 위해 `-p 127.0.0.1:8000:8000`
 | `LLM_MODE` | mock | mock: 고정 응답, remote: 학교 GPU 서버 호출(실제 서버 통합 미검증) |
 | `LLM_SERVER_URL` | (없음) | `LLM_MODE=remote`일 때 필수. AI 서버 주소 |
 | `LLM_SERVER_TOKEN` | (없음) | AI 서버로 보내는 Bearer 토큰. 서비스 인증 방식은 #14 확인 후 확정 |
-| `LLM_TIMEOUT_SECONDS` | (없음) | `LLM_MODE=remote`일 때 필수(0보다 큼). GPU 측정과 합의 전이라 기본값을 두지 않음 |
+| `LLM_TIMEOUT_SECONDS` | (없음) | `LLM_MODE=remote`일 때 필수(0보다 큼). 코드에 기본값은 두지 않으며 초깃값은 60초로 제안(결정 기록과 앱 확인 범위는 `contracts/backend-ai/api-spec.md`의 시간 제한 행). AI HTTP 호출 한 단계의 대기 기준이라 STT·TTS·요청 전체 시간·GPU 마감과 별개이고 만료돼도 GPU 작업은 중단되지 않음. STT·LLM 단계 stale 판정(요청 시 재확인)의 기준으로도 쓰이므로 올리면 고아 점유 복구도 늦어짐. 통합 후 `llm_ms`와 `llm_timeout`·`llm_deadline` 건수로 조정 |
 | `LLM_MODEL_NAME` | `Qwen/Qwen3-8B` | DB에 기록하는 답변 모델 라벨. 서비스 모델은 `Qwen/Qwen3-8B`입니다(2026-11-10 PM 결정, #107). 배포 때 GPU 서버의 `REPLICA_MODEL_ID`와 같은 값으로 맞춥니다 |
 | `STT_PROVIDER` | mock | mock 또는 STT 공급자 |
 | `TTS_PROVIDER` | mock | mock 또는 TTS 공급자 |

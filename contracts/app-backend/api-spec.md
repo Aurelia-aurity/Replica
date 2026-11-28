@@ -1145,7 +1145,7 @@ DB가 원인인 오류(`NOT_FOUND`, `CONFLICT`, `DB_UNAVAILABLE` 등)는 **DB �
 
 같은 `code`는 한 가지 문구만 씁니다. 2장·3장·DB 규격 문서의 `code`와 문구는 같고, 상황이 다르면 `code`를 나눕니다.
 
-AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 요청 종류별 자체 타임아웃(텍스트·TTS 180초, 음성 200초)으로 처리합니다. 백엔드의 AI 호출 대기 `LLM_TIMEOUT_SECONDS`(잠정 60초, #96에서 검토 중)는 앱의 대기 시간과 별개의 값입니다.
+AI·STT·TTS 단계의 시간 초과는 각 단계의 `code`(`AI_TIMEOUT`, `STT_FAILED`, `TTS_FAILED`)로 보냅니다. 전체 시간 초과 전용 코드는 두지 않고, 앱은 요청 종류별 자체 타임아웃(텍스트·TTS 180초, 음성 200초)으로 처리합니다. 백엔드의 AI 호출 대기 `LLM_TIMEOUT_SECONDS`는 AI HTTP 호출 한 단계에만 적용되는 값입니다(초깃값 60초 제안. 결정 기록은 [#133 코멘트](https://github.com/Aurelia-aurity/Replica/pull/133#issuecomment-7135002662)이고, 백엔드 담당 동의와 앱 담당의 범위 확인은 `contracts/backend-ai/api-spec.md`의 '시간 제한' 행에 적었으며 현재 head의 앱 재확인은 대기 중입니다). STT·TTS 단계, 요청 전체의 소요 시간, GPU 마감과는 별개이므로 텍스트 오류가 요청 시작 정확히 60초 뒤에 도착하거나 음성 요청 전체(STT→AI→TTS)가 200초 안에 끝난다는 보장은 아닙니다. 앱의 대기 시간(텍스트·TTS 180초, 음성 200초)은 이 값에서 계산한 것이 아니라 앱 요청 대기 기준이며, AI 호출 단계 기준으로는 앱의 대기 시간보다 짧습니다.
 
 오류 본문에는 SQL, 예외 원문, 토큰, 질문·답변 내용, 서버 키를 넣지 않습니다.
 
@@ -1193,7 +1193,7 @@ AI 서버의 요청·응답·오류 규격 원본은 `contracts/baseline`(PR #29
 
 | 상황 (AI 오류 본문이 없는 경우) | 백엔드 처리 | 앱에 보내는 HTTP | 앱 `code` | 앱 `message` | `retryable` | DB 기록 `error_code` (안) |
 |---|---|---|---|---|---|---|
-| 백엔드의 연결·읽기·전체 타임아웃, 연결 끊김 (결과 **UNKNOWN**) | AI 504를 만들어 귀속하지 않음. 자동 재시도·재전송 없음. 답변을 저장하지 않음. AI가 계산을 이어가고 있을 수 있어 직후 요청이 429를 받을 수 있음 | 504 | `AI_TIMEOUT` | `답변을 만드는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.` | true | `llm_timeout` |
+| 백엔드의 전체 대기 만료, 연결된 뒤의 끊김·읽기 오류 등 `ConnectError`를 제외한 전송 오류 (결과 **UNKNOWN**) | AI 504를 만들어 귀속하지 않음. 자동 재시도·재전송 없음. 답변을 저장하지 않음. AI가 계산을 이어가고 있을 수 있어 직후 요청이 429를 받을 수 있음 | 504 | `AI_TIMEOUT` | `답변을 만드는 데 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.` | true | `llm_timeout` |
 | AI 서버에 연결 불가 (연결 거부·DNS 실패) | 전송 실패로 기록, 자동 재시도 없음 | 503 | `AI_UNAVAILABLE` | `AI 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.` | true | `llm_unreachable` |
 | 응답의 `request_id`가 요청과 다름, 또는 허용되지 않은 `null` | 프로토콜 실패, 결과 UNKNOWN. 정상 답변·AI 오류로 저장하지 않음, 자동 재시도 없음 | 502 | `AI_FAILED` | `답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.` | true | `llm_protocol_error` |
 | 응답이 스키마에 맞지 않음 (필드 누락, `finish_reason` 값 오류, `ai_generated`가 `true`가 아님, `context` 합 불일치, 답변이 빈 값) | 응답 폐기 | 502 | `AI_FAILED` | `답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.` | true | `llm_protocol_error` |
