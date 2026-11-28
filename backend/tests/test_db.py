@@ -173,6 +173,18 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
             await self.user.reserve_record(P, kind="text", original_name="x", mime_type="audio/wav",
                 size_bytes=5, consent_at=TIME, consent_version="v1")
 
+    async def test_reservation_accepts_a_consent_time_slightly_ahead_but_not_far_ahead(self):
+        now = datetime.now(timezone.utc)
+        await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
+            size_bytes=5, consent_at=now + timedelta(minutes=4), consent_version="v1", record_id=R)
+        self.assertEqual(self.transport.calls[-1]["path"], "/rest/v1/records")
+        with self.assertRaises(ValidationError):
+            await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
+                size_bytes=5, consent_at=now + timedelta(minutes=6), consent_version="v1")
+        # 다른 시각 인자는 허용 오차 없이 그대로 검사한다.
+        with self.assertRaises(ValidationError):
+            await self.user.create_session(P, ai_notice_ack_at=now + timedelta(minutes=1))
+
     async def test_speaker_selection_is_sent_with_the_reservation_only_when_given(self):
         await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
             size_bytes=5, consent_at=TIME, consent_version="v1", record_id=R)

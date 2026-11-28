@@ -504,11 +504,30 @@ def test_a_zero_byte_reservation_is_rejected_with_its_field(client, persona):
         assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", "size_bytes")
 
 
-def test_a_future_consent_time_is_rejected_with_its_field(client, fake_db, persona):
-    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+def test_a_consent_time_far_in_the_future_is_rejected_with_its_field(client, fake_db, persona):
+    future = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()  # 허용 오차(5분)를 넘는다
     res = reserve(client, persona, consent_at=future)
     assert res.status_code == 422 and (error(res)["code"], error(res)["field"]) == ("INVALID_INPUT", "consent_at")
     assert fake_db.records == {}
+
+
+@pytest.mark.parametrize("seconds", [1, 30, 120, 240])
+def test_a_device_clock_slightly_ahead_of_the_server_is_accepted(client, fake_db, persona, seconds):
+    """기기 시계가 서버보다 앞서도 허용 오차(5분) 안이면 예약된다. 1초만 앞서도 422이던 문제(#143 검토)."""
+    ahead = (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
+    res = reserve(client, persona, consent_at=ahead)
+    assert res.status_code == 201
+    assert len(fake_db.records) == 1
+
+
+def test_a_slightly_ahead_consent_time_is_kept_as_sent_so_a_rereservation_matches(client, fake_db, persona):
+    ahead = (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()
+    record_id = new_id()
+    first = reserve(client, persona, record_id=record_id, consent_at=ahead)
+    assert first.status_code == 201
+    again = reserve(client, persona, record_id=record_id, consent_at=ahead)  # 같은 본문의 재예약
+    assert again.status_code == 200
+    assert len(fake_db.records) == 1
 
 
 def test_a_concurrent_call_that_finished_first_is_answered_with_the_current_record(client, fake_db, storage, persona):
