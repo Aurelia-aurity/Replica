@@ -44,16 +44,20 @@ class _DatedPreviewAuth extends PreviewAuthService {
 }
 
 /// Partners whose list is held until [gate] completes (none: answers now).
+/// The list is answered once the gate opens, so a [listError] set by then is
+/// the answer.
 class _HeldListPersonas extends FakePersonaService {
   Completer<void>? gate = Completer<void>();
 
+  /// Lists asked for, held ones included ([listCalls] counts answers).
+  int asked = 0;
+
   @override
   Future<List<Persona>> list() async {
+    asked++;
     final held = gate;
-    // Answered (and counted) first, so a failure is never left unawaited.
-    final items = await super.list();
     if (held != null) await held.future;
-    return items;
+    return super.list();
   }
 }
 
@@ -443,7 +447,7 @@ void main() {
         ..gate = null
         ..listError = StateError('offline');
       await openSettings(tester, personas);
-      final calls = personas.listCalls;
+      final calls = personas.asked;
       final reload = personas.gate = Completer<void>();
       personas
         ..listError = null
@@ -454,7 +458,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('말투 프로필'));
       await tester.pump();
-      expect(personas.listCalls, calls + 1);
+      expect(personas.asked, calls + 1);
       expect(find.text('대화 상대를 불러오는 중이에요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
 
       reload.complete();
@@ -465,11 +469,13 @@ void main() {
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
-    /// SC-12 after a failed list, whose next list (with [partners]) is held
-    /// until the returned completer completes. "말투 프로필" is tapped once.
+    /// SC-12 after a failed list, whose next list (with [partners], or
+    /// failing with [error]) is held until the returned completer completes.
+    /// "말투 프로필" is tapped once.
     Future<(_HeldListPersonas, Completer<void>)> tapDuringReload(
       WidgetTester tester, {
       List<Persona> partners = const [],
+      Object? error,
     }) async {
       final personas = _HeldListPersonas()
         ..gate = null
@@ -477,7 +483,7 @@ void main() {
       await openSettings(tester, personas);
       final reload = personas.gate = Completer<void>();
       personas
-        ..listError = null
+        ..listError = error
         ..personas.addAll(partners);
       await tester.ensureVisible(find.text('말투 프로필'));
       await tester.pumpAndSettle();
@@ -549,6 +555,90 @@ void main() {
       expect(find.byType(PersonaNameScreen), findsNothing);
       expect(personas.created, isEmpty);
     });
+
+    // Opened over SC-12 and closed again before the reload is answered.
+    final covers = <String, Future<void> Function(WidgetTester)>{
+      'sign-out dialog closed by 취소': (tester) async {
+        await openMenu(tester, '로그아웃');
+        await tester.tap(find.text('취소'));
+        await tester.pumpAndSettle();
+      },
+      'sign-out dialog closed by system back': (tester) async {
+        await openMenu(tester, '로그아웃');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+      },
+      'sign-out dialog closed by its barrier': (tester) async {
+        await openMenu(tester, '로그아웃');
+        await tester.tapAt(const Offset(4, 4));
+        await tester.pumpAndSettle();
+      },
+      'consent sheet closed by 닫기': (tester) async {
+        await openMenu(tester, '기록 사용 동의 내역');
+        await tester.ensureVisible(find.text('닫기'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('닫기'));
+        await tester.pumpAndSettle();
+      },
+    };
+    const failureNotice = '대화 상대를 불러오지 못했어요. 다시 시도해 주세요.';
+
+    for (final cover in covers.entries) {
+      group('after the ${cover.key}', () {
+        Future<void> coverAndAnswer(
+          WidgetTester tester,
+          Completer<void> reload,
+        ) async {
+          await cover.value(tester);
+          expect(find.byType(AlertDialog), findsNothing);
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(find.byType(SettingsScreen), findsOneWidget);
+          reload.complete();
+          await tester.pumpAndSettle();
+          expect(find.byType(SettingsScreen), findsOneWidget);
+          expect(find.byType(SpeechProfileScreen), findsNothing);
+          expect(find.byType(PersonaNameScreen), findsNothing);
+          expect(find.text(failureNotice), findsNothing);
+        }
+
+        testWidgets('a partner answer opens no SC-07; a new tap does', (
+          tester,
+        ) async {
+          final (_, reload) = await tapDuringReload(
+            tester,
+            partners: const [Persona(id: 'p1', name: '엄마')],
+          );
+          await coverAndAnswer(tester, reload);
+          await openMenu(tester, '말투 프로필');
+          expect(shownProfileId(tester), 'p1');
+        });
+
+        testWidgets('an empty answer opens no SC-13; a new tap does', (
+          tester,
+        ) async {
+          final (personas, reload) = await tapDuringReload(tester);
+          await coverAndAnswer(tester, reload);
+          expect(personas.created, isEmpty);
+          await openMenu(tester, '말투 프로필');
+          expect(find.byType(PersonaNameScreen), findsOneWidget);
+        });
+
+        testWidgets('a failed answer shows no notice; a new tap retries', (
+          tester,
+        ) async {
+          final (personas, reload) = await tapDuringReload(
+            tester,
+            error: StateError('offline'),
+          );
+          await coverAndAnswer(tester, reload);
+          final asked = personas.asked;
+          await openMenu(tester, '말투 프로필');
+          expect(personas.asked, asked + 1);
+          expect(find.text(failureNotice), findsOneWidget);
+          expect(find.byType(PersonaNameScreen), findsNothing);
+        });
+      });
+    }
 
     testWidgets('after a failed list that is truly empty it goes to SC-13', (
       tester,

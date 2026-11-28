@@ -58,9 +58,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _starting = false;
   int _tab = 0;
 
-  /// Counts the times the tab changed, so an answer that comes after the
-  /// user left a tab can tell, even once they are back on it.
-  int _tabVisit = 0;
+  /// Counts the times what the user sees changed: another tab, or a dialog,
+  /// sheet or screen opened over this one. An answer that comes after such a
+  /// change can tell, even once the user is back where they were.
+  int _view = 0;
+
+  /// Whether this screen's route was on top the last time it was checked.
+  bool _onTop = true;
   late Future<List<Conversation>> _recent;
 
   /// Record state of this login, one controller (with its own service) per
@@ -81,6 +85,16 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.personas.addListener(_personasChanged);
     // Not synchronously: the listeners below must not rebuild during mount.
     Future.microtask(widget.personas.load);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Depends on whether the route is on top, so a dialog or sheet opened
+    // over it (closed again or not) is counted when it opens.
+    final onTop = ModalRoute.isCurrentOf(context) ?? true;
+    if (_onTop && !onTop) _view++;
+    _onTop = onTop;
   }
 
   @override
@@ -172,17 +186,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Shows tab [index]. Call inside `setState`.
   void _showTab(int index) {
-    if (index != _tab) _tabVisit++;
+    if (index != _tab) _view++;
     _tab = index;
   }
 
-  /// Whether SC-12 is still what the user sees as it was on [visit]: the
-  /// settings tab was not left in between, and no dialog, sheet or screen
-  /// covers it.
-  bool _settingsShownSince(int visit) =>
-      _tab == 3 &&
-      _tabVisit == visit &&
-      (ModalRoute.of(context)?.isCurrent ?? true);
+  /// Whether SC-12 is still what the user sees as it was on [view]: the
+  /// settings tab was not left, and no dialog, sheet or screen was opened
+  /// over it in between (even one closed again) or covers it now.
+  bool _settingsShownSince(int view) =>
+      _tab == 3 && _view == view && (ModalRoute.isCurrentOf(context) ?? true);
 
   void _account() {
     setState(() => _showTab(3));
@@ -221,7 +233,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// While the partners load (also a reload after a failure) it only asks to
   /// wait, so taps during the reload open nothing more. A reload whose
   /// answer comes once the user left SC-12 (for another tab, even if they
-  /// came back) or opened something over it only updates the list.
+  /// came back) or opened something over it (even if it was closed again)
+  /// only updates the list: no screen and no failure notice.
   Future<void> _openSpeechProfile() async {
     final personas = widget.personas;
     if (personas.current == null && _personasLoading) {
@@ -231,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // After a failed list it is unknown whether a partner exists: load the
     // list again rather than offer a new partner.
     if (personas.current == null && personas.status == LoadStatus.failed) {
-      final visit = _tabVisit;
+      final view = _view;
       await personas.load();
-      if (!mounted || !_settingsShownSince(visit)) return;
+      if (!mounted || !_settingsShownSince(view)) return;
       if (personas.status != LoadStatus.ready) {
         _notice('대화 상대를 불러오지 못했어요. 다시 시도해 주세요.');
         return;
