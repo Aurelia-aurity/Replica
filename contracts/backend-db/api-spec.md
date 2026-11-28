@@ -1,5 +1,7 @@
 # 레플리카 API 명세서: 백엔드 ↔ DB
 
+#121의 분석·색인·스냅샷·게시 SQL 호출과 적용 순서는 [개인화 DB 수명주기 계약](personalization-lifecycle.md)에 정리한다.
+
 기준일 2026-11-01 · DB 담당의 이슈 #25·#26, PR #45·#61과 `main`의 백엔드 구현(#63)을 바탕으로 정리했습니다. 팀 검토를 거쳐 병합하기 전까지는 합의된 규격이 아닙니다.
 
 **[구현]** `main`에 코드가 있고 동작함   **[제안]** 이슈를 근거로 이 문서가 제안한 규격   **[미정]** 아직 정해지지 않음   (표에서 `필수`는 필수 여부)
@@ -73,7 +75,7 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 
 ### DB 추가 배포안 (#121 · #124)
 
-`infra/supabase/record_metadata.sql`에 아래 SQL RPC를 구현했다. 원격 적용과 Python 래퍼 연결은 진행 중이다. 백엔드에서 함수 서명을 확인한 뒤 DB 패치, 롤백형 검증, PostgREST 호출 확인, 백엔드 연결 순서로 적용한다.
+`infra/supabase/record_metadata.sql`에 아래 SQL RPC를 구현했고 2026-11-24 개발 Supabase에 적용했다. 원격 롤백형 검증과 PostgREST 호출을 확인했다. `update_persona_addresses`의 Python 호출은 #134, `update_record_upload`의 Python 호출과 업로드 API 연결은 #128에서 제공한다.
 
 모든 RPC는 `service_role`만 실행할 수 있다. `p_user_id`는 백엔드가 검증한 사용자 ID에서 얻고, SQL도 해당 소유자와 부모의 `active` 상태를 검사한다.
 
@@ -90,7 +92,7 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 
 잘못된 인자·최종 화자 조합은 `22023`, 없거나 소유자가 다르거나 삭제 중인 대상은 `P0002`, 상태·수정 시각 충돌은 `55000`이다. 기존 `ValidationError`·`NotFoundError`·`ConflictError` 매핑을 사용한다. 기존 Python 함수와 SQL RPC의 서명은 유지한다.
 
-청크 화자 역할, 텍스트 개정별 확인 연결, 반영 상태, 분석 스냅샷·작업·시도와 게시 검증은 #121·#112·#113의 후속 범위다.
+청크 화자 역할, 텍스트 개정별 확인 연결, 반영 상태, 분석 스냅샷·작업·시도와 게시 검증의 DB·Python 함수는 #134에 구현했다. [개인화 DB 수명주기 명세](personalization-lifecycle.md)의 순서로 호출하며, #112·#113의 서비스 처리 흐름에 연결한다.
 
 ### 말투 프로필·검색 함수 (이슈 #10, 검색은 전용 이슈 없음)
 
@@ -354,3 +356,29 @@ DB 모듈이 어떤 조건에서 어떤 예외를 던지는지 코드 기준으�
 삭제 요청의 중복(같은 기록에 다시 요청)은 오류가 아니라 **같은 삭제 작업을 돌려줍니다.**
 
 `finish_chat_stage`의 `error_code`로 DB에 기록하는 AI·STT·TTS 실패 코드는 앱↔백엔드 규격 문서 3장의 'DB 기록 `error_code`' 열과 같은 규칙(영문 소문자·밑줄)을 따릅니다 (예: `llm_timeout`, `tts_provider_error`).
+
+
+### 개인화 Python 함수 (#121)
+
+[개인화 DB 수명주기 명세](personalization-lifecycle.md)의 SQL 호출을 UserDatabase에서 제공한다.
+
+| 함수 | 인자 | 반환 | 동작 |
+|---|---|---|---|
+| `update_persona_addresses` | `persona_id: Identifier`, `*`, `fields: Mapping[str, str \| None]` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `confirm_record_text_v2` | `text_version_id: Identifier`, `*`, `source_format: str`, `units: Sequence[Mapping[str, Any]]`, `speakers: Mapping[str, str \| None]` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `capture_personalization_snapshot` | `persona_id: Identifier`, `*`, `snapshot_id: Identifier`, `masking_policy_version: str` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `advance_personalization_source` | `persona_id: Identifier`, `*`, `expected_stamp: Identifier` | `str` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `start_profile_analysis` | `snapshot_id: Identifier`, `*`, `operation_id: Identifier`, `deadline: datetime`, `runtime: Mapping[str, Any]` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `start_profile_analysis_node` | `operation_id: Identifier`, `*`, `attempt: int`, `node_id: Identifier`, `request_id: Identifier`, `kind: str`, `ranges: Sequence[Mapping[str, Any]]`, `children: Sequence[Identifier]` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `finish_profile_analysis_node` | `operation_id: Identifier`, `*`, `attempt: int`, `node_id: Identifier`, `request_id: Identifier`, `runtime: Mapping[str, Any]`, `status: str`, `content: Mapping[str, Any] \| None = None`, `model_name: str \| None = None`, `error_code: str \| None = None` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `publish_analysis_profile` | `operation_id: Identifier`, `*`, `attempt: int`, `root_node_id: Identifier` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `get_profile_analysis_result` | `operation_id: Identifier`, `*`, `attempt: int` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `start_record_index_build` | `snapshot_id: Identifier`, `*`, `build_id: Identifier`, `embedding_model: str`, `embedding_revision: str`, `dimensions: int` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `append_record_index_chunks` | `build_id: Identifier`, `*`, `chunks: Sequence[Mapping[str, Any]]` | `int` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `activate_record_index_build` | `build_id: Identifier` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `fail_record_index_build` | `build_id: Identifier` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `read_persona_context` | `persona_id: Identifier`, `*`, `embedding_model: str`, `embedding_revision: str`, `query_embedding: Sequence[float]`, `limit: int = 10`, `min_similarity: float = 0.5` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `get_record_reflection` | `record_id: Identifier` | `str` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `bind_persona_chat_turn` | `turn_id: Identifier`, `*`, `request_id: Identifier`, `snapshot_id: Identifier`, `build_id: Identifier`, `profile_id: Identifier` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `check_persona_chat_turn` | `turn_id: Identifier`, `*`, `request_id: Identifier`, `attempt: int` | `bool` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |
+| `finish_persona_chat_turn` | `turn_id: Identifier`, `*`, `request_id: Identifier`, `attempt: int`, `ok: bool`, `text: str \| None = None`, `elapsed_ms: int \| None = None`, `error_code: str \| None = None`, `total_ms: int \| None = None`, `finish_reason: str \| None = None` | `Row` | 새 SQL RPC 호출. 세부 규칙은 개인화 DB 수명주기 명세를 따른다. |

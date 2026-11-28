@@ -7,7 +7,7 @@ import math
 import re
 import struct
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal, Mapping, Sequence
 from uuid import UUID, uuid4
 
@@ -83,6 +83,33 @@ def _rows(data: Any) -> list[Row]:
     return data
 
 
+def _json_argument_value(value: Any) -> Any:
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return _time(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return dict(value)
+    raise TypeError("Expected a JSON value")
+
+
+def _json_argument(value: Any, container: type) -> Any:
+    expected = Mapping if container is dict else Sequence
+    if not isinstance(value, expected) or isinstance(value, (str, bytes, bytearray)):
+        raise ValidationError()
+    try:
+        copied = json.loads(json.dumps(
+            dict(value) if container is dict else list(value),
+            allow_nan=False,
+            default=_json_argument_value,
+        ))
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        raise ValidationError() from None
+    return copied
+
+
 def _one(data: Any, *, empty_error: type[DatabaseError] = NotFoundError) -> Row:
     if isinstance(data, dict):
         return data
@@ -137,7 +164,7 @@ class Database:
             raise NotFoundError(code=code)
         if code in ("55000", "23505", "23503", "40001", "40P01"):
             raise ConflictError(code=code)
-        if code in ("23514", "23502") or code is not None and code.startswith("22"):
+        if code in ("23514", "23502", "P1201", "P1202", "P1203") or code is not None and code.startswith("22"):
             raise ValidationError(code=code)
         if response.status == 403 or code == "42501":
             raise PermissionDeniedError(code=code)
@@ -508,3 +535,134 @@ class UserDatabase:
 
     async def list_deletion_jobs(self, *, limit: int = 50, offset: int = 0) -> list[Row]:
         return await self._select("deletion_jobs", **_page(limit, offset), order="created_at.desc,id.desc")
+
+    async def update_persona_addresses(self, persona_id: Identifier, *, fields: Mapping[str, str | None]) -> Row:
+        return self._owned_one(await self._rpc("update_persona_addresses", p_persona_id=_id(persona_id),
+            p_fields=_json_argument(fields, dict)))
+
+    async def confirm_record_text_v2(self, text_version_id: Identifier, *, source_format: str,
+                                     units: Sequence[Mapping[str, Any]], speakers: Mapping[str, str | None]) -> Row:
+        if source_format not in ("plain", "kakao", "audio"):
+            raise ValidationError()
+        return self._owned_one(await self._rpc("confirm_record_text_v2", p_text_version_id=_id(text_version_id),
+            p_source_format=source_format, p_units=_json_argument(units, list),
+            p_speakers=_json_argument(speakers, dict)))
+
+    async def capture_personalization_snapshot(self, persona_id: Identifier, *, snapshot_id: Identifier,
+                                                masking_policy_version: str) -> Row:
+        return self._owned_one(await self._rpc("capture_personalization_snapshot", p_persona_id=_id(persona_id),
+            p_snapshot_id=_id(snapshot_id), p_masking_policy_version=_text(masking_policy_version)))
+
+    async def advance_personalization_source(self, persona_id: Identifier, *, expected_stamp: Identifier) -> str:
+        return _id(await self._rpc("advance_personalization_source", p_persona_id=_id(persona_id),
+            p_expected_stamp=_id(expected_stamp)))
+
+    async def start_profile_analysis(self, snapshot_id: Identifier, *, operation_id: Identifier,
+                                     deadline: datetime, runtime: Mapping[str, Any]) -> Row:
+        return self._owned_one(await self._rpc("start_profile_analysis", p_snapshot_id=_id(snapshot_id),
+            p_operation_id=_id(operation_id), p_deadline=_time(deadline), p_runtime=_json_argument(runtime, dict)))
+
+    async def start_profile_analysis_node(self, operation_id: Identifier, *, attempt: int, node_id: Identifier,
+                                          request_id: Identifier, kind: str, ranges: Sequence[Mapping[str, Any]],
+                                          children: Sequence[Identifier]) -> Row:
+        if kind not in ("analyze", "merge") or not isinstance(children, Sequence) or isinstance(children, (str, bytes)):
+            raise ValidationError()
+        return self._owned_one(await self._rpc("start_profile_analysis_node", p_operation_id=_id(operation_id),
+            p_attempt=_integer(attempt, minimum=1), p_node_id=_id(node_id), p_request_id=_id(request_id),
+            p_kind=kind, p_ranges=_json_argument(ranges, list), p_children=[_id(child) for child in children]))
+
+    async def finish_profile_analysis_node(self, operation_id: Identifier, *, attempt: int, node_id: Identifier,
+                                           request_id: Identifier, runtime: Mapping[str, Any], status: str,
+                                           content: Mapping[str, Any] | None = None, model_name: str | None = None,
+                                           error_code: str | None = None) -> Row:
+        if status not in ("done", "failed", "unknown"):
+            raise ValidationError()
+        if error_code is not None and (not isinstance(error_code, str) or not re.fullmatch(r"[a-zA-Z0-9_.-]{1,64}", error_code)):
+            raise ValidationError()
+        return self._owned_one(await self._rpc("finish_profile_analysis_node", p_operation_id=_id(operation_id),
+            p_attempt=_integer(attempt, minimum=1), p_node_id=_id(node_id), p_request_id=_id(request_id),
+            p_runtime=_json_argument(runtime, dict), p_status=status,
+            p_content=None if content is None else _json_argument(content, dict),
+            p_model_name=None if model_name is None else _text(model_name), p_error_code=error_code))
+
+    async def publish_analysis_profile(self, operation_id: Identifier, *, attempt: int, root_node_id: Identifier) -> Row:
+        return self._owned_one(await self._rpc("publish_analysis_profile", p_operation_id=_id(operation_id),
+            p_attempt=_integer(attempt, minimum=1), p_root_node_id=_id(root_node_id)))
+
+    async def get_profile_analysis_result(self, operation_id: Identifier, *, attempt: int) -> Row:
+        return _one(await self._rpc("get_profile_analysis_result", p_operation_id=_id(operation_id),
+            p_attempt=_integer(attempt, minimum=1)))
+
+    async def start_record_index_build(self, snapshot_id: Identifier, *, build_id: Identifier,
+                                       embedding_model: str, embedding_revision: str, dimensions: int) -> Row:
+        return self._owned_one(await self._rpc("start_record_index_build", p_snapshot_id=_id(snapshot_id),
+            p_build_id=_id(build_id), p_embedding_model=_text(embedding_model),
+            p_embedding_revision=_text(embedding_revision), p_dimensions=_integer(dimensions, minimum=1, maximum=16000)))
+
+    async def append_record_index_chunks(self, build_id: Identifier, *, chunks: Sequence[Mapping[str, Any]]) -> int:
+        payload = _json_argument(chunks, list)
+        if not payload:
+            raise ValidationError()
+        for chunk in payload:
+            if not isinstance(chunk, dict):
+                raise ValidationError()
+            chunk["id"] = _id(chunk.get("id"))
+            chunk["chunk_no"] = _integer(chunk.get("chunk_no"))
+            chunk["content"] = _text(chunk.get("content"))
+            chunk["embedding"] = json.loads(_vector(chunk.get("embedding")))
+        count = await self._rpc("append_record_index_chunks", p_build_id=_id(build_id), p_chunks=payload)
+        if type(count) is not int or count != len(payload):
+            raise DatabaseError(code="invalid_response")
+        return count
+
+    async def activate_record_index_build(self, build_id: Identifier) -> Row:
+        return self._owned_one(await self._rpc("activate_record_index_build", p_build_id=_id(build_id)))
+
+    async def fail_record_index_build(self, build_id: Identifier) -> Row:
+        return self._owned_one(await self._rpc("fail_record_index_build", p_build_id=_id(build_id)))
+
+    async def read_persona_context(self, persona_id: Identifier, *, embedding_model: str, embedding_revision: str,
+                                   query_embedding: Sequence[float], limit: int = 10,
+                                   min_similarity: float = 0.5) -> Row:
+        if (isinstance(min_similarity, bool) or not isinstance(min_similarity, (int, float))
+                or not math.isfinite(min_similarity) or not -1 <= min_similarity <= 1):
+            raise ValidationError()
+        return _one(await self._rpc("read_persona_context", p_persona_id=_id(persona_id),
+            p_embedding_model=_text(embedding_model), p_embedding_revision=_text(embedding_revision),
+            p_query_embedding=_vector(query_embedding), p_limit=_integer(limit, minimum=1, maximum=10),
+            p_min_similarity=min_similarity))
+
+    async def get_record_reflection(self, record_id: Identifier) -> str:
+        result = await self._rpc("get_record_reflection", p_record_id=_id(record_id))
+        if result not in ("none", "pending", "reflected", "failed"):
+            raise DatabaseError(code="invalid_response")
+        return result
+
+    async def bind_persona_chat_turn(self, turn_id: Identifier, *, request_id: Identifier,
+                                     snapshot_id: Identifier, build_id: Identifier, profile_id: Identifier) -> Row:
+        return self._owned_one(await self._rpc("bind_persona_chat_turn", p_turn_id=_id(turn_id),
+            p_request_id=_id(request_id), p_snapshot_id=_id(snapshot_id), p_build_id=_id(build_id),
+            p_profile_id=_id(profile_id)))
+
+    async def check_persona_chat_turn(self, turn_id: Identifier, *, request_id: Identifier, attempt: int) -> bool:
+        result = await self._rpc("check_persona_chat_turn", p_turn_id=_id(turn_id),
+            p_request_id=_id(request_id), p_attempt=_integer(attempt, minimum=1))
+        if result is not True:
+            raise DatabaseError(code="invalid_response")
+        return result
+
+    async def finish_persona_chat_turn(self, turn_id: Identifier, *, request_id: Identifier, attempt: int,
+                                       ok: bool, text: str | None = None, elapsed_ms: int | None = None,
+                                       error_code: str | None = None, total_ms: int | None = None,
+                                       finish_reason: str | None = None) -> Row:
+        if (type(ok) is not bool or finish_reason not in (None, "stop", "length")
+                or (not ok and finish_reason is not None)):
+            raise ValidationError()
+        if error_code is not None and (not isinstance(error_code, str) or not re.fullmatch(r"[a-zA-Z0-9_.-]{1,64}", error_code)):
+            raise ValidationError()
+        if ok:
+            _text(text)
+        return self._owned_one(await self._rpc("finish_persona_chat_turn", p_turn_id=_id(turn_id),
+            p_request_id=_id(request_id), p_attempt=_integer(attempt, minimum=1), p_ok=ok, p_text=text,
+            p_ms=None if elapsed_ms is None else _integer(elapsed_ms), p_error_code=error_code,
+            p_total_ms=None if total_ms is None else _integer(total_ms), p_finish_reason=finish_reason))

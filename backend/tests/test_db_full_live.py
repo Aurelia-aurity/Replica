@@ -204,3 +204,70 @@ class FullLiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await a.list_sessions(), [])
         with self.assertRaises(AuthenticationError):
             await self.database.for_user("synthetic-invalid-token")
+
+    async def test_personalization_lifecycle(self):
+        a, b = self.users
+        persona = await a.create_persona("synthetic lifecycle wrappers")
+        await a.update_persona_addresses(persona["id"], fields={"display_name": "synthetic", "provider_address": None})
+        record = await a.reserve_record(persona["id"], kind="text", original_name="synthetic.txt",
+            mime_type="text/plain", size_bytes=10, consent_at=datetime.now(timezone.utc), consent_version="synthetic-v1")
+        await a.update_record_status(record["id"], expected_status="uploading", status="uploaded")
+        await a.update_record_status(record["id"], expected_status="uploaded", status="ready")
+        version = await a.create_text_draft(record["id"], revision=1, content="alpha\nbeta")
+        await a.confirm_record_text_v2(version["id"], source_format="plain",
+            units=[{"start": 0, "end": 5}, {"start": 6, "end": 10}], speakers={})
+        snapshot = await a.capture_personalization_snapshot(persona["id"], snapshot_id=uuid4(),
+            masking_policy_version="synthetic-v1")
+        with self.assertRaises(NotFoundError):
+            await b.capture_personalization_snapshot(persona["id"], snapshot_id=uuid4(),
+                masking_policy_version="synthetic-v1")
+        runtime = {"model": "synthetic-r1", "tokenizer": "synthetic-r1", "template": "synthetic-r1"}
+        operation = await a.start_profile_analysis(snapshot["id"], operation_id=uuid4(),
+            deadline=datetime.now(timezone.utc) + timedelta(minutes=5), runtime=runtime)
+        op, attempt = operation["operation_id"], operation["attempt"]
+        content = {"schema_version": 1, "speech_style": {"tone": ["synthetic"], "address_terms": [],
+            "sentence_endings": [], "frequent_expressions": []}, "conversation_habits": [], "limitations": []}
+        nodes, chunks = [], []
+        for ordinal, unit in enumerate(snapshot["manifest"]):
+            spans = [{"unit_id": unit["id"], "start": 0, "end": len(unit["text"])}]
+            node = await a.start_profile_analysis_node(op, attempt=attempt, node_id=uuid4(),
+                request_id=uuid4(), kind="analyze", ranges=spans, children=[])
+            await a.finish_profile_analysis_node(op, attempt=attempt, node_id=node["node_id"],
+                request_id=node["request_id"], runtime=runtime, status="done", content=content,
+                model_name="synthetic-model")
+            nodes.append(node["node_id"])
+            chunks.append({"id": str(uuid4()), "chunk_no": ordinal, "content": unit["text"],
+                "coverage": spans, "embedding": [1, 0]})
+        root = await a.start_profile_analysis_node(op, attempt=attempt, node_id=uuid4(), request_id=uuid4(),
+            kind="merge", ranges=[], children=nodes)
+        await a.finish_profile_analysis_node(op, attempt=attempt, node_id=root["node_id"],
+            request_id=root["request_id"], runtime=runtime, status="done", content=content, model_name="synthetic-model")
+        profile = await a.publish_analysis_profile(op, attempt=attempt, root_node_id=root["node_id"])
+        self.assertEqual((await a.publish_analysis_profile(op, attempt=attempt,
+            root_node_id=root["node_id"]))["id"], profile["id"])
+        self.assertEqual((await a.get_profile_analysis_result(op, attempt=attempt))["publication_state"], "committed")
+        build = await a.start_record_index_build(snapshot["id"], build_id=uuid4(),
+            embedding_model="synthetic-encoder", embedding_revision="r1", dimensions=2)
+        self.assertEqual(await a.append_record_index_chunks(build["id"], chunks=chunks), 2)
+        await a.activate_record_index_build(build["id"])
+        failed = await a.start_record_index_build(snapshot["id"], build_id=uuid4(),
+            embedding_model="synthetic-encoder", embedding_revision="r2", dimensions=2)
+        await a.fail_record_index_build(failed["id"])
+        context = await a.read_persona_context(persona["id"], embedding_model="synthetic-encoder",
+            embedding_revision="r1", query_embedding=[1, 0], min_similarity=-1)
+        self.assertEqual(context["source_stamp"], snapshot["source_stamp"])
+        self.assertEqual(await a.get_record_reflection(record["id"]), "reflected")
+        session = await a.create_session(persona["id"], ai_notice_ack_at=datetime.now(timezone.utc))
+        turn_id, request_id = uuid4(), uuid4()
+        await a.create_chat_turn(session["id"], turn_id, input_mode="text", question="synthetic question")
+        claimed = await a.start_chat_stage(turn_id, "llm", model_name="synthetic-model", request_id=request_id)
+        await a.bind_persona_chat_turn(turn_id, request_id=request_id, snapshot_id=snapshot["id"],
+            build_id=build["id"], profile_id=profile["id"])
+        self.assertTrue(await a.check_persona_chat_turn(turn_id, request_id=request_id, attempt=claimed["llm_attempt"]))
+        done = await a.finish_persona_chat_turn(turn_id, request_id=request_id, attempt=claimed["llm_attempt"],
+            ok=True, text="synthetic answer", elapsed_ms=1, total_ms=1, finish_reason="stop")
+        self.assertEqual(done["answer_status"], "done")
+        await a.advance_personalization_source(persona["id"], expected_stamp=snapshot["source_stamp"])
+        with self.assertRaises(ConflictError):
+            await a.read_persona_context(persona["id"], embedding_model="synthetic-encoder",
+                embedding_revision="r1", query_embedding=[1, 0])
