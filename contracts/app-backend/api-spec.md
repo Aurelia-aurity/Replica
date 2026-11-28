@@ -616,7 +616,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | original_name | body | string | 필수 | 원본 파일 이름. 비어 있지 않음, 최대 255자 |
 | mime_type | body | string | 필수 | 파일 MIME 형식 |
 | size_bytes | body | integer | 필수 | 파일 크기(바이트). 1 이상(0이면 422 `INVALID_INPUT`, `field: size_bytes`) |
-| consent_at | body | datetime | 필수 | 자료 사용 동의 시각 (시간대 포함). 서버 시각보다 미래이면 422 `INVALID_INPUT`(`field: consent_at`). 현재 구현은 시계 오차 허용 범위가 없어 기기 시계가 앞서면 거절될 수 있으므로 앱은 동의한 시각을 그대로 보냄 |
+| consent_at | body | datetime | 필수 | 자료 사용 동의 시각 (시간대 포함). 기기 시계 오차를 감안해 서버 시각보다 5분까지의 미래는 받고(제안), 그보다 먼 미래이면 422 `INVALID_INPUT`(`field: consent_at`). 앱은 동의한 시각을 그대로 보내며, 이 오류를 받으면 기기의 날짜와 시간이 맞는지 확인하도록 안내함 |
 | consent_version | body | string | 필수 | 동의 문구 버전. 최대 100자 |
 | target_speaker | body | string | 조건부 | (제안) 카카오톡 내보내기에서 말투를 반영할 화자. 화자가 2명 이상이면 `provider_speaker`와 함께 보내고, 1명뿐이면 그 화자를 대화 상대로 확인한 값으로 이것만 보냄. 카카오톡이 아니거나 음성이면 보내지 않음. 앞뒤 공백 제거 후 1~100자 |
 | provider_speaker | body | string | 조건부 | (제안) 화자가 2명 이상인 카카오톡 내보내기에서 기록을 제공한 화자. `target_speaker`와 함께 보내며 화자가 1명뿐이면 보내지 않음. 앞뒤 공백 제거 후 1~100자 |
@@ -652,7 +652,7 @@ SC-13(이름 입력·수정)은 `display_name`을 바꾸고, `provider_address`�
 | 404 | `NOT_FOUND` | 없거나 남의 대화 상대 | 대화 상대 목록을 새로고침 |
 | 409 | `CONFLICT` | 같은 `record_id`인데 화자 값 외 필드가 다르거나 이미 `uploading`이 아님 | 새 `record_id`로 예약 |
 | 413 | `FILE_TOO_LARGE`(`field: size_bytes`) | 25 MiB 초과 | 더 작은 파일 |
-| 422 | `INVALID_INPUT`(`field`) | 형식·MIME·`size_bytes` 0·`consent_at` 미래·화자 형식 오류 | 값을 고쳐 다시 예약 |
+| 422 | `INVALID_INPUT`(`field`) | 형식·MIME·`size_bytes` 0·`consent_at`이 허용 오차(5분)를 넘는 미래·화자 형식 오류 | 값을 고쳐 다시 예약 |
 | 503 | `DB_UNAVAILABLE`(`retryable: true`) | Storage가 서명 주소를 발급하지 못함. 기록 행은 이미 만들어져 있음 | 같은 `record_id`로 다시 예약(화자 값 외 필드는 같게. 200과 새 `upload`, 원본이 이미 올라가 있으면 `upload: null`) |
 
 <a id="a-record-uploaded"></a>

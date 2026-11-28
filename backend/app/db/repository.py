@@ -7,7 +7,7 @@ import math
 import re
 import struct
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Mapping, Sequence
 from uuid import UUID, uuid4
 
@@ -45,10 +45,15 @@ def _integer(value: int, *, minimum: int = 0, maximum: int = 2**31 - 1) -> int:
     return value
 
 
-def _time(value: datetime, *, not_future: bool = False) -> str:
+# 앱이 보낸 동의 시각(`consent_at`)은 기기 시계다. 서버보다 조금 앞선 기기를 거절하지 않도록 이만큼의 미래까지 받는다.
+# 이 값을 넘는 미래는 잘못된 값으로 본다. 다른 시각 인자(`ai_notice_ack_at` 등)는 허용 오차 없이 그대로 검사한다.
+CONSENT_CLOCK_TOLERANCE = timedelta(minutes=5)
+
+
+def _time(value: datetime, *, not_future: bool = False, tolerance: timedelta = timedelta(0)) -> str:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise ValidationError()
-    if not_future and value > datetime.now(timezone.utc):
+    if not_future and value > datetime.now(timezone.utc) + tolerance:
         raise ValidationError()
     return value.astimezone(timezone.utc).isoformat()
 
@@ -369,7 +374,7 @@ class UserDatabase:
             "original_name": _text(original_name, max_length=255), "mime_type": mime_type,
             "size_bytes": _integer(size_bytes, maximum=2**63 - 1),
             "object_path": self._user_id + "/" + rid + "/original",
-            "consent_at": _time(consent_at, not_future=True), "consent_version": _text(consent_version, max_length=100),
+            "consent_at": _time(consent_at, not_future=True, tolerance=CONSENT_CLOCK_TOLERANCE), "consent_version": _text(consent_version, max_length=100),
             "consent_scopes": ["personalization"], "status": "uploading"}
         # 카카오톡 화자 선택값. 원격 records에는 provider_speaker 컬럼이 아직 없어(DB 담당 확정 전) 값이 있을 때만 보낸다.
         if target_speaker is not None:

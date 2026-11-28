@@ -12,7 +12,7 @@ from app import db
 from app.clients.storage import SignedUpload, StorageClient, StorageUnavailable
 from app.core.config import get_settings
 from app.core.errors import CONFLICT_MESSAGE, INVALID_INPUT_MESSAGE, AppError
-from app.db.repository import RECORD_MIME_TYPES
+from app.db.repository import CONSENT_CLOCK_TOLERANCE, RECORD_MIME_TYPES
 from app.schemas.record import RecordCreate, UploadedBody
 from app.services.audio_signature import HEAD_BYTES, signature_matches
 from app.services.kakao import MAX_SPEAKER_NAME, NoChatMessages, SpeakerNameTooLong, TooManySpeakers, analyze_text
@@ -164,8 +164,9 @@ async def reserve(user_db: db.UserDatabase, storage: StorageClient, req: RecordC
                        retryable=False, field="size_bytes")
     if req.mime_type not in RECORD_MIME_TYPES[req.kind]:
         raise _invalid("mime_type", "지원하지 않는 파일 형식이에요.")
-    if req.consent_at > datetime.now(timezone.utc):
-        raise _invalid("consent_at", "동의한 시각을 확인해 주세요.")
+    # 기기 시계가 서버보다 조금 앞서도 받는다(같은 허용 오차를 DB 모듈도 쓴다). 그보다 먼 미래만 거절한다.
+    if req.consent_at > datetime.now(timezone.utc) + CONSENT_CLOCK_TOLERANCE:
+        raise _invalid("consent_at", "동의한 시각을 확인해 주세요. 기기의 날짜와 시간이 맞는지 확인해 주세요.")
     target, provider = clean_speakers(req.kind, req.target_speaker, req.provider_speaker)
 
     try:
