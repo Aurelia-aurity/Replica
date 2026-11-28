@@ -159,7 +159,7 @@ class EncoderTests(unittest.TestCase):
         self.path = Path(self.temp.name)
         (self.path / "modules.json").write_text(json.dumps([
             {"type": "sentence_transformers.models.Transformer", "path": ""},
-            {"type": "sentence_transformers.models.Pooling", "path": "1_Pooling"}]))
+            {"type": "sentence_transformers.models.Pooling", "path": "1_Pooling"}]), encoding="utf-8")
         self.model = ModelBoundary()
         module = ModuleType("sentence_transformers")
         module.__version__ = "5.1.2"
@@ -232,21 +232,22 @@ class EncoderTests(unittest.TestCase):
         with patch.object(sys.modules["sentence_transformers"], "__version__", "other"):
             with self.assertRaisesRegex(EncodingError, "unsupported_encoding_runtime"):
                 LocalEncoder(self.path)
-        (self.path / "config_sentence_transformers.json").write_text('{"model_type":"SparseEncoder"}')
+        (self.path / "config_sentence_transformers.json").write_text(
+            '{"model_type":"SparseEncoder"}', encoding="utf-8")
         with self.assertRaisesRegex(EncodingError, "invalid_local_model_type"):
             LocalEncoder(self.path)
-        (self.path / "config_sentence_transformers.json").write_text("{}")
+        (self.path / "config_sentence_transformers.json").write_text("{}", encoding="utf-8")
         self.model.get_sentence_embedding_dimension = lambda: 384
         with self.assertRaisesRegex(EncodingError, "model_dimension_mismatch"):
             LocalEncoder(self.path)
-        (self.path / "modules.json").write_text("[]")
+        (self.path / "modules.json").write_text("[]", encoding="utf-8")
         with self.assertRaisesRegex(EncodingError, "unsupported_local_modules"):
             LocalEncoder(self.path)
         for manifest in (
             [1], [{"type": "custom.Remote", "path": ""}],
             [{"type": "sentence_transformers.models.Transformer", "path": "../outside"}],
         ):
-            (self.path / "modules.json").write_text(json.dumps(manifest))
+            (self.path / "modules.json").write_text(json.dumps(manifest), encoding="utf-8")
             with self.subTest(manifest=manifest), self.assertRaises(EncodingError):
                 LocalEncoder(self.path)
 

@@ -13,7 +13,7 @@ from persona_contract import parse_request
 from persona_guard import check_reply
 import server
 from test_persona import PATH, request
-from test_server import Engine, call, request as baseline_request, serving
+from server_test_support import Engine, call, request as baseline_request, serving
 
 
 class PersonaInferenceTests(unittest.TestCase):

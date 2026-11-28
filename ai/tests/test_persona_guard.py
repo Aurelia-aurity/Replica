@@ -96,7 +96,7 @@ class PersonaGuardTests(unittest.TestCase):
         # When: drive the real CLI, bounded by process completion rather than sleeps.
         result = subprocess.run(
             [sys.executable, "-B", str(script)], cwd=script.parent,
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True, encoding="utf-8", timeout=10, check=False,
         )
         # Then: JSON stdout and successful exit establish the actual CLI surface.
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -12,7 +12,7 @@ import inference
 from persona_adapter import PersonaInference
 import server
 from test_persona import PATH
-from test_server import Engine, call, serving
+from server_test_support import Engine, call, serving
 
 FIXTURES = Path(__file__).parent / "fixtures/smoke35891"
 
@@ -29,7 +29,7 @@ class JsonPrefixTests(unittest.TestCase):
     def test_captured_plain_replies_show_missing_generation_constraint(self):
         for file in sorted(FIXTURES.glob("*.json")):
             # Given: verbatim real GPU output, not a fabricated repaired envelope.
-            capture = json.loads(file.read_text())
+            capture = json.loads(file.read_text(encoding="utf-8"))
             engine = Engine()
             engine.answer = capture["raw_output"]
             engine.reason = capture["finish_reason"]
@@ -46,7 +46,7 @@ class JsonPrefixTests(unittest.TestCase):
 
     def test_forwarded_prefix_can_be_completed_in_one_valid_persona_decode(self):
         # Given: a decoder that completes the adapter's prefix without repairing it.
-        capture = json.loads((FIXTURES / "no-evidence-daily.json").read_text())
+        capture = json.loads((FIXTURES / "no-evidence-daily.json").read_text(encoding="utf-8"))
         engine = FramingEngine()
         adapter = PersonaInference(engine, "synthetic-model")
         with serving(server.Service(engine, persona_generator=adapter)) as port:

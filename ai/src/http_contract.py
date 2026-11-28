@@ -1,6 +1,7 @@
 """Inference HTTP framing and health checks; shared contracts and JSON responses."""
 import logging
 import re
+import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -53,6 +54,24 @@ def read_body(handler: BaseHTTPRequestHandler, auth: Callable[[HTTPMessage], int
 
 class InferenceHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
+
+    def shutdown_request(self, request: socket.socket) -> None:
+        # Deliver the response before draining. Closing with unread socket data
+        # can reset the connection, but a rejected client need not finish sending.
+        try:
+            request.shutdown(socket.SHUT_WR)
+            deadline = time.monotonic() + 1.0
+            budget = RAW_LIMIT
+            while budget and (remaining := deadline - time.monotonic()) > 0:
+                request.settimeout(remaining)
+                chunk = request.recv(min(8192, budget))
+                if not chunk:
+                    break
+                budget -= len(chunk)
+        except OSError as error:
+            LOGGER.debug("HTTP socket shutdown or drain ended: errno=%s", error.errno)
+        finally:
+            self.close_request(request)
 
     def handle_error(self, request, client_address):
         # Base implementation prints raw exceptions and possibly request text.

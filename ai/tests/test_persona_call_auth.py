@@ -12,7 +12,7 @@ from persona_adapter import PersonaInference
 import server
 from request_timing import RequestTiming
 from test_persona import PATH, request
-from test_server import Engine, call, serving
+from server_test_support import Engine, call, serving
 
 MARKERS = (
     "PRIVATE_PROMPT_44", "PRIVATE_PROFILE_44", "PRIVATE_EVIDENCE_44",
@@ -121,7 +121,8 @@ class PersonaCallAuthTests(unittest.TestCase):
             service = server.Service(
                 engine, auth=auth, persona_generator=PersonaInference(engine, "synthetic-model"))
             with self.subTest(decision=decision), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(
+                        service, join_handlers=True) as port:
                 result = call(port, private_request(), headers=HEADERS, path=PATH)
             status = decision or 200
             self.assertEqual(result[0], status)
@@ -139,7 +140,7 @@ class PersonaCallAuthTests(unittest.TestCase):
         auth = Mock(return_value=401)
         with patch.object(server.persona_contract, "parse_request") as parse:
             with self.assertLogs(server.LOGGER, level="INFO") as logs, serving(
-                    server.Service(auth=auth)) as port:
+                    server.Service(auth=auth), join_handlers=True) as port:
                 result = call(port, raw=b"", headers={
                     **HEADERS, "Content-Length": str(server.RAW_LIMIT + 1)}, path=PATH)
             parse.assert_not_called()
@@ -153,7 +154,7 @@ class PersonaCallAuthTests(unittest.TestCase):
                 auth = Mock(return_value=decision)
                 with self.subTest(decision=decision, broken=raw == b"{broken"), self.assertLogs(
                         server.LOGGER, level="INFO") as logs, serving(
-                            server.Service(auth=auth)) as port:
+                            server.Service(auth=auth), join_handlers=True) as port:
                     connection = HTTPConnection("127.0.0.1", port, timeout=5)
                     try:
                         with patch.object(server.json, "loads") as decode:
@@ -173,7 +174,7 @@ class PersonaCallAuthTests(unittest.TestCase):
         data = private_request()
         data["request_id"] = None
         with self.assertLogs(server.LOGGER, level="INFO") as logs, serving(
-                server.Service(auth=auth)) as port:
+                server.Service(auth=auth), join_handlers=True) as port:
             self.assertEqual(call(port, data, headers=HEADERS, path=PATH),
                              (400, server.error_body(400)))
         auth.assert_called_once()
@@ -185,7 +186,8 @@ class PersonaCallAuthTests(unittest.TestCase):
             auth = Mock(return_value=403)
             service = server.Service(private_engine() if ready else None, auth=auth)
             with self.subTest(ready=ready), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(
+                        service, join_handlers=True) as port:
                 status = 200 if ready else 503
                 self.assertEqual(call(port, method="GET", path="/readyz", headers=HEADERS),
                                  (status, {"ready": ready}))
@@ -210,7 +212,8 @@ class PersonaCallAuthTests(unittest.TestCase):
             method = "apply_chat_template" if phase == "prepare" else "generate"
             failure = RuntimeError(MARKERS[7])
             with self.subTest(phase=phase), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(
+                        service, join_handlers=True) as port:
                 if phase in ("prepare", "decode"):
                     with patch.object(target, method, side_effect=failure):
                         result = call(port, data, headers=HEADERS, path=PATH)

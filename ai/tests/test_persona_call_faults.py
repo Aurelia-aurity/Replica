@@ -15,7 +15,7 @@ from test_persona import PATH
 from test_persona_call_auth import (
     HEADERS, MARKERS, assert_private_logs, private_engine, private_request,
 )
-from test_server import OTHER_ID, RecordingService, call, request as baseline_request, serving
+from server_test_support import OTHER_ID, RecordingService, call, request as baseline_request, serving
 
 BASELINE = "/v1/baseline/generate"
 
@@ -35,7 +35,7 @@ class PersonaCallFaultTests(unittest.TestCase):
             request_id = data["request_id"]
             connection = None
             with self.subTest(outcome=outcome), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(service, join_handlers=True) as port:
                 try:
                     if outcome == "disconnect":
                         connection = HTTPConnection("127.0.0.1", port, timeout=5)
@@ -84,7 +84,7 @@ class PersonaCallFaultTests(unittest.TestCase):
             second = baseline if second_path == BASELINE else data
             results = []
             with self.subTest(first_path=first_path), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(service, join_handlers=True) as port:
                 thread = threading.Thread(target=lambda: results.append(
                     call(port, first, headers=HEADERS, path=first_path)))
                 thread.start()
@@ -122,7 +122,7 @@ class PersonaCallFaultTests(unittest.TestCase):
             service = server.Service(engine, persona_generator=PersonaInference(engine, "test"))
             data = private_request()
             with self.subTest(output=index), self.assertLogs(
-                    server.LOGGER, level="INFO") as logs, serving(service) as port:
+                    server.LOGGER, level="INFO") as logs, serving(service, join_handlers=True) as port:
                 self.assert_error(call(port, data, headers=HEADERS, path=PATH),
                                   500, data["request_id"])
             self.assertEqual(engine.calls, 1)
@@ -141,7 +141,7 @@ class PersonaCallFaultTests(unittest.TestCase):
         self.assertNotIn(OTHER_ID, [item["chunk_id"] for item in data["evidence"]])
         with patch.object(adapter, "generate", side_effect=mismatched), self.assertLogs(
                 server.LOGGER, level="INFO") as logs, serving(
-                    server.Service(engine, persona_generator=adapter)) as port:
+                    server.Service(engine, persona_generator=adapter), join_handlers=True) as port:
             self.assert_error(call(port, data, headers=HEADERS, path=PATH),
                               500, data["request_id"])
         self.assertEqual(engine.calls, 1)

@@ -12,7 +12,7 @@ import server
 from profile_adapter import ProfileConfig
 from test_profile_contract import analyze, merge, profile, uid
 from test_profile_inference import Runtime
-from test_server import RecordingService, call, request, serving
+from server_test_support import RecordingService, call, request, serving
 
 ANALYZE = "/v1/persona-profiles/analyze"
 MERGE = "/v1/persona-profiles/merge"

@@ -3,7 +3,7 @@ import json
 import unittest
 
 from test_persona import FakePersona, PATH, request as persona_request
-from test_server import Engine, REQUEST_ID, call, request as baseline_request, serving
+from server_test_support import Engine, REQUEST_ID, call, request as baseline_request, serving
 import server
 
 

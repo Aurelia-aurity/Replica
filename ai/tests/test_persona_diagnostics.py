@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from persona_adapter import PersonaInference
 import server
 from test_persona import PATH
-from test_server import Engine, call, request as baseline_request, serving
+from server_test_support import Engine, call, request as baseline_request, serving
 from test_smoke_persona import smoke
 
 
