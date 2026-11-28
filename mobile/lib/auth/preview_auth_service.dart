@@ -6,10 +6,12 @@ class PreviewAuthService extends AuthService {
     this.registrationResult = SignUpResult.loginRequired,
     this.signInFailure,
     this.registrationFailure,
+    this.resendFailure,
   });
   final SignUpResult registrationResult;
   final AuthFailureKind? signInFailure;
   final AuthFailureKind? registrationFailure;
+  final AuthFailureKind? resendFailure;
   static const password = 'Replica123!';
   static const emails = ['preview.a@example.com', 'preview.b@example.com'];
 
@@ -49,6 +51,14 @@ class PreviewAuthService extends AuthService {
       );
     }
     return registrationResult;
+  }
+
+  /// Accepts the request without sending any email.
+  @override
+  Future<void> resendSignUpConfirmation(String email) async {
+    if (resendFailure != null) {
+      throw AuthFailure('미리보기 재전송 오류입니다.', kind: resendFailure!);
+    }
   }
 
   @override

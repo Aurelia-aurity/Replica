@@ -18,7 +18,22 @@
 
 `AuthFailureKind`는 `invalidCredentials`, `emailNotVerified`, `emailAlreadyRegistered`, `weakPassword`, `rateLimited`, `network`, `consentRequired`, `generic`을 구분합니다. UI는 종류별로 안전한 안내를 표시하며 네트워크 오류는 하단 안내·재시도를, 중복 이메일은 이메일 아래 안내·로그인 전환을 제공합니다. 그 외 인증 실패도 입력을 유지합니다.
 
-더미의 `signInFailure`와 `registrationFailure`로 오류 종류를 주입할 수 있습니다. Supabase 어댑터는 SDK가 실제 중복 오류를 반환한 경우에만 중복 이메일 오류로 변환합니다.
+더미의 `signInFailure`와 `registrationFailure`로 오류 종류를 주입할 수 있습니다. Supabase 어댑터는 SDK가 실제 중복 오류를 반환한 경우에만 중복 이메일 오류로 변환합니다. 오류 코드 없이 HTTP 429가 와도 `rateLimited`로 변환합니다.
+
+## 인증 메일 재전송 (#125)
+
+`AuthService.resendSignUpConfirmation(email)`은 가입 확인 메일을 다시 요청합니다. Supabase 어댑터는 SDK의 `auth.resend(type: OtpType.signup, email, emailRedirectTo)`를 호출하며, 가입과 같은 `SUPABASE_EMAIL_REDIRECT_TO`를 씁니다. 실패는 로그인·가입과 같은 `AuthFailure` 변환을 거칩니다(`over_email_send_rate_limit`·`over_request_rate_limit`·429는 `rateLimited`, 연결 실패와 5xx는 `network`). 더미는 메일을 보내지 않고 성공하며, `resendFailure`로 오류 종류를 주입할 수 있습니다.
+
+| 버튼이 나오는 경우 | 재전송 대상 |
+| --- | --- |
+| 가입 결과가 `emailVerificationRequired` | 가입 요청에 보낸 이메일(앞뒤 공백 제거) |
+| 로그인이 `emailNotVerified`로 거절됨 | 로그인 요청에 보낸 이메일(앞뒤 공백 제거) |
+
+- 재전송 대상은 위 요청 때 정해지며 이메일 입력칸의 이후 값을 보내지 않습니다. 입력칸을 다른 주소로 바꾸거나, 로그인·회원가입을 전환하거나, 새로 로그인·가입을 요청하면 버튼과 결과 안내가 사라집니다.
+- 요청 중에는 재전송 버튼을 비활성화하고(‘요청 중…’), 입력칸·로그인·회원가입 전환도 막아 요청이 겹치지 않게 합니다. 로그인·가입을 새로 요청하면 그 순간 버튼이 사라지므로, 로그인·가입 요청과 재전송이 함께 진행되지 않습니다.
+- 결과는 버튼 아래에 표시합니다. 성공: ‘인증 메일을 다시 요청했어요. 메일함을 확인해 주세요.’ 요청 제한: ‘잠시 후 다시 시도해 주세요.’ 연결 실패: ‘네트워크 연결을 확인하고 다시 시도해 주세요.’ 그 밖의 실패: ‘요청하지 못했어요. 다시 시도해 주세요.’ 실패 뒤에도 버튼을 다시 누를 수 있습니다. 서버 오류 원문은 표시하지 않습니다.
+- Supabase는 이메일 존재 여부를 드러내지 않으려고 없는 주소나 이미 인증한 주소에도 성공으로 답할 수 있습니다. 그래서 성공 안내는 ‘보냈어요’가 아니라 ‘요청했어요’로 표현합니다.
+- 앱은 재전송 간격(쿨다운)을 따로 두지 않고 서버의 요청 제한 응답을 따릅니다. Supabase의 기본 이메일 발송 제한·간격은 프로젝트 설정에 따르며 실제 값은 확인하지 않았습니다.
 
 ## 401 공통 처리
 
