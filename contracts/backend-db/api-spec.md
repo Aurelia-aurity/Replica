@@ -132,7 +132,7 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 | 요청 시 표시 | `request_persona_deletion`·`request_account_deletion`이 대상의 모든 기록을 `deleting`으로 표시합니다. 기록이 `deleting`이어야 guard를 통과할 수 있고, 읽기는 부모 상태를 따르는 기존 RLS로 즉시 막힙니다 |
 | guard 확장 | 행 삭제 허용 조건에 '그 기록의 대화 상대를 대상으로 하는 열린 `persona` 작업, 또는 그 기록의 소유자를 대상으로 하는 열린 `account` 작업이 `storage` 단계를 끝냄(`remaining_steps`에 `storage`가 없음)'을 추가합니다. 기존 `record` 작업 조건은 그대로입니다 |
 | 열린 하위 작업의 흡수 | 상위 작업을 요청하면 그 범위의 열린(`pending`·`running`·`failed`) `record` 작업(계정이면 `persona` 작업도)을 상위 작업이 흡수합니다. 흡수된 작업은 `parent_job_id`가 상위 작업을 가리키고 소유 토큰(`lease_token`)이 비워져 이전 시도의 늦은 완료·실패는 `55000`으로 거부되며, worker가 따로 집지 않습니다. 이미 `persona` 작업에 흡수된 `record` 작업은 계정 요청 때 `parent_job_id`를 계정 작업으로 다시 지정하고(`persona` 작업도 계정 작업이 흡수) 상위는 항상 계정 작업 하나로 평탄하게 둡니다. 흡수된 작업의 `manifest` 경로는 상위 작업의 `manifest`에 합칩니다. 그래서 하위 작업이 기록 행을 이미 지운 뒤 `database` 완료 전에 멈췄거나 `failed`여도 그 원본 경로를 상위 `storage` 단계가 지웁니다. 하위 작업의 `manifest`는 상위 `storage`·`database`가 끝나기 전에는 비우지 않습니다. 상위 작업의 `database` 단계가 성공하면 `parent_job_id`가 그 상위 작업인 모든 작업(다시 묶은 것 포함)을 같은 트랜잭션에서 `completed`로 닫고 `manifest`를 비웁니다. 그래서 상위 작업이 `completed`가 된 뒤에는 하위 작업의 `manifest`가 남지 않습니다 |
-| 기록이 없는 대화 상대·계정 | 기록 행이 없어도 흡수한 하위 작업이 남긴 원본 경로가 합친 `manifest`에 있으면 `storage` 단계를 둡니다. 경로가 하나도 없을 때만 `storage` 없이 `database`부터 진행합니다. guard는 기록 행을 지울 때만 작동하므로 기록이 없으면 걸리지 않습니다 |
+| 기록이 없는 대화 상대·계정 | 기록 행이 없어도 흡수한 하위 작업이 남긴 원본 경로가 합친 `manifest`에 있으면 `storage` 단계를 둡니다. 경로가 하나도 없을 때만 `storage` 없이 `database`부터 진행합니다. guard는 기록 행을 지울 때만 작동하므로 기록이 없으면 걸리지 않습니다. 이 상태에서도 Auth 사용자가 먼저 사라질 수 있으며, 그 경우 서버는 합친 `manifest`의 경로부터 이어서 처리합니다(아래 '로그인 계정이 먼저 사라진 작업') |
 | `database` 단계의 삭제 순서 | 하위부터 지웁니다: 검색 조각·텍스트 버전 → 프로필 → 기록 → (대화 상대·계정 삭제일 때) 대화방과 턴 → 대화 상대 행. 프로필은 출처 연결(`profile_sources`)이 지워지기 **전에** 식별합니다. 기록 삭제 작업은 삭제 대상 기록의 텍스트 버전을 출처로 가진 프로필 버전만 `style_profiles` 행(`content` 포함)까지 지우고, 이 기록과 무관하거나 요청 뒤 새로 만들어져 이 기록을 쓰지 않은 버전은 남깁니다. 대화 상대·계정 삭제는 범위 전체의 프로필을 지웁니다. 이 정리까지 끝나야 `database` 단계가 끝납니다(`stale` 표시만으로는 끝나지 않음). #134가 추가하는 스냅샷·분석 노드·색인·턴 결속도 같은 단계에서 지워야 합니다(#134 병합 뒤 확정) |
 
 #### Auth 삭제와 작업 정리 (제안)
@@ -143,17 +143,17 @@ DB 담당의 이슈 #25(스키마·SQL 함수)·#26(Python 함수 명세)과 PR 
 
 #### 로그인 계정이 먼저 사라진 작업(고아 작업) (제안)
 
-`deletion_jobs.user_id`는 `auth.users`에 `on delete set null`로 연결되어 있어 Auth 사용자가 지워지면 자동으로 `null`이 됩니다. 이를 이용해 DB가 Auth를 따로 호출하지 않고 '`user_id`가 `null`이고 `completed`가 아닌 작업'을 **고아 작업**으로 판정합니다. 정상 흐름의 `auth` 단계 직후와, 앞 단계 도중 관리자가 Auth만 지운 조기 소실을 같은 규칙으로 다룹니다(대상 종류와 무관).
+`deletion_jobs.user_id`는 `auth.users`에 `on delete set null`로 연결되어 있어 Auth 사용자가 지워지면 자동으로 `null`이 됩니다. 이를 이용해 DB가 Auth를 따로 호출하지 않고 '`user_id`가 `null`이고 `completed`가 아닌 작업'을 **고아 작업**으로 판정합니다. 정상 흐름의 `auth` 단계 직후와, 어느 단계에서든 진행 중에 관리자가 Auth만 지운 조기 소실을 같은 규칙으로 다룹니다(대상 종류와 무관).
 
 | 항목 | 내용 |
 |---|---|
 | 감지 주체·조건 | 삭제 worker의 주기적인 `claim_deletion_job` 호출이 고아 작업을 대상에 포함합니다(이미 `failed`로 멈춘 작업 포함). 별도의 감시자나 앱 요청은 필요 없습니다 |
-| 재개 | 집은 뒤 `remaining_steps`부터 끝냅니다. 남은 단계는 이미 없는 행·객체를 성공으로 보는 멱등 처리이며 `auto_retry_count`는 0에서 다시 시작합니다 |
+| 재개 | 집은 뒤 기록 행 유무와 관계없이 남은 `remaining_steps`를 정해진 순서(`storage` → `external_index` → `adapter` → `database` → `auth`)대로 재개합니다. 흡수한 경로가 있어 `storage`가 남아 있으면 `storage`부터 처리하고 `external_index`·`adapter`가 남아 있으면 건너뛰지 않습니다. 남은 단계는 이미 없는 행·객체를 성공으로 보는 멱등 처리입니다. `auto_retry_count`는 고아 `failed`를 회수해 집을 때 0으로 되돌리며, 이미 `pending`·`running`이던 고아 작업의 선점에서는 값을 그대로 둡니다 |
 | 실패 처리 | `finish_deletion_step`이 `user_id`가 `null`인 작업의 실패를 `failed`로 두지 않고 `pending`과 `next_attempt_at`(최대 30분 뒤)으로 둡니다. 사용자가 retry할 수 없기 때문입니다 |
 | 대상 식별 | `user_id`가 비어 있으므로 작업 id와 `target_id`(계정 작업은 삭제된 사용자의 id), `manifest` 범위로 처리합니다. Auth 사용자 삭제의 cascade가 이미 지운 행은 멱등으로 성공합니다 |
-| 완료 판정 | 앞당기지 않습니다. 앱·백엔드 응답은 작업이 있으면 `ACCOUNT_DELETION_INCOMPLETE`, `completed`가 된 뒤에야 `ACCOUNT_DELETED`입니다 |
-| 조기 소실의 범위 | `guard_record_delete`가 기록 행의 삭제(cascade 포함)를 `storage` 완료 전에는 막으므로, 기록이 남은 채 Auth 사용자만 지워지는 일은 Storage 정리 뒤에만 가능하다고 봅니다(DB 담당 확인 필요: cascade 경로에서도 이 보호가 작동하는지). 작업 행이 아예 없으면 정리할 `manifest`가 없어 복구 대상이 아닙니다 |
-| 운영자 호출 | `retry_deletion_job(null, 작업 id)`는 자동 재개가 막혔을 때 즉시 다시 시작하는 보조 수단입니다 |
+| 완료 판정 | 앞당기지 않습니다. `ACCOUNT_DELETION_INCOMPLETE`의 조건(`user_not_found`, 토큰 `sub`와 일치하는 계정 작업, 유효한 토큰)은 위 '앱에 알리는 신호' 문단을 그대로 따르며, `completed`가 된 뒤에야 `ACCOUNT_DELETED`입니다 |
+| 조기 소실의 범위 | `guard_record_delete`는 기록 **행**의 삭제(cascade 포함)만 `storage` 완료 전에 막으므로, 기록 행이 남은 상태에서는 Auth 삭제가 거절될 수 있습니다. 그러나 기록 행이 이미 지워지고 흡수한 하위 작업의 Storage 경로만 `manifest`에 남은 상태처럼 이 보호가 적용되지 않는 경우에는 어느 단계에서든 조기 소실이 일어날 수 있다고 보고, 서버는 남은 단계를 순서대로 재개합니다(`storage`가 남았으면 `storage`부터). 실제 cascade 차단 범위는 DB 구현 단계의 확인 사항입니다(DB 담당 확인 필요). 작업 행이 아예 없으면 이 경로에서 조회할 작업·`manifest`가 없어 복구 대상이 아닙니다(남은 자료가 없다는 뜻은 아님) |
+| 운영자 호출 | `retry_deletion_job(null, 작업 id)`는 자동 재개가 막힌 흡수되지 않은 `failed` 고아 작업을 곧바로 다시 `pending`으로 돌리는 보조 수단입니다. 미래로 예약된 `pending`과 `running`은 바꾸지 않고 현재 작업을 돌려줍니다 |
 
 삭제 worker는 백엔드 프로세스의 백그라운드 작업으로 둡니다(제안, 실행 위치와 외부 파생물 정리 책임은 합의 필요). 서버가 시작될 때와 주기적으로 `claim_deletion_job`으로 작업을 집고, 처리 중에는 `heartbeat_deletion_job`으로 진행을 알리며, 단계가 끝날 때마다 `finish_deletion_step`으로 `remaining_steps`를 줄입니다. 서버가 중간에 멈춰도 `remaining_steps`부터 이어가며 이미 끝난 단계를 다시 처리하지 않습니다.
 
