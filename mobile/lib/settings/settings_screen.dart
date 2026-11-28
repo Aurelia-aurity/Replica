@@ -15,6 +15,7 @@ class SettingsScreen extends StatelessWidget {
     this.accountCreatedAt,
     required this.isDemo,
     this.onSignOut,
+    this.onOpenSpeechProfile,
     this.onDeleteAccount,
     this.onExpireSession,
     this.bottomNavigationBar,
@@ -24,6 +25,10 @@ class SettingsScreen extends StatelessWidget {
   final DateTime? accountCreatedAt;
   final bool isDemo;
   final Future<void> Function()? onSignOut;
+
+  /// Opens the speech profile (SC-07, or SC-13 first when there is no
+  /// partner yet). When null, the row only says the screen is not connected.
+  final VoidCallback? onOpenSpeechProfile;
 
   /// Starts the account deletion flow. When null (no record service that can
   /// delete this account), the row only explains that deletion is unavailable.
@@ -238,13 +243,15 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   _SettingsRow(
                     title: '말투 프로필',
-                    onTap: () => _showDetails(
-                      context,
-                      title: '말투 프로필',
-                      child: const Text(
-                        '말투 프로필 화면 연결은 준비 중이에요. 대화 상대와 프로필을 확인하는 기능이 연결되면 여기서 볼 수 있어요.',
-                      ),
-                    ),
+                    onTap:
+                        onOpenSpeechProfile ??
+                        () => _showDetails(
+                          context,
+                          title: '말투 프로필',
+                          child: const Text(
+                            '말투 프로필 화면 연결은 준비 중이에요. 대화 상대와 프로필을 확인하는 기능이 연결되면 여기서 볼 수 있어요.',
+                          ),
+                        ),
                   ),
                 ],
               ),

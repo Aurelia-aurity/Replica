@@ -57,6 +57,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _starting = false;
   int _tab = 0;
+
+  /// Counts the times what the user sees changed: another tab, or a dialog,
+  /// sheet or screen opened over this one. An answer that comes after such a
+  /// change can tell, even once the user is back where they were.
+  int _view = 0;
+
+  /// Whether this screen's route was on top the last time it was checked.
+  bool _onTop = true;
   late Future<List<Conversation>> _recent;
 
   /// Record state of this login, one controller (with its own service) per
@@ -77,6 +85,16 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.personas.addListener(_personasChanged);
     // Not synchronously: the listeners below must not rebuild during mount.
     Future.microtask(widget.personas.load);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Depends on whether the route is on top, so a dialog or sheet opened
+    // over it (closed again or not) is counted when it opens.
+    final onTop = ModalRoute.isCurrentOf(context) ?? true;
+    if (_onTop && !onTop) _view++;
+    _onTop = onTop;
   }
 
   @override
@@ -166,8 +184,20 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  /// Shows tab [index]. Call inside `setState`.
+  void _showTab(int index) {
+    if (index != _tab) _view++;
+    _tab = index;
+  }
+
+  /// Whether SC-12 is still what the user sees as it was on [view]: the
+  /// settings tab was not left, and no dialog, sheet or screen was opened
+  /// over it in between (even one closed again) or covers it now.
+  bool _settingsShownSince(int view) =>
+      _tab == 3 && _view == view && (ModalRoute.isCurrentOf(context) ?? true);
+
   void _account() {
-    setState(() => _tab = 3);
+    setState(() => _showTab(3));
   }
 
   /// Whether SC-12 can start account deletion. Until the partners are known it
@@ -194,6 +224,49 @@ class _HomeScreenState extends State<HomeScreen> {
       preview: records.service.isPreview,
     );
     if (mounted && complete == true) accountDeleted();
+  }
+
+  /// SC-12 "말투 프로필": SC-07 of the current partner. Without a partner it
+  /// starts with SC-13, as the home card does, and SC-07 follows once the
+  /// partner is saved.
+  ///
+  /// While the partners load (also a reload after a failure) it only asks to
+  /// wait, so taps during the reload open nothing more. A reload whose
+  /// answer comes once the user left SC-12 (for another tab, even if they
+  /// came back) or opened something over it (even if it was closed again)
+  /// only updates the list: no screen and no failure notice.
+  Future<void> _openSpeechProfile() async {
+    final personas = widget.personas;
+    if (personas.current == null && _personasLoading) {
+      _notice('대화 상대를 불러오는 중이에요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    // After a failed list it is unknown whether a partner exists: load the
+    // list again rather than offer a new partner.
+    if (personas.current == null && personas.status == LoadStatus.failed) {
+      final view = _view;
+      await personas.load();
+      if (!mounted || !_settingsShownSince(view)) return;
+      if (personas.status != LoadStatus.ready) {
+        _notice('대화 상대를 불러오지 못했어요. 다시 시도해 주세요.');
+        return;
+      }
+    }
+    final persona = personas.current;
+    if (persona != null) {
+      await openSpeechProfile(
+        context,
+        personas,
+        persona,
+        onOpenRecordUpload: _openRecordUpload,
+      );
+    } else {
+      await createPersonaThenProfile(
+        context,
+        personas,
+        onOpenRecordUpload: _openRecordUpload,
+      );
+    }
   }
 
   Future<void> _start({required bool voice}) async {
@@ -258,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
     backgroundColor: Colors.white,
     indicatorColor: const Color(0xFFE3EFEB),
     onDestinationSelected: (index) => setState(() {
-      _tab = index;
+      _showTab(index);
       if (index == 0) _refreshRecent();
       if (index == 1) _loadRecords();
     }),
@@ -394,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
         accountCreatedAt: widget.accountCreatedAt,
         isDemo: widget.history.isDemo,
         onSignOut: widget.onSignOut,
+        onOpenSpeechProfile: _openSpeechProfile,
         onDeleteAccount: _accountDeletionOffered ? _deleteAccount : null,
         onExpireSession: widget.onExpireSession,
         bottomNavigationBar: _navigation(),
@@ -461,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   TextButton(
-                    onPressed: () => setState(() => _tab = 2),
+                    onPressed: () => setState(() => _showTab(2)),
                     child: const Text('전체 보기'),
                   ),
                 ],
