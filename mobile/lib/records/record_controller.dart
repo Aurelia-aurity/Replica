@@ -133,6 +133,11 @@ class RecordController extends ChangeNotifier {
   String? analysisError;
   String? targetSpeaker;
   String? providerSpeaker;
+
+  /// The server refused the speakers after the upload (422 `SPEAKER_*`) and
+  /// [analysis] now holds the speakers it found: choose again and only
+  /// `/uploaded` is called, without sending the file again.
+  bool speakerRecovery = false;
   Future<void>? _analysis;
   int _analysisToken = 0;
 
@@ -262,6 +267,7 @@ class RecordController extends ChangeNotifier {
     analysisError = null;
     targetSpeaker = null;
     providerSpeaker = null;
+    speakerRecovery = false;
     _analysis = null;
   }
 
@@ -283,34 +289,48 @@ class RecordController extends ChangeNotifier {
 
   Future<void> _analyze(RecordFile file, int token) async {
     TextAnalysis? result;
-    var failed = false;
+    Object? failure;
     try {
       result = await analyze(file);
-    } catch (_) {
-      failed = true;
+    } catch (error) {
+      failure = error;
     }
     if (_disposed || token != _analysisToken) return;
     analyzing = false;
-    if (failed) {
-      // The upload does not depend on the speaker step; fall back to the file.
-      analysis = TextAnalysis.plain;
-      analysisError = '파일 내용을 확인하지 못해 화자 선택 없이 올려요.';
-    } else {
+    if (failure == null) {
       analysis = result;
+    } else {
+      // The server would refuse a text it cannot read, so it is not sent:
+      // the reservation would be left behind for nothing.
+      analysis = null;
+      analysisError = failure is TextNotUtf8
+          ? 'UTF-8로 저장된 텍스트 파일만 올릴 수 있어요. 파일을 UTF-8로 다시 저장한 뒤 선택해 주세요.'
+          : '파일을 읽지 못했어요. 파일을 다시 선택해 주세요.';
     }
     _changed();
   }
 
+  /// The picked text could not be read as UTF-8 (or at all).
+  bool get textUnreadable => analysisError != null;
+
   bool get needsSpeakers => analysis?.needsSpeakerSelection ?? false;
+  bool get needsProvider => analysis?.needsProviderSelection ?? false;
+  bool get singleSpeaker => analysis?.singleSpeaker ?? false;
+
+  /// Speakers can be chosen before the upload starts, and again when the
+  /// server asks for it.
+  bool get _speakersLocked =>
+      uploading || (attempt != null && !speakerRecovery);
 
   void selectTarget(String? name) {
-    if (uploading || attempt != null || name == providerSpeaker) return;
+    if (_speakersLocked || name == providerSpeaker) return;
     targetSpeaker = name;
     _changed();
   }
 
   void selectProvider(String? name) {
-    if (uploading || attempt != null || name == targetSpeaker) return;
+    if (_speakersLocked || !needsProvider) return;
+    if (name == targetSpeaker) return;
     providerSpeaker = name;
     _changed();
   }
@@ -326,9 +346,12 @@ class RecordController extends ChangeNotifier {
       consent &&
       !uploading &&
       !analyzing &&
+      !textUnreadable &&
       !uploadSucceeded &&
       uploadRetryAllowed &&
-      (!needsSpeakers || (targetSpeaker != null && providerSpeaker != null));
+      (!needsSpeakers ||
+          (targetSpeaker != null &&
+              (!needsProvider || providerSpeaker != null)));
 
   /// Cancelling is possible until the file is fully transferred.
   bool get canCancelUpload =>
@@ -347,12 +370,21 @@ class RecordController extends ChangeNotifier {
       _changed();
       return;
     }
+    final retried = attempt;
+    if (speakerRecovery && retried != null) {
+      // Sent with the next `/uploaded`; null clears what was reserved.
+      retried.targetSpeaker = needsSpeakers ? targetSpeaker : null;
+      retried.providerSpeaker = needsProvider ? providerSpeaker : null;
+      retried.speakersChanged = true;
+      speakerRecovery = false;
+    }
     final current = attempt ??= RecordUpload(
       file: selected!,
       consentAt: DateTime.now(),
       consentVersion: service.policy.consentVersion,
       targetSpeaker: needsSpeakers ? targetSpeaker : null,
-      providerSpeaker: needsSpeakers ? providerSpeaker : null,
+      // A one-speaker file sends the confirmed speaker alone.
+      providerSpeaker: needsProvider ? providerSpeaker : null,
     );
     current.onProgress = _changed;
     uploading = true;
@@ -360,26 +392,121 @@ class RecordController extends ChangeNotifier {
     uploadNotice = null;
     _changed();
     try {
-      await service.upload(current, _changed);
+      await _runUpload(current);
       if (_disposed) return;
       uploadSucceeded = true;
       await refresh();
     } on UploadCancelled {
       if (_disposed) return;
-      await _afterCancel(current);
+      // A mismatch may have replaced the attempt with a new record.
+      await _afterCancel(attempt ?? current);
     } catch (error) {
       if (_disposed) return;
-      if (current.cancelToken.isCancelled) {
-        await _afterCancel(current);
+      final latest = attempt ?? current;
+      if (latest.cancelToken.isCancelled) {
+        await _afterCancel(latest);
+      } else if (error is BackendFailure && isSpeakerFailure(error)) {
+        _askSpeakersAgain(error);
       } else {
         uploadRetryAllowed = error is! BackendFailure || error.retryable;
         uploadError = _uploadMessage(error);
       }
     } finally {
       current.onProgress = null;
+      attempt?.onProgress = null;
       uploading = false;
       cancelling = false;
       _changed();
+    }
+  }
+
+  /// Runs the upload and the recoveries that need no new choice from the user.
+  ///
+  /// - 422 `SPEAKER_NOT_ALLOWED`: the server needs no value there (not a chat,
+  ///   or one speaker and no provider), so the value is cleared with `null`
+  ///   and `/uploaded` is called again once.
+  /// - 409 `UPLOAD_SIZE_MISMATCH`: a stored original of another size cannot be
+  ///   replaced under the same record, so the record is deleted and, if the
+  ///   file on the device is still the reserved size, the same file, consent
+  ///   and speakers are sent once more as a new record. Otherwise the user
+  ///   picks the file again.
+  Future<void> _runUpload(RecordUpload first) async {
+    var current = first;
+    var restarted = false;
+    var cleared = false;
+    while (true) {
+      BackendFailure refused;
+      try {
+        await service.upload(current, _changed);
+        if (restarted) {
+          uploadNotice = '저장된 원본의 크기가 달라 이전 임시 기록을 지우고 새 기록으로 다시 올렸어요.';
+        }
+        return;
+      } on BackendFailure catch (failure) {
+        if (current.cancelToken.isCancelled) rethrow;
+        refused = failure;
+      }
+      if (refused.code == 'SPEAKER_NOT_ALLOWED' && !cleared) {
+        cleared = true;
+        if (refused.field != 'provider_speaker') current.targetSpeaker = null;
+        current.providerSpeaker = null;
+        current.speakersChanged = true;
+        continue;
+      }
+      if (refused.code != 'UPLOAD_SIZE_MISMATCH') throw refused;
+      // A failed delete request keeps the attempt, so retrying asks again.
+      await _discardUpload(current);
+      if (_disposed) return;
+      final unchanged = !restarted && await _hasReservedSize(current.file);
+      if (_disposed) return;
+      if (!unchanged) {
+        // The record is gone; picking the file again starts a new one.
+        attempt = null;
+        throw BackendFailure(
+          BackendFailureKind.generic,
+          code: restarted ? 'UPLOAD_SIZE_MISMATCH' : 'FILE_CHANGED',
+        );
+      }
+      restarted = true;
+      current = current.restart()..onProgress = _changed;
+      attempt = current;
+      uploadNotice = '저장된 원본의 크기가 달라 이전 임시 기록을 지우고 새 기록으로 다시 올리고 있어요.';
+      _changed();
+    }
+  }
+
+  /// Shows the speakers the server found in the file so the user can choose
+  /// again. Choices the server's list no longer has are cleared; a lone
+  /// speaker still needs the user's own tap.
+  void _askSpeakersAgain(BackendFailure failure) {
+    final names = failure.speakers ?? const <String>[];
+    _analysisToken++;
+    _analysis = null;
+    analyzing = false;
+    analysisError = null;
+    analysis = TextAnalysis.fromServer(names);
+    if (!names.contains(targetSpeaker)) targetSpeaker = null;
+    if (!needsProvider || !names.contains(providerSpeaker)) {
+      providerSpeaker = null;
+    }
+    speakerRecovery = true;
+    uploadRetryAllowed = true;
+    uploadError = names.isEmpty
+        ? '화자 확인이 필요해요. 다시 시도해 주세요. 파일은 다시 올리지 않아요.'
+        : '서버가 파일에서 확인한 화자로 다시 골라 주세요. 파일은 다시 올리지 않아요.';
+  }
+
+  /// Whether the picked file still has the size it was reserved with.
+  Future<bool> _hasReservedSize(RecordFile file) async {
+    try {
+      var size = 0;
+      await for (final chunk in file.openRead()) {
+        size += chunk.length;
+        if (size > file.sizeBytes) return false;
+      }
+      return size == file.sizeBytes;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -388,6 +515,24 @@ class RecordController extends ChangeNotifier {
     if (error is BackendFailure) {
       if (error.code == 'FILE_CHANGED') {
         return '올리는 도중 파일이 바뀌었어요. 파일을 다시 선택해 주세요.';
+      }
+      if (error.code == 'UPLOAD_SIZE_MISMATCH') {
+        return '저장된 원본의 크기가 맞지 않아 올리지 못했어요. 파일을 다시 선택해 주세요.';
+      }
+      // Without `field` the file's content was refused (unreadable text, a
+      // speaker name over 100 characters, too many speakers, no messages, an
+      // audio format mismatch). The same record cannot be fixed.
+      if (error.code == 'INVALID_INPUT' && error.field == null) {
+        return '파일 내용을 처리하지 못했어요. 파일을 확인한 뒤 ‘새 파일로 시작’으로 다시 올려 주세요. 올리던 기록은 이때 지워져요.';
+      }
+      if (error.code == 'NOT_FOUND') {
+        return '기록을 찾을 수 없어요. 이미 삭제됐을 수 있어요. 기록 목록을 확인한 뒤 새 파일로 다시 올려 주세요.';
+      }
+      if (error.code == 'RECORD_DELETING') {
+        return '이 기록은 삭제되고 있어요. 새 파일로 다시 올려 주세요.';
+      }
+      if (error.code == 'RECORD_FAILED') {
+        return '서버에서 이 기록을 처리하지 못했어요. 기록 목록에서 상태를 확인하거나 새 파일로 다시 올려 주세요.';
       }
       if (error.kind == BackendFailureKind.forbidden) {
         return '이 기록을 올릴 권한이 없어요.';

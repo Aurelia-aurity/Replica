@@ -5,6 +5,14 @@ import 'record_playback.dart';
 import 'record_review.dart';
 import 'transcript_segments.dart';
 
+/// The server refused the speaker values for the uploaded file (422
+/// `SPEAKER_REQUIRED` · `SPEAKER_NOT_FOUND` · `SPEAKER_NOT_ALLOWED`).
+bool isSpeakerFailure(BackendFailure failure) => const {
+  'SPEAKER_REQUIRED',
+  'SPEAKER_NOT_FOUND',
+  'SPEAKER_NOT_ALLOWED',
+}.contains(failure.code);
+
 abstract class RecordService
     implements RecordReviewService, RecordDeletionService {
   @override
@@ -50,6 +58,16 @@ abstract class RecordService
   bool get canRetryProcessing => false;
   Future<void> retryProcessing(String id) =>
       throw UnsupportedError('Retry API not agreed');
+
+  /// `POST /records/{id}/uploaded` for a record waiting at a speaker check.
+  /// Without [speakers] the server reads the file again and its 422 carries
+  /// `error.speakers`; with them the choice is sent (null clears a value).
+  /// The server re-reads the whole original, so call it only when the user
+  /// opens the record, never for list refreshes or polling.
+  Future<void> completeUpload(
+    String recordId, {
+    Map<String, String?>? speakers,
+  }) => throw UnsupportedError('Upload completion not connected');
 
   /// Whether the original audio of a record can be played in the app.
   bool get canPlayOriginal => false;
@@ -388,4 +406,10 @@ class SessionRecordService extends RecordService {
   @override
   Future<void> retryProcessing(String id) =>
       backend.run(() => delegate.retryProcessing(id));
+  @override
+  Future<void> completeUpload(
+    String recordId, {
+    Map<String, String?>? speakers,
+  }) =>
+      backend.run(() => delegate.completeUpload(recordId, speakers: speakers));
 }

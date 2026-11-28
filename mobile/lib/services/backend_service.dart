@@ -20,6 +20,8 @@ class BackendFailure implements Exception {
     this.retryable = false,
     this.stage,
     this.statusCode,
+    this.field,
+    this.speakers,
   });
   const BackendFailure.unauthenticated()
     : this(BackendFailureKind.unauthenticated, code: 'UNAUTHENTICATED');
@@ -32,6 +34,13 @@ class BackendFailure implements Exception {
   /// no answer. Lets an adapter tell a route the server lacks (404/405 with no
   /// envelope) from a refusal.
   final int? statusCode;
+
+  /// The request field the error is about (`error.field`), if any.
+  final String? field;
+
+  /// Speaker names the server found in a record's file (`error.speakers`).
+  /// Only speaker errors carry it; null when the key was absent.
+  final List<String>? speakers;
 
   bool get canRetry =>
       kind == BackendFailureKind.network ||
@@ -87,6 +96,15 @@ class BackendFailure implements Exception {
           ? error['stage'] as String
           : null,
       statusCode: statusCode,
+      field: error is Map && error['field'] is String
+          ? error['field'] as String
+          : null,
+      speakers:
+          error is Map &&
+              error['speakers'] is List &&
+              (error['speakers'] as List).every((name) => name is String)
+          ? List.unmodifiable((error['speakers'] as List).cast<String>())
+          : null,
     );
   }
 }

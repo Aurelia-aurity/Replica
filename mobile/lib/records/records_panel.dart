@@ -6,6 +6,7 @@ import 'record_models.dart';
 import 'record_picker.dart';
 import 'record_upload_screen.dart';
 import 'record_review_screen.dart';
+import 'record_speaker_check.dart';
 import 'deletion_sheet.dart';
 
 class RecordsPanel extends StatefulWidget {
@@ -311,12 +312,13 @@ class _RecordsPanelState extends State<RecordsPanel> {
     // Amber asks for attention: an unconfirmed transcript, or a stalled
     // reflection that the user may want to look at again.
     final needsAttention =
-        ready &&
-        !reflected &&
-        !reflectFailed &&
-        ((!entry.textConfirmed &&
-                entry.personalization == ReviewProfileState.unknown) ||
-            entry.personalization == ReviewProfileState.delayed);
+        entry.needsSpeakerCheck ||
+        (ready &&
+            !reflected &&
+            !reflectFailed &&
+            ((!entry.textConfirmed &&
+                    entry.personalization == ReviewProfileState.unknown) ||
+                entry.personalization == ReviewProfileState.delayed));
     final badgeColor = failed || reflectFailed
         ? const Color(0xFFBF3328)
         : needsAttention
@@ -369,10 +371,16 @@ class _RecordsPanelState extends State<RecordsPanel> {
           : () async {
               await Navigator.of(context).push<void>(
                 MaterialPageRoute(
-                  builder: (_) => RecordReviewScreen(
-                    records: widget.controller,
-                    entry: entry,
-                  ),
+                  // A record waiting for its speakers continues the upload.
+                  builder: (_) => entry.needsSpeakerCheck
+                      ? RecordSpeakerCheckScreen(
+                          records: widget.controller,
+                          entry: entry,
+                        )
+                      : RecordReviewScreen(
+                          records: widget.controller,
+                          entry: entry,
+                        ),
                 ),
               );
               if (mounted) await widget.controller.refresh();

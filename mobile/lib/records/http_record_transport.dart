@@ -6,36 +6,32 @@ import '../services/backend_service.dart';
 import 'api_record_service.dart';
 import 'record_models.dart';
 
-/// Where and how one original file is sent. Supplied by the app once the
-/// upload protocol is agreed (direct Storage upload or through the backend);
-/// nothing here guesses a URL, bucket path or header.
-class RecordUploadTarget {
-  const RecordUploadTarget({
-    required this.url,
-    this.method = 'PUT',
-    this.headers = const {},
-  });
-  final Uri url;
-  final String method;
-  final Map<String, String> headers;
-}
+export 'record_models.dart' show RecordUploadTarget;
 
-/// Streams the picked file to an agreed [RecordUploadTarget] with real
-/// progress and cancellation.
+/// Streams the picked file to a [RecordUploadTarget] with real progress and
+/// cancellation. By default the target is the signed upload information of
+/// the record's latest reservation (`upload.uploadTarget`).
 ///
-/// Reconciling an ambiguous earlier attempt and refusing to overwrite an
-/// existing original stay the responsibility of the agreed protocol:
-/// [alreadyStored] lets the app confirm a previous transfer, and the target
-/// headers must make the server reject an overwrite.
+/// No `Authorization` header is added: the signed URL authorizes the request.
+/// Reconciling an ambiguous earlier attempt stays with the caller, which asks
+/// `/uploaded` before sending again; [alreadyStored] is an optional extra
+/// check.
 class HttpRecordFileTransport extends RecordFileTransport {
   HttpRecordFileTransport({
     required this.client,
-    required this.resolveTarget,
+    this.resolveTarget = reservedTarget,
     this.alreadyStored,
     this.timeout = const Duration(minutes: 10),
   });
   final http.Client client;
   final Future<RecordUploadTarget> Function(RecordUpload upload) resolveTarget;
+
+  /// The signed upload information from the latest reservation.
+  static Future<RecordUploadTarget> reservedTarget(RecordUpload upload) async {
+    final target = upload.uploadTarget;
+    if (target == null) throw StateError('No signed upload target');
+    return target;
+  }
 
   /// Returns true when the original of [upload] is already stored completely.
   final Future<bool> Function(RecordUpload upload)? alreadyStored;
@@ -130,7 +126,8 @@ class HttpRecordFileTransport extends RecordFileTransport {
       final response = await client.send(request);
       final result = await http.Response.fromStream(response);
       if (result.statusCode < 200 || result.statusCode >= 300) {
-        throw BackendFailure.fromResponse(statusCode: result.statusCode);
+        // Not a backend envelope: a Storage 401/403 must not sign the user out.
+        throw RecordStorageRejected(result.statusCode);
       }
     }
 

@@ -712,7 +712,7 @@ void main() {
       expect(upload.progress, 1.0);
     });
 
-    test('maps a rejected upload to a typed failure', () async {
+    test('maps a rejected upload to a Storage rejection', () async {
       final client = MockClient.streaming((request, stream) async {
         await stream.drain<void>();
         return http.StreamedResponse(const Stream.empty(), 403);
@@ -729,11 +729,12 @@ void main() {
             ]),
           ),
         ),
+        // Not a backend failure, so it cannot end the session.
         throwsA(
-          isA<BackendFailure>().having(
-            (f) => f.kind,
-            'kind',
-            BackendFailureKind.forbidden,
+          isA<RecordStorageRejected>().having(
+            (f) => f.statusCode,
+            'statusCode',
+            403,
           ),
         ),
       );
@@ -1002,6 +1003,15 @@ void main() {
       expect(on['target_speaker'], '엄마');
       expect(on['provider_speaker'], '나');
       expect(on.containsKey('user_id'), isFalse);
+      // The contract now carries the speaker fields, so they are sent by
+      // default.
+      expect(
+        const RecordPolicy(
+          maxBytes: 1,
+          consentVersion: 'test',
+        ).sendSpeakerSelection,
+        isTrue,
+      );
     });
   });
 }

@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'record_models.dart';
 
 class ChatSpeaker {
-  const ChatSpeaker(this.name, this.messages);
+  const ChatSpeaker(this.name, [this.messages]);
   final String name;
-  final int messages;
+
+  /// Messages counted on the device; null for names the server listed.
+  final int? messages;
 }
 
 /// Result of inspecting a `.txt` file on the device (SC-04 items 2–4).
@@ -20,13 +22,38 @@ class TextAnalysis {
     this.messages = 0,
   });
   static const plain = TextAnalysis(kakao: false);
+
+  /// The speakers the server found in the uploaded file (`error.speakers`),
+  /// most messages first. The server's judgment is final, so it replaces what
+  /// the device found. An empty list means the server did not see a chat.
+  factory TextAnalysis.fromServer(List<String> names) => names.isEmpty
+      ? plain
+      : TextAnalysis(
+          kakao: true,
+          speakers: [for (final name in names) ChatSpeaker(name)],
+        );
   final bool kakao;
   final List<ChatSpeaker> speakers;
   final int messages;
 
-  /// Picking whose speech to learn and who provided the file needs two people.
-  bool get needsSpeakerSelection => kakao && speakers.length >= 2;
+  /// Every chat export asks whose speech to learn, even with one speaker:
+  /// the file alone cannot tell whether that person is the provider or the
+  /// conversation partner, so the user confirms it by picking them.
+  bool get needsSpeakerSelection => kakao && speakers.isNotEmpty;
+
+  /// Naming who provided the file needs a second person in it. A file with
+  /// one speaker leaves the provider out rather than guessing one.
+  bool get needsProviderSelection => kakao && speakers.length >= 2;
+
+  bool get singleSpeaker => kakao && speakers.length == 1;
   String get label => kakao ? '카카오톡 대화로 인식됨' : '일반 텍스트';
+}
+
+/// The text is not valid UTF-8. The server reads text as UTF-8 (a BOM is
+/// allowed) and refuses a file with even one broken byte, so the app does not
+/// upload it.
+class TextNotUtf8 implements Exception {
+  const TextNotUtf8();
 }
 
 // Android / PC export: `[이름] [오후 3:12] 내용`
@@ -37,15 +64,21 @@ final _dated = RegExp(
   r'(?: [가-힣]요일)? ?(?:(?:오전|오후) )?\d{1,2}:\d{2}(?::\d{2})?, (.+?) : ',
 );
 
-/// Reads the file as a stream; throws if the file cannot be read.
+/// Reads the file as a stream. Throws [TextNotUtf8] for a byte that is not
+/// valid UTF-8 (the same rule the server applies), and the read error itself
+/// when the file cannot be read.
 Future<TextAnalysis> analyzeTextRecord(RecordFile file) async {
   if (file.kind != RecordKind.text) return TextAnalysis.plain;
   final counts = <String, int>{};
   var total = 0;
   var first = true;
-  final lines = const Utf8Decoder(allowMalformed: true)
+  final lines = const Utf8Decoder()
       .bind(file.openRead())
-      .transform(const LineSplitter());
+      .transform(const LineSplitter())
+      .handleError(
+        (Object _) => throw const TextNotUtf8(),
+        test: (error) => error is FormatException,
+      );
   await for (var line in lines) {
     if (first) {
       first = false;
@@ -61,7 +94,7 @@ Future<TextAnalysis> analyzeTextRecord(RecordFile file) async {
   if (total < 2) return TextAnalysis.plain;
   final speakers = [
     for (final entry in counts.entries) ChatSpeaker(entry.key, entry.value),
-  ]..sort((a, b) => b.messages.compareTo(a.messages));
+  ]..sort((a, b) => b.messages!.compareTo(a.messages!));
   return TextAnalysis(kakao: true, speakers: speakers, messages: total);
 }
 

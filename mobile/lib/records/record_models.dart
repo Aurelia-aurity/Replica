@@ -60,8 +60,16 @@ class RecordEntry {
   /// Saved successfully according to the current UI completion rule.
   bool get confirmed => personalization == ReviewProfileState.reflected;
 
+  /// `/uploaded` refused the speakers (`error_code: speaker_*`) and the record
+  /// waits in `uploading` for the user to choose them. Not in progress: it
+  /// does not move until the user opens it.
+  bool get needsSpeakerCheck =>
+      status == RecordStatus.uploading &&
+      (errorCode?.startsWith('speaker_') ?? false);
+
   bool get inProgress =>
       !confirmed &&
+      !needsSpeakerCheck &&
       (status == RecordStatus.uploading ||
           status == RecordStatus.uploaded ||
           status == RecordStatus.processing ||
@@ -101,7 +109,12 @@ class RecordEntry {
   );
 
   String get statusLabel => switch (status) {
-    RecordStatus.uploading => kind == RecordKind.audio ? '전사 중' : '반영 중',
+    RecordStatus.uploading =>
+      needsSpeakerCheck
+          ? '확인 필요'
+          : kind == RecordKind.audio
+          ? '전사 중'
+          : '반영 중',
     RecordStatus.uploaded || RecordStatus.processing =>
       confirmed
           ? '반영됨'
@@ -149,13 +162,14 @@ class RecordPolicy {
   const RecordPolicy({
     required this.maxBytes,
     required this.consentVersion,
-    this.sendSpeakerSelection = false,
+    this.sendSpeakerSelection = true,
   });
   final int maxBytes;
   final String consentVersion;
 
-  /// The draft reservation has no speaker fields. Enable only after the app and
-  /// backend agree on them; until then the selection stays on the device.
+  /// Sends `target_speaker` (and `provider_speaker` when the chat has two or
+  /// more speakers) with the reservation, as the app-backend contract
+  /// specifies. Turn it off to keep the selection on the device only.
   final bool sendSpeakerSelection;
   String? validate(RecordFile file) {
     if (!const ['txt', 'wav', 'mp3', 'm4a'].contains(file.extension)) {
@@ -173,6 +187,61 @@ class RecordPolicy {
 }
 
 enum UploadStage { reserve, transfer, complete, done }
+
+/// Where and how one original file is sent: the signed upload information
+/// `POST /records` returns as `upload`. The app adds no URL, bucket path or
+/// authorization header of its own.
+class RecordUploadTarget {
+  const RecordUploadTarget({
+    required this.url,
+    this.method = 'PUT',
+    this.headers = const {},
+    this.expiresAt,
+  });
+
+  /// Reads the reservation's `upload` object; throws [FormatException] when a
+  /// field is missing or has the wrong type.
+  factory RecordUploadTarget.fromJson(Object? json) {
+    if (json is! Map) throw const FormatException('upload is not an object');
+    final url = json['url'];
+    final method = json['method'];
+    final headers = json['headers'] ?? const <String, Object?>{};
+    final expiresAt = json['expires_at'];
+    final parsed = url is String ? Uri.tryParse(url) : null;
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+      throw const FormatException('upload.url is not an absolute URL');
+    }
+    if (method is! String || method.isEmpty) {
+      throw const FormatException('upload.method is missing');
+    }
+    if (headers is! Map ||
+        headers.entries.any((e) => e.key is! String || e.value is! String)) {
+      throw const FormatException('upload.headers is not a string map');
+    }
+    if (expiresAt is! String) {
+      throw const FormatException('upload.expires_at is missing');
+    }
+    return RecordUploadTarget(
+      url: parsed,
+      method: method.toUpperCase(),
+      headers: Map.unmodifiable(headers.cast<String, String>()),
+      expiresAt: DateTime.parse(expiresAt),
+    );
+  }
+
+  final Uri url;
+  final String method;
+  final Map<String, String> headers;
+
+  /// After this the signature no longer works and the record is reserved
+  /// again with the same ID for a new one.
+  final DateTime? expiresAt;
+
+  bool expiredAt(DateTime now, {Duration margin = Duration.zero}) {
+    final end = expiresAt;
+    return end != null && !now.add(margin).isBefore(end);
+  }
+}
 
 /// Raised inside an upload when the user cancelled it.
 class UploadCancelled implements Exception {
@@ -205,11 +274,44 @@ class RecordUpload {
   final DateTime consentAt;
   final String consentVersion;
 
-  /// Chosen on SC-04 for KakaoTalk exports. Names stay in memory only.
-  final String? targetSpeaker;
-  final String? providerSpeaker;
+  /// A new record (new ID) for the same file, consent and speaker choice,
+  /// for when the stored original cannot be fixed under this record.
+  RecordUpload restart() => RecordUpload(
+    file: file,
+    consentAt: consentAt,
+    consentVersion: consentVersion,
+    targetSpeaker: targetSpeaker,
+    providerSpeaker: providerSpeaker,
+  );
+
+  /// Chosen on SC-04 for KakaoTalk exports. Names stay in memory only. They
+  /// change when the server asks to choose again after the upload.
+  String? targetSpeaker;
+  String? providerSpeaker;
+
+  /// The speakers were chosen again after the server refused them, so the
+  /// next `/uploaded` carries them (an explicit null clears a value).
+  bool speakersChanged = false;
+
+  /// Body of `POST /records/{id}/uploaded`. Leaving the keys out keeps the
+  /// reserved values.
+  Map<String, Object?> uploadedJson({bool includeSpeakers = false}) =>
+      includeSpeakers && speakersChanged
+      ? {'target_speaker': targetSpeaker, 'provider_speaker': providerSpeaker}
+      : const {};
   UploadStage stage = UploadStage.reserve;
   bool reservationRequested = false;
+
+  /// Signed upload information from the latest reservation, if it gave one.
+  RecordUploadTarget? uploadTarget;
+
+  /// The latest reservation answered `upload: null`: the original is already
+  /// in Storage, so it is not sent again.
+  bool originalStored = false;
+
+  /// A transfer was started, so the original may already be stored. The next
+  /// attempt asks `/uploaded` first instead of sending the file again.
+  bool transferStarted = false;
   final cancelToken = UploadCancelToken();
 
   /// Bytes handed to the transport for the current transfer attempt.

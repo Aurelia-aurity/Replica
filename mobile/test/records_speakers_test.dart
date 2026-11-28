@@ -35,6 +35,10 @@ const _ios = '''2025. 9. 20. 오후 3:12, 엄마 : 밥은 먹었니?
 2025-09-20 15:15, 나 : 곧 갈게
 ''';
 
+const _solo = '''[엄마] [오후 3:12] 밥은 먹었니?
+[엄마] [오후 3:13] 조심히 와
+''';
+
 void main() {
   group('analyzeTextRecord', () {
     test(
@@ -62,17 +66,39 @@ void main() {
       );
     });
 
-    test('tolerates a byte order mark and malformed bytes', () async {
+    test('accepts a byte order mark and rejects broken bytes', () async {
       final bom = await analyzeTextRecord(
         _text('﻿[엄마] [오후 3:12] 안녕\n[나] [오후 3:13] 응'),
       );
       expect(bom.speakers.length, 2);
-      final broken = RecordFile(
+      RecordFile bytes(List<int> data) => RecordFile(
         name: 'x.txt',
-        sizeBytes: 5,
-        openRead: () => Stream.value([0xff, 0xfe, 0x41, 0x0a, 0xff]),
+        sizeBytes: data.length,
+        openRead: () => Stream.value(data),
       );
-      expect((await analyzeTextRecord(broken)).kakao, isFalse);
+      // Broken bytes, as the server would refuse them.
+      for (final data in [
+        [0xff, 0xfe, 0x41, 0x0a, 0xff],
+        // '안녕' saved as CP949 (EUC-KR) instead of UTF-8.
+        [0xbe, 0xc8, 0xb3, 0xe7],
+        // A file cut in the middle of a character.
+        [...utf8.encode('[엄마] [오후 3:12] 안'), 0xeb, 0x85],
+      ]) {
+        await expectLater(
+          analyzeTextRecord(bytes(data)),
+          throwsA(isA<TextNotUtf8>()),
+          reason: '$data',
+        );
+      }
+      // A character split across two chunks is still read.
+      final split = utf8.encode('[엄마] [오후 3:12] 안녕\n[나] [오후 3:13] 응');
+      final chunked = RecordFile(
+        name: 'x.txt',
+        sizeBytes: split.length,
+        openRead: () =>
+            Stream.fromIterable([split.sublist(0, 20), split.sublist(20)]),
+      );
+      expect((await analyzeTextRecord(chunked)).speakers.length, 2);
     });
 
     test('plain text, one stray timestamp and audio are not chats', () async {
@@ -93,12 +119,16 @@ void main() {
       expect(TextAnalysis.plain.label, '일반 텍스트');
     });
 
-    test('a one-person chat needs no speaker selection', () async {
-      final solo = await analyzeTextRecord(
-        _text('[나] [오후 3:12] 메모\n[나] [오후 3:13] 또 메모'),
-      );
+    test('a one-person chat asks for the speaker but no provider', () async {
+      final solo = await analyzeTextRecord(_text(_solo));
       expect(solo.kakao, isTrue);
-      expect(solo.needsSpeakerSelection, isFalse);
+      expect(solo.singleSpeaker, isTrue);
+      expect(solo.needsSpeakerSelection, isTrue);
+      expect(solo.needsProviderSelection, isFalse);
+      final pair = await analyzeTextRecord(_text(_android));
+      expect(pair.singleSpeaker, isFalse);
+      expect(pair.needsProviderSelection, isTrue);
+      expect(TextAnalysis.plain.needsSpeakerSelection, isFalse);
     });
 
     test('thousands are grouped', () {
@@ -131,7 +161,7 @@ void main() {
       final upload = controller.attempt!;
       expect(upload.targetSpeaker, '엄마');
       expect(upload.providerSpeaker, '나');
-      // Never part of the draft reservation unless the contract adds them.
+      // Only included when the policy asks for them.
       expect(
         upload.reservationJson('persona').containsKey('target_speaker'),
         isFalse,
@@ -145,6 +175,72 @@ void main() {
       );
     });
 
+    test(
+      'a one-speaker chat waits for the user to confirm that speaker',
+      () async {
+        final controller = RecordController(PreviewRecordService());
+        addTearDown(controller.dispose);
+        controller.select(_text(_solo));
+        controller.setConsent(true);
+        await pumpEventQueue();
+        expect(controller.singleSpeaker, isTrue);
+        expect(controller.needsProvider, isFalse);
+        // Never confirmed on the user's behalf.
+        expect(controller.targetSpeaker, isNull);
+        expect(controller.canUpload, isFalse);
+        // There is nobody else to name as the provider.
+        controller.selectProvider('엄마');
+        expect(controller.providerSpeaker, isNull);
+        controller.selectTarget('엄마');
+        expect(controller.canUpload, isTrue);
+        // Picking the only speaker again keeps the confirmation.
+        controller.selectTarget('엄마');
+        expect(controller.targetSpeaker, '엄마');
+        await controller.send();
+        expect(controller.uploadSucceeded, isTrue);
+        final upload = controller.attempt!;
+        expect(upload.targetSpeaker, '엄마');
+        expect(upload.providerSpeaker, isNull);
+        final body = upload.reservationJson('persona', includeSpeakers: true);
+        expect(body['target_speaker'], '엄마');
+        expect(body.containsKey('provider_speaker'), isFalse);
+      },
+    );
+
+    test(
+      'consent alone does not upload an unconfirmed one-speaker chat',
+      () async {
+        final controller = RecordController(PreviewRecordService());
+        addTearDown(controller.dispose);
+        controller.select(_text(_solo));
+        controller.setConsent(true);
+        await controller.send();
+        expect(controller.uploadSucceeded, isFalse);
+        expect(controller.attempt, isNull);
+      },
+    );
+
+    test('changing from a one-speaker chat clears the confirmation', () async {
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      controller.select(_text(_solo));
+      await pumpEventQueue();
+      controller.selectTarget('엄마');
+      controller.select(_text(_android, name: 'pair.txt'));
+      expect(controller.targetSpeaker, isNull);
+      await pumpEventQueue();
+      expect(controller.singleSpeaker, isFalse);
+      expect(controller.needsProvider, isTrue);
+      controller.setConsent(true);
+      controller.selectTarget('엄마');
+      expect(controller.canUpload, isFalse);
+      // In a multi-speaker chat picking again keeps the choice.
+      controller.selectTarget('엄마');
+      expect(controller.targetSpeaker, '엄마');
+      controller.selectProvider('나');
+      expect(controller.canUpload, isTrue);
+    });
+
     test('plain text uploads without a speaker step', () async {
       final controller = RecordController(PreviewRecordService());
       addTearDown(controller.dispose);
@@ -155,7 +251,7 @@ void main() {
       expect(controller.attempt!.targetSpeaker, isNull);
     });
 
-    test('a file that cannot be read still uploads as a whole file', () async {
+    test('a file that cannot be read is not uploaded', () async {
       final controller = RecordController(
         PreviewRecordService(),
         analyze: (_) async => throw StateError('unreadable'),
@@ -164,8 +260,36 @@ void main() {
       controller.select(_text('내용'));
       controller.setConsent(true);
       await controller.send();
-      expect(controller.analysisError, isNotNull);
-      expect(controller.uploadSucceeded, isTrue);
+      expect(controller.analysisError, contains('파일을 읽지 못했어요'));
+      expect(controller.textUnreadable, isTrue);
+      expect(controller.canUpload, isFalse);
+      expect(controller.attempt, isNull);
+      expect(controller.uploadSucceeded, isFalse);
+    });
+
+    test('text that is not UTF-8 is stopped before the upload', () async {
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      final cp949 = [0xbe, 0xc8, 0xb3, 0xe7];
+      controller.select(
+        RecordFile(
+          name: 'diary.txt',
+          sizeBytes: cp949.length,
+          openRead: () => Stream.value(cp949),
+        ),
+      );
+      controller.setConsent(true);
+      await controller.send();
+      expect(controller.analysisError, contains('UTF-8'));
+      expect(controller.canUpload, isFalse);
+      // No reservation was made.
+      expect(controller.attempt, isNull);
+      // Another file starts clean.
+      controller.select(_text('오늘의 일기', name: 'ok.txt'));
+      await pumpEventQueue();
+      expect(controller.analysisError, isNull);
+      controller.setConsent(true);
+      expect(controller.canUpload, isTrue);
     });
 
     test(
@@ -223,6 +347,48 @@ void main() {
     );
   });
 
+  testWidgets('SC-04 explains a text that is not UTF-8 and blocks it', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 2000);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final controller = RecordController(PreviewRecordService());
+    addTearDown(controller.dispose);
+    final broken = [0xff, 0xfe, 0x41];
+    controller.select(
+      RecordFile(
+        name: 'broken.txt',
+        sizeBytes: broken.length,
+        openRead: () => Stream.value(broken),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RecordUploadScreen(
+          controller: controller,
+          picker: () async => null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('record-text-unreadable')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('UTF-8로 저장된 텍스트 파일만'), findsOneWidget);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('record-upload')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('SC-04 shows speakers, counts and blocks the same person', (
     tester,
   ) async {
@@ -273,4 +439,56 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'SC-04 asks to confirm a lone speaker and locks the provider choice',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 2000);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final controller = RecordController(PreviewRecordService());
+      addTearDown(controller.dispose);
+      controller.select(_text(_solo));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RecordUploadScreen(
+            controller: controller,
+            picker: () async => null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      FilledButton upload() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('record-upload')),
+      );
+      expect(find.text('누구의 말투를 반영할까요?'), findsOneWidget);
+      expect(find.text('이 기록을 제공한 사람은 누구인가요?'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('speaker-single-notice')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('대화 상대일 때만 선택해 주세요'), findsOneWidget);
+      expect(find.textContaining('제공자는 고르지 않아요'), findsNothing);
+      // The choice is sent, so the "not sent" notice is gone.
+      expect(find.textContaining('전송하지 않아요'), findsNothing);
+      expect(find.text('메시지 2개'), findsNWidgets(2));
+      // The provider area stays visible but cannot be used.
+      expect(
+        tester
+            .widget<InkWell>(find.byKey(const ValueKey('speaker-provider-엄마')))
+            .onTap,
+        isNull,
+      );
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      // Consent alone is not the speaker confirmation.
+      expect(upload().onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('speaker-target-엄마')));
+      await tester.pump();
+      expect(controller.targetSpeaker, '엄마');
+      expect(upload().onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

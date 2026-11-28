@@ -4,6 +4,7 @@ import '../shared/conversation_widgets.dart';
 import 'record_controller.dart';
 import 'record_models.dart';
 import 'record_picker.dart';
+import 'speaker_choice.dart';
 import 'text_analysis.dart';
 
 class RecordUploadScreen extends StatefulWidget {
@@ -221,7 +222,14 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                     if (c.analysisError != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
-                        child: Text(c.analysisError!, style: _muted),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            c.analysisError!,
+                            key: const ValueKey('record-text-unreadable'),
+                            style: const TextStyle(color: Color(0xFFB3261E)),
+                          ),
+                        ),
                       ),
                     if (_kind == RecordKind.text) ...[
                       if (c.needsSpeakers) ..._speakerSections(c, analysis!),
@@ -340,6 +348,8 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
                               ? '기록 목록 보기'
                               : busy
                               ? (_kind == RecordKind.text ? '반영 중' : '전사 중')
+                              : c.speakerRecovery
+                              ? '선택한 화자로 이어서 올리기'
                               : c.uploadError != null
                               ? '다시 시도'
                               : '올리기',
@@ -407,126 +417,16 @@ class _RecordUploadScreenState extends State<RecordUploadScreen> {
     ];
   }
 
-  List<Widget> _speakerSections(RecordController c, TextAnalysis analysis) {
-    final locked = c.uploading || c.attempt != null;
-    Widget group({
-      required String title,
-      required String keyPrefix,
-      required String? selected,
-      required String? blocked,
-      required void Function(String) onSelect,
-    }) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF4C5C54),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: _card(),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (var i = 0; i < analysis.speakers.length; i++) ...[
-                if (i > 0) const Divider(height: 1, color: replicaBorder),
-                _speakerTile(
-                  key: ValueKey('$keyPrefix-${analysis.speakers[i].name}'),
-                  speaker: analysis.speakers[i],
-                  selected: selected == analysis.speakers[i].name,
-                  enabled: !locked && blocked != analysis.speakers[i].name,
-                  onTap: () => onSelect(analysis.speakers[i].name),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-    return [
-      const SizedBox(height: 24),
-      group(
-        title: '누구의 말투를 반영할까요?',
-        keyPrefix: 'speaker-target',
-        selected: c.targetSpeaker,
-        blocked: c.providerSpeaker,
-        onSelect: c.selectTarget,
-      ),
-      const SizedBox(height: 10),
-      const Text(
-        '고르지 않은 사람의 메시지는 문맥으로만 쓰고, 다른 사람의 개인 정보는 저장 전에 가려요.',
-        style: _muted,
-      ),
-      const SizedBox(height: 24),
-      group(
-        title: '이 기록을 제공한 사람은 누구인가요?',
-        keyPrefix: 'speaker-provider',
-        selected: c.providerSpeaker,
-        blocked: c.targetSpeaker,
-        onSelect: c.selectProvider,
-      ),
-      const SizedBox(height: 10),
-      Text(
-        c.service.policy.sendSpeakerSelection
-            ? '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 제공자는 본인 동의 확인에 함께 저장돼요.'
-            : '말투를 반영할 사람과 제공한 사람은 서로 달라야 해요. 화자 목록은 이 기기에서만 확인하며, 선택 내용을 서버에 전달하는 방식은 아직 합의 전이라 이번에는 전송하지 않아요.',
-        style: _muted,
-      ),
-    ];
-  }
-
-  Widget _speakerTile({
-    required Key key,
-    required ChatSpeaker speaker,
-    required bool selected,
-    required bool enabled,
-    required VoidCallback onTap,
-  }) => Semantics(
-    inMutuallyExclusiveGroup: true,
-    checked: selected,
-    enabled: enabled,
-    child: InkWell(
-      key: key,
-      onTap: enabled ? onTap : null,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 52),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-                color: !enabled && !selected
-                    ? const Color(0xFFB9C2BD)
-                    : replicaGreen,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  speaker.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: enabled || selected
-                        ? const Color(0xFF17201C)
-                        : const Color(0xFF9AA5A0),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text('메시지 ${formatCount(speaker.messages)}개', style: _muted),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
+  List<Widget> _speakerSections(RecordController c, TextAnalysis analysis) =>
+      speakerChoiceSections(
+        speakers: analysis.speakers,
+        target: c.targetSpeaker,
+        provider: c.providerSpeaker,
+        locked: c.uploading || (c.attempt != null && !c.speakerRecovery),
+        sendSelection: c.service.policy.sendSpeakerSelection,
+        onTarget: c.selectTarget,
+        onProvider: c.selectProvider,
+      );
 
   static const _muted = TextStyle(
     fontSize: 12,
