@@ -49,6 +49,24 @@ class StorageClient(Protocol):
         """파일 앞쪽 `size`바이트(파일이 더 짧으면 전부)."""
 
 
+def _object_missing(status: int, raw: bytes) -> bool:
+    """정보 조회 응답이 '원본 없음'인지. Storage는 없는 객체를 HTTP 404, 또는 바깥 HTTP 400에 본문 `not_found`·`NoSuchKey`
+    (`statusCode` 404)로 알린다. 그 밖의 400(`InvalidRequest` 등)은 원본이 없다는 뜻이 아니므로 없는 것으로 보지 않는다."""
+    if status == 404:
+        return True
+    if status != 400:
+        return False
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return False
+    if not isinstance(body, dict):
+        return False
+    error = str(body.get("error", "")).lower()
+    message = str(body.get("message", "")).lower()
+    return str(body.get("statusCode", "")) == "404" or error in ("not_found", "nosuchkey") or "not found" in message
+
+
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None  # apikey·Authorization을 다른 주소로 넘기지 않는다.
@@ -124,8 +142,8 @@ class SupabaseStorage:
     async def object_size(self, object_path: str) -> int | None:
         path = f"/storage/v1/object/info/{BUCKET}/{self._path(object_path)}"
         status, raw = await asyncio.to_thread(self._call, "GET", path, max_bytes=65536)
-        if status in (400, 404):
-            return None  # Storage는 없는 객체를 404(또는 400 not_found)로 알린다.
+        if _object_missing(status, raw):
+            return None  # 원본 없음이 분명한 응답만 None이다. 그 밖의 400은 아래에서 저장소 장애(StorageUnavailable)가 된다.
         try:
             size = json.loads(raw)["size"]
         except (ValueError, KeyError, TypeError):

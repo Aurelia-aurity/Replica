@@ -66,6 +66,21 @@ class StorageClientTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(StorageUnavailable):
                 run(Recorder(status, payload).object_size(PATH))
 
+    def test_only_a_clear_not_found_400_means_the_original_is_missing(self):
+        missing = (
+            {"statusCode": "404", "error": "not_found", "message": "Object not found"},
+            {"error": "NoSuchKey", "message": "The specified key does not exist."},
+            {"message": "Object not found"},
+        )
+        for payload in missing:
+            with self.subTest(payload=payload):
+                self.assertIsNone(run(Recorder(400, payload).object_size(PATH)))
+        # 원본이 없다는 뜻이 아닌 400은 '없음'이 아니라 저장소 문제다(앱에는 503).
+        for payload in ({"statusCode": "400", "error": "InvalidRequest", "message": "bad"}, {"error": "Forbidden"},
+                        b"not json", [], {}):
+            with self.subTest(payload=payload), self.assertRaises(StorageUnavailable):
+                run(Recorder(400, payload).object_size(PATH))
+
     def test_read_object_is_bounded_and_needs_200(self):
         self.assertEqual(run(Recorder(200, b"abc").read_object(PATH, max_bytes=3)), b"abc")
         with self.assertRaises(StorageUnavailable):

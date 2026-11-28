@@ -15,7 +15,8 @@ from app.core.errors import CONFLICT_MESSAGE, INVALID_INPUT_MESSAGE, AppError
 from app.db.repository import RECORD_MIME_TYPES
 from app.schemas.record import RecordCreate, UploadedBody
 from app.services.audio_signature import HEAD_BYTES, signature_matches
-from app.services.kakao import MAX_SPEAKER_NAME, NoChatMessages, SpeakerNameTooLong, TooManySpeakers, analyze_text
+from app.services.kakao import (
+    MAX_SPEAKER_NAME, BlankText, NoChatMessages, SpeakerNameTooLong, TooManySpeakers, analyze_text)
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +247,7 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
             data = await storage.read_object(path, max_bytes=size)
         except StorageUnavailable:
             raise _storage_down() from None
-        if b"\x00" in data or data.isspace():
+        if b"\x00" in data:
             raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.")
         try:
             # 최대 25MiB를 줄 단위로 훑으므로 이벤트 루프를 막지 않게 스레드에서 돌린다. UTF-8로 읽히지 않으면
@@ -255,6 +256,9 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
         except (UnicodeDecodeError, TooManySpeakers):
             # UTF-8이 아니거나, 서로 다른 화자가 너무 많아(대화 내보내기가 아님) 읽을 수 없는 파일이다.
             raise _invalid(None, "파일 내용을 읽을 수 없어요. 다른 파일을 올려 주세요.") from None
+        except BlankText:
+            # BOM이나 유니코드 공백뿐인 파일도 비어 있는 파일이다. `uploaded`로 넘기지 않는다.
+            raise _invalid(None, "파일에 내용이 없어요. 다른 파일을 올려 주세요.") from None
         except NoChatMessages:
             raise _invalid(None, "대화 내용을 찾을 수 없어요. 파일을 확인해 주세요.") from None
         except SpeakerNameTooLong:
@@ -287,8 +291,9 @@ async def mark_uploaded(user_db: db.UserDatabase, storage: StorageClient, record
         # 같은 호출이 동시에 와서 다른 요청이 먼저 처리했다면(응답 유실 뒤 재호출 등) 현재 기록을 돌려준다.
         current = await user_db.get_record(record_id)
         if current.get("status") in _PROCESSED:
-            # 다른 요청이 다른 화자로 먼저 확정했다면 그 결과를 성공 재시도로 돌려주지 않는다.
-            if _speaker_choice_conflicts(current, body):
+            # 이 요청은 위에서 검증한 최종 화자 쌍(생략한 키는 예약값)으로 저장하려 했다. 그 사이 다른 요청이 다른 쌍으로
+            # 먼저 확정했다면, 본문에 그 키가 없었어도 그 결과를 성공 재시도로 돌려주지 않는다. 같은 쌍이면 200이다.
+            if (current.get("target_speaker"), current.get("provider_speaker")) != (target, provider):
                 raise AppError(409, "CONFLICT", CONFLICT_MESSAGE, retryable=False) from None
             return current
         raise

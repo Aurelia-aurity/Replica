@@ -43,6 +43,10 @@ class NoChatMessages(Exception):
     """내보내기 머리글은 있는데 메시지로 인식한 줄이 하나도 없다. 화자를 알 수 없어 받을 수 없다."""
 
 
+class BlankText(Exception):
+    """BOM을 벗기고 UTF-8로 읽은 내용이 비었거나 공백(유니코드 공백 포함)뿐이다. 바이트 검사로는 걸러지지 않는다."""
+
+
 class TooManySpeakers(Exception):
     """서로 다른 화자가 `MAX_SPEAKERS`를 넘었다. 대화 내보내기로 볼 수 없는 파일이다."""
 
@@ -64,7 +68,10 @@ def analyze_text(data: bytes) -> TextAnalysis:
     # UTF-8이 아니면 UnicodeDecodeError를 그대로 올린다(호출하는 쪽이 "읽을 수 없는 파일"로 처리).
     lines = io.TextIOWrapper(io.BytesIO(data), encoding="utf-8-sig", errors="strict")
     header_title = header_saved = False
+    has_text = False
     for index, line in enumerate(lines):
+        if not has_text and line.strip():  # 공백이 아닌 글자를 하나 만나면 더 검사하지 않는다
+            has_text = True
         if index < _HEADER_LINES:
             header_title = header_title or bool(_HEADER_TITLE.match(line))
             header_saved = header_saved or bool(_HEADER_SAVED.match(line))
@@ -79,6 +86,8 @@ def analyze_text(data: bytes) -> TextAnalysis:
             raise TooManySpeakers()
         counts[name] = counts.get(name, 0) + 1
         total += 1
+    if not has_text:
+        raise BlankText()
     if header_title and header_saved:
         if total == 0:
             raise NoChatMessages()

@@ -602,6 +602,72 @@ def test_repeating_uploaded_with_a_different_speaker_choice_is_409_and_keeps_the
     assert fake_db.upload_updates == []  # 모순 요청은 아무것도 쓰지 않는다
 
 
+def _competitor_confirms(fake_db, record_id, **pair):
+    """검증을 마친 이쪽 요청이 저장하기 직전에, 다른 요청이 먼저 `pair`로 확정해 두는 상황을 만든다."""
+    original = fake_db.update_record_upload
+
+    async def competitor_first(rid, **kwargs):
+        row = fake_db.records[record_id]
+        row.update(status="uploaded", **pair)
+        fake_db._touch(row)
+        return await original(rid, **kwargs)  # 이쪽은 상태가 바뀌어 충돌
+
+    fake_db.update_record_upload = competitor_first
+
+
+def test_a_conflict_after_validating_a_reserved_pair_is_409_when_the_other_request_confirmed_another_pair(
+        client, fake_db, storage, persona):
+    """본문에 `target_speaker`만 보냈어도 검증한 최종 쌍은 엄마/나다. 경쟁 요청이 엄마/다른사람으로 확정했다면 409(PM 검토)."""
+    record_id = reserved(client, persona, size_bytes=len(KAKAO), target_speaker="엄마", provider_speaker="나")
+    put_file(storage, fake_db, record_id, KAKAO)
+    _competitor_confirms(fake_db, record_id, provider_speaker="다른사람")
+    res = client.post(f"/records/{record_id}/uploaded", json={"target_speaker": "엄마"})
+    assert res.status_code == 409 and error(res)["code"] == "CONFLICT"
+    stored = fake_db.records[record_id]
+    assert (stored["status"], stored["target_speaker"], stored["provider_speaker"]) == ("uploaded", "엄마", "다른사람")
+
+
+def test_a_conflict_without_a_body_is_409_when_the_other_request_confirmed_another_pair(
+        client, fake_db, storage, persona):
+    record_id = reserved(client, persona, size_bytes=len(KAKAO), target_speaker="엄마", provider_speaker="나")
+    put_file(storage, fake_db, record_id, KAKAO)
+    _competitor_confirms(fake_db, record_id, provider_speaker="다른사람")
+    res = client.post(f"/records/{record_id}/uploaded")  # 예약값 엄마/나를 검증했다
+    assert res.status_code == 409 and error(res)["code"] == "CONFLICT"
+
+
+@pytest.mark.parametrize("payload", [None, {"target_speaker": "엄마"}, {"target_speaker": "엄마", "provider_speaker": "나"}])
+def test_a_conflict_is_still_200_when_the_other_request_confirmed_the_same_pair(
+        client, fake_db, storage, persona, payload):
+    record_id = reserved(client, persona, size_bytes=len(KAKAO), target_speaker="엄마", provider_speaker="나")
+    put_file(storage, fake_db, record_id, KAKAO)
+    _competitor_confirms(fake_db, record_id, target_speaker="엄마", provider_speaker="나")
+    res = client.post(f"/records/{record_id}/uploaded") if payload is None else client.post(
+        f"/records/{record_id}/uploaded", json=payload)
+    assert res.status_code == 200 and (res.json()["target_speaker"], res.json()["provider_speaker"]) == ("엄마", "나")
+
+
+@pytest.mark.parametrize("label, data", [
+    ("BOM만", b"\xef\xbb\xbf"),
+    ("BOM과 공백", b"\xef\xbb\xbf   \n"),
+    ("U+3000 공백", "\u3000\u3000".encode()),
+    ("U+00A0 공백", "\u00a0".encode()),
+])
+def test_text_that_is_blank_after_decoding_is_422_and_stays_uploading(client, fake_db, storage, persona, label, data):
+    record_id = reserved(client, persona, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    res = client.post(f"/records/{record_id}/uploaded")
+    assert res.status_code == 422 and error(res)["code"] == "INVALID_INPUT" and error(res)["field"] is None
+    assert fake_db.records[record_id]["status"] == "uploading"
+
+
+def test_a_bom_followed_by_real_text_is_still_accepted(client, fake_db, storage, persona):
+    data = b"\xef\xbb\xbf" + PLAIN
+    record_id = reserved(client, persona, size_bytes=len(data))
+    put_file(storage, fake_db, record_id, data)
+    assert client.post(f"/records/{record_id}/uploaded").status_code == 200
+
+
 def test_a_conflict_that_is_not_a_finished_record_stays_409(client, fake_db, storage, persona):
     record_id = reserved(client, persona, size_bytes=len(PLAIN))
     put_file(storage, fake_db, record_id, PLAIN)

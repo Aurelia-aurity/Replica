@@ -3,7 +3,8 @@
 import pytest
 
 from app.services.kakao import (
-    MAX_SPEAKER_NAME, MAX_SPEAKERS, PLAIN, NoChatMessages, SpeakerNameTooLong, TooManySpeakers, analyze_text)
+    MAX_SPEAKER_NAME, MAX_SPEAKERS, PLAIN, BlankText, NoChatMessages, SpeakerNameTooLong, TooManySpeakers,
+    analyze_text)
 
 ANDROID = "[엄마] [오후 3:12] 밥 먹었니\n[나] [오후 3:13] 응\n[엄마] [오후 3:14] 다행이다\n".encode()
 DATED = (
@@ -105,6 +106,18 @@ def test_a_single_message_without_the_full_header_is_still_plain_text():
     assert analyze_text(("일기\n저장한 날짜 : 오늘\n2023년 2월 28일 오후 7:51, 엄마 : 안녕\n").encode()) == PLAIN  # 제목 줄이 없음
     late = ("\n" * 5 + PC_HEADER + "2023년 2월 28일 오후 7:51, 엄마 : 안녕\n").encode()  # 앞쪽 5줄 밖의 머리글은 보지 않음
     assert analyze_text(late) == PLAIN
+
+
+@pytest.mark.parametrize("data", [
+    b"", b"\xef\xbb\xbf", b"\xef\xbb\xbf   \n", "\u3000\u3000".encode(), "\u00a0".encode(), b" \t\r\n",
+])
+def test_text_that_is_blank_after_decoding_is_refused_not_treated_as_plain(data):
+    with pytest.raises(BlankText):
+        analyze_text(data)
+
+
+def test_text_with_any_visible_character_is_not_blank():
+    assert analyze_text(b"\xef\xbb\xbf\n  x  \n") is PLAIN
 
 
 def test_a_single_stray_timestamp_is_not_a_chat_export():
