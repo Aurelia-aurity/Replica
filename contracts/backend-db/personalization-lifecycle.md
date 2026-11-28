@@ -104,6 +104,8 @@ node infra/supabase/tests/verify_personalization_lifecycle.mjs .cache/db-check/n
 
 `await Database(...).for_user(access_token)`으로 얻은 `UserDatabase`에서 SQL 이름과 같은 비동기 메서드를 호출한다. `p_user_id`는 전달하지 않는다. 메서드의 정확한 인자·기본값은 [Python 함수 표](api-spec.md#개인화-python-함수-121)에 있으며, SQL의 `p_ms`는 Python에서 `elapsed_ms`다.
 
+Python 호출에서는 `units[].date`에 `datetime.date` 또는 `YYYY-MM-DD` 문자열을, `ranges[].unit_id`·`chunks[].id`·`chunks[].coverage[].unit_id`에 `UUID` 객체 또는 UUID 문자열을 보낼 수 있다. Python 함수가 객체를 SQL에 전달할 JSON 문자열로 변환한다.
+
 ```python
 snapshot = await user.capture_personalization_snapshot(
     persona_id, snapshot_id=uuid4(), masking_policy_version="synthetic-v1")

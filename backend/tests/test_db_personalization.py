@@ -1,8 +1,9 @@
 """Check the new public Python entry points against actual SQL argument names."""
 import re
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from uuid import UUID
 
 from app.db import Database, ValidationError
 from app.db.transport import Response
@@ -68,6 +69,30 @@ class PersonalizationRepositoryTests(unittest.IsolatedAsyncioTestCase):
                     units=[{"start": 0, "end": 1, "speaker": "synthetic"}], speakers={})
             self.assertEqual(caught.exception.code, code)
             self.assertNotIn("private source", str(caught.exception))
+
+    async def test_nested_identifiers_and_dates_are_serialized(self):
+        day = date(2026, 11, 24)
+        unit_id = UUID(R)
+        ranges = [{"unit_id": unit_id, "start": 0, "end": 4}]
+        serialized_ranges = [{"unit_id": R, "start": 0, "end": 4}]
+        await self.user.confirm_record_text_v2(V, source_format="plain", units=[
+            {"start": 0, "end": 4, "date": day},
+        ], speakers={})
+        self.assertEqual(self.transport.calls[-1]["body"]["p_units"], [
+            {"start": 0, "end": 4, "date": day.isoformat()},
+        ])
+        await self.user.start_profile_analysis_node(V, attempt=1, node_id=T, request_id=P,
+            kind="analyze", ranges=ranges, children=[])
+        self.assertEqual(self.transport.calls[-1]["body"]["p_ranges"], serialized_ranges)
+
+        self.transport.responses[("POST", "/rest/v1/rpc/append_record_index_chunks")] = [Response(200, 1)]
+        await self.user.append_record_index_chunks(V, chunks=[
+            {"id": UUID(T), "chunk_no": 0, "content": "text", "coverage": ranges, "embedding": [1, 0]},
+        ])
+        (chunk,) = self.transport.calls[-1]["body"]["p_chunks"]
+        self.assertEqual(chunk["id"], T)
+        self.assertEqual(chunk["coverage"], serialized_ranges)
+        self.assertIs(ranges[0]["unit_id"], unit_id)
 
     async def test_nonfinite_json_and_invalid_vector_are_rejected_before_writes(self):
         with self.assertRaises(ValidationError):

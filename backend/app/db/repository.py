@@ -7,7 +7,7 @@ import math
 import re
 import struct
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal, Mapping, Sequence
 from uuid import UUID, uuid4
 
@@ -83,12 +83,28 @@ def _rows(data: Any) -> list[Row]:
     return data
 
 
+def _json_argument_value(value: Any) -> Any:
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return _time(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return dict(value)
+    raise TypeError("Expected a JSON value")
+
+
 def _json_argument(value: Any, container: type) -> Any:
     expected = Mapping if container is dict else Sequence
     if not isinstance(value, expected) or isinstance(value, (str, bytes, bytearray)):
         raise ValidationError()
     try:
-        copied = json.loads(json.dumps(dict(value) if container is dict else list(value), allow_nan=False, default=dict))
+        copied = json.loads(json.dumps(
+            dict(value) if container is dict else list(value),
+            allow_nan=False,
+            default=_json_argument_value,
+        ))
     except (TypeError, ValueError, OverflowError, RecursionError):
         raise ValidationError() from None
     return copied
