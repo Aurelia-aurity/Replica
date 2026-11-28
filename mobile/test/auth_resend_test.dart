@@ -216,13 +216,23 @@ void main() {
     auth.pending.last.complete();
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-switch')));
-    await tester.tap(find.byKey(const ValueKey('auth-switch')));
+    expect(find.byKey(resendKey), findsOneWidget);
+    const confirmationKey = ValueKey('auth-confirmation');
+    const switchKey = ValueKey('auth-switch');
+    // Switch to signup and back. The signup form is taller, so the link is
+    // scrolled into view before each tap.
+    await tester.ensureVisible(find.byKey(switchKey));
+    await tester.tap(find.byKey(switchKey));
     await tester.pumpAndSettle();
+    expect(find.byKey(confirmationKey), findsOneWidget);
     expect(find.byKey(resendKey), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('auth-switch')));
+    expect(find.byKey(resultKey), findsNothing);
+    await tester.ensureVisible(find.byKey(switchKey));
+    await tester.tap(find.byKey(switchKey));
     await tester.pumpAndSettle();
+    expect(find.byKey(confirmationKey), findsNothing);
     expect(find.byKey(resendKey), findsNothing);
+    expect(find.byKey(resultKey), findsNothing);
   });
 
   testWidgets('a new sign-in request removes resend until it is refused', (
