@@ -173,6 +173,59 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
             await self.user.reserve_record(P, kind="text", original_name="x", mime_type="audio/wav",
                 size_bytes=5, consent_at=TIME, consent_version="v1")
 
+    async def test_speaker_selection_is_sent_with_the_reservation_only_when_given(self):
+        await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
+            size_bytes=5, consent_at=TIME, consent_version="v1", record_id=R)
+        body = self.transport.calls[-1]["body"]
+        self.assertNotIn("target_speaker", body)
+        self.assertNotIn("provider_speaker", body)  # 원격에 provider_speaker 컬럼이 없어도 평소 예약은 깨지지 않는다
+        await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
+            size_bytes=5, consent_at=TIME, consent_version="v1", record_id=R,
+            target_speaker="엄마", provider_speaker="나")
+        body = self.transport.calls[-1]["body"]
+        self.assertEqual((body["target_speaker"], body["provider_speaker"]), ("엄마", "나"))
+        with self.assertRaises(ValidationError):
+            await self.user.reserve_record(P, kind="text", original_name="a.txt", mime_type="text/plain",
+                size_bytes=5, consent_at=TIME, consent_version="v1", target_speaker="가" * 101)
+
+    async def test_update_record_upload_calls_the_rpc_with_the_read_time_and_validates_locally(self):
+        read_at = datetime(2026, 11, 23, 1, 2, 3, 456789, tzinfo=timezone.utc)
+        await self.user.update_record_upload(R, expected_updated_at=read_at, status="uploaded",
+            speakers={"target_speaker": "엄마", "provider_speaker": None})
+        call = self.transport.calls[-1]
+        self.assertEqual(call["path"], "/rest/v1/rpc/update_record_upload")
+        self.assertEqual(call["body"], {"p_record_id": R, "p_expected_updated_at": "2026-11-23T01:02:03.456789+00:00",
+            "p_status": "uploaded", "p_speakers": {"target_speaker": "엄마", "provider_speaker": None},
+            "p_error_code": None, "p_user_id": U1})  # 생략한 키 유지·null 해제는 키 유무로 전한다
+        await self.user.update_record_upload(R, expected_updated_at=read_at, status="uploading", speakers={},
+            error_code="speaker_required")
+        self.assertEqual(self.transport.calls[-1]["body"]["p_speakers"], {})
+        bad = [dict(status="done", speakers={}), dict(status="uploaded", speakers=[]),
+               dict(status="uploaded", speakers={"name": "x"}), dict(status="uploaded", speakers={"target_speaker": ""}),
+               dict(status="uploaded", speakers={"target_speaker": "가" * 101}),
+               dict(status="uploading", speakers={}, error_code="failed"),
+               dict(status="uploaded", speakers={}, error_code="speaker_required")]
+        for kwargs in bad:
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValidationError):
+                    await self.user.update_record_upload(R, expected_updated_at=read_at, **kwargs)
+        with self.assertRaises(ValidationError):  # 시간대 없는 시각
+            await self.user.update_record_upload(R, expected_updated_at=datetime(2026, 11, 23), status="uploaded", speakers={})
+
+    async def test_update_record_upload_maps_the_rpc_errors(self):
+        read_at = datetime(2026, 11, 23, tzinfo=timezone.utc)
+        for code, error in (("55000", ConflictError), ("P0002", NotFoundError), ("22023", ValidationError)):
+            with self.subTest(code=code):
+                status = 404 if code == "P0002" else 500 if code == "55000" else 400
+                self.transport.responses[("POST", "/rest/v1/rpc/update_record_upload")] = [Response(status, {"code": code})]
+                with self.assertRaises(error):
+                    await self.user.update_record_upload(R, expected_updated_at=read_at, status="uploaded", speakers={})
+
+    async def test_record_list_hides_deleting_records(self):
+        await self.user.list_records(persona_id=P)
+        params = self.transport.calls[-1]["params"]
+        self.assertEqual((params["status"], params["persona_id"]), ("neq.deleting", "eq." + P))
+
     async def test_status_compare_and_swap(self):
         self.transport.record_status = "uploaded"
         await self.user.update_record_status(R, expected_status="uploaded", status="processing")

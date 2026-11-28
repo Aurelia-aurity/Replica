@@ -58,10 +58,11 @@ user_db = await db.for_user(access_token)
 | list_turns | session_id: UUID, *, after_turn_no: int=0, limit: int=50 | list[Row], turn_no 오름차순 커서 조회 |
 | get_recent_history | session_id: UUID, *, limit: int=20, before_turn_id: UUID 또는 None=None | list[dict], 최근 완결 N쌍을 오래된 순으로 반환. 각 쌍은 user/assistant 문자열. 현재 턴을 기준으로 이전 턴만 포함 |
 | record_turn_total_ms | turn_id: UUID, stage: stt/llm/tts, *, attempt: int, total_ms: int | Row, 최신 완료·실패 단계 및 시도 번호가 맞을 때 한 번 기록. 같은 값은 재사용, 다른 값·늦은 시도는 ConflictError |
-| reserve_record | persona_id: UUID, *, kind: text/audio, original_name: str, mime_type: str, size_bytes: int, consent_at: datetime, consent_version: str, record_id: UUID 또는 None=None | Row, uploading 예약 및 user_id/record_id/original 경로 생성. 파일 업로드는 별도 |
+| reserve_record | persona_id: UUID, *, kind: text/audio, original_name: str, mime_type: str, size_bytes: int, consent_at: datetime, consent_version: str, record_id: UUID 또는 None=None, target_speaker: str 또는 None=None, provider_speaker: str 또는 None=None | Row, uploading 예약 및 user_id/record_id/original 경로 생성. 화자 선택값(카카오톡 내보내기, 각 1~100자)은 값이 있을 때만 저장. 파일 업로드는 별도 |
 | get_record | record_id: UUID | Row, deleting 제외 |
 | list_records | *, persona_id: UUID 또는 None=None, limit: int=50, offset: int=0 | list[Row] |
 | update_record_status | record_id: UUID, *, expected_status: str, status: str, error_code: str 또는 None=None | Row, 예상 상태와 일치할 때만 변경. deleting은 삭제 요청 함수만 사용 |
+| update_record_upload | record_id: UUID, *, expected_updated_at: datetime, status: uploading/uploaded, speakers: Mapping[str, str 또는 None], error_code: str 또는 None=None | Row, 업로드 확인 단계의 화자·상태·오류를 SQL RPC로 한 번에 저장. 기록이 uploading이고 수정 시각이 expected_updated_at과 같을 때만 저장하며 아니면 ConflictError. speakers는 target_speaker·provider_speaker의 부분 매핑(생략은 유지, None은 지움). error_code는 None 또는 speaker_required/speaker_not_found/speaker_not_allowed이며 uploaded로 바꿀 때는 None이어야 함 |
 | create_text_draft | record_id: UUID, *, revision: int, content: str, text_version_id: UUID 또는 None=None | Row, 양의 revision 초안 생성. 충돌 시 ConflictError |
 | get_text_version | text_version_id: UUID | Row |
 | list_text_versions | record_id: UUID | list[Row], revision 오름차순 |

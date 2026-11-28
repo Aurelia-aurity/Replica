@@ -166,7 +166,17 @@ class FullLiveTests(unittest.IsolatedAsyncioTestCase):
         rid = record["id"]
         self.assertEqual((await a.get_record(rid))["id"], rid)
         self.assertEqual(len(await a.list_records(persona_id=pid)), 1)
-        await a.update_record_status(rid, expected_status="uploading", status="uploaded")
+        # 업로드 확인 단계(#124의 update_record_upload): 오류 저장 → 오래된 시각 거부 → 최신 시각으로 uploaded 전환.
+        read_at = datetime.fromisoformat(record["updated_at"].replace("Z", "+00:00"))
+        pending_upload = await a.update_record_upload(rid, expected_updated_at=read_at, status="uploading",
+            speakers={}, error_code="speaker_required")
+        self.assertEqual((pending_upload["status"], pending_upload["error_code"]), ("uploading", "speaker_required"))
+        with self.assertRaises(ConflictError):
+            await a.update_record_upload(rid, expected_updated_at=read_at, status="uploaded", speakers={})
+        latest = datetime.fromisoformat(pending_upload["updated_at"].replace("Z", "+00:00"))
+        uploaded = await a.update_record_upload(rid, expected_updated_at=latest, status="uploaded",
+            speakers={"target_speaker": None, "provider_speaker": None})
+        self.assertEqual((uploaded["status"], uploaded["error_code"]), ("uploaded", None))
         await a.update_record_status(rid, expected_status="uploaded", status="ready")
         draft = await a.create_text_draft(rid, revision=1, content="합성 개인화 자료")
         version_id = draft["id"]

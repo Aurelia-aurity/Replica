@@ -1,0 +1,169 @@
+"""Supabase Storage 클라이언트: 기록 원본 파일의 서명 업로드 주소 발급, 존재·크기 확인, 읽기.
+
+비공개 버킷 `replica-records`만 쓴다. 서버 키(secret)로만 호출하며, 앱에는 서명 업로드 주소만 준다.
+토큰·서명 주소·파일 내용은 로그와 예외 문자열에 넣지 않는다.
+
+확인 범위: 서버 키로 하는 서명 발급(`/object/upload/sign`)의 응답(`url`, `token`)·`PUT`·정보 조회(`/object/info`)의 `size`·
+읽기와 없는 객체의 응답(바깥 HTTP 400, 본문 `NoSuchKey`)은 #120에서 실제 Storage로 직접 호출해 확인했다. 이 클라이언트가
+발급한 주소로 올려 `/uploaded`까지 가는 통합과, 음성 시그니처용 `Range` 요청(`read_head`)은 아직 확인하지 않았다.
+"""
+
+import asyncio
+import base64
+import json
+import socket
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Mapping, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+from app import db
+
+BUCKET = "replica-records"
+# 서명 업로드 토큰의 유효 시간을 읽지 못할 때 쓰는 기본값(Supabase 서명 업로드 주소는 약 2시간).
+DEFAULT_UPLOAD_TTL = timedelta(hours=2)
+
+
+class StorageUnavailable(Exception):
+    """Storage에 연결하지 못했거나 예상하지 못한 응답을 받았다. 원인 상세는 담지 않는다."""
+
+
+@dataclass(frozen=True)
+class SignedUpload:
+    url: str
+    headers: Mapping[str, str]
+    expires_at: datetime
+
+
+class StorageClient(Protocol):
+    async def create_upload(self, object_path: str, *, mime_type: str) -> SignedUpload: ...
+
+    async def object_size(self, object_path: str) -> int | None:
+        """원본의 크기(바이트). 객체가 없으면 None."""
+
+    async def read_object(self, object_path: str, *, max_bytes: int) -> bytes: ...
+
+    async def read_head(self, object_path: str, *, size: int) -> bytes:
+        """파일 앞쪽 `size`바이트(파일이 더 짧으면 전부)."""
+
+
+def _object_missing(status: int, raw: bytes) -> bool:
+    """정보 조회 응답이 '원본 없음'인지. Storage는 없는 객체를 HTTP 404, 또는 바깥 HTTP 400에 본문 `not_found`·`NoSuchKey`
+    (`statusCode` 404)로 알린다. 그 밖의 400(`InvalidRequest` 등)은 원본이 없다는 뜻이 아니므로 없는 것으로 보지 않는다."""
+    if status == 404:
+        return True
+    if status != 400:
+        return False
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return False
+    if not isinstance(body, dict):
+        return False
+    error = str(body.get("error", "")).lower()
+    message = str(body.get("message", "")).lower()
+    return str(body.get("statusCode", "")) == "404" or error in ("not_found", "nosuchkey") or "not found" in message
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # apikey·Authorization을 다른 주소로 넘기지 않는다.
+
+
+def _token_expiry(token: str, now: datetime) -> datetime:
+    """서명 토큰(JWT)의 만료 시각. 읽지 못하면 기본 유효 시간을 쓴다. 서명은 검증하지 않는다(값 표시용)."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        exp = json.loads(base64.urlsafe_b64decode(payload))["exp"]
+        return datetime.fromtimestamp(float(exp), tz=timezone.utc)
+    except (IndexError, KeyError, ValueError, TypeError, OSError, OverflowError):
+        return now + DEFAULT_UPLOAD_TTL
+
+
+class SupabaseStorage:
+    """블로킹 I/O는 asyncio 기본 실행기에서 돌린다. 자동 재시도는 없다."""
+
+    def __init__(self, settings: db.Settings):
+        self._settings = settings
+        key = settings.secret_key
+        self._headers = {"apikey": key}
+        if not key.startswith("sb_secret_"):
+            self._headers["Authorization"] = "Bearer " + key  # 예전 service_role 키만 JWT다.
+
+    def _base(self) -> str:
+        return self._settings.url.rstrip("/")
+
+    @staticmethod
+    def _path(object_path: str) -> str:
+        return "/".join(quote(part, safe="") for part in object_path.split("/"))
+
+    def _call(self, method: str, path: str, *, max_bytes: int, body: bytes | None = None,
+              extra: Mapping[str, str] | None = None, truncate: bool = False) -> tuple[int, bytes]:
+        """`truncate`이면 응답이 `max_bytes`보다 길어도 앞부분만 읽고 닫는다(머리만 필요할 때)."""
+        request = Request(self._base() + path, data=body, method=method,
+                          headers={**self._headers, **(extra or {})})
+        try:
+            try:
+                response = build_opener(_NoRedirect()).open(request, timeout=self._settings.timeout_seconds)
+            except HTTPError as error:
+                response = error
+            with response:
+                if truncate:
+                    return response.code, response.read(max_bytes)
+                raw = response.read(max_bytes + 1)
+                if len(raw) > max_bytes:
+                    raise StorageUnavailable()
+                return response.code, raw
+        except (URLError, OSError, socket.timeout):
+            raise StorageUnavailable() from None
+
+    async def create_upload(self, object_path: str, *, mime_type: str) -> SignedUpload:
+        path = f"/storage/v1/object/upload/sign/{BUCKET}/{self._path(object_path)}"
+        status, raw = await asyncio.to_thread(
+            self._call, "POST", path, max_bytes=65536, body=b"{}",
+            extra={"Content-Type": "application/json"})
+        try:
+            data = json.loads(raw)
+            signed, token = data["url"], data["token"]
+            if status != 200 or not isinstance(signed, str) or not isinstance(token, str):
+                raise ValueError
+            # 응답의 url은 `/object/upload/sign/...?token=...` 형태의 상대 경로여야 한다. 다른 주소는 받지 않는다.
+            if not signed.startswith("/") or signed.startswith("//"):
+                raise ValueError
+            url = self._base() + "/storage/v1" + signed
+        except (ValueError, KeyError, TypeError):
+            raise StorageUnavailable() from None
+        return SignedUpload(url=url, headers={"Content-Type": mime_type},
+                            expires_at=_token_expiry(token, datetime.now(timezone.utc)))
+
+    async def object_size(self, object_path: str) -> int | None:
+        path = f"/storage/v1/object/info/{BUCKET}/{self._path(object_path)}"
+        status, raw = await asyncio.to_thread(self._call, "GET", path, max_bytes=65536)
+        if _object_missing(status, raw):
+            return None  # 원본 없음이 분명한 응답만 None이다. 그 밖의 400은 아래에서 저장소 장애(StorageUnavailable)가 된다.
+        try:
+            size = json.loads(raw)["size"]
+        except (ValueError, KeyError, TypeError):
+            raise StorageUnavailable() from None
+        if status != 200 or type(size) is not int or size < 0:
+            raise StorageUnavailable()
+        return size
+
+    async def read_object(self, object_path: str, *, max_bytes: int) -> bytes:
+        path = f"/storage/v1/object/{BUCKET}/{self._path(object_path)}"
+        status, raw = await asyncio.to_thread(self._call, "GET", path, max_bytes=max_bytes)
+        if status != 200:
+            raise StorageUnavailable()
+        return raw
+
+    async def read_head(self, object_path: str, *, size: int) -> bytes:
+        """파일 앞쪽 `size`바이트만 읽는다(파일 시그니처 확인용). Range를 무시하는 서버라도 앞부분만 읽고 닫는다."""
+        path = f"/storage/v1/object/{BUCKET}/{self._path(object_path)}"
+        status, raw = await asyncio.to_thread(
+            self._call, "GET", path, max_bytes=size, extra={"Range": f"bytes=0-{size - 1}"}, truncate=True)
+        if status not in (200, 206):
+            raise StorageUnavailable()
+        return raw
